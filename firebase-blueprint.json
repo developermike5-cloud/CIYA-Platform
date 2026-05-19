@@ -1,0 +1,74 @@
+{
+  "entities": {
+    "Course": {
+      "title": "Course",
+      "description": "A learning course offered on the platform",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the course" },
+        "subtitle": { "type": "string" },
+        "slug": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "youtube_link": { "type": "string" },
+        "level": { "type": "string", "enum": ["Beginner", "Advanced", "Masterclass"] },
+        "price": { "type": "number" },
+        "modules": { "type": "string", "description": "Stringified JSON of modules due to nested rules limitations" },
+        "publish_status": { "type": "string", "enum": ["Draft", "Published", "Archived"] },
+        "createdAt": { "type": "string", "format": "timestamp" },
+        "updatedAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["title", "slug", "publish_status", "createdAt", "updatedAt"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile with onboarding data",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "intent": { "type": "string" },
+        "experience": { "type": "string" },
+        "pathwaySelection": { "type": "string" },
+        "pathwayReason": { "type": "string" },
+        "pathwayExperience": { "type": "string" },
+        "recommendedPath": { "type": "string" },
+        "goal": { "type": "string" },
+        "availability": { "type": "string" },
+        "fullName": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "state": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "myReferralCode": { "type": "string" },
+        "isActivated": { "type": "boolean" },
+        "referralsCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "timestamp" },
+        "updatedAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["email", "createdAt", "updatedAt"]
+    },
+    "AdminConfig": {
+      "title": "Admin Configuration",
+      "description": "Configuration to store admin user IDs",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/Course" },
+      "description": "The main collection for all courses."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminConfig" },
+      "description": "List of admin users allowed to manage the system."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles and onboarding data."
+    }
+  }
+}

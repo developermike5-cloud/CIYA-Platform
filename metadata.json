@@ -1,0 +1,6 @@
+{
+  "name": "Create It Yourself Academy (CIYA)",
+  "description": "An academy learning platform designed to help people learn modern AI tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
