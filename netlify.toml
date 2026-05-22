@@ -11,3 +11,9 @@
   to = "https://gen-lang-client-0862975917.firebaseapp.com/__/auth/:splat"
   status = 200
   force = true
+
+# Fallback for React Single Page Application (SPA) client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

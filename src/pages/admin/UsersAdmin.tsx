@@ -32,6 +32,16 @@ export default function UsersAdmin() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Clipboard copy state
+  const onboardingUrl = `${window.location.origin}/onboarding`;
+  const [copiedLink, setCopiedLink] = useState(false);
+  
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(onboardingUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
   // Filters
   const [filterState, setFilterState] = useState('');
   const [filterCourse, setFilterCourse] = useState('');
@@ -148,6 +158,27 @@ export default function UsersAdmin() {
 
   return (
     <div>
+      {/* Onboarding Registration Link panel */}
+      <div className="bg-indigo-50 border border-indigo-200/60 rounded-2xl p-6 md:p-8 mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 shadow-sm">
+        <div className="space-y-1">
+          <h2 className="text-lg font-extrabold text-indigo-900 tracking-tight">Invite New Students (Copy Onboarding Link) 👩‍💻</h2>
+          <p className="text-sm text-indigo-700/90 leading-relaxed max-w-2xl">
+            To register new qualified students, copy the onboarding link below and send it directly to them. They will be guided through the profile creation wizard to request registration review.
+          </p>
+          <div className="pt-2">
+            <span className="inline-block bg-white border border-indigo-200 font-mono text-xs text-indigo-800 px-3.5 py-1.5 rounded-lg select-all shadow-inner">
+              {onboardingUrl}
+            </span>
+          </div>
+        </div>
+        <button 
+          onClick={handleCopyLink}
+          className={`shrink-0 px-6 py-3.5 rounded-xl text-sm font-extrabold shadow-md transition-all duration-200 ${copiedLink ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/10' : 'bg-indigo-600 hover:bg-indigo-750 text-white shadow-indigo-500/10 hover:-translate-y-0.5'}`}
+        >
+          {copiedLink ? 'Copied Invitation Link ✓' : 'Copy Onboarding Link'}
+        </button>
+      </div>
+
       <div className="flex flex-col mb-6 gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h1 className="text-2xl font-bold text-slate-800">Students & Onboarding Stats</h1>

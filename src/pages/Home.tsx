@@ -138,7 +138,7 @@ const useLogin = () => {
             navigate('/dashboard');
           } else {
             await signOut(auth);
-            alert("Your account is not registered. Please sign up using the 'Start for Free' button.");
+            alert("Your account is not registered. If you are an invited student, please complete the registration using the private onboarding link sent by your administrator.");
           }
         }
         return;
@@ -154,7 +154,7 @@ const useLogin = () => {
           navigate('/dashboard');
         } else {
           await signOut(auth);
-          alert("Your account is not registered. Please sign up using the 'Start for Free' button.");
+          alert("Your account is not registered. If you are an invited student, please complete the registration using the private onboarding link sent by your administrator.");
         }
       }
     } catch (e: any) {
@@ -258,7 +258,7 @@ function Hero() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 mb-16 w-full justify-center">
-          <Link to="/onboarding" className="px-8 py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 rounded-full text-sm font-bold shadow-lg shadow-amber-500/30 transition-all text-center cursor-pointer">
+          <Link to="/get-started" className="px-8 py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 rounded-full text-sm font-bold shadow-lg shadow-amber-500/30 transition-all text-center cursor-pointer">
             Start for Free
           </Link>
           <a href="#courses" className="px-8 py-3.5 bg-teal-900 border border-teal-800 hover:bg-teal-800 hover:border-teal-700 text-teal-50 font-bold rounded-full text-sm transition-all text-center flex items-center justify-center">
@@ -493,64 +493,29 @@ function CourseSkillSection({ skillId }: { skillId: 'web' | 'film' | 'image' }) 
   const op4 = useTransform(scrollYProgress, [0.85, 0.95, 1], [0, 1, 1]);
   const ops = [op1, op2, op3, op4];
 
+  const subskillNames = {
+    web: [
+      "Landing Pages",
+      "E-commerce Stores",
+      "Portfolio Websites",
+      "Business Websites"
+    ],
+    film: [
+      "Social Media Videos",
+      "Commercial/Product Ads",
+      "YouTube Content",
+      "Cinematic Storytelling"
+    ],
+    image: [
+      "Flyers & Ads",
+      "Logos & Branding",
+      "Social Media Graphics",
+      "Product Mockups"
+    ]
+  }[skillId];
+
   return (
     <>
-    <section ref={containerRef} className="h-[350vh] md:h-[400vh] relative bg-teal-950">
-      <div className="sticky top-0 h-[100svh] w-full overflow-hidden flex flex-col justify-center py-6 md:py-20">
-        
-        {/* Dynamic Background */}
-        <div className="absolute inset-0 z-0 pointer-events-none bg-teal-950">
-          {mUrls.map((url, idx) => (
-            <motion.div 
-              key={url + idx}
-              className="absolute inset-0 flex items-center justify-center overflow-hidden bg-teal-950"
-              style={{ opacity: ops[idx] }}
-            >
-              {skillId === 'image' ? (
-                <img src={url} alt="" className="w-full h-full object-cover object-center" />
-              ) : (
-                <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover object-center pointer-events-none" />
-              )}
-            </motion.div>
-          ))}
-          <div className="absolute inset-0 bg-teal-950/10 mix-blend-overlay" />
-          <div className="absolute inset-0 bg-gradient-to-t from-teal-950/80 via-teal-950/20 to-transparent pointer-events-none" />
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 max-w-6xl mx-auto w-full px-4 md:px-12 lg:px-24 h-full flex flex-col pt-6 md:pt-10 pb-4">
-          <div className="mt-4 md:mt-12 flex-1 flex flex-col items-center justify-center min-h-0">
-            <div className="text-[11px] md:text-sm font-bold tracking-widest text-teal-200 uppercase mb-6 md:mb-10 drop-shadow-md text-center shrink-0 mix-blend-plus-lighter">{d.pillsTitle}</div>
-            
-            <motion.div 
-              initial="hidden" 
-              whileInView="visible" 
-              viewport={{ once: true, margin: "-100px" }}
-              variants={{
-                visible: { transition: { staggerChildren: 0.1 } },
-                hidden: {}
-              }}
-              className="flex flex-wrap gap-3 md:gap-4 lg:gap-5 items-center justify-center w-full px-2 max-w-4xl mx-auto overflow-y-auto no-scrollbar pb-10"
-            >
-              {d.pills.map((pill) => (
-                <motion.div
-                  key={pill}
-                  variants={{
-                    hidden: { opacity: 0, y: 20 },
-                    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-                  }}
-                  className="flex items-center gap-2 md:gap-3 lg:gap-4 bg-teal-900/40 border border-teal-700/40 text-teal-50 px-5 py-2.5 md:px-6 md:py-3 lg:px-7 lg:py-3.5 rounded-full text-sm md:text-base lg:text-lg backdrop-blur-sm shadow-md font-bold shrink-0"
-                >
-                  <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)] shrink-0" />
-                  <span>{pill}</span>
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-        </div>
-      </div>
-    </section>
-    
     <section className="bg-teal-950 px-6 md:px-12 lg:px-24 py-16 lg:py-24 border-b border-teal-900 border-t border-t-teal-700/30">
       <div className="max-w-4xl mx-auto w-full">
         <div className="flex flex-col justify-center">
@@ -589,11 +554,131 @@ function CourseSkillSection({ skillId }: { skillId: 'web' | 'film' | 'image' }) 
                   ))}
                 </ul>
                 
-                <Link to="/onboarding" className="w-full text-center block rounded-full py-3.5 md:py-4 text-sm md:text-base font-bold transition-all border cursor-pointer bg-teal-50 text-teal-950 border-transparent hover:bg-amber-400 shadow-xl shadow-teal-950/50">
+                <Link to="/get-started" className="w-full text-center block rounded-full py-3.5 md:py-4 text-sm md:text-base font-bold transition-all border cursor-pointer bg-teal-50 text-teal-950 border-transparent hover:bg-amber-400 shadow-xl shadow-teal-950/50">
                   Join Free
                 </Link>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section ref={containerRef} className="h-[350vh] md:h-[400vh] relative bg-teal-950">
+      <div className="sticky top-0 h-[100svh] w-full overflow-hidden flex flex-col justify-center py-6 md:py-20">
+        
+        {/* Dynamic Background */}
+        <div className="absolute inset-0 z-0 pointer-events-none bg-teal-950">
+          {mUrls.map((url, idx) => (
+            <motion.div 
+              key={url + idx}
+              className="absolute inset-0 flex items-center justify-center overflow-hidden bg-teal-950"
+              style={{ opacity: ops[idx] }}
+            >
+              {skillId === 'image' ? (
+                <img src={url} alt="" className="w-full h-full object-cover object-center" />
+              ) : (
+                <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover object-center pointer-events-none" />
+              )}
+            </motion.div>
+          ))}
+          <div className="absolute inset-0 bg-teal-950/10 mix-blend-overlay" />
+          <div className="absolute inset-0 bg-gradient-to-t from-teal-950/80 via-teal-950/20 to-transparent pointer-events-none" />
+        </div>
+
+        {/* Dynamic Navigation Progress Indicator (On the Right Edge) */}
+        <div className="absolute right-4 md:right-8 lg:right-12 top-1/2 -translate-y-1/2 z-20 flex items-center gap-4 bg-teal-950/85 backdrop-blur-md px-4 py-6 rounded-2xl border border-teal-800/60 shadow-2xl">
+          <div className="flex flex-col gap-5 text-right hidden lg:flex font-sans select-none">
+            {subskillNames.map((name, idx) => {
+              const textOpacity = useTransform(ops[idx], [0, 0.5, 1], [0.4, 0.7, 1]);
+              const textColor = useTransform(ops[idx], [0, 1], ["#5eead4", "#fbbf24"]);
+              const scale = useTransform(ops[idx], [0, 1], [0.9, 1.1]);
+              return (
+                <motion.div 
+                  key={name}
+                  style={{ opacity: textOpacity, color: textColor, scale }}
+                  className="text-xs font-black tracking-wide h-6 flex items-center justify-end"
+                >
+                  {name}
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* Visual Vertical Progress Bar Tracker */}
+          <div className="relative flex flex-col items-center justify-between h-56 w-8 pb-3 pt-3 select-none">
+            {/* Background Line Track */}
+            <div className="absolute top-4 bottom-4 left-1/2 -translate-x-1/2 w-1 bg-teal-900 border border-teal-800/40 rounded-full" />
+            
+            {/* Active Moving Progress Line */}
+            <motion.div 
+              style={{ 
+                height: useTransform(scrollYProgress, [0, 1], ["0%", "100%"]),
+                top: "16px"
+              }} 
+              className="absolute left-1/2 -translate-x-1/2 w-1 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full shadow-[0_0_12px_#f59e0b] origin-top" 
+            />
+
+            {/* 4 Steps Bullet Indicators */}
+            {subskillNames.map((name, idx) => {
+              const ringColor = useTransform(ops[idx], [0, 1], ["rgba(20, 184, 166, 0.2)", "rgba(245, 158, 11, 1)"]);
+              const activeBg = useTransform(ops[idx], [0, 1], ["#042f2e", "#fbbf24"]);
+              const scale = useTransform(ops[idx], [0, 1], [1, 1.25]);
+
+              return (
+                <div key={idx} className="relative group/bullet flex items-center justify-center w-8 h-8 shrink-0">
+                  <motion.div 
+                    style={{ 
+                      borderColor: ringColor, 
+                      backgroundColor: activeBg, 
+                      scale
+                    }}
+                    className="w-5 h-5 rounded-full border-2 flex items-center justify-center z-10 transition-colors duration-300 shadow-md"
+                  >
+                    <span className="text-[9px] font-black leading-none text-teal-950">
+                      {idx + 1}
+                    </span>
+                  </motion.div>
+
+                  {/* Tooltip for mobile or non-desktop */}
+                  <span className="absolute right-10 whitespace-nowrap bg-teal-950 border border-teal-800 text-[10px] md:text-xs font-black text-amber-400 px-2.5 py-1 rounded-lg opacity-0 pointer-events-none group-hover/bullet:opacity-100 transition-opacity lg:hidden z-30 shadow-lg">
+                    {name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="relative z-10 max-w-6xl mx-auto w-full px-4 md:px-12 lg:px-24 h-full flex flex-col pt-6 md:pt-10 pb-4">
+          <div className="mt-4 md:mt-12 flex-1 flex flex-col items-center justify-center min-h-0">
+            <div className="text-[11px] md:text-sm font-bold tracking-widest text-teal-200 uppercase mb-6 md:mb-10 drop-shadow-md text-center shrink-0 mix-blend-plus-lighter">{d.pillsTitle}</div>
+            
+            <motion.div 
+              initial="hidden" 
+              whileInView="visible" 
+              viewport={{ once: true, margin: "-100px" }}
+              variants={{
+                visible: { transition: { staggerChildren: 0.1 } },
+                hidden: {}
+              }}
+              className="flex flex-wrap gap-3 md:gap-4 lg:gap-5 items-center justify-center w-full px-2 max-w-4xl mx-auto overflow-y-auto no-scrollbar pb-10"
+            >
+              {d.pills.map((pill) => (
+                <motion.div
+                  key={pill}
+                  variants={{
+                    hidden: { opacity: 0, y: 20 },
+                    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+                  }}
+                  className="flex items-center gap-2 md:gap-3 lg:gap-4 bg-teal-900/40 border border-teal-700/40 text-teal-50 px-5 py-2.5 md:px-6 md:py-3 lg:px-7 lg:py-3.5 rounded-full text-sm md:text-base lg:text-lg backdrop-blur-sm shadow-md font-bold shrink-0"
+                >
+                  <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)] shrink-0" />
+                  <span>{pill}</span>
+                </motion.div>
+              ))}
+            </motion.div>
           </div>
         </div>
       </div>
@@ -739,7 +824,7 @@ function CTA() {
           Join thousands of Nigerian youths who are choosing to build their future with AI-powered digital skills. Start your free beginner course today — no payment, no excuses.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center w-full">
-          <Link to="/onboarding" className="px-8 py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-bold rounded-full text-base shadow-lg shadow-amber-500/30 transition-all text-center cursor-pointer">
+          <Link to="/get-started" className="px-8 py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-bold rounded-full text-base shadow-lg shadow-amber-500/30 transition-all text-center cursor-pointer">
             Start for Free
           </Link>
           <a href="#courses" className="px-8 py-3.5 bg-teal-900 border border-teal-800 hover:bg-teal-800 hover:border-teal-700 text-teal-50 font-bold rounded-full text-base transition-all text-center flex items-center justify-center">
