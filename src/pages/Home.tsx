@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
 import { 
@@ -80,7 +80,7 @@ function Counter({ from = 0, to, duration = 2, suffix = "" }: { from?: number, t
   return <span ref={ref}>{from.toLocaleString()}{suffix}</span>;
 }
 
-function MissionCard({ item, index }: { item: any, index: number }) {
+function MissionCard({ item, index }: { item: any, index: number, key?: React.Key }) {
   const ref = useRef<HTMLDivElement>(null);
   
   const { scrollYProgress } = useScroll({
@@ -794,7 +794,7 @@ function Footer() {
           <h5 className="font-semibold uppercase tracking-wider text-teal-500 text-xs mb-5">Connect</h5>
           <ul className="space-y-4">
             <li><a href="#" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">Instagram</a></li>
-            <li><a href="#" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">WhatsApp</a></li>
+            <li><a href="https://chat.whatsapp.com/BzyYP0DyV2TFRqzfrrCXYi?s=cl&p=a&mlu=3" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">WhatsApp</a></li>
             <li><a href="#" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">YouTube</a></li>
             <li><a href="#" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">Contact Us</a></li>
           </ul>

@@ -183,6 +183,7 @@ export default function Onboarding() {
           myReferralCode: userCode,
           isActivated: false,
           referralsCount: 0,
+          approvalStatus: 'Pending',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
@@ -441,13 +442,6 @@ export default function Onboarding() {
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Referral Code (Optional)</label>
-                  <div className="relative">
-                    <Gift className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="text" value={data.referralCode} onChange={e => selectData('referralCode', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-900 focus:bg-slate-900 hover:bg-slate-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all uppercase text-slate-50 placeholder:text-slate-500" placeholder="Enter code if you have one" />
-                  </div>
-                </div>
               </div>
 
               <div className="mt-8">
@@ -469,56 +463,39 @@ export default function Onboarding() {
             <motion.div key="9" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl w-full">
               <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-slate-100 text-center relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-400 to-orange-500"></div>
-                <div className="w-24 h-24 bg-green-100 rounded-full mx-auto flex items-center justify-center mb-6">
-                  <Check className="w-12 h-12 text-green-500 stroke-[3]" />
+                <div className="w-20 h-20 bg-indigo-50 rounded-full mx-auto flex items-center justify-center mb-6">
+                  <MessageCircle className="w-10 h-10 text-indigo-600 stroke-[2.5]" />
                 </div>
-                <h2 className="text-4xl font-extrabold text-slate-800 mb-2">Congratulations, {data.fullName.split(' ')[0]}! 🎉</h2>
-                <p className="text-slate-600 text-lg mb-8 font-medium">You are successfully enrolled and joining <strong className="text-slate-800">Cohort 1 starting June 1st, 2026.</strong></p>
-                
-                <div className="bg-slate-50 rounded-2xl p-6 text-left mb-8 border border-slate-200">
-                  <h3 className="font-bold text-slate-800 mb-4 text-xl">What You Will Bring to Life:</h3>
-                  <div className="font-bold text-amber-600 text-lg mb-4">{data.recommendedPath}</div>
-                  <ul className="space-y-3 font-medium text-slate-600">
-                    <li className="flex items-start gap-3"><Check className="w-5 h-5 text-teal-500 shrink-0 mt-0.5" /> High-income digital skills tailored to your intent</li>
-                    <li className="flex items-start gap-3"><Check className="w-5 h-5 text-teal-500 shrink-0 mt-0.5" /> 5 days of intensive practical learning</li>
-                    <li className="flex items-start gap-3"><Check className="w-5 h-5 text-teal-500 shrink-0 mt-0.5" /> Direct mentorship and exclusive tools list</li>
-                    <li className="flex items-start gap-3"><Check className="w-5 h-5 text-teal-500 shrink-0 mt-0.5" /> A portfolio ready to attract clients or boost your business</li>
-                  </ul>
+                <h2 className="text-3xl font-extrabold text-slate-800 mb-4">Application Received! 📋</h2>
+                           <div className="text-slate-600 text-base md:text-lg mb-8 leading-relaxed max-w-lg mx-auto space-y-4">
+                  <p>
+                    Thank you for applying, <strong className="text-slate-800">{data.fullName ? data.fullName.split(' ')[0] : 'Student'}</strong>! Your application is currently under processing review.
+                  </p>
+                  <p>
+                    Please watch out for your email, as you will receive an email confirmation once you have been selected for the program. Make sure to check both your inbox and your spam/junk folder.
+                  </p>
                 </div>
 
-                {!data.isActivated ? (
-                  <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 mb-8 relative">
-                    <div className="absolute -top-4 -right-2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md animate-pulse flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> ACTION REQUIRED
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">Secure Your Slot!</h3>
-                    <p className="text-slate-700 text-sm mb-4">This training is 100% free, but slots are strictly limited. To activate your dashboard and confirm your seat, invite at least 1 person using your unique referral code within 24 hours.</p>
-                    
-                    <div className="bg-white p-4 rounded-xl border border-amber-300 font-mono text-3xl font-black tracking-widest text-slate-800 mb-4 select-all">
-                      {data.myReferralCode}
-                    </div>
+                <div className="w-full mb-8 max-h-[300px] overflow-y-auto rounded-2xl">
+                  <OnboardingSubmissionDetails data={data} />
+                </div>
 
-                    <div className="flex items-center justify-center gap-2 text-sm font-bold text-red-600 bg-red-50 py-2 px-4 rounded-lg inline-flex">
-                      <Clock className="w-4 h-4" /> Expires in: {timeLeft}
-                    </div>
-
-                    <a href="https://chat.whatsapp.com/ReplaceWithYourLink" target="_blank" rel="noopener noreferrer" className="block w-full mt-4 py-3 bg-green-500 text-white font-bold rounded-xl text-center shadow-md hover:bg-green-600 transition-colors flex justify-center items-center gap-2">
-                       <MessageCircle className="w-5 h-5" /> Join WhatsApp For Info
-                    </a>
-                  </div>
-                ) : (
-                  <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-6 mb-8 text-center">
-                    <div className="w-16 h-16 bg-emerald-100 rounded-full mx-auto flex items-center justify-center mb-4">
-                      <Check className="w-8 h-8 text-emerald-600 stroke-[3]" />
-                    </div>
-                    <h3 className="text-xl font-bold text-emerald-800 mb-1">Account Activated! ✅</h3>
-                    <p className="text-emerald-700 text-sm font-medium">Your slot is secured. Get ready for June 1st!</p>
-                  </div>
-                )}
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 mb-8 text-left border border-indigo-100/50">
+                  <h3 className="font-bold text-indigo-900 mb-2 text-lg flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-indigo-600" /> Join Our Community!
+                  </h3>
+                  <p className="text-slate-655 text-sm leading-relaxed mb-4">
+                    While we process your application, join our thriving community to stay updated, access vital digital builder resources, and connect with other students.
+                  </p>
+                  
+                  <a href="https://chat.whatsapp.com/BzyYP0DyV2TFRqzfrrCXYi?s=cl&p=a&mlu=3" target="_blank" rel="noopener noreferrer" className="block w-full py-4 bg-[#25D366] hover:bg-[#20ba5a] text-white font-extrabold rounded-xl text-center shadow-lg shadow-green-500/20 hover:-translate-y-0.5 transition-all flex justify-center items-center gap-2.5 text-lg">
+                     <MessageCircle className="w-6 h-6 fill-white stroke-none" /> Join Our WhatsApp Community
+                  </a>
+                </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
-                  <button onClick={() => navigate('/dashboard')} className="flex-1 py-4 bg-slate-900 text-amber-400 font-bold rounded-full hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20 text-lg">
-                    Explore Dashboard
+                  <button onClick={() => navigate('/dashboard')} className="flex-1 py-4 bg-slate-900 text-amber-400 font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/20 text-lg">
+                    Explore My Dashboard
                   </button>
                 </div>
               </div>
@@ -526,6 +503,77 @@ export default function Onboarding() {
           )}
 
         </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingSubmissionDetails({ data }: { data: any }) {
+  return (
+    <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left max-w-xl mx-auto my-6 text-sm">
+      <h3 className="font-extrabold text-slate-800 mb-4 text-xs tracking-tight border-b border-slate-200 pb-2 uppercase text-[11px] tracking-wider text-indigo-700 flex items-center gap-2">
+        <span>📋</span> Submitted Application Details
+      </h3>
+      <div className="space-y-4 text-xs md:text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Full Name</span>
+            <span className="text-slate-800 font-semibold">{data.fullName || '-'}</span>
+          </div>
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Gender</span>
+            <span className="text-slate-800 font-semibold">{data.gender || '-'}</span>
+          </div>
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">WhatsApp Number</span>
+            <span className="text-slate-800 font-mono font-semibold">{data.whatsapp || '-'}</span>
+          </div>
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">State of Residence</span>
+            <span className="text-slate-800 font-semibold">{data.state || '-'}</span>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-150 pt-3 space-y-3">
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Recommended Study Program</span>
+            <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded text-xs inline-block mt-0.5">
+              {data.recommendedPath || '-'}
+            </span>
+          </div>
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Path Selections</span>
+            <span className="text-slate-800 font-bold text-xs">
+              {data.courseType || ''} {data.pathwaySelection ? `(${data.pathwaySelection})` : ''}
+            </span>
+          </div>
+          {data.pathwayReason && (
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Reason for Selection</span>
+              <p className="text-slate-650 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-150 rounded">{data.pathwayReason}</p>
+            </div>
+          )}
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Prior Experience in Course</span>
+            <span className="text-slate-800 font-semibold">{data.pathwayExperience || data.experience || 'None'}</span>
+          </div>
+          {data.intent && (
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
+              <p className="text-slate-650 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-150 rounded">{data.intent}</p>
+            </div>
+          )}
+          {data.goal && (
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Target Learning Goal</span>
+              <p className="text-slate-650 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-150 rounded">{data.goal}</p>
+            </div>
+          )}
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Commitment Level</span>
+            <span className="text-slate-850 font-bold">{data.availability || '-'}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

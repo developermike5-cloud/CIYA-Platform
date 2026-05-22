@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, orderBy } from 'firebase/firestore';
+import React, { useState, useEffect, useMemo } from 'react';
+import { collection, query, getDocs, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -23,6 +23,7 @@ interface UserProfile {
   myReferralCode?: string;
   isActivated?: boolean;
   referralsCount?: number;
+  approvalStatus?: string;
   createdAt: any;
 }
 
@@ -35,7 +36,14 @@ export default function UsersAdmin() {
   const [filterState, setFilterState] = useState('');
   const [filterCourse, setFilterCourse] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterApproval, setFilterApproval] = useState('');
+  const [filterGender, setFilterGender] = useState('');
   const [sortDate, setSortDate] = useState('desc');
+
+  // Actions Toggle & States
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<Record<string, 'approve' | 'disapprove' | 'delete' | null>>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -56,6 +64,52 @@ export default function UsersAdmin() {
   const uniqueStates = Array.from(new Set(users.map(u => u.state).filter(Boolean))).sort() as string[];
   const uniqueCourses = Array.from(new Set(users.map(u => u.courseType || u.pathwaySelection).filter(Boolean))).sort() as string[];
 
+  // Action methods
+  const handleApprove = async (userId: string) => {
+    setActionLoading(prev => ({ ...prev, [userId]: 'approve' }));
+    try {
+      await updateDoc(doc(db, 'users', userId), { approvalStatus: 'Approved' });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Approved' } : u));
+    } catch (error) {
+      console.error("Error approving user application:", error);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [userId]: null }));
+    }
+  };
+
+  const handleDisapprove = async (userId: string) => {
+    setActionLoading(prev => ({ ...prev, [userId]: 'disapprove' }));
+    try {
+      await updateDoc(doc(db, 'users', userId), { approvalStatus: 'Disapproved' });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Disapproved' } : u));
+    } catch (error) {
+      console.error("Error disapproving user application:", error);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [userId]: null }));
+    }
+  };
+
+  const handleDeleteClick = async (userId: string) => {
+    if (deleteConfirmId !== userId) {
+      setDeleteConfirmId(userId);
+      setTimeout(() => {
+        setDeleteConfirmId(prev => prev === userId ? null : prev);
+      }, 4000); // 4 seconds window to confirm
+      return;
+    }
+    setDeleteConfirmId(null);
+    setActionLoading(prev => ({ ...prev, [userId]: 'delete' }));
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      if (expandedUserId === userId) setExpandedUserId(null);
+    } catch (error) {
+      console.error("Error deleting user application:", error);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [userId]: null }));
+    }
+  };
+
   const filteredUsers = useMemo(() => {
     let result = users.filter(u => {
       const term = searchTerm.toLowerCase();
@@ -64,7 +118,6 @@ export default function UsersAdmin() {
         (u.email?.toLowerCase() || '').includes(term) ||
         (u.whatsapp?.toLowerCase() || '').includes(term) ||
         (u.state?.toLowerCase() || '').includes(term) ||
-        (u.myReferralCode?.toLowerCase() || '').includes(term) ||
         (u.recommendedPath?.toLowerCase() || '').includes(term) ||
         (u.courseType?.toLowerCase() || '').includes(term)
       );
@@ -72,8 +125,16 @@ export default function UsersAdmin() {
       const matchesState = filterState ? u.state === filterState : true;
       const matchesCourse = filterCourse ? (u.courseType === filterCourse || u.pathwaySelection === filterCourse) : true;
       const matchesStatus = filterStatus === 'activated' ? u.isActivated : filterStatus === 'pending' ? !u.isActivated : true;
+      const matchesGender = filterGender ? (u.gender?.toLowerCase() === filterGender.toLowerCase()) : true;
+      
+      const appStatus = u.approvalStatus || 'Pending';
+      const matchesApproval = filterApproval ? (
+        filterApproval === 'pending' ? appStatus === 'Pending' :
+        filterApproval === 'approved' ? appStatus === 'Approved' :
+        filterApproval === 'disapproved' ? appStatus === 'Disapproved' : true
+      ) : true;
 
-      return matchesSearch && matchesState && matchesCourse && matchesStatus;
+      return matchesSearch && matchesState && matchesCourse && matchesStatus && matchesApproval && matchesGender;
     });
 
     result.sort((a, b) => {
@@ -83,7 +144,7 @@ export default function UsersAdmin() {
     });
 
     return result;
-  }, [users, searchTerm, filterState, filterCourse, filterStatus, sortDate]);
+  }, [users, searchTerm, filterState, filterCourse, filterStatus, filterApproval, sortDate]);
 
   return (
     <div>
@@ -118,13 +179,24 @@ export default function UsersAdmin() {
           </select>
 
           <select 
-            value={filterStatus} 
-            onChange={(e) => setFilterStatus(e.target.value)}
+            value={filterApproval} 
+            onChange={(e) => setFilterApproval(e.target.value)}
             className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
           >
-            <option value="" className="text-slate-800">All Statuses</option>
-            <option value="activated" className="text-slate-800">Activated Slots</option>
-            <option value="pending" className="text-slate-800">Pending Slots</option>
+            <option value="" className="text-slate-800">All Approvals</option>
+            <option value="pending" className="text-slate-800">Pending Review</option>
+            <option value="approved" className="text-slate-800">Approved Applications</option>
+            <option value="disapproved" className="text-slate-800">Disapproved Applications</option>
+          </select>
+
+           <select 
+            value={filterGender} 
+            onChange={(e) => setFilterGender(e.target.value)}
+            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
+          >
+            <option value="" className="text-slate-800">All Genders</option>
+            <option value="male" className="text-slate-800">Male</option>
+            <option value="female" className="text-slate-800">Female</option>
           </select>
 
           <select 
@@ -132,7 +204,7 @@ export default function UsersAdmin() {
             onChange={(e) => setFilterCourse(e.target.value)}
             className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
           >
-            <option value="" className="text-slate-800">All Courses</option>
+            <option value="" className="text-slate-800">All Path Options</option>
             {uniqueCourses.map(c => (
               <option key={c} value={c} className="text-slate-800">{c}</option>
             ))}
@@ -149,12 +221,14 @@ export default function UsersAdmin() {
             ))}
           </select>
           
-          {(filterState || filterCourse || filterStatus || sortDate !== 'desc') && (
+          {(filterState || filterCourse || filterStatus || filterApproval || filterGender || sortDate !== 'desc') && (
             <button 
               onClick={() => {
                 setFilterState('');
                 setFilterCourse('');
                 setFilterStatus('');
+                setFilterApproval('');
+                setFilterGender('');
                 setSortDate('desc');
               }}
               className="text-sm text-indigo-600 hover:text-indigo-800 font-medium ml-2"
@@ -167,28 +241,28 @@ export default function UsersAdmin() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-lg shadow p-5 border-t-4 border-indigo-500">
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Students</h3>
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Applicants</h3>
           <p className="text-3xl font-bold text-indigo-600 mt-1">{users.length}</p>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-5 border-t-4 border-emerald-500">
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Activated Slots</h3>
-          <p className="text-3xl font-bold text-emerald-600 mt-1">
-            {users.filter(u => u.isActivated).length}
+        <div className="bg-white rounded-lg shadow p-5 border-t-4 border-amber-500">
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Pending Review</h3>
+          <p className="text-3xl font-bold text-amber-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('pending')}>
+            {users.filter(u => !u.approvalStatus || u.approvalStatus === 'Pending').length}
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-5 border-t-4 border-amber-500">
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Beginners</h3>
-          <p className="text-3xl font-bold text-amber-600 mt-1">
-            {users.filter(u => u.experience && u.experience.toLowerCase().includes('beginner')).length}
+        <div className="bg-white rounded-lg shadow p-5 border-t-4 border-emerald-500">
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Approved Applicants</h3>
+          <p className="text-3xl font-bold text-emerald-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('approved')}>
+            {users.filter(u => u.approvalStatus === 'Approved').length}
           </p>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-5 border-t-4 border-blue-500">
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Committed (5 Days)</h3>
-          <p className="text-3xl font-bold text-blue-600 mt-1">
-            {users.filter(u => u.availability && u.availability.includes('Fully committed')).length}
+        <div className="bg-white rounded-lg shadow p-5 border-t-4 border-rose-500">
+          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Disapproved</h3>
+          <p className="text-3xl font-bold text-rose-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('disapproved')}>
+            {users.filter(u => u.approvalStatus === 'Disapproved').length}
           </p>
         </div>
       </div>
@@ -198,69 +272,197 @@ export default function UsersAdmin() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Student</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Contact</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Path Details (Selection / Goal)</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Recommended Path</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Referral & Status</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Joined</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {filteredUsers.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{u.fullName || '-'}</div>
-                    <div className="text-slate-500 text-xs">{u.gender ? `${u.gender} • ` : ''}{u.email}</div>
-                    <div className="text-slate-500 text-xs">{u.state || '-'}</div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="text-slate-900">{u.whatsapp || '-'}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-slate-900 font-medium text-xs mb-1 break-words">{u.intent}</div>
-                    <div className="text-slate-600 text-xs mb-1">Level: {u.experience}</div>
-                    <div className="text-slate-600 text-xs">Goal: {u.goal}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
-                      {u.recommendedPath || '-'}
-                    </span>
-                    <div className="text-slate-500 text-xs mt-1">
-                      <span className="font-semibold text-slate-700">{u.courseType || ''}</span>
-                      {u.courseType && u.pathwaySelection ? ' - ' : ''}
-                      {u.pathwaySelection || ''}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex items-center gap-2 mb-1">
-                      {u.isActivated ? (
-                        <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-700">ACTIVATED</span>
-                      ) : (
-                        <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-700">PENDING</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-slate-600">Code: <span className="font-mono bg-slate-100 px-1 rounded">{u.myReferralCode || '-'}</span></div>
-                    <div className="text-xs text-slate-600">Invited: {u.referralsCount || 0}</div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-slate-500 text-xs">
-                    {u.createdAt ? ((u.createdAt as any).toDate ? (u.createdAt as any).toDate().toLocaleDateString() : new Date(u.createdAt).toLocaleDateString()) : '-'}
-                  </td>
-                </tr>
-              ))}
-              {filteredUsers.length === 0 && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-slate-500">
-                    No results found.
-                  </td>
+                  <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Student</th>
+                  <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Contact</th>
+                  <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Path Details</th>
+                  <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Recommended Path</th>
+                  <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Application Review</th>
+                  <th className="px-4 py-3 text-center font-medium text-slate-500 uppercase tracking-wider">Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-200">
+                {filteredUsers.map((u) => {
+                  const isUserExpanded = expandedUserId === u.id;
+                  const isAppPending = !u.approvalStatus || u.approvalStatus === 'Pending';
+                  
+                  return (
+                    <React.Fragment key={u.id}>
+                      <tr className={`hover:bg-slate-50/50 transition-colors ${isUserExpanded ? 'bg-indigo-50/20' : ''}`}>
+                        <td className="px-4 py-3">
+                          <div className="font-bold text-slate-900 leading-tight">{u.fullName || '-'}</div>
+                          <div className="text-slate-505 text-xs mt-0.5">{u.gender ? `${u.gender} • ` : ''}{u.state || '-'}</div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-800">
+                          <div className="font-semibold text-xs text-indigo-900">{u.email}</div>
+                          <div className="text-slate-600 text-xs mt-0.5 font-mono">{u.whatsapp || '-'}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-slate-900 font-medium text-xs break-words max-w-[200px] line-clamp-2" title={u.intent}>
+                            {u.intent}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-1">Level: {u.experience || 'None'}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex px-2 py-0.5 text-xs font-bold rounded bg-slate-100 text-slate-850">
+                            {u.recommendedPath || '-'}
+                          </span>
+                          <div className="text-slate-500 text-xs mt-1">
+                            <span className="font-semibold text-slate-700">{u.courseType || ''}</span>
+                            {u.courseType && u.pathwaySelection ? ' - ' : ''}
+                            {u.pathwaySelection || ''}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {u.approvalStatus === 'Approved' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Approved
+                            </span>
+                          ) : u.approvalStatus === 'Disapproved' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-full bg-rose-100 text-rose-800">
+                              <AlertCircle className="w-3.5 h-3.5" /> Disapproved
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-800 animate-pulse">
+                              <Clock className="w-3.5 h-3.5" /> Pending Review
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {/* Expand Row details */}
+                            <button 
+                              onClick={() => setExpandedUserId(isUserExpanded ? null : u.id)}
+                              title={isUserExpanded ? "Hide Details" : "Show Full Details"}
+                              className={`p-1.5 rounded transition-all ${isUserExpanded ? 'bg-slate-200 text-slate-800' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                            >
+                              {isUserExpanded ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+
+                            {/* Approve */}
+                            <button 
+                              disabled={u.approvalStatus === 'Approved' || (actionLoading[u.id] !== undefined && actionLoading[u.id] !== null)}
+                              onClick={() => handleApprove(u.id)}
+                              title="Approve User Application"
+                              className={`p-1.5 rounded transition-all ${
+                                u.approvalStatus === 'Approved' 
+                                  ? 'bg-emerald-50 text-emerald-300 cursor-not-allowed' 
+                                  : 'bg-emerald-55 border border-emerald-250 text-emerald-600 hover:bg-emerald-100'
+                              }`}
+                            >
+                              <Check className="w-4 h-4 stroke-[3]" />
+                            </button>
+
+                            {/* Disapprove */}
+                            <button 
+                              disabled={u.approvalStatus === 'Disapproved' || (actionLoading[u.id] !== undefined && actionLoading[u.id] !== null)}
+                              onClick={() => handleDisapprove(u.id)}
+                              title="Disapprove User Application"
+                              className={`p-1.5 rounded transition-all ${
+                                u.approvalStatus === 'Disapproved' 
+                                  ? 'bg-rose-50 text-rose-350 cursor-not-allowed' 
+                                  : 'bg-rose-55 border border-rose-250 text-rose-600 hover:bg-rose-100'
+                              }`}
+                            >
+                              <X className="w-4 h-4 stroke-[3]" />
+                            </button>
+
+                            {/* Delete Button (Double click to confirm) */}
+                            <button 
+                              disabled={actionLoading[u.id] !== undefined && actionLoading[u.id] !== null}
+                              onClick={() => handleDeleteClick(u.id)}
+                              title={deleteConfirmId === u.id ? "Click again to confirm delete" : "Delete student record"}
+                              className={`px-2 py-1.5 text-xs font-bold rounded transition-all duration-200 ${
+                                deleteConfirmId === u.id 
+                                  ? 'bg-rose-600 text-white animate-pulse' 
+                                  : 'bg-slate-100 text-rose-600 border border-slate-200 hover:bg-rose-50'
+                              }`}
+                            >
+                              {deleteConfirmId === u.id ? "Confirm?" : <Trash2 className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expandable row: Question & Answers metadata */}
+                      {isUserExpanded && (
+                        <tr className="bg-slate-50/50">
+                          <td colSpan={6} className="px-6 py-4 border-t border-b border-indigo-100/50">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                              <div className="space-y-1.5">
+                                <h4 className="font-extrabold uppercase text-[10px] text-indigo-700 tracking-wider flex items-center gap-1 mb-1 bg-indigo-50 px-2 py-0.5 rounded-md inline-block">
+                                  <span>🎯</span> Motivation & Intent
+                                </h4>
+                                <p className="text-slate-700 text-xs leading-relaxed">
+                                  <strong className="text-slate-800 font-semibold">What are you building CIYA Academy for?</strong> <br/>
+                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-150 block mt-1">{u.intent || 'Not answered'}</span>
+                                </p>
+                                <p className="text-slate-700 text-xs leading-relaxed mt-2">
+                                  <strong className="text-slate-800 font-semibold">Primary target learning goal:</strong> <br/>
+                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-150 block mt-1">{u.goal || 'Not answered'}</span>
+                                </p>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <h4 className="font-extrabold uppercase text-[10px] text-teal-700 tracking-wider flex items-center gap-1 mb-1 bg-teal-50 px-2 py-0.5 rounded-md inline-block">
+                                  <span>⚙️</span> Skills & Experience
+                                </h4>
+                                <p className="text-slate-700 text-xs leading-relaxed">
+                                  <strong className="text-slate-800 font-semibold">Knowledge or tools/code background:</strong> <br/>
+                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-150 block mt-1">{u.pathwayExperience || u.experience || 'Not answered'}</span>
+                                </p>
+                                <p className="text-slate-700 text-xs leading-relaxed mt-2">
+                                  <strong className="text-slate-800 font-semibold">Reason for choosing this pathway:</strong> <br/>
+                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-150 block mt-1">{u.pathwayReason || 'Not answered'}</span>
+                                </p>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <h4 className="font-extrabold uppercase text-[10px] text-pink-700 tracking-wider flex items-center gap-1 mb-1 bg-pink-50 px-2 py-0.5 rounded-md inline-block">
+                                  <span>📋</span> Extra Metadata
+                                </h4>
+                                <div className="bg-white p-3 rounded border border-slate-150 space-y-2 text-xs">
+                                  <div>
+                                    <span className="text-slate-400 block font-bold text-[9px] uppercase">Commitment Availability</span>
+                                    <span className="font-medium text-slate-800">{u.availability || 'Not answered'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400 block font-bold text-[9px] uppercase">Joined Date & Time</span>
+                                    <span className="font-medium text-slate-800">
+                                      {u.createdAt ? ((u.createdAt as any).toDate ? (u.createdAt as any).toDate().toLocaleString() : new Date(u.createdAt).toLocaleString()) : '-'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400 block font-bold text-[9px] uppercase">Path Routing & Details</span>
+                                    <span className="font-medium text-slate-800">
+                                      System suggested: <strong className="text-slate-900">{u.recommendedPath || '-'}</strong> <br/>
+                                      Choice selections: <strong className="text-slate-900">{u.courseType || ''} {u.pathwaySelection ? `(${u.pathwaySelection})` : ''}</strong>
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+                {filteredUsers.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                      <div className="text-lg font-bold">No Applications Match Filter</div>
+                      <div className="text-xs text-slate-400 mt-1">Try resetting or editing your filter search criteria.</div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

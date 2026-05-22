@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { Home, Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save } from 'lucide-react';
+import { Home, Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router';
 import { Course } from '../types';
+import { motion } from 'motion/react';
 
 export default function StudentDashboard() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -133,7 +134,11 @@ export default function StudentDashboard() {
   if (!userProfile) return null;
 
   const categories = Array.from(new Set(courses.map(c => c.category).filter(Boolean)));
-  const isLockedOut = userProfile && !userProfile.isActivated;
+  const approvalStatus = userProfile?.approvalStatus || 'Pending';
+  const isApproved = approvalStatus === 'Approved';
+  const isPending = approvalStatus === 'Pending';
+  const isDisapproved = approvalStatus === 'Disapproved';
+  const isLockedOut = false;
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans">
@@ -146,17 +151,17 @@ export default function StudentDashboard() {
       )}
       
       {/* Sidebar */}
-      <aside className={`w-64 bg-white border-r border-slate-200 flex flex-col fixed md:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <aside className={`w-64 bg-blue-900 border-r border-blue-800 flex flex-col fixed md:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-6 flex flex-col gap-1 relative">
           <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-lg shadow-lg shadow-orange-500/20 shrink-0"></div>
-            <span className="font-bold text-xl md:text-2xl tracking-tight uppercase text-slate-800">CIYA</span>
+            <span className="font-bold text-xl md:text-2xl tracking-tight uppercase text-white">CIYA</span>
           </Link>
-          <span className="text-[10px] font-semibold tracking-[0.2em] text-slate-500 uppercase leading-none mt-0.5">
+          <span className="text-[10px] font-semibold tracking-[0.2em] text-blue-300 uppercase leading-none mt-0.5">
             Academy
           </span>
           <button 
-            className="absolute top-6 right-6 md:hidden text-slate-400 hover:text-slate-600"
+            className="absolute top-6 right-6 md:hidden text-blue-300 hover:text-white"
             onClick={() => setIsMobileMenuOpen(false)}
           >
             <X className="w-6 h-6" />
@@ -166,27 +171,27 @@ export default function StudentDashboard() {
         <nav className="flex-1 px-4 space-y-2 mt-4 text-sm font-medium">
           <button 
             onClick={() => { setCurrentView('courses'); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${currentView === 'courses' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${currentView === 'courses' ? 'bg-blue-800 text-white font-semibold' : 'text-blue-200 hover:bg-blue-800/50 hover:text-white'}`}
           >
             <Compass className="w-5 h-5" />
             Explore Courses
           </button>
           <button 
             onClick={() => { setCurrentView('profile'); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${currentView === 'profile' ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${currentView === 'profile' ? 'bg-blue-800 text-white font-semibold' : 'text-blue-200 hover:bg-blue-800/50 hover:text-white'}`}
           >
             <UserIcon className="w-5 h-5" />
             Profile
           </button>
         </nav>
 
-        <div className="p-4 border-t border-slate-200 mb-2">
-          <p className="text-xs font-medium text-slate-500 px-4 mb-2 truncate">
+        <div className="p-4 border-t border-blue-800 mb-2">
+          <p className="text-xs font-medium text-blue-300 px-4 mb-2 truncate">
             {currentUser?.email}
           </p>
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+            className="flex items-center gap-3 w-full px-4 py-2 rounded-lg text-sm font-medium text-blue-200 hover:bg-red-500 hover:text-white transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -215,46 +220,6 @@ export default function StudentDashboard() {
         </header>
         
         <div className="flex-1 overflow-auto p-6 md:p-10">
-          {isLockedOut && (
-            <div className="mb-8 bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 relative">
-              <h3 className="text-xl font-bold text-slate-800 mb-2 mt-1">Account Locked - Activation Required</h3>
-              <p className="text-slate-700 text-sm mb-4">You have <b>{timeLeft}</b> remaining to activate your account. Invite at least 1 person using your unique referral code.</p>
-              
-              <div className="bg-white p-4 rounded-xl border border-amber-300 font-mono text-2xl font-black tracking-widest text-slate-800 mb-4 inline-block select-all">
-                {userProfile.myReferralCode}
-              </div>
-
-              <a href="https://chat.whatsapp.com/ReplaceWithYourLink" target="_blank" rel="noopener noreferrer" className="block sm:inline-flex sm:ml-4 px-6 py-3 bg-green-500 text-white font-bold rounded-xl text-center shadow-md hover:bg-green-600 transition-colors justify-center items-center gap-2">
-                 Join WhatsApp For More Info
-              </a>
-            </div>
-          )}
-
-          {!isLockedOut && userProfile?.referralsCount > 0 && !userProfile?.congratsViewed && (
-            <div className="mb-8 bg-green-50 border-2 border-emerald-300 rounded-2xl p-6 relative pr-12">
-              <button 
-                onClick={async () => {
-                  try {
-                    await updateDoc(doc(db, 'users', currentUser!.uid), { congratsViewed: true });
-                    setUserProfile({ ...userProfile, congratsViewed: true });
-                  } catch (e) {
-                    console.error(e);
-                  }
-                }}
-                className="absolute top-4 right-4 text-green-600 hover:text-green-800 bg-green-100 hover:bg-green-200 p-1.5 rounded-full transition-colors"
-                aria-label="Dismiss message"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <h3 className="text-xl font-bold text-green-800 mb-2 mt-1 flex items-center gap-2">
-                <CheckCircle className="w-6 h-6 text-green-600" /> Congratulations!
-              </h3>
-              <p className="text-green-700 font-medium">
-                Your referral code <b>{userProfile.myReferralCode}</b> has been used to sign up! Your account is fully activated and you have unlocked lifetime access to your courses and dashboard.
-              </p>
-            </div>
-          )}
-
           {currentView === 'profile' ? (
             <div className="bg-white border text-sm border-slate-200 rounded-2xl p-6 md:p-10 max-w-2xl mx-auto shadow-sm">
               <div className="flex justify-between items-center mb-6">
@@ -316,13 +281,64 @@ export default function StudentDashboard() {
                       <p className="text-slate-500 font-medium mb-1">My Goal</p>
                       <p className="text-slate-900 leading-relaxed bg-slate-50 p-4 rounded-lg mt-1">{userProfile.goal || 'Not provided'}</p>
                     </div>
-                    <div className="sm:col-span-2 bg-amber-50 p-4 rounded-lg border border-amber-100">
-                      <p className="text-amber-800 font-semibold mb-1">Referral Code to Share</p>
-                      <p className="text-amber-900 font-black text-2xl font-mono">{userProfile.myReferralCode}</p>
-                    </div>
+                  </div>
+                  
+                  <div className="sm:col-span-2 pt-6 border-t border-slate-100">
+                    <SubmissionDetailsCard profile={userProfile} />
                   </div>
                 </div>
               )}
+            </div>
+          ) : isPending ? (
+            <div className="max-w-3xl mx-auto bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-6 border border-amber-100">
+                  <Clock className="w-10 h-10 text-amber-500 animate-pulse" />
+                </div>
+                <h2 className="text-3xl font-extrabold text-slate-800 mb-4">Application Pending Review 📋</h2>
+                
+                <div className="text-slate-600 text-base md:text-lg mb-8 leading-relaxed max-w-xl space-y-4">
+                  <p>
+                    Hi <strong className="text-slate-800">{userProfile.fullName || 'Student'}</strong>! Thank you for applying. Your application is currently under processing review.
+                  </p>
+                  <p>
+                    Please watch out for your email, as you will receive an email confirmation once you have been selected for the program. Make sure to check both your inbox and your spam/junk folder.
+                  </p>
+                </div>
+
+                <div className="w-full mb-8">
+                  <SubmissionDetailsCard profile={userProfile} />
+                </div>
+
+                <a href="https://chat.whatsapp.com/BzyYP0DyV2TFRqzfrrCXYi?s=cl&p=a&mlu=3" target="_blank" rel="noopener noreferrer" className="inline-flex px-8 py-4 bg-[#25D366] hover:bg-[#20ba5a] text-white font-extrabold rounded-xl text-center shadow-lg shadow-green-500/20 hover:-translate-y-0.5 transition-all justify-center items-center gap-2.5 text-lg w-full sm:w-auto">
+                   <MessageCircle className="w-6 h-6 fill-white stroke-none" /> Join Our WhatsApp Community
+                </a>
+              </div>
+            </div>
+          ) : isDisapproved ? (
+            <div className="max-w-3xl mx-auto bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200">
+              <div className="flex flex-col items-center text-center">
+                <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6 border border-red-150">
+                  <X className="w-10 h-10 text-red-500" />
+                </div>
+                <h2 className="text-3xl font-extrabold text-slate-800 mb-4">Application Reviewed ❌</h2>
+                
+                <div className="text-slate-650 text-base md:text-lg mb-8 leading-relaxed max-w-lg space-y-4">
+                  <p>
+                    Hi <strong className="text-slate-850">{userProfile.fullName || 'Student'}</strong>!
+                  </p>
+                  <p>
+                    We appreciate your interest in CIYA Academy. After careful consideration of your application profile, we regret to inform you that you have not been selected for this cohort.
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    We received a massive volume of entries and had to make challenging selections. We wish you the absolute best in your digital and tech journey.
+                  </p>
+                </div>
+
+                <div className="w-full border-t border-slate-100 pt-6 mt-6">
+                  <SubmissionDetailsCard profile={userProfile} />
+                </div>
+              </div>
             </div>
           ) : (
             <>
@@ -335,8 +351,8 @@ export default function StudentDashboard() {
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 mb-4">
                     <BookOpen className="w-8 h-8 text-slate-400" />
                   </div>
-                  <h3 className="text-lg font-semibold text-slate-800 mb-2">No courses available yet</h3>
-                  <p className="text-slate-500">Check back later for new content.</p>
+                  <h3 className="text-lg font-semibold text-slate-800 mb-2">Training begins on the 1st of June, 2026</h3>
+                  <p className="text-slate-500">check back later.</p>
                 </div>
               ) : (
                 <div className="space-y-12">
@@ -558,6 +574,78 @@ function CourseCard({ course, isLocked }: { course: Course, isLocked: boolean, k
                View
              </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubmissionDetailsCard({ profile }: { profile: any }) {
+  if (!profile) return null;
+  return (
+    <div className="w-full bg-slate-50/85 border border-slate-200 rounded-2xl p-6 text-left max-w-xl mx-auto mt-6">
+      <h3 className="font-extrabold text-slate-800 mb-4 text-sm tracking-tight border-b border-slate-200 pb-2 uppercase text-[11px] tracking-wider text-indigo-750 flex items-center gap-2">
+        <span>📋</span> Submitted Application Details
+      </h3>
+      <div className="space-y-4 text-xs md:text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Full Name</span>
+            <span className="text-slate-800 font-semibold">{profile.fullName || '-'}</span>
+          </div>
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Gender</span>
+            <span className="text-slate-800 font-semibold">{profile.gender || '-'}</span>
+          </div>
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">WhatsApp Number</span>
+            <span className="text-slate-800 font-mono font-semibold">{profile.whatsapp || '-'}</span>
+          </div>
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">State of Residence</span>
+            <span className="text-slate-800 font-semibold">{profile.state || '-'}</span>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-150 pt-3 space-y-3">
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Recommended Study Program</span>
+            <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded text-xs inline-block mt-0.5">
+              {profile.recommendedPath || '-'}
+            </span>
+          </div>
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Path Selections</span>
+            <span className="text-slate-800 font-semibold text-xs">
+              {profile.courseType || ''} {profile.pathwaySelection ? `(${profile.pathwaySelection})` : ''}
+            </span>
+          </div>
+          {profile.pathwayReason && (
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Reason for Selection</span>
+              <p className="text-slate-650 italic mt-0.5 leading-relaxed font-semibold bg-white p-2 rounded border border-slate-150">{profile.pathwayReason}</p>
+            </div>
+          )}
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Prior Experience in Course</span>
+            <span className="text-slate-800 font-semibold">{profile.pathwayExperience || profile.experience || 'None'}</span>
+          </div>
+          {profile.intent && (
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
+              <p className="text-slate-650 italic mt-0.5 leading-relaxed font-semibold bg-white p-2 rounded border border-slate-150">{profile.intent}</p>
+            </div>
+          )}
+          {profile.goal && (
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Target Learning Goal</span>
+              <p className="text-slate-650 italic mt-0.5 leading-relaxed font-semibold bg-white p-2 rounded border border-slate-150">{profile.goal}</p>
+            </div>
+          )}
+          <div>
+            <span className="text-slate-400 block text-[10px] uppercase font-bold">Commitment Level</span>
+            <span className="text-slate-850 font-bold">{profile.availability || '-'}</span>
+          </div>
         </div>
       </div>
     </div>
