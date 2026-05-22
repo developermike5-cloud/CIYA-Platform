@@ -3,7 +3,24 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
+// Dynamically use the custom Netlify domain if running in production on Netlify,
+// otherwise fall back to the default gen-lang Firebase authDomain.
+let customAuthDomain = firebaseConfig.authDomain;
+if (typeof window !== 'undefined') {
+  const hostname = window.location.hostname;
+  if (hostname === 'ciyacademy.netlify.app') {
+    customAuthDomain = 'ciyacademy.netlify.app';
+  } else if (hostname.endsWith('.netlify.app')) {
+    customAuthDomain = hostname;
+  }
+}
+
+const activeFirebaseConfig = {
+  ...firebaseConfig,
+  authDomain: customAuthDomain
+};
+
+const app = initializeApp(activeFirebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth();
 

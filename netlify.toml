@@ -1,0 +1,13 @@
+# netlify.toml - Configuration file for Netlify deployments
+
+[build]
+  # Configures the build command and directory where Vite stores build outputs
+  publish = "dist"
+  command = "npm run build"
+
+# Redirect / Proxy rules for Firebase Auth Handler with Custom Domain
+[[redirects]]
+  from = "/__/auth/*"
+  to = "https://gen-lang-client-0862975917.firebaseapp.com/__/auth/:splat"
+  status = 200
+  force = true
