@@ -7,19 +7,28 @@
       "properties": {
         "title": { "type": "string", "description": "Title of the course" },
         "subtitle": { "type": "string" },
+        "tagline": { "type": "string" },
         "slug": { "type": "string" },
         "thumbnail": { "type": "string" },
         "description": { "type": "string" },
+        "overview": { "type": "string" },
         "category": { "type": "string" },
+        "skill": { "type": "string" },
+        "subskill": { "type": "string" },
         "youtube_link": { "type": "string" },
         "level": { "type": "string", "enum": ["Beginner", "Advanced", "Masterclass"] },
+        "tier": { "type": "string", "enum": ["beginner", "advanced", "masterclass"] },
         "price": { "type": "number" },
-        "modules": { "type": "string", "description": "Stringified JSON of modules due to nested rules limitations" },
+        "instructor": { "type": "string" },
+        "outcomes": { "type": "string" },
+        "requirements": { "type": "string" },
         "publish_status": { "type": "string", "enum": ["Draft", "Published", "Archived"] },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "days": { "type": "array", "description": "5 days of videos and themes" },
         "createdAt": { "type": "string", "format": "timestamp" },
         "updatedAt": { "type": "string", "format": "timestamp" }
       },
-      "required": ["title", "slug", "publish_status", "createdAt", "updatedAt"]
+      "required": ["title", "publish_status", "createdAt", "updatedAt"]
     },
     "UserProfile": {
       "title": "User Profile",
@@ -42,6 +51,7 @@
         "myReferralCode": { "type": "string" },
         "isActivated": { "type": "boolean" },
         "referralsCount": { "type": "number" },
+        "approvalStatus": { "type": "string", "enum": ["Pending", "Approved", "Disapproved"] },
         "createdAt": { "type": "string", "format": "timestamp" },
         "updatedAt": { "type": "string", "format": "timestamp" }
       },

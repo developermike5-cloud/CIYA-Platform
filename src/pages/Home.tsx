@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
 import { 
-  Lightbulb, Gift, Bot, Wallet, Check, Smartphone, Briefcase, Zap, TrendingUp, Globe, Film, Palette
+  Lightbulb, Gift, Bot, Wallet, Check, Smartphone, Briefcase, Zap, TrendingUp, Globe, Film, Palette, Sparkles
 } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
@@ -125,9 +125,15 @@ function MissionCard({ item, index }: { item: any, index: number, key?: React.Ke
   );
 }
 
+let globalLoginActive = false;
+
 const useLogin = () => {
   const navigate = useNavigate();
   return async () => {
+    if (globalLoginActive) {
+      console.warn("Sign-in already in progress, ignoring duplicate action.");
+      return;
+    }
     try {
       if (auth.currentUser) {
         if (auth.currentUser.email === 'developermike5@gmail.com') {
@@ -143,6 +149,7 @@ const useLogin = () => {
         }
         return;
       }
+      globalLoginActive = true;
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
@@ -163,11 +170,23 @@ const useLogin = () => {
         return;
       }
       console.error(e);
+      if (
+        e.code === 'auth/popup-blocked' || 
+        e.message?.toLowerCase().includes('popup-blocked') || 
+        e.message?.toLowerCase().includes('popup estuvo bloqueado') ||
+        e.message?.includes('Pending promise was never set') ||
+        e.message?.includes('INTERNAL ASSERTION FAILED')
+      ) {
+        window.dispatchEvent(new CustomEvent('ciya-auth-popup-blocked'));
+        return;
+      }
       if (e.message?.includes('offline') || e.code === 'unavailable') {
         alert("Network error: Please check your internet connection and try again.");
       } else {
         alert("An error occurred: " + e.message);
       }
+    } finally {
+      globalLoginActive = false;
     }
   };
 };
@@ -254,7 +273,7 @@ function Hero() {
         </h1>
 
         <p className="text-teal-200 text-lg md:text-xl max-w-2xl mb-12 leading-relaxed">
-          Create It Yourself Academy (CIYA) empowers Nigerian youths with powerful AI-driven digital skills — from building websites to making videos to designing brands. Free to start. Real results. No excuses.
+          Create It Yourself Academy (CIYA) empowers Nigerian youths with powerful AI-driven website creation skills — from high-impact landing pages to fully functional e-commerce websites. Free to start. Real results. No excuses.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 mb-16 w-full justify-center">
@@ -324,162 +343,108 @@ function Mission() {
 }
 
 const COURSES_DATA = {
-  web: {
+  landing: {
+    icon: Lightbulb,
+    title: "AI Landing Page Creation",
+    desc: "Building a landing page in 2026 is the easiest it has ever been — thanks to AI. Whether you need a landing page to sell your service, capture emails for your lead magnet, build personal branding, or create an interactive sales funnel, CIYA teaches you exactly how to do it without writing a single line of code.",
+    tiers: [
+      {
+        level: "Beginner",
+        title: "Landing Page Foundations",
+        price: "100% Free",
+        isFree: true,
+        desc: "Build your first landing page in 5 days using AI generators. No coding needed. Enough to launch your online presence right away.",
+        features: ["Landing page creation", "AI copywriting assistant", "Lead capture forms", "Publish & go live"]
+      },
+      {
+        level: "Advanced",
+        title: "Professional Conversion Page Builder",
+        price: "₦15,000",
+        subPrice: "/ 5-day course",
+        featured: true,
+        badge: "Most Popular",
+        desc: "Offer professional landing page design services. Learn the full workflow to structure conversion heroes, perform speed audits, and deliver client projects confidently.",
+        features: ["Commercial landing pages", "Speed & responsiveness", "Analytics setup & tracking", "Client delivery workflow"]
+      },
+      {
+        level: "Masterclass",
+        title: "Conversion Funnel Agency",
+        price: "₦30,000",
+        subPrice: "/ 5-day course",
+        desc: "Scale into a high-ticket landing page agency. Master multivariate layout testing, advanced copywriting frameworks, client acquisition, and team pricing.",
+        features: ["Complex marketing systems", "Client acquisition strategy", "High-ticket pricing & packaging", "Agency team operations"]
+      }
+    ],
+    pillsTitle: "Landing Page formats You'll Learn to Build",
+    pills: [
+      "SaaS Landing Pages (Product walkthroughs)",
+      "Local Business Pages (Leads capture)",
+      "Course & Webinar Registrations (Funnels)",
+      "App Launch Showcase Pages (Waitlist capture)",
+      "Personal Branding Pages (Speaker, coach bio)",
+      "Event Promotion Landing Pages"
+    ]
+  },
+  ecommerce: {
     icon: Globe,
-    title: "AI Website Building",
-    desc: "Building a website in 2026 is the easiest it has ever been — thanks to AI. Whether you need a landing page to sell your service, an e-commerce store to replace your WhatsApp status, a portfolio to win clients, or a full business website, CIYA teaches you exactly how to do it without writing a single line of code.",
+    title: "AI E-commerce Website Creation",
+    desc: "Transform standard catalogs into highly profitable automated web stores. Learn to design high-converting visual stores using interactive AI layouts, build responsive shopping carts, configure inventory sync, and integrate WhatsApp checkout flows that receive and organize orders seamlessly.",
     tiers: [
       {
         level: "Beginner",
-        title: "Website Foundations",
+        title: "E-commerce Essentials",
         price: "100% Free",
         isFree: true,
-        desc: "Build your first website in 5 days using AI tools. No coding needed. Enough to launch your online presence right away.",
-        features: ["Landing page creation", "Basic e-commerce setup", "Simple portfolio site", "Publish & go live"]
+        desc: "Launch your personal online store in 5 days with AI. Hook up a basic catalog, add product cards, set up images, and integrate simple WhatsApp checkouts for instant sales.",
+        features: ["Product listing setups", "Interactive shop catalogs", "WhatsApp routing checkouts", "Inventory publishing"]
       },
       {
         level: "Advanced",
-        title: "Professional Web Builder",
+        title: "Professional Store Builder",
         price: "₦15,000",
         subPrice: "/ 5-day course",
         featured: true,
         badge: "Most Popular",
-        desc: "Offer professional web development services. Learn the full workflow to build and deliver client projects confidently.",
-        features: ["Custom e-commerce stores", "Business websites", "SEO & performance basics", "Client delivery workflow"]
+        desc: "Build highly robust commercial stores for retail brands and direct-to-consumer businesses. Include filters, order search, tax setups, and localized delivery configurations.",
+        features: ["Advanced shopping carts", "Promo codes & discounts", "Product search & indexing", "Payment gateway plugins"]
       },
       {
         level: "Masterclass",
-        title: "Web Agency Mastery",
+        title: "E-Commerce Agency Growth",
         price: "₦30,000",
         subPrice: "/ 5-day course",
-        desc: "Scale into a web agency. Advanced projects, client management, pricing strategies, and positioning your services.",
-        features: ["Complex multi-page builds", "Client acquisition strategy", "Pricing & packaging", "Agency workflow & tools"]
+        desc: "Create and scale a dedicated e-commerce agency. Gain high-value store blueprints, master wholesale setup strategies, and access lead lists of retail merchants ready to pay for dynamic stores.",
+        features: ["Multi-vendor marketplaces", "Automated email notifications", "Merchant sales reporting", "Agency client acquisition"]
       }
     ],
-    pillsTitle: "Website Types You'll Learn to Build",
+    pillsTitle: "Store Structures You'll Build",
     pills: [
-      "E-commerce Websites (Online stores, marketplaces)",
-      "Business Websites, Company sites",
-      "Landing Pages (Sales funnels, lead pages)",
-      "Portfolio Websites (Personal brands, creatives)",
-      "Educational Websites (Courses, LMS platforms)",
-      "Media & Content Websites (Blogs, news, streaming)",
-      "Community Websites (Forums, memberships)",
-      "Entertainment Websites (Gaming, music, movies)"
-    ]
-  },
-  film: {
-    icon: Film,
-    title: "AI Film Studio",
-    desc: "Create stunning professional videos without expensive equipment or editing agencies. From social media reels and YouTube content to brand ads and corporate videos — AI Film Studio teaches you to produce high-quality content that gets attention and earns income.",
-    tiers: [
-      {
-        level: "Beginner",
-        title: "Video Creation Basics",
-        price: "100% Free",
-        isFree: true,
-        desc: "Create your first AI-generated video in 5 days. Perfect for social media content, simple brand promos, and faceless YouTube.",
-        features: ["AI video generation tools", "Short-form content creation", "Basic branding in video", "Export & publish"]
-      },
-      {
-        level: "Advanced",
-        title: "Content Creator Pro",
-        price: "₦15,000",
-        subPrice: "/ 5-day course",
-        featured: true,
-        badge: "Most Popular",
-        desc: "Build a full content creation or video production service. Deliver commercial-quality results for brands and businesses.",
-        features: ["Commercial video ads", "Motion graphics basics", "Cinematic storytelling", "Client brief workflow"]
-      },
-      {
-        level: "Masterclass",
-        title: "Film Studio Mastery",
-        price: "₦30,000",
-        subPrice: "/ 5-day course",
-        desc: "Operate as a full AI film studio. Handle complex productions, animations, VFX, and build a sustainable content business.",
-        features: ["3D & VFX with AI", "Documentary production", "YouTube strategy", "Build a video agency"]
-      }
-    ],
-    pillsTitle: "Video Types You'll Learn to Create",
-    pills: [
-      "Commercial Videos, Ads, promos, product videos",
-      "Social Media Content (Reels, TikToks, Shorts)",
-      "Entertainment video (trailers, music videos)",
-      "Educational video, documentaries video",
-      "Animation & Motion Design, Motion graphics",
-      "Professional Training video"
-    ]
-  },
-  image: {
-    icon: Palette,
-    title: "AI Image Engineering",
-    desc: "From logo design to social media graphics, flyers to packaging — AI has transformed visual design into something anyone can master. CIYA teaches you to create professional brand identities and marketing visuals that compete with expensive design agencies.",
-    tiers: [
-      {
-        level: "Beginner",
-        title: "Visual Design Basics",
-        price: "100% Free",
-        isFree: true,
-        desc: "Design your first professional visuals in 5 days — flyers, social posts, and basic branding for your business or personal use.",
-        features: ["Flyer & poster design", "Social media graphics", "AI logo creation", "Export for print & digital"]
-      },
-      {
-        level: "Advanced",
-        title: "Brand Designer Pro",
-        price: "₦15,000",
-        subPrice: "/ 5-day course",
-        featured: true,
-        badge: "Most Popular",
-        desc: "Offer full brand identity design services. Build complete brand systems, marketing materials, and UI design for paying clients.",
-        features: ["Complete brand kits", "Product packaging", "Thumbnails & carousels", "Client delivery process"]
-      },
-      {
-        level: "Masterclass",
-        title: "Design Agency Mastery",
-        price: "₦30,000",
-        subPrice: "/ 5-day course",
-        desc: "Run a full AI design studio. Handle enterprise branding, editorial design, motion graphics, and corporate pitches.",
-        features: ["Motion graphics", "Editorial & book design", "Pitch decks", "Scale a design agency"]
-      }
-    ],
-    pillsTitle: "Design Types You'll Master",
-    pills: [
-      "Marketing & Advertising Design, Flyers, ads, banners",
-      "Branding & Identity Design, Logos, Product Mockup",
-      "Website UX/UI design",
-      "Social Media Design, Thumbnails, carousels",
-      "Motion Graphics, Animated visuals",
-      "Editorial Design, Books, magazines",
-      "Packaging Design",
-      "Infographics, presentations",
-      "Entertainment Design, Posters, album covers",
-      "Corporate Design"
+      "WhatsApp Automated Stores (Instant orders)",
+      "Digital Product Stores (E-books, downloads)",
+      "Fashion & Boutique Showcase Stores (Retail)",
+      "Dropshipping Hubs (AI product import)",
+      "Subscription & Box Stores (Weekly/Monthly)",
+      "Local Grocery & Delivery Catalogs"
     ]
   }
 };
 
 const MEDIA_URLS = {
-  web: [
+  landing: [
     'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
+    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4',
     'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/704f7970e09360476c34e5b8dd6a1239_720w_hkdauz.mp4',
     'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4'
   ],
-  film: [
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/7bee2ea0eabdda3d8b25f88bb5cac243_720w_igzzgc.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5a34fc982d2847355b768f97774966a7_720w_kd1iw5.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/c5495e4e04d349539fe97a193db66b92_720w_ntvzus.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/d8e7b4c4d2c6d301fe8368f0d083c8e4_720w_ls2fk3.mp4'
-  ],
-  image: [
-    'https://res.cloudinary.com/di4dlnd5x/image/upload/v1779199790/New_Month_Flyer_November_iypfck.jpg',
-    'https://res.cloudinary.com/di4dlnd5x/image/upload/v1779199775/Brand_Identity_-_Marketing_Agency_q3fhwf.jpg',
-    'https://res.cloudinary.com/di4dlnd5x/image/upload/v1779199753/Clothing_Ad_Flyer_Design_d7wwr7.jpg',
-    'https://res.cloudinary.com/di4dlnd5x/image/upload/v1779199740/Clear_Ledger_jvkytv.jpg'
+  ecommerce: [
+    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
+    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
+    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
+    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4'
   ]
 };
 
-function CourseSkillSection({ skillId }: { skillId: 'web' | 'film' | 'image' }) {
+function CourseSkillSection({ skillId }: { skillId: 'landing' | 'ecommerce' }) {
   const d = COURSES_DATA[skillId];
   const Icon = d.icon;
   const mUrls = MEDIA_URLS[skillId];
@@ -494,23 +459,17 @@ function CourseSkillSection({ skillId }: { skillId: 'web' | 'film' | 'image' }) 
   const ops = [op1, op2, op3, op4];
 
   const subskillNames = {
-    web: [
-      "Landing Pages",
-      "E-commerce Stores",
-      "Portfolio Websites",
-      "Business Websites"
+    landing: [
+      "Copywriting",
+      "Structure hero",
+      "Leads capture",
+      "Email integrations"
     ],
-    film: [
-      "Social Media Videos",
-      "Commercial/Product Ads",
-      "YouTube Content",
-      "Cinematic Storytelling"
-    ],
-    image: [
-      "Flyers & Ads",
-      "Logos & Branding",
-      "Social Media Graphics",
-      "Product Mockups"
+    ecommerce: [
+      "WhatsApp checkouts",
+      "Digital catalogs",
+      "Shopping flows",
+      "Cart management"
     ]
   }[skillId];
 
@@ -575,11 +534,7 @@ function CourseSkillSection({ skillId }: { skillId: 'web' | 'film' | 'image' }) 
               className="absolute inset-0 flex items-center justify-center overflow-hidden bg-teal-950"
               style={{ opacity: ops[idx] }}
             >
-              {skillId === 'image' ? (
-                <img src={url} alt="" className="w-full h-full object-cover object-center" />
-              ) : (
-                <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover object-center pointer-events-none" />
-              )}
+              <video src={url} autoPlay loop muted playsInline className="w-full h-full object-cover object-center pointer-events-none" />
             </motion.div>
           ))}
           <div className="absolute inset-0 bg-teal-950/10 mix-blend-overlay" />
@@ -701,14 +656,13 @@ function Courses() {
         <div className="max-w-4xl mx-auto w-full">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.5 }}>
             <span className="text-xs md:text-sm font-semibold uppercase tracking-wider text-amber-400 mb-2 block">Our Courses</span>
-            <h2 className="text-3xl md:text-5xl font-extrabold text-teal-50 mb-4 tracking-tight drop-shadow-md">Three Skills. Infinite Possibilities.</h2>
-            <p className="text-teal-100 text-base md:text-lg max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow">Master a high-income digital skill in just 5 days, from zero to your first complete project.</p>
+            <h2 className="text-3xl md:text-5xl font-extrabold text-teal-50 mb-4 tracking-tight drop-shadow-md">AI Website Creation Tracks</h2>
+            <p className="text-teal-100 text-base md:text-lg max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow">Master premium layout builders & automated checkouts in just 5 days, from zero to your first host.</p>
             
             <div className="flex flex-wrap gap-3 justify-center mb-10">
               {[
-                { id: 'web-section', label: '🌐 AI Website Building' },
-                { id: 'film-section', label: '🎬 AI Film Studio' },
-                { id: 'image-section', label: '🎨 AI Image Engineering' },
+                { id: 'landing-section', label: '🌐 AI Landing Page Creation' },
+                { id: 'ecommerce-section', label: '🛍️ AI E-commerce Website Creation' },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -723,19 +677,18 @@ function Courses() {
         </div>
       </section>
 
-      <div id="web-section"><CourseSkillSection skillId="web" /></div>
-      <div id="film-section"><CourseSkillSection skillId="film" /></div>
-      <div id="image-section"><CourseSkillSection skillId="image" /></div>
+      <div id="landing-section"><CourseSkillSection skillId="landing" /></div>
+      <div id="ecommerce-section"><CourseSkillSection skillId="ecommerce" /></div>
     </>
   );
 }
 
 function HowItWorks() {
   const steps = [
-    { title: "Pick Your Skill", desc: "Choose from Website Building, Film Studio, or Image Engineering. Start with the free beginner course — no commitment needed." },
-    { title: "Join the 5-Day Training", desc: "Attend daily live/recorded sessions with practical exercises. Each day builds on the last — by day 5 you'll have a real project to show." },
-    { title: "Build Real Projects", desc: "Every class ends with a live project you build during training — a website, a video, or a brand design — that you own and can use." },
-    { title: "Apply or Advance", desc: "Use the beginner skills to save money or start earning. When ready, upgrade to advanced or masterclass to unlock professional-grade income potential." },
+    { title: "Pick Your Creator Track", desc: "Choose between AI Landing Pages and AI E-commerce Websites. Start with the free beginner course — no commitment needed." },
+    { title: "Join the 5-Day Training", desc: "Attend daily live/recorded sessions with practical exercises. Each day builds on the last — by day 5 you'll have a real website live to show." },
+    { title: "Build Real Sites", desc: "Every class ends with a live project you build during training — a landing page or an e-commerce storefront — that you own and can use." },
+    { title: "Apply or Advance", desc: "Use the beginner skills to save money or start-up. When ready, upgrade to advanced or masterclass to unlock professional-grade client contract potential." },
   ];
 
   return (
@@ -858,10 +811,9 @@ function Footer() {
         <div className="md:col-span-3 lg:col-span-2">
           <h5 className="font-semibold uppercase tracking-wider text-teal-500 text-xs mb-5">Courses</h5>
           <ul className="space-y-4">
-            <li><a href="#" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">AI Website Building</a></li>
-            <li><a href="#" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">AI Film Studio</a></li>
-            <li><a href="#" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">AI Image Engineering</a></li>
-            <li><a href="#courses" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">All Courses</a></li>
+            <li><a href="#landing-section" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">AI Landing Pages</a></li>
+            <li><a href="#ecommerce-section" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">AI E-commerce Creator</a></li>
+            <li><a href="#courses" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">All Tracks</a></li>
           </ul>
         </div>
         
@@ -900,6 +852,18 @@ function Footer() {
 }
 
 export default function App() {
+  const [showPopupBlocked, setShowPopupBlocked] = useState(false);
+
+  useEffect(() => {
+    const handlePopupBlocked = () => {
+      setShowPopupBlocked(true);
+    };
+    window.addEventListener('ciya-auth-popup-blocked', handlePopupBlocked);
+    return () => {
+      window.removeEventListener('ciya-auth-popup-blocked', handlePopupBlocked);
+    };
+  }, []);
+
   return (
     <div className="bg-teal-950 font-sans text-teal-50 min-h-screen selection:bg-amber-500/30 selection:text-amber-200 flex flex-col">
       <Navbar />
@@ -912,6 +876,55 @@ export default function App() {
         <CTA />
       </main>
       <Footer />
+
+      {/* POPUP BLOCKED ALERT MODAL */}
+      {showPopupBlocked && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md text-slate-800">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-500">
+              <Sparkles className="w-8 h-8 fill-amber-500" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-800 tracking-tight">Login Popup Blocked</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Because this virtual Academy program is running inside an AI Studio preview frame, modern web browsers block standard login popups by default to protect your privacy.
+              </p>
+            </div>
+            
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-left space-y-3.5 text-xs text-slate-600">
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 font-extrabold text-[10px]">1</span>
+                <p className="leading-relaxed">
+                  Look for a <strong>Popups Blocked</strong> icon in your browser's address bar, click it, and select <strong>"Always allow popups"</strong>.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 font-extrabold text-[10px]">2</span>
+                <p className="leading-relaxed">
+                  Or, click the <strong>"Open App"</strong> / <strong>"Open in New Tab"</strong> button in the top-right corner of AI Studio to run the app directly, where log-in popups are never blocked!
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                onClick={() => setShowPopupBlocked(false)}
+                className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-sm font-bold transition-all cursor-pointer"
+              >
+                Close Window
+              </button>
+              <button
+                onClick={() => {
+                  setShowPopupBlocked(false);
+                }}
+                className="flex-1 py-3 px-4 bg-amber-500 hover:bg-amber-400 text-teal-950 rounded-2xl text-sm font-bold transition-all shadow-lg shadow-amber-500/20 cursor-pointer"
+              >
+                Retry Sign In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

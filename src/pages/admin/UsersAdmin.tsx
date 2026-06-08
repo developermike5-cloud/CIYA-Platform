@@ -3,6 +3,44 @@ import { collection, query, getDocs, orderBy, doc, updateDoc, deleteDoc } from '
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
+function getFirestoreTime(timestamp: any): number {
+  if (!timestamp) return 0;
+  try {
+    if (typeof timestamp.toDate === 'function') {
+      return timestamp.toDate().getTime();
+    }
+    if (timestamp.seconds !== undefined) {
+      return timestamp.seconds * 1000;
+    }
+    const d = new Date(timestamp);
+    if (!isNaN(d.getTime())) {
+      return d.getTime();
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return 0;
+}
+
+function formatFirestoreDateTime(timestamp: any): string {
+  if (!timestamp) return '-';
+  try {
+    if (typeof timestamp.toDate === 'function') {
+      return timestamp.toDate().toLocaleString();
+    }
+    if (timestamp.seconds !== undefined) {
+      return new Date(timestamp.seconds * 1000).toLocaleString();
+    }
+    const d = new Date(timestamp);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleString();
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return '-';
+}
+
 interface UserProfile {
   id: string;
   email: string;
@@ -148,8 +186,8 @@ export default function UsersAdmin() {
     });
 
     result.sort((a, b) => {
-      const dateA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()) : 0;
-      const dateB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()) : 0;
+      const dateA = getFirestoreTime(a.createdAt);
+      const dateB = getFirestoreTime(b.createdAt);
       return sortDate === 'asc' ? dateA - dateB : dateB - dateA;
     });
 
@@ -173,7 +211,7 @@ export default function UsersAdmin() {
         </div>
         <button 
           onClick={handleCopyLink}
-          className={`shrink-0 px-6 py-3.5 rounded-xl text-sm font-extrabold shadow-md transition-all duration-200 ${copiedLink ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/10' : 'bg-indigo-600 hover:bg-indigo-750 text-white shadow-indigo-500/10 hover:-translate-y-0.5'}`}
+          className={`shrink-0 px-6 py-3.5 rounded-xl text-sm font-extrabold shadow-md transition-all duration-200 ${copiedLink ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/10' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/10 hover:-translate-y-0.5'}`}
         >
           {copiedLink ? 'Copied Invitation Link ✓' : 'Copy Onboarding Link'}
         </button>
@@ -326,7 +364,7 @@ export default function UsersAdmin() {
                       <tr className={`hover:bg-slate-50/50 transition-colors ${isUserExpanded ? 'bg-indigo-50/20' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="font-bold text-slate-900 leading-tight">{u.fullName || '-'}</div>
-                          <div className="text-slate-505 text-xs mt-0.5">{u.gender ? `${u.gender} • ` : ''}{u.state || '-'}</div>
+                          <div className="text-slate-500 text-xs mt-0.5">{u.gender ? `${u.gender} • ` : ''}{u.state || '-'}</div>
                         </td>
                         <td className="px-4 py-3 text-slate-800">
                           <div className="font-semibold text-xs text-indigo-900">{u.email}</div>
@@ -339,7 +377,7 @@ export default function UsersAdmin() {
                           <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-1">Level: {u.experience || 'None'}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="inline-flex px-2 py-0.5 text-xs font-bold rounded bg-slate-100 text-slate-850">
+                          <span className="inline-flex px-2 py-0.5 text-xs font-bold rounded bg-slate-100 text-slate-800">
                             {u.recommendedPath || '-'}
                           </span>
                           <div className="text-slate-500 text-xs mt-1">
@@ -382,7 +420,7 @@ export default function UsersAdmin() {
                               className={`p-1.5 rounded transition-all ${
                                 u.approvalStatus === 'Approved' 
                                   ? 'bg-emerald-50 text-emerald-300 cursor-not-allowed' 
-                                  : 'bg-emerald-55 border border-emerald-250 text-emerald-600 hover:bg-emerald-100'
+                                  : 'bg-emerald-50 border border-emerald-200 text-emerald-650 hover:bg-emerald-100'
                               }`}
                             >
                               <Check className="w-4 h-4 stroke-[3]" />
@@ -395,8 +433,8 @@ export default function UsersAdmin() {
                               title="Disapprove User Application"
                               className={`p-1.5 rounded transition-all ${
                                 u.approvalStatus === 'Disapproved' 
-                                  ? 'bg-rose-50 text-rose-350 cursor-not-allowed' 
-                                  : 'bg-rose-55 border border-rose-250 text-rose-600 hover:bg-rose-100'
+                                  ? 'bg-rose-50 text-rose-300 cursor-not-allowed' 
+                                  : 'bg-rose-50 border border-rose-200 text-rose-650 hover:bg-rose-100'
                               }`}
                             >
                               <X className="w-4 h-4 stroke-[3]" />
@@ -430,11 +468,11 @@ export default function UsersAdmin() {
                                 </h4>
                                 <p className="text-slate-700 text-xs leading-relaxed">
                                   <strong className="text-slate-800 font-semibold">What are you building CIYA Academy for?</strong> <br/>
-                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-150 block mt-1">{u.intent || 'Not answered'}</span>
+                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-200 block mt-1">{u.intent || 'Not answered'}</span>
                                 </p>
                                 <p className="text-slate-700 text-xs leading-relaxed mt-2">
                                   <strong className="text-slate-800 font-semibold">Primary target learning goal:</strong> <br/>
-                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-150 block mt-1">{u.goal || 'Not answered'}</span>
+                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-200 block mt-1">{u.goal || 'Not answered'}</span>
                                 </p>
                               </div>
 
@@ -444,11 +482,11 @@ export default function UsersAdmin() {
                                 </h4>
                                 <p className="text-slate-700 text-xs leading-relaxed">
                                   <strong className="text-slate-800 font-semibold">Knowledge or tools/code background:</strong> <br/>
-                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-150 block mt-1">{u.pathwayExperience || u.experience || 'Not answered'}</span>
+                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-200 block mt-1">{u.pathwayExperience || u.experience || 'Not answered'}</span>
                                 </p>
                                 <p className="text-slate-700 text-xs leading-relaxed mt-2">
                                   <strong className="text-slate-800 font-semibold">Reason for choosing this pathway:</strong> <br/>
-                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-150 block mt-1">{u.pathwayReason || 'Not answered'}</span>
+                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-200 block mt-1">{u.pathwayReason || 'Not answered'}</span>
                                 </p>
                               </div>
 
@@ -456,7 +494,7 @@ export default function UsersAdmin() {
                                 <h4 className="font-extrabold uppercase text-[10px] text-pink-700 tracking-wider flex items-center gap-1 mb-1 bg-pink-50 px-2 py-0.5 rounded-md inline-block">
                                   <span>📋</span> Extra Metadata
                                 </h4>
-                                <div className="bg-white p-3 rounded border border-slate-150 space-y-2 text-xs">
+                                <div className="bg-white p-3 rounded border border-slate-200 space-y-2 text-xs">
                                   <div>
                                     <span className="text-slate-400 block font-bold text-[9px] uppercase">Commitment Availability</span>
                                     <span className="font-medium text-slate-800">{u.availability || 'Not answered'}</span>
@@ -464,7 +502,7 @@ export default function UsersAdmin() {
                                   <div>
                                     <span className="text-slate-400 block font-bold text-[9px] uppercase">Joined Date & Time</span>
                                     <span className="font-medium text-slate-800">
-                                      {u.createdAt ? ((u.createdAt as any).toDate ? (u.createdAt as any).toDate().toLocaleString() : new Date(u.createdAt).toLocaleString()) : '-'}
+                                      {formatFirestoreDateTime(u.createdAt)}
                                     </span>
                                   </div>
                                   <div>

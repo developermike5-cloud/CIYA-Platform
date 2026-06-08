@@ -5,20 +5,69 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User 
 import { Menu, X } from 'lucide-react';
 
 export default function AdminLayout() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(() => {
+    const cached = localStorage.getItem('ciya_cached_user');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.email === 'developermike5@gmail.com') {
+          return parsed;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    return null;
+  });
+
+  const [loading, setLoading] = useState(() => {
+    return !localStorage.getItem('ciya_cached_user');
+  });
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      if (currentUser) {
+        if (currentUser.email === 'developermike5@gmail.com') {
+          const userData = {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            role: 'admin'
+          };
+          localStorage.setItem('ciya_cached_user', JSON.stringify(userData));
+          setUser(currentUser);
+        } else {
+          localStorage.removeItem('ciya_cached_user');
+          setUser(null);
+        }
+      } else {
+        const cached = localStorage.getItem('ciya_cached_user');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.email === 'developermike5@gmail.com') {
+              setUser(parsed);
+            } else {
+              localStorage.removeItem('ciya_cached_user');
+              setUser(null);
+            }
+          } catch (e) {
+            localStorage.removeItem('ciya_cached_user');
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
   const handleLogout = async () => {
+    localStorage.removeItem('ciya_cached_user');
     await signOut(auth);
   };
 

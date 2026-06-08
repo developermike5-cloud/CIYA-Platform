@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
-import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock } from 'lucide-react';
+import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 
 type Pathway = 'A' | 'B' | 'C' | null;
+
+let globalOnboardingSignInActive = false;
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -43,13 +45,16 @@ export default function Onboarding() {
   const [formError, setFormError] = useState('');
   const [timeLeft, setTimeLeft] = useState('');
   const [creationTime, setCreationTime] = useState<number | null>(null);
+  const [showPopupBlocked, setShowPopupBlocked] = useState(false);
 
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => Math.max(1, s - 1));
 
   const handleDirectLogin = async () => {
+    if (globalOnboardingSignInActive) return;
     setLoading(true);
     try {
+      globalOnboardingSignInActive = true;
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
@@ -70,12 +75,23 @@ export default function Onboarding() {
         return;
       }
       console.error(e);
+      if (
+        e.code === 'auth/popup-blocked' || 
+        e.message?.toLowerCase().includes('popup-blocked') || 
+        e.message?.toLowerCase().includes('popup estuvo bloqueado') ||
+        e.message?.includes('Pending promise was never set') ||
+        e.message?.includes('INTERNAL ASSERTION FAILED')
+      ) {
+        setShowPopupBlocked(true);
+        return;
+      }
       if (e.message?.includes('offline') || e.code === 'unavailable') {
         alert("Network error: Please check your internet connection and try again.");
       } else {
         alert("An error occurred: " + e.message);
       }
     } finally {
+      globalOnboardingSignInActive = false;
       setLoading(false);
     }
   };
@@ -109,9 +125,8 @@ export default function Onboarding() {
   ];
 
   const pathwaysOpt = [
-    { val: 'A' as Pathway, label: 'AI Website Development', icon: <Globe className="w-6 h-6 text-blue-500" /> },
-    { val: 'B' as Pathway, label: 'AI Film Studio', icon: <Film className="w-6 h-6 text-purple-500" /> },
-    { val: 'C' as Pathway, label: 'AI Image & Graphics Engineering', icon: <Palette className="w-6 h-6 text-pink-500" /> }
+    { val: 'A' as Pathway, label: 'AI Landing Page Creation', icon: <Globe className="w-6 h-6 text-blue-500" /> },
+    { val: 'B' as Pathway, label: 'AI E-commerce Website Creation', icon: <ShoppingBag className="w-6 h-6 text-emerald-500" /> }
   ];
 
   const experiences = [
@@ -132,8 +147,10 @@ export default function Onboarding() {
 
   const doAuthAndSave = async () => {
     if (!validateForm()) return;
+    if (globalOnboardingSignInActive) return;
     setLoading(true);
     try {
+      globalOnboardingSignInActive = true;
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
@@ -157,9 +174,23 @@ export default function Onboarding() {
         const userCode = data.myReferralCode || user.uid.slice(0, 6).toUpperCase();
         
         let recommendedPath = '';
-        if (data.experience.includes('Intermediate')) recommendedPath = 'Advanced ' + (pathway === 'A' ? 'Website' : pathway === 'B' ? 'Film' : 'Image') + ' Program';
-        else if (data.experience.includes('expert')) recommendedPath = 'Masterclass ' + (pathway === 'A' ? 'Website' : pathway === 'B' ? 'Film' : 'Image') + ' Program';
-        else recommendedPath = pathway === 'A' ? 'AI Website Builder Beginner Bootcamp' : pathway === 'B' ? 'AI Film Studio Beginner Program' : 'AI Image Engineering Foundation Class';
+        if (pathway === 'A') {
+          if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
+            recommendedPath = 'Professional Conversion Page Builder';
+          } else if (data.experience.includes('expert')) {
+            recommendedPath = 'Conversion Funnel Agency Masterclass';
+          } else {
+            recommendedPath = 'Landing Page Foundations';
+          }
+        } else {
+          if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
+            recommendedPath = 'Professional Store Builder';
+          } else if (data.experience.includes('expert')) {
+            recommendedPath = 'E-Commerce Agency Growth Masterclass';
+          } else {
+            recommendedPath = 'E-commerce Essentials';
+          }
+        }
 
         let isActivated = false;
 
@@ -215,12 +246,23 @@ export default function Onboarding() {
         return;
       }
       console.error(e);
+      if (
+        e.code === 'auth/popup-blocked' || 
+        e.message?.toLowerCase().includes('popup-blocked') || 
+        e.message?.toLowerCase().includes('popup estuvo bloqueado') ||
+        e.message?.includes('Pending promise was never set') ||
+        e.message?.includes('INTERNAL ASSERTION FAILED')
+      ) {
+        setShowPopupBlocked(true);
+        return;
+      }
       if (e.message?.includes('offline') || e.code === 'unavailable') {
         alert("Network error: Please check your internet connection and try again.");
       } else {
         alert('Error during sign up: ' + e.message);
       }
     } finally {
+      globalOnboardingSignInActive = false;
       setLoading(false);
     }
   };
@@ -507,6 +549,55 @@ export default function Onboarding() {
 
         </AnimatePresence>
       </div>
+
+      {/* POPUP BLOCKED ALERT MODAL */}
+      {showPopupBlocked && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-500">
+              <Sparkles className="w-8 h-8 fill-amber-500" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-800 tracking-tight">Login Popup Blocked</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Because this virtual Academy program is running inside an AI Studio preview frame, modern web browsers block standard login popups by default to protect your privacy.
+              </p>
+            </div>
+            
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-left space-y-3.5 text-xs text-slate-600">
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 font-extrabold text-[10px]">1</span>
+                <p className="leading-relaxed">
+                  Look for a <strong>Popups Blocked</strong> icon in your browser's address bar, click it, and select <strong>"Always allow popups"</strong>.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 font-extrabold text-[10px]">2</span>
+                <p className="leading-relaxed">
+                  Or, click the <strong>"Open App"</strong> / <strong>"Open in New Tab"</strong> button in the top-right corner of AI Studio to run the app directly, where log-in popups are never blocked!
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                onClick={() => setShowPopupBlocked(false)}
+                className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-sm font-bold transition-all cursor-pointer"
+              >
+                Close Window
+              </button>
+              <button
+                onClick={() => {
+                  setShowPopupBlocked(false);
+                }}
+                className="flex-1 py-3 px-4 bg-amber-500 hover:bg-amber-400 text-teal-950 rounded-2xl text-sm font-bold transition-all shadow-lg shadow-amber-500/20 cursor-pointer"
+              >
+                Retry Sign In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -537,7 +628,7 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
           </div>
         </div>
 
-        <div className="border-t border-slate-150 pt-3 space-y-3">
+        <div className="border-t border-slate-200 pt-3 space-y-3">
           <div>
             <span className="text-slate-400 block text-[10px] uppercase font-bold">Recommended Study Program</span>
             <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded text-xs inline-block mt-0.5">
@@ -553,7 +644,7 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
           {data.pathwayReason && (
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold">Reason for Selection</span>
-              <p className="text-slate-650 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-150 rounded">{data.pathwayReason}</p>
+              <p className="text-slate-600 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-200 rounded">{data.pathwayReason}</p>
             </div>
           )}
           <div>
@@ -563,18 +654,18 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
           {data.intent && (
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
-              <p className="text-slate-650 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-150 rounded">{data.intent}</p>
+              <p className="text-slate-600 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-200 rounded">{data.intent}</p>
             </div>
           )}
           {data.goal && (
             <div>
               <span className="text-slate-400 block text-[10px] uppercase font-bold">Target Learning Goal</span>
-              <p className="text-slate-650 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-150 rounded">{data.goal}</p>
+              <p className="text-slate-600 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-200 rounded">{data.goal}</p>
             </div>
           )}
           <div>
             <span className="text-slate-400 block text-[10px] uppercase font-bold">Commitment Level</span>
-            <span className="text-slate-850 font-bold">{data.availability || '-'}</span>
+            <span className="text-slate-800 font-bold">{data.availability || '-'}</span>
           </div>
         </div>
       </div>
@@ -585,10 +676,8 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
 function PathwayA({ data, setData, onNext }: { data: any, setData: any, onNext: () => void }) {
   const [subStep, setSubStep] = useState(1);
   const q1 = [
-    { title: 'Landing Pages', meaning: 'A standalone web page created specifically for a marketing or advertising campaign.', uses: 'Lead generation, sales funnels, webinar registrations, product launches.', businesses: 'Course creators, marketers, event organizers, startups.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp' },
-    { title: 'E-commerce Stores', meaning: 'A virtual storefront where businesses can sell products or services online.', uses: 'Online retail, dropshipping, subscription services, digital products.', businesses: 'Fashion brands, retailers, creators, direct-to-consumer startups.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=5b233e180530fcf94134bfed78e2c49d_720w_gqclim' },
-    { title: 'Portfolio Websites', meaning: 'A personal website showcasing an individual\'s work, skills, and experience.', uses: 'Displaying projects, sharing case studies, personal branding.', businesses: 'Freelancers, consultants, artists, photographers, developers.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=704f7970e09360476c34e5b8dd6a1239_720w_hkdauz' },
-    { title: 'Business Websites', meaning: 'A comprehensive site representing a company\'s brand, services, and contact info.', uses: 'Establishing credibility, providing info, client inquiries.', businesses: 'Consultants, agencies, corporate firms, local service businesses.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r' }
+    { title: 'SaaS & Tech Landing Pages', meaning: 'Clean, high-tech landing pages built specifically to launch products, software, or mobile applications.', uses: 'Product walkthroughs, app feature showcases, waitlist registrations.', businesses: 'SaaS startups, software developers, technical founders.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp' },
+    { title: 'Local Business Funnels', meaning: 'High-converting sales funnels designed for local services, coaching, or webinar event registration.', uses: 'Lead generation, local client list building, selling services.', businesses: 'Course creators, real estate agents, consultants, consulting partners.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r' },
   ];
   const q2 = ['To build for my own business', 'To get clients and make money', 'To stop paying developers'];
   const q3 = ['Never', 'Only with Canva/Wix', 'I tried coding before', 'I already build websites manually'];
@@ -598,31 +687,29 @@ function PathwayA({ data, setData, onNext }: { data: any, setData: any, onNext: 
   const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext(); };
 
   return <PathwayFlow step={subStep} mediaType="video"
-    title1="What type of website would you love to create?" opts1={q1} click1={clickQ1}
-    title2="Why do you want to learn website creation?" opts2={q2} click2={clickQ2}
-    title3="Have you ever built a website before?" opts3={q3} click3={clickQ3}
+    title1="What type of landing page would you love to create?" opts1={q1} click1={clickQ1}
+    title2="Why do you want to learn landing page creation?" opts2={q2} click2={clickQ2}
+    title3="Have you ever built a landing page before?" opts3={q3} click3={clickQ3}
   />;
 }
 
 function PathwayB({ data, setData, onNext }: { data: any, setData: any, onNext: () => void }) {
   const [subStep, setSubStep] = useState(1);
   const q1 = [
-    { title: 'Social media videos', meaning: 'Short-form content optimized for platforms like TikTok, Instagram, and Shorts.', uses: 'Viral marketing, brand awareness, engagement, trends.', businesses: 'Content creators, influencers, consumer brands, agencies.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=7bee2ea0eabdda3d8b25f88bb5cac243_720w_igzzgc' },
-    { title: 'Commercial/product ads', meaning: 'Promotional videos designed to sell a specific product or service.', uses: 'Paid advertising, social media campaigns, product launches.', businesses: 'E-commerce stores, SaaS companies, real estate, physical product brands.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=5a34fc982d2847355b768f97774966a7_720w_kd1iw5' },
-    { title: 'YouTube content', meaning: 'Long-form educational, entertaining, or documentary-style videos.', uses: 'Community building, deep-dive tutorials, vlogging, monetization.', businesses: 'Educators, entertainers, thought leaders, media companies.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=c5495e4e04d349539fe97a193db66b92_720w_ntvzus' },
-    { title: 'Cinematic storytelling', meaning: 'High-quality, narrative-driven videos with movie-like aesthetics.', uses: 'Brand films, short films, music videos, emotional storytelling.', businesses: 'Luxury brands, filmmakers, travel agencies, musicians.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=d8e7b4c4d2c6d301fe8368f0d083c8e4_720w_ls2fk3' }
+    { title: 'WhatsApp Automated Stores', meaning: 'Responsive digital storefronts integrated with instant WhatsApp order forwarding.', uses: 'Accepting local orders, listing standard item menus, instant buyer alerts.', businesses: 'Instagram clothing brands, local bakeries, dropshipping shops.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=5b233e180530fcf94134bfed78e2c49d_720w_gqclim' },
+    { title: 'Full Checkout Digital Catalogs', meaning: 'Structured online catalogs displaying physical or digital downloadable products with secure card gateways.', uses: 'Credit card payments (Paystack/Flutterwave), automated file delivery, wholesale orders.', businesses: 'Ebook authors, creative designers, fashion boutiques, manufacturers.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=5b233e180530fcf94134bfed78e2c49d_720w_gqclim' },
   ];
-  const q2 = ['Grow my brand', 'Become a content creator', 'Start a faceless YouTube channel', 'Offer video services to clients', 'Learn AI filmmaking for fun'];
-  const q3 = ['None', 'CapCut', 'Canva', 'Premiere Pro', 'AI tools already'];
+  const q2 = ['To build for my own business', 'To get clients and make money', 'To stop paying developers'];
+  const q3 = ['Never', 'Only with Canva/Wix', 'I tried coding before', 'I already build websites manually'];
 
   const clickQ1 = (val: string) => { setData((p:any) => ({...p, pathwaySelection: val})); setSubStep(2); };
   const clickQ2 = (val: string) => { setData((p:any) => ({...p, pathwayReason: val})); setSubStep(3); };
   const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext(); };
 
   return <PathwayFlow step={subStep} mediaType="video"
-    title1="What kind of videos do you want to create?" opts1={q1} click1={clickQ1}
-    title2="What is your main goal?" opts2={q2} click2={clickQ2}
-    title3="What tools have you used before?" opts3={q3} click3={clickQ3}
+    title1="What type of e-commerce store would you love to create?" opts1={q1} click1={clickQ1}
+    title2="Why do you want to learn e-commerce creation?" opts2={q2} click2={clickQ2}
+    title3="Have you ever built an e-commerce store before?" opts3={q3} click3={clickQ3}
   />;
 }
 

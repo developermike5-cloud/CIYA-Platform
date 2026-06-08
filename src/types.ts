@@ -1,18 +1,50 @@
 export interface Course {
   id?: string;
   title: string;
-  subtitle?: string;
-  slug: string;
+  subtitle?: string; // used for tagline / subtitle
+  tagline?: string;   // guide property
+  slug?: string;
   thumbnail?: string;
-  description?: string;
+  description?: string; // used for overview
+  overview?: string;    // guide property
   category?: string;
+  skill?: string;       // "web" | "film" | "image"
+  subskill?: string;
   youtube_link?: string;
   level?: 'Beginner' | 'Advanced' | 'Masterclass';
+  tier?: 'beginner' | 'advanced' | 'masterclass';  // guide property
   price?: number;
-  modules?: string; // stringified JSON for modules
+  instructor?: string;
+  outcomes?: string;
+  requirements?: string;
   publish_status: 'Draft' | 'Published' | 'Archived';
-  createdAt?: string; // ISO String
-  updatedAt?: string; // ISO String
+  status?: 'draft' | 'published'; // guide property
+  createdAt?: any;
+  updatedAt?: any;
+  days?: CourseDay[];
+}
+
+export interface CourseDay {
+  dayNumber: number; // 1 to 5
+  title: string;
+  description?: string;
+  videos: CourseVideo[];
+  assignment?: {
+    prompt: string;
+    dueNote: string;
+  };
+}
+
+export interface CourseVideo {
+  id: string; // unique identifier
+  title: string;
+  video_url: string; // compatibility
+  url?: string;       // guide property
+  duration?: string;
+  description?: string;
+  resources?: string;
+  checkType?: 'none' | 'mcq' | 'tf' | 'fact';
+  check?: any; // MCQ, TF, or Fact object
 }
 
 export interface Module {

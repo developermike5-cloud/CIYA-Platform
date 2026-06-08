@@ -30,18 +30,27 @@ service cloud.firestore {
 
     // Entity Validation: Course
     function isValidCourse(data) {
-      return data.keys().hasAll(['title', 'slug', 'publish_status', 'createdAt', 'updatedAt']) 
+      return data.keys().hasAll(['title', 'publish_status', 'createdAt', 'updatedAt']) 
         && data.title is string && data.title.size() > 0 && data.title.size() <= 200
-        && data.slug is string && data.slug.size() > 0 && data.slug.size() <= 200
         && data.publish_status in ['Draft', 'Published', 'Archived']
-        && (data.get('subtitle', '') is string && data.get('subtitle', '').size() <= 500)
-        && (data.get('thumbnail', '') is string && data.get('thumbnail', '').size() <= 1000)
+        && (data.get('subtitle', '') is string && data.get('subtitle', '').size() <= 1000)
+        && (data.get('tagline', '') is string && data.get('tagline', '').size() <= 1000)
+        && (data.get('slug', '') is string && data.get('slug', '').size() <= 500)
+        && (data.get('thumbnail', '') is string && data.get('thumbnail', '').size() <= 2000)
         && (data.get('description', '') is string && data.get('description', '').size() <= 10000)
-        && (data.get('category', '') is string && data.get('category', '').size() <= 100)
+        && (data.get('overview', '') is string && data.get('overview', '').size() <= 10000)
+        && (data.get('category', '') is string && data.get('category', '').size() <= 200)
+        && (data.get('skill', '') is string && data.get('skill', '').size() <= 100)
+        && (data.get('subskill', '') is string && data.get('subskill', '').size() <= 200)
         && (data.get('youtube_link', '') is string && data.get('youtube_link', '').size() <= 1000)
         && (data.get('level', '') is string && data.get('level', '').size() <= 100)
-        && (data.get('price', 0) is number)
-        && (data.get('modules', '') is string && data.get('modules', '').size() <= 1000000);
+        && (data.get('tier', '') is string && data.get('tier', '').size() <= 100)
+        && (data.get('price', 0) is int || data.get('price', 0) is float)
+        && (data.get('instructor', '') is string && data.get('instructor', '').size() <= 500)
+        && (data.get('outcomes', '') is string && data.get('outcomes', '').size() <= 10000)
+        && (data.get('requirements', '') is string && data.get('requirements', '').size() <= 10000)
+        && (data.get('status', '') is string && data.get('status', '').size() <= 100)
+        && (data.get('days', []) is list && data.get('days', []).size() <= 15);
     }
     
     // Entity Validation: AdminConfig
@@ -54,21 +63,22 @@ service cloud.firestore {
     function isValidUserProfile(data) {
       return data.keys().hasAll(['email', 'createdAt', 'updatedAt'])
         && data.email is string && data.email.size() <= 200
-        && (data.get('intent', '') is string && data.get('intent', '').size() <= 200)
-        && (data.get('experience', '') is string && data.get('experience', '').size() <= 200)
-        && (data.get('pathwaySelection', '') is string && data.get('pathwaySelection', '').size() <= 200)
-        && (data.get('pathwayReason', '') is string && data.get('pathwayReason', '').size() <= 200)
-        && (data.get('pathwayExperience', '') is string && data.get('pathwayExperience', '').size() <= 200)
-        && (data.get('recommendedPath', '') is string && data.get('recommendedPath', '').size() <= 500)
-        && (data.get('goal', '') is string && data.get('goal', '').size() <= 200)
-        && (data.get('availability', '') is string && data.get('availability', '').size() <= 200)
-        && (data.get('fullName', '') is string && data.get('fullName', '').size() <= 100)
-        && (data.get('whatsapp', '') is string && data.get('whatsapp', '').size() <= 100)
-        && (data.get('state', '') is string && data.get('state', '').size() <= 100)
-        && (data.get('referralCode', '') is string && data.get('referralCode', '').size() <= 100)
-        && (data.get('myReferralCode', '') is string && data.get('myReferralCode', '').size() <= 100)
+        && (data.get('intent', '') is string && data.get('intent', '').size() <= 5000)
+        && (data.get('experience', '') is string && data.get('experience', '').size() <= 5000)
+        && (data.get('pathwaySelection', '') is string && data.get('pathwaySelection', '').size() <= 5000)
+        && (data.get('pathwayReason', '') is string && data.get('pathwayReason', '').size() <= 5000)
+        && (data.get('pathwayExperience', '') is string && data.get('pathwayExperience', '').size() <= 5000)
+        && (data.get('recommendedPath', '') is string && data.get('recommendedPath', '').size() <= 5000)
+        && (data.get('goal', '') is string && data.get('goal', '').size() <= 5000)
+        && (data.get('availability', '') is string && data.get('availability', '').size() <= 5000)
+        && (data.get('fullName', '') is string && data.get('fullName', '').size() <= 1000)
+        && (data.get('whatsapp', '') is string && data.get('whatsapp', '').size() <= 500)
+        && (data.get('state', '') is string && data.get('state', '').size() <= 500)
+        && (data.get('referralCode', '') is string && data.get('referralCode', '').size() <= 500)
+        && (data.get('myReferralCode', '') is string && data.get('myReferralCode', '').size() <= 500)
         && (data.get('isActivated', false) is bool)
-        && (data.get('referralsCount', 0) is number);
+        && (data.get('referralsCount', 0) is int || data.get('referralsCount', 0) is float)
+        && (data.get('approvalStatus', 'Pending') is string && data.get('approvalStatus', 'Pending') in ['Pending', 'Approved', 'Disapproved']);
     }
 
     // Collections Routes
@@ -93,6 +103,8 @@ service cloud.firestore {
                     && incoming().updatedAt == request.time;
       allow update: if isSignedIn() 
                     && (
+                      isAdmin()
+                      ||
                       (request.auth.uid == userId 
                        && isValidUserProfile(incoming())
                        && incoming().email == existing().email
@@ -134,9 +146,10 @@ service cloud.firestore {
                     && incoming().createdAt == existing().createdAt
                     && incoming().updatedAt == request.time
                     && incoming().diff(existing()).affectedKeys().hasOnly([
-                      'title', 'subtitle', 'slug', 'thumbnail', 'description', 
-                      'category', 'youtube_link', 'level', 'price', 'modules', 
-                      'publish_status', 'updatedAt'
+                      'title', 'subtitle', 'tagline', 'slug', 'thumbnail', 'description', 
+                      'overview', 'category', 'skill', 'subskill', 'youtube_link', 
+                      'level', 'tier', 'price', 'instructor', 'outcomes', 
+                      'requirements', 'publish_status', 'status', 'days', 'updatedAt'
                     ]);
                     
       allow delete: if isAdmin();
