@@ -238,10 +238,6 @@ function Navbar() {
         <a href="#how" className="hover:text-amber-400 transition-colors">How it works</a>
         <a href="#why" className="hover:text-amber-400 transition-colors">Why CIYA</a>
       </div>
-
-      <button onClick={login} className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-teal-950 rounded-full text-sm font-bold shadow-lg shadow-amber-500/30 transition-all cursor-pointer">
-        Sign In
-      </button>
     </motion.nav>
   );
 }
