@@ -239,6 +239,38 @@ export default function Onboarding() {
           } catch(e) { console.error('Error activating referral:', e); }
         }
 
+        // Send registration details formatted for WhatsApp straight to the Admin's Chat
+        try {
+          const adminWhatsapp = "2349030064109";
+          const messageText = `*🆕 NEW CIYA STUDENT REGISTRATION*
+
+*👤 PERSONAL DETAILS:*
+• *Name:* ${data.fullName}
+• *Email:* ${user.email || 'N/A'}
+• *WhatsApp:* ${data.whatsapp}
+• *Gender:* ${data.gender}
+• *State:* ${data.state}
+
+*📚 ACADEMIC PROFILE:*
+• *Recommended:* ${recommendedPath}
+• *Pathway Selection:* ${data.courseType || ''} ${data.pathwaySelection ? `(${data.pathwaySelection})` : ''}
+• *Reason:* ${data.pathwayReason || 'N/A'}
+• *Experience:* ${data.pathwayExperience || data.experience || 'None'}
+
+*🎯 COMMITMENT & GOALS:*
+• *Target Goal:* ${data.goal || 'N/A'}
+• *Commitment:* ${data.availability || 'N/A'}
+• *Referral Code Entered:* ${data.referralCode || 'None'}
+• *Student's Referral Code:* ${userCode}
+
+_Action: Please review and approve this student profile!_`;
+
+          const whatsappUrl = `https://api.whatsapp.com/send?phone=${adminWhatsapp}&text=${encodeURIComponent(messageText)}`;
+          window.open(whatsappUrl, '_blank');
+        } catch (wsErr) {
+          console.error("Error launching WhatsApp portal:", wsErr);
+        }
+
         nextStep(); 
       }
     } catch (e: any) {

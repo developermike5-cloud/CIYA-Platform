@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CIYA Academy – Portal Hub</title>
+  <!-- Tailwind CSS CDN for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-[#022c22] text-teal-100 min-h-screen flex flex-col justify-between selection:bg-amber-400/30 selection:text-amber-200">
+
+  <!-- Main Container -->
+  <main class="flex-1 flex flex-col items-center justify-center p-6 md:p-12">
+    <div class="max-w-md w-full bg-[#043d30]/60 border border-teal-800 rounded-3xl p-8 shadow-2xl backdrop-blur-md space-y-8 relative overflow-hidden">
+      <!-- Glow effect -->
+      <div class="absolute -top-10 -right-10 w-24 h-24 bg-amber-500/10 blur-xl rounded-full"></div>
+
+      <!-- Header -->
+      <div class="text-center space-y-3">
+        <div class="inline-flex items-center gap-3 justify-center">
+          <div class="w-8 h-8 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-lg shadow-md"></div>
+          <span class="font-extrabold text-sm tracking-widest text-white uppercase">CIYA ACADEMY</span>
+        </div>
+        <h1 class="text-2xl font-black text-white tracking-tight">Access Control & Portal Hub</h1>
+        <p class="text-xs text-teal-300 font-medium">To keep the landing page clean and professional, use this private link to navigate to restricted/administrative platform directories.</p>
+      </div>
+
+      <!-- Links Grid -->
+      <div class="space-y-4">
+        <!-- Student Onboarding -->
+        <a href="/onboarding" class="group block p-4 bg-[#022c22]/80 hover:bg-[#022c22] border border-teal-900 hover:border-amber-500/50 rounded-2xl transition-all duration-300 flex items-center justify-between">
+          <div class="space-y-1">
+            <span class="text-xs font-bold uppercase tracking-widest text-amber-400 block">01 / Student Setup</span>
+            <span class="text-base font-extrabold text-white block">Student Onboarding</span>
+            <span class="text-xs text-teal-300/80 block">Registration questions & stream recommendation</span>
+          </div>
+          <span class="w-8 h-8 rounded-full bg-teal-900 group-hover:bg-amber-500 group-hover:text-teal-950 flex items-center justify-center text-teal-300 font-bold transition-all text-sm">&rarr;</span>
+        </a>
+
+        <!-- Student Dashboard -->
+        <a href="/dashboard" class="group block p-4 bg-[#022c22]/80 hover:bg-[#022c22] border border-teal-900 hover:border-amber-500/50 rounded-2xl transition-all duration-300 flex items-center justify-between">
+          <div class="space-y-1">
+            <span class="text-xs font-bold uppercase tracking-widest text-amber-500 block">02 / Learn Area</span>
+            <span class="text-base font-extrabold text-white block">Active Student Dashboard</span>
+            <span class="text-xs text-teal-300/80 block">Courses, curriculum content, progress trackers</span>
+          </div>
+          <span class="w-8 h-8 rounded-full bg-teal-900 group-hover:bg-amber-500 group-hover:text-teal-950 flex items-center justify-center text-teal-300 font-bold transition-all text-sm">&rarr;</span>
+        </a>
+
+        <!-- Admin Control Panel -->
+        <a href="/admin" class="group block p-4 bg-[#022c22]/80 hover:bg-[#022c22] border border-teal-900 hover:border-amber-500/50 rounded-2xl transition-all duration-300 flex items-center justify-between">
+          <div class="space-y-1">
+            <span class="text-xs font-bold uppercase tracking-widest text-red-400 block">03 / Platform Management</span>
+            <span class="text-base font-extrabold text-white block">CIYA Administration Panel</span>
+            <span class="text-xs text-teal-300/80 block">Database tables, user logs, courses & lesson customizer</span>
+          </div>
+          <span class="w-8 h-8 rounded-full bg-teal-900 group-hover:bg-amber-500 group-hover:text-teal-950 flex items-center justify-center text-teal-300 font-bold transition-all text-sm">&rarr;</span>
+        </a>
+      </div>
+
+      <!-- Action Footer -->
+      <div class="pt-4 border-t border-teal-900/60 flex items-center justify-between text-xs text-teal-400">
+        <a href="/" class="hover:text-white transition-colors flex items-center gap-1">
+          &larr; Back to Landing Page
+        </a>
+        <span class="font-mono text-[10px] bg-teal-950 px-2 py-1 rounded border border-teal-900">v1.2.0-secure</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Sticky Footer -->
+  <footer class="py-6 text-center text-[10px] text-teal-500 border-t border-teal-900/40">
+    &copy; 2026 Create It Yourself Academy (CIYA). Hidden Management Node.
+  </footer>
+
+</body>
+</html>
