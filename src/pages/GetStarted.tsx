@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Link } from 'react-router';
 import { ChevronLeft, Globe, Sparkles, Check, Info, ArrowRight } from 'lucide-react';
+import BrandingLogo from '../components/BrandingLogo';
 
 export default function GetStarted() {
   const navigate = useNavigate();
@@ -19,9 +20,8 @@ export default function GetStarted() {
         <Link to="/" className="flex items-center gap-2 text-teal-300 hover:text-teal-50 transition-colors text-sm font-semibold">
           <ChevronLeft className="w-5 h-5" /> Back to Home
         </Link>
-        <div className="flex items-center gap-3">
-          <div className="w-6 h-6 bg-gradient-to-tr from-amber-400 to-orange-500 rounded shadow"></div>
-          <span className="font-extrabold text-sm tracking-widest text-teal-50 uppercase">CIYA ACADEMY</span>
+        <div>
+          <BrandingLogo size="xs" />
         </div>
       </header>
 

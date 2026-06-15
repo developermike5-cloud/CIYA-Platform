@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, orderBy, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
-import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { collection, query, getDocs, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
+import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw } from 'lucide-react';
+import BrandingLogo from '../../components/BrandingLogo';
 
 function getFirestoreTime(timestamp: any): number {
   if (!timestamp) return 0;
@@ -73,7 +74,7 @@ export default function UsersAdmin() {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Clipboard copy state
-  const onboardingUrl = `${window.location.origin}/onboarding`;
+  const onboardingUrl = `https://ciyaacademy.netlify.app/dashboard`;
   const [copiedLink, setCopiedLink] = useState(false);
   
   const handleCopyLink = () => {
@@ -99,6 +100,162 @@ export default function UsersAdmin() {
   const [editingCodes, setEditingCodes] = useState<Record<string, string>>({});
   const [codeSuccessId, setCodeSuccessId] = useState<string | null>(null);
 
+  // Admins state & Super Admin check
+  const [admins, setAdmins] = useState<string[]>([]);
+  const [adminsData, setAdminsData] = useState<Record<string, { email: string, role?: string, permissions?: string[] }>>({});
+  const isSuperAdmin = auth.currentUser?.email === 'developermike5@gmail.com';
+
+  const cachedUserStr = localStorage.getItem('ciya_cached_user');
+  let userDetails: any = null;
+  try {
+    if (cachedUserStr) {
+      userDetails = JSON.parse(cachedUserStr);
+    }
+  } catch (e) { }
+
+  const isSuperAdminLocal = userDetails?.email === 'developermike5@gmail.com' || userDetails?.role === 'super_admin';
+  const hasBrandingPermission = isSuperAdminLocal || userDetails?.permissions?.includes('manage_branding');
+
+  // Logo upload state
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [currentLogo, setCurrentLogo] = useState<string | null>(() => {
+    return localStorage.getItem('ciya_brand_logo');
+  });
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 250 * 1024) {
+      alert("Please select an image smaller than 250KB to keep page loads lightning-fast.");
+      return;
+    }
+
+    setLogoUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      try {
+        await setDoc(doc(db, 'settings', 'app'), {
+          logo: base64String,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        localStorage.setItem('ciya_brand_logo', base64String);
+        setCurrentLogo(base64String);
+        alert("Website branding logo updated and synchronized successfully! 🎉");
+      } catch (err) {
+        console.error("Error saving brand logo to Firestore settings:", err);
+        alert("Could not save branding logo to database settings. Check permission rules.");
+      } finally {
+        setLogoUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResetLogo = async () => {
+    if (!window.confirm("Are you sure you want to reset to the default CIYA text logo?")) return;
+    setLogoUploading(true);
+    try {
+      await setDoc(doc(db, 'settings', 'app'), {
+        logo: null,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      localStorage.removeItem('ciya_brand_logo');
+      setCurrentLogo(null);
+      alert("Website logo reset to default.");
+    } catch (err) {
+      console.error("Error resetting brand logo:", err);
+      alert("Error resetting logo.");
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const handleToggleAdminStatus = async (targetUser: UserProfile) => {
+    if (!isSuperAdmin) {
+      alert("Only the super admin can manage administrator privileges.");
+      return;
+    }
+    const isAdminCurrently = admins.includes(targetUser.id);
+    try {
+      if (isAdminCurrently) {
+        if (targetUser.email === 'developermike5@gmail.com') {
+          alert("Cannot demote the super admin!");
+          return;
+        }
+        await deleteDoc(doc(db, 'admins', targetUser.id));
+        setAdmins(prev => prev.filter(id => id !== targetUser.id));
+        setAdminsData(prev => {
+          const updated = { ...prev };
+          delete updated[targetUser.id];
+          return updated;
+        });
+        alert(`${targetUser.fullName || 'User'} has been removed from CIYA admins.`);
+      } else {
+        const newAdmin = {
+          email: targetUser.email,
+          role: 'CIYA Admin',
+          permissions: ['manage_courses'] // Default permission
+        };
+        await setDoc(doc(db, 'admins', targetUser.id), newAdmin);
+        setAdmins(prev => [...prev, targetUser.id]);
+        setAdminsData(prev => ({
+          ...prev,
+          [targetUser.id]: newAdmin
+        }));
+        alert(`${targetUser.fullName || 'User'} has been upgraded to a CIYA Admin!`);
+      }
+    } catch (e) {
+      console.error("Error managing admin privileges:", e);
+      alert("Could not update admin privilege. Check database rules.");
+    }
+  };
+
+  const handleUpdateAdminFields = async (userId: string, field: string, value: any) => {
+    try {
+      const updatedAdmin = {
+        ...(adminsData[userId] || { email: '' }),
+        [field]: value
+      };
+      
+      await setDoc(doc(db, 'admins', userId), updatedAdmin, { merge: true });
+      
+      setAdminsData(prev => ({
+        ...prev,
+        [userId]: updatedAdmin
+      }));
+    } catch (err) {
+      console.error("Error updating admin fields:", err);
+      alert("Failed to update admin role.");
+    }
+  };
+
+  const handleTogglePermission = async (userId: string, permission: string) => {
+    try {
+      const currentPermissions = adminsData[userId]?.permissions || [];
+      const updatedPermissions = currentPermissions.includes(permission)
+        ? currentPermissions.filter(p => p !== permission)
+        : [...currentPermissions, permission];
+        
+      const updatedAdmin = {
+        ...(adminsData[userId] || { email: '' }),
+        permissions: updatedPermissions
+      };
+      
+      await setDoc(doc(db, 'admins', userId), updatedAdmin, { merge: true });
+      
+      setAdminsData(prev => ({
+        ...prev,
+        [userId]: updatedAdmin
+      }));
+    } catch (err) {
+      console.error("Error updating admin permissions:", err);
+      alert("Failed to update admin permissions.");
+    }
+  };
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -106,6 +263,17 @@ export default function UsersAdmin() {
         const snapshot = await getDocs(q);
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
         setUsers(data);
+
+        // Fetch admins
+        const adminSnapshot = await getDocs(collection(db, 'admins'));
+        const adminIds: string[] = [];
+        const adminMap: Record<string, { email: string, role?: string, permissions?: string[] }> = {};
+        adminSnapshot.docs.forEach(docSnap => {
+          adminIds.push(docSnap.id);
+          adminMap[docSnap.id] = (docSnap.data() || {}) as any;
+        });
+        setAdmins(adminIds);
+        setAdminsData(adminMap);
       } catch (error) {
         handleFirestoreError(error, OperationType.LIST, 'users');
       } finally {
@@ -231,7 +399,7 @@ export default function UsersAdmin() {
   return (
     <div>
       {/* Onboarding Registration Link panel */}
-      <div className="bg-indigo-50 border border-indigo-200/60 rounded-2xl p-6 md:p-8 mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 shadow-sm">
+      <div className="bg-indigo-50 border border-indigo-200/60 rounded-2xl p-6 md:p-8 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-6 shadow-sm">
         <div className="space-y-1">
           <h2 className="text-lg font-extrabold text-indigo-900 tracking-tight">Invite New Students (Copy Onboarding Link) 👩‍💻</h2>
           <p className="text-sm text-indigo-700/90 leading-relaxed max-w-2xl">
@@ -250,6 +418,46 @@ export default function UsersAdmin() {
           {copiedLink ? 'Copied Invitation Link ✓' : 'Copy Onboarding Link'}
         </button>
       </div>
+
+      {/* Website Branding Logo Uploader */}
+      {hasBrandingPermission && (
+        <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-6 md:p-8 mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 shadow-sm">
+          <div className="space-y-2">
+            <h2 className="text-lg font-extrabold text-amber-900 tracking-tight">Website Brand Logo Settings 🎨</h2>
+            <p className="text-sm text-slate-700 leading-relaxed max-w-2xl">
+              Upload the custom website logo image here. Supported formats: PNG, JPG, or SVG, ideally with a transparent background. This logo will take effect immediately across all landing & student portal pages!
+            </p>
+            <div className="pt-2 flex flex-wrap items-center gap-3">
+              <span className="text-xs font-bold text-slate-700">Current active logo preview:</span>
+              <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-2xl border border-slate-700 shadow-inner">
+                <BrandingLogo size="xs" />
+                {currentLogo && (
+                  <button 
+                    onClick={handleResetLogo}
+                    title="Reset to default text logo"
+                    className="p-1.5 hover:bg-slate-800 text-rose-450 hover:text-rose-355 rounded-lg transition-colors bg-transparent border-0 cursor-pointer ml-1"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="shrink-0 flex items-center gap-3">
+            <label className="flex items-center gap-2 px-5 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-sm rounded-xl shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer">
+              <Upload className="w-4 h-4" />
+              {logoUploading ? "Uploading..." : "Upload Real Logo"}
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleLogoUpload} 
+                className="hidden" 
+                disabled={logoUploading}
+              />
+            </label>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col mb-6 gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -601,10 +809,92 @@ export default function UsersAdmin() {
                                     )}
 
                                     <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/50 mt-1">
+                                      <span className="text-slate-500 font-semibold">User Role:</span>
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                        u.email === 'developermike5@gmail.com'
+                                          ? 'bg-purple-101 text-purple-800'
+                                          : admins.includes(u.id)
+                                            ? 'bg-indigo-101 text-indigo-805 animate-pulse'
+                                            : 'bg-slate-101 text-slate-700'
+                                      }`}>
+                                        {u.email === 'developermike5@gmail.com'
+                                          ? 'Super Admin 👑'
+                                          : admins.includes(u.id)
+                                            ? `${adminsData[u.id]?.role || 'CIYA Admin'} 💻`
+                                            : 'Student 🎓'}
+                                      </span>
+                                    </div>
+
+                                    {isSuperAdmin && u.email !== 'developermike5@gmail.com' && (
+                                      <>
+                                        <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/50 mt-1">
+                                          <span className="text-slate-500 font-semibold">Admin Access:</span>
+                                          <button
+                                            onClick={() => handleToggleAdminStatus(u)}
+                                            className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                                              admins.includes(u.id)
+                                                ? 'bg-rose-100 text-rose-800 hover:bg-rose-200' 
+                                                : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'
+                                            }`}
+                                          >
+                                            {admins.includes(u.id) ? '🔒 Revoke Admin Power' : '🔑 Upgrade to Admin'}
+                                          </button>
+                                        </div>
+
+                                        {admins.includes(u.id) && (
+                                          <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 mt-2 space-y-2.5 text-left">
+                                            <div className="flex flex-col gap-1">
+                                              <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Custom Admin Role/Title</label>
+                                              <input
+                                                type="text"
+                                                className="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-teal-500 w-full"
+                                                placeholder="e.g. CIYA Admin, Content Editor"
+                                                value={adminsData[u.id]?.role || 'CIYA Admin'}
+                                                onChange={(e) => handleUpdateAdminFields(u.id, 'role', e.target.value)}
+                                              />
+                                            </div>
+                                            <div className="space-y-1">
+                                              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Grant Specific Powers</span>
+                                              <div className="space-y-1 text-xs text-slate-700">
+                                                <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none">
+                                                  <input 
+                                                    type="checkbox"
+                                                    checked={adminsData[u.id]?.permissions?.includes('manage_courses') ?? false}
+                                                    onChange={() => handleTogglePermission(u.id, 'manage_courses')}
+                                                    className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
+                                                  />
+                                                  Course Management
+                                                </label>
+                                                <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none">
+                                                  <input 
+                                                    type="checkbox"
+                                                    checked={adminsData[u.id]?.permissions?.includes('manage_students') ?? false}
+                                                    onChange={() => handleTogglePermission(u.id, 'manage_students')}
+                                                    className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
+                                                  />
+                                                  Student & Stats Management
+                                                </label>
+                                                <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none">
+                                                  <input 
+                                                    type="checkbox"
+                                                    checked={adminsData[u.id]?.permissions?.includes('manage_branding') ?? false}
+                                                    onChange={() => handleTogglePermission(u.id, 'manage_branding')}
+                                                    className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
+                                                  />
+                                                  Branding & Logo Management
+                                                </label>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+
+                                    <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/50 mt-1">
                                       <span className="text-slate-500 font-semibold">Dashboard Access:</span>
                                       <button
                                         onClick={() => handleToggleDashboardUnlock(u.id, u.isDashboardUnlocked === true)}
-                                        className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
+                                        className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
                                           u.isDashboardUnlocked 
                                             ? 'bg-emerald-100 text-emerald-805' 
                                             : 'bg-amber-100 text-amber-800'

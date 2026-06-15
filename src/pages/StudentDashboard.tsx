@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../types';
 import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
+import BrandingLogo from '../components/BrandingLogo';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -870,60 +871,60 @@ function SubmissionDetailsCard({ profile }: { profile: any }) {
       <div className="space-y-4 text-xs md:text-sm">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Full Name</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Full Name</span>
             <span className="text-slate-800 font-semibold">{profile.fullName || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Gender</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Gender</span>
             <span className="text-slate-800 font-semibold">{profile.gender || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">WhatsApp Number</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">WhatsApp Number</span>
             <span className="text-slate-800 font-mono font-semibold">{profile.whatsapp || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">State of Residence</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">State of Residence</span>
             <span className="text-slate-800 font-semibold">{profile.state || '-'}</span>
           </div>
         </div>
 
         <div className="border-t border-slate-200 pt-3 space-y-3">
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Recommended Study Program</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Recommended Study Program</span>
             <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded text-xs inline-block mt-0.5">
               {profile.recommendedPath || '-'}
             </span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Path Selections</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Path Selections</span>
             <span className="text-slate-800 font-semibold text-xs">
               {profile.courseType || ''} {profile.pathwaySelection ? `(${profile.pathwaySelection})` : ''}
             </span>
           </div>
           {profile.pathwayReason && (
             <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-bold">Reason for Selection</span>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">Reason for Selection</span>
               <p className="text-slate-600 italic mt-0.5 leading-relaxed font-semibold bg-white p-2 rounded border border-slate-200">{profile.pathwayReason}</p>
             </div>
           )}
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Prior Experience in Course</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Prior Experience in Course</span>
             <span className="text-slate-800 font-semibold">{profile.pathwayExperience || profile.experience || 'None'}</span>
           </div>
           {profile.intent && (
             <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
               <p className="text-slate-600 italic mt-0.5 leading-relaxed font-semibold bg-white p-2 rounded border border-slate-200">{profile.intent}</p>
             </div>
           )}
           {profile.goal && (
             <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-bold">Target Learning Goal</span>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">Target Learning Goal</span>
               <p className="text-slate-600 italic mt-0.5 leading-relaxed font-semibold bg-white p-2 rounded border border-slate-200">{profile.goal}</p>
             </div>
           )}
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Commitment Level</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Commitment Level</span>
             <span className="text-slate-800 font-bold">{profile.availability || '-'}</span>
           </div>
         </div>
@@ -1367,7 +1368,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans overflow-x-hidden">
-      {isApproved && <FallingFlowers />}
+      {showCongratsPopup && <FallingFlowers />}
       
       {/* Mobile Sidebar overlay toggle */}
       {isMobileMenuOpen && (
@@ -1380,11 +1381,10 @@ export default function StudentDashboard() {
       {/* Sidebar navigation */}
       <aside className={`w-64 bg-slate-900 border-r border-slate-800 flex flex-col fixed md:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-6 flex flex-col gap-1 relative">
-          <Link to="/" className="flex items-center gap-3 hover:opacity-85 transition-opacity">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-tr from-emerald-450 from-teal-500 to-indigo-600 rounded-lg shadow-lg shadow-emerald-500/10 shrink-0" />
-            <span className="font-black text-xl tracking-tight uppercase text-white">CIYA</span>
+          <Link to="/" className="hover:opacity-85 transition-opacity">
+            <BrandingLogo size="sm" />
           </Link>
-          <span className="text-[9px] font-black tracking-[0.25em] text-teal-400 uppercase leading-none mt-1">
+          <span className="text-[9px] font-black tracking-[0.25em] text-teal-400 uppercase leading-none mt-1 pl-3">
             Academy Portal
           </span>
           <button 

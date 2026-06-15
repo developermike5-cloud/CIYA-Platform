@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
+import BrandingLogo from '../components/BrandingLogo';
 import { 
   Lightbulb, Gift, Bot, Wallet, Check, Smartphone, Briefcase, Zap, TrendingUp, Globe, Film, Palette, Sparkles
 } from 'lucide-react';
@@ -209,6 +210,7 @@ const navAnimation = {
 function Navbar() {
   const login = useLogin();
   const [scrolled, setScrolled] = useState(false);
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
@@ -222,14 +224,8 @@ function Navbar() {
         scrolled ? 'bg-teal-950/80 backdrop-blur-md border-b border-teal-900' : 'bg-transparent'
       }`}
     >
-      <a href="#" className="flex flex-col gap-1 items-start">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-lg shadow-lg shadow-orange-500/20 shrink-0"></div>
-          <span className="font-bold text-xl tracking-tight uppercase text-teal-50">CIYA</span>
-        </div>
-        <span className="text-[10px] font-semibold tracking-[0.2em] text-teal-300/90 uppercase leading-none mt-0.5">
-          Create It Yourself Academy
-        </span>
+      <a href="#" className="hover:opacity-85 transition-opacity">
+        <BrandingLogo size="sm" />
       </a>
       
       <div className="hidden md:flex items-center gap-10 text-sm font-medium text-teal-200">
@@ -790,14 +786,8 @@ function Footer() {
     <footer className="bg-teal-950 pt-20 pb-8 px-6 md:px-12 lg:px-24 border-t border-teal-900 shrink-0 mt-auto">
       <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-12 mb-16 w-full">
         <div className="md:col-span-5 lg:col-span-4">
-          <a href="#" className="flex flex-col gap-1 items-start mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 bg-gradient-to-tr from-amber-400 to-orange-500 rounded shadow-lg shadow-orange-500/20 shrink-0"></div>
-              <span className="font-bold text-lg tracking-tight uppercase text-teal-50 border-none inline outline-none">CIYA</span>
-            </div>
-            <span className="text-[10px] font-semibold tracking-[0.2em] text-teal-400/80 uppercase leading-none mt-0.5">
-              Create It Yourself Academy
-            </span>
+          <a href="#" className="mb-6 block hover:opacity-85 transition-opacity">
+            <BrandingLogo size="sm" />
           </a>
           <p className="text-sm text-teal-300 leading-relaxed max-w-xs mb-6">
             Create It Yourself Academy — bridging the digital skill gap in Nigeria and Africa, one youth at a time.

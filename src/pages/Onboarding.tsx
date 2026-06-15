@@ -711,60 +711,60 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
       <div className="space-y-4 text-xs md:text-sm">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Full Name</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Full Name</span>
             <span className="text-slate-800 font-semibold">{data.fullName || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Gender</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Gender</span>
             <span className="text-slate-800 font-semibold">{data.gender || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">WhatsApp Number</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">WhatsApp Number</span>
             <span className="text-slate-800 font-mono font-semibold">{data.whatsapp || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">State of Residence</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">State of Residence</span>
             <span className="text-slate-800 font-semibold">{data.state || '-'}</span>
           </div>
         </div>
 
         <div className="border-t border-slate-200 pt-3 space-y-3">
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Recommended Study Program</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Recommended Study Program</span>
             <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded text-xs inline-block mt-0.5">
               {data.recommendedPath || '-'}
             </span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Path Selections</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Path Selections</span>
             <span className="text-slate-800 font-bold text-xs">
               {data.courseType || ''} {data.pathwaySelection ? `(${data.pathwaySelection})` : ''}
             </span>
           </div>
           {data.pathwayReason && (
             <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-bold">Reason for Selection</span>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">Reason for Selection</span>
               <p className="text-slate-600 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-200 rounded">{data.pathwayReason}</p>
             </div>
           )}
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Prior Experience in Course</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Prior Experience in Course</span>
             <span className="text-slate-800 font-semibold">{data.pathwayExperience || data.experience || 'None'}</span>
           </div>
           {data.intent && (
             <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
               <p className="text-slate-600 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-200 rounded">{data.intent}</p>
             </div>
           )}
           {data.goal && (
             <div>
-              <span className="text-slate-400 block text-[10px] uppercase font-bold">Target Learning Goal</span>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">Target Learning Goal</span>
               <p className="text-slate-600 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-200 rounded">{data.goal}</p>
             </div>
           )}
           <div>
-            <span className="text-slate-400 block text-[10px] uppercase font-bold">Commitment Level</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Commitment Level</span>
             <span className="text-slate-800 font-bold">{data.availability || '-'}</span>
           </div>
         </div>
