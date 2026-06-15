@@ -78,7 +78,10 @@ service cloud.firestore {
         && (data.get('myReferralCode', '') is string && data.get('myReferralCode', '').size() <= 500)
         && (data.get('isActivated', false) is bool)
         && (data.get('referralsCount', 0) is int || data.get('referralsCount', 0) is float)
-        && (data.get('approvalStatus', 'Pending') is string && data.get('approvalStatus', 'Pending') in ['Pending', 'Approved', 'Disapproved']);
+        && (data.get('approvalStatus', 'Pending') is string && data.get('approvalStatus', 'Pending') in ['Pending', 'Approved', 'Disapproved'])
+        && (data.get('isDashboardUnlocked', false) is bool)
+        && (data.get('adminCode', '') is string)
+        && (data.get('progress', {}) is map);
     }
 
     // Collections Routes
@@ -109,9 +112,9 @@ service cloud.firestore {
                        && isValidUserProfile(incoming())
                        && incoming().email == existing().email
                        && incoming().createdAt == existing().createdAt
-                       && incoming().updatedAt == request.time
+                       && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt)
                        && incoming().diff(existing()).affectedKeys().hasOnly([
-                         'intent', 'experience', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'whatsapp', 'state', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'updatedAt'
+                         'intent', 'experience', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'whatsapp', 'state', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'isDashboardUnlocked', 'adminCode', 'progress', 'updatedAt'
                        ])
                       )
                       ||
@@ -119,7 +122,7 @@ service cloud.firestore {
                        isValidUserProfile(incoming())
                        && incoming().email == existing().email
                        && incoming().createdAt == existing().createdAt
-                       && incoming().updatedAt == request.time
+                       && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt)
                        && incoming().diff(existing()).affectedKeys().hasOnly(['isActivated', 'referralsCount', 'updatedAt'])
                        && incoming().isActivated == true
                        && incoming().referralsCount == existing().get('referralsCount', 0) + 1

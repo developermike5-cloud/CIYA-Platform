@@ -793,7 +793,7 @@ export default function CourseEdit() {
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
             <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center justify-between pb-3 border-b">
               <span>📅 Day {activeDayIdx + 1} Theme and Topic</span>
-              <span className="text-[10px] font-bold text-slate-450">Study Theme</span>
+              <span className="text-[10px] font-bold text-slate-500">Study Theme</span>
             </h3>
 
             <div className="grid grid-cols-1 gap-4">
@@ -845,7 +845,7 @@ export default function CourseEdit() {
             ) : (
               <div className="space-y-6">
                 {((form.days || [])[activeDayIdx]?.videos || []).map((v, vIdx) => (
-                  <div key={v.id || vIdx} className="border border-slate-200 hover:border-slate-350 rounded-2xl p-4 md:p-5 relative shadow-sm transition-all bg-white relative">
+                  <div key={v.id || vIdx} className="border border-slate-200 hover:border-slate-300 rounded-2xl p-4 md:p-5 relative shadow-sm transition-all bg-white relative">
                     <div className="flex items-center justify-between mb-4 pb-2 border-b border-dashed">
                       <span className="w-6 h-6 rounded-lg bg-slate-900 text-amber-400 flex items-center justify-center font-black text-xs leading-none">
                         #{vIdx + 1}

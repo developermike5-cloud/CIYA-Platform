@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router';
@@ -96,7 +96,7 @@ function PostVideoCheck({ check, checkType, checkKey, onPass }: PostVideoCheckPr
                   className={`flex-1 py-2.5 border rounded-xl font-bold text-xs cursor-pointer transition-all ${
                     selected === v
                       ? 'border-indigo-600 bg-indigo-50 text-indigo-700 font-extrabold'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-350'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                   }`}
                 >
                   {v ? "TRUE" : "FALSE"}
@@ -155,7 +155,7 @@ function PostVideoCheck({ check, checkType, checkKey, onPass }: PostVideoCheckPr
                 className={`w-full text-left p-3 border rounded-xl font-medium text-xs flex gap-2.5 items-center cursor-pointer transition-all ${
                   selected === idx
                     ? 'border-teal-600 bg-teal-50 text-teal-800 font-bold shadow-inner'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-350'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                 }`}
               >
                 <span className={`w-5 h-5 rounded-full border flex items-center justify-center font-black text-[9px] ${
@@ -264,7 +264,7 @@ function AssignmentPanel({ assignment, dayIndex, submissions, onSubmit }: Assign
         </div>
       </div>
 
-      <div className="text-xs text-slate-655 bg-slate-50 border p-3 rounded-xl leading-relaxed">
+      <div className="text-xs text-slate-600 bg-slate-50 border p-3 rounded-xl leading-relaxed">
         {assignment?.prompt || "Execute today's syllabus lessons on your system and log your drafted link below."}
       </div>
 
@@ -275,7 +275,7 @@ function AssignmentPanel({ assignment, dayIndex, submissions, onSubmit }: Assign
             rows={3}
             value={text}
             onChange={e => setText(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 outline-none p-3 text-xs font-bold text-slate-900 focus:border-indigo-400 rounded-xl"
+            className="w-full bg-white border border-slate-300 shadow-sm outline-none p-3 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl transition-all"
             required
             placeholder="Describe what you built today, what obstacles you overcame, or outline your next study milestone..."
           />
@@ -286,7 +286,7 @@ function AssignmentPanel({ assignment, dayIndex, submissions, onSubmit }: Assign
             type="text"
             value={link}
             onChange={e => setLink(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 outline-none p-2.5 text-xs text-slate-800 font-mono focus:border-indigo-400 rounded-xl"
+            className="w-full bg-white border border-slate-300 shadow-sm outline-none p-2.5 text-xs text-slate-800 font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl transition-all"
             placeholder="https://your-live-deployment.web.app"
           />
         </div>
@@ -363,7 +363,8 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
       
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
-        [`progress.${courseId}.watched`]: updatedWatched
+        [`progress.${courseId}.watched`]: updatedWatched,
+        updatedAt: serverTimestamp()
       });
 
       if (hasCheck && !isCheckPassed) {
@@ -383,7 +384,8 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
 
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
-        [`progress.${courseId}.checkPassed`]: updatedPassed
+        [`progress.${courseId}.checkPassed`]: updatedPassed,
+        updatedAt: serverTimestamp()
       });
 
       setShowCheck(false);
@@ -430,7 +432,8 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
     try {
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
-        [`progress.${courseId}.submissions.${key}`]: data
+        [`progress.${courseId}.submissions.${key}`]: data,
+        updatedAt: serverTimestamp()
       });
     } catch (e) {
       console.error("Error submitting assignment:", e);
@@ -982,6 +985,41 @@ export default function StudentDashboard() {
   // Selected Course playing state
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
+  // Activation Gating and Popup States
+  const [activationCode, setActivationCode] = useState('');
+  const [activationError, setActivationError] = useState('');
+  const [showCongratsPopup, setShowCongratsPopup] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+
+  const handleVerifyCode = async () => {
+    setActivationError('');
+    const codeEntered = activationCode.trim().toUpperCase();
+    const targetCode = (userProfile?.adminCode || '').trim().toUpperCase();
+    
+    if (!codeEntered) {
+      setActivationError('Please enter your activation code.');
+      return;
+    }
+    
+    if (codeEntered === targetCode) {
+      setUnlocking(true);
+      try {
+        await updateDoc(doc(db, 'users', currentUser.uid), {
+          isDashboardUnlocked: true,
+          updatedAt: serverTimestamp()
+        });
+        setShowCongratsPopup(true);
+      } catch (err) {
+        console.error('Error unlocking dashboard:', err);
+        setActivationError('Unlock sync failed, please try again.');
+      } finally {
+        setUnlocking(false);
+      }
+    } else {
+      setActivationError('Invalid activation code. Please check with your Admissions administrator.');
+    }
+  };
+
   useEffect(() => {
     let unsubSnapshot: (() => void) | null = null;
 
@@ -1154,6 +1192,7 @@ export default function StudentDashboard() {
         whatsapp: userProfile.whatsapp,
         state: userProfile.state,
         goal: userProfile.goal,
+        updatedAt: serverTimestamp()
       });
       setEditingProfile(false);
       alert('Profile updated successfully!');
@@ -1184,6 +1223,147 @@ export default function StudentDashboard() {
   // Apply Skill tags sorting filters
   const filteredCourses = courses.filter(c => activeSkillFilter === 'all' || c.skill === activeSkillFilter);
   const selectedCourse = courses.find(c => c.id === selectedCourseId);
+
+  // Master Full-Screen Gating Page for Unapproved or Locked Users (No dashboard UI visible)
+  if (userProfile?.isDashboardUnlocked !== true) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8 font-sans">
+        {(!liveCheckComplete && !isApproved) ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-12 h-12 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-slate-600 text-sm font-extrabold tracking-tight">Verifying credentials and parameters...</p>
+          </div>
+        ) : isPending ? (
+          <div className="max-w-xl w-full bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-slate-100 text-center space-y-6">
+            <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center border border-amber-100 mx-auto">
+              <Clock className="w-8 h-8 text-amber-500 animate-pulse" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Application Selected & Pending Review 📋</h2>
+            
+            <div className="text-slate-600 text-sm leading-relaxed max-w-md mx-auto space-y-3 font-medium">
+              <p>
+                Hello <strong className="text-slate-800 font-bold">{userProfile.fullName || 'Student'}</strong>! Thank you for lodging your request. Your onboarding metrics are currently under verification.
+              </p>
+              <p className="italic text-xs text-slate-500">
+                Keep eye contact with your personal inbox because once checked, notification pathways automatically transmit the link. Checking junk mail ensures zero latency!
+              </p>
+            </div>
+
+            <div className="w-full">
+              <SubmissionDetailsCard profile={userProfile} />
+            </div>
+
+            <div className="pt-2">
+              <button 
+                onClick={handleLogout} 
+                className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold rounded-xl text-xs transition-colors border-0 cursor-pointer"
+              >
+                Sign Out / Switch Account
+              </button>
+            </div>
+          </div>
+        ) : isDisapproved ? (
+          <div className="max-w-xl w-full bg-white rounded-3xl p-8 md:p-12 border border-slate-100 text-center space-y-6 shadow-xl">
+            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center border border-red-100 mx-auto">
+              <X className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Application Reviewed ❌</h2>
+            
+            <p className="text-slate-600 text-sm leading-relaxed max-w-sm mx-auto font-medium">
+              Hello <strong>{userProfile.fullName || 'Student'}</strong>! After reviewing your submitted metrics, we regret to notify that you were not chosen for this specific cohort. We received a massive scale of CIYA Five days Free Website Development Training requests. We wish you rapid career velocity!
+            </p>
+
+            <div className="w-full">
+              <SubmissionDetailsCard profile={userProfile} />
+            </div>
+
+            <div className="pt-2">
+              <button 
+                onClick={handleLogout} 
+                className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold rounded-xl text-xs transition-colors border-0 cursor-pointer"
+              >
+                Sign Out / Switch Account
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-xl w-full bg-white rounded-3xl p-8 md:p-12 shadow-2xl border border-slate-100 text-center space-y-6 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-amber-400 via-emerald-500 to-indigo-600"></div>
+            <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center border border-amber-100 mx-auto">
+              <Lock className="w-8 h-8 text-amber-500 animate-bounce" />
+            </div>
+            <div className="space-y-4">
+              <span className="inline-block bg-emerald-100 text-emerald-800 text-xs font-black uppercase px-3 py-1 rounded-full">
+                Training Verification Approved! 🎉
+              </span>
+              <h2 className="text-3xl font-black text-slate-900 tracking-tight">Enter Your Access Activation Code 🔑</h2>
+              <p className="text-slate-950 text-base leading-relaxed max-w-md mx-auto font-black">
+                Congratulations, <strong className="text-teal-800 font-black decoration-teal-600/30 underline decoration-2">{userProfile.fullName || 'Scholar'}</strong>! Your spot for CIYA Five days Free Website Development Training has been approved by the administrators. 
+                Please enter your unique <strong className="text-indigo-800 font-black decoration-indigo-600/30 underline decoration-2">activation code (e.g., CIYA-854473)</strong> below to unlock your course learning dashboard.
+              </p>
+            </div>
+
+            <div className="max-w-sm mx-auto space-y-4">
+              <input 
+                type="text"
+                placeholder="CIYA-XXXXXX"
+                value={activationCode}
+                onChange={(e) => {
+                  setActivationError('');
+                  setActivationCode(e.target.value.toUpperCase());
+                }}
+                className="w-full text-center tracking-widest font-mono font-black text-lg border-2 border-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 bg-white placeholder:text-slate-400 text-slate-950 rounded-2xl py-3.5 px-4 outline-none transition-all shadow-md"
+              />
+
+              {activationError && (
+                <p className="text-rose-600 text-xs font-semibold leading-relaxed">{activationError}</p>
+              )}
+
+              <button 
+                onClick={handleVerifyCode}
+                disabled={unlocking}
+                className="w-full py-4 px-4 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-2xl text-sm font-black shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer border-0"
+              >
+                {unlocking ? 'Verifying...' : 'Unlock Dashboard 🚀'}
+              </button>
+            </div>
+
+            <div className="border-t border-slate-100 pt-5 text-center">
+              <p className="text-slate-800 text-sm leading-relaxed font-semibold">
+                <strong>Need help finding your code?</strong><br/>
+                Once approved, your admissions administrator will issue your unique training code. Click below to request it directly on WhatsApp.
+              </p>
+              <div className="mt-3">
+                {(() => {
+                  const reqMsg = `Hello Admission Team! My CIYA Free Website Development Training profile has been approved. Could you please send me my custom Dashboard Activation Code for my studies? My name is ${userProfile.fullName || ''} (${userProfile.email || currentUser?.email || ''}).`;
+                  const whatsappUrl = `https://api.whatsapp.com/send?phone=2349153846786&text=${encodeURIComponent(reqMsg)}`;
+                  return (
+                    <a 
+                      href={whatsappUrl}
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-flex px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-md transition-all gap-2 items-center cursor-pointer border-0"
+                    >
+                      <MessageCircle className="w-4 h-4 fill-white stroke-[3px] text-emerald-600" />
+                      <span>Request Code on WhatsApp</span>
+                    </a>
+                  );
+                })()}
+              </div>
+              <div className="mt-4 pt-2 text-center">
+                <button 
+                  onClick={handleLogout} 
+                  className="text-slate-700 hover:text-slate-900 font-bold text-xs transition-colors bg-transparent border-0 cursor-pointer"
+                >
+                  Sign Out / Switch Account
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans overflow-x-hidden">
@@ -1288,20 +1468,20 @@ export default function StudentDashboard() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                       <div>
                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Full Name</label>
-                        <input type="text" value={userProfile.fullName || ''} onChange={e => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-400" required />
+                        <input type="text" value={userProfile.fullName || ''} onChange={e => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans" required />
                       </div>
                       <div>
                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">WhatsApp Number</label>
-                        <input type="tel" value={userProfile.whatsapp || ''} onChange={e => setUserProfile({...userProfile, whatsapp: e.target.value})} className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-3 outline-none text-xs font-bold font-mono focus:border-indigo-400" required />
+                        <input type="tel" value={userProfile.whatsapp || ''} onChange={e => setUserProfile({...userProfile, whatsapp: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
                       </div>
                     </div>
                     <div className="text-xs">
                       <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">State</label>
-                      <input type="text" value={userProfile.state || ''} onChange={e => setUserProfile({...userProfile, state: e.target.value})} className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-400" required />
+                      <input type="text" value={userProfile.state || ''} onChange={e => setUserProfile({...userProfile, state: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
                     </div>
                     <div className="text-xs">
                       <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Your Primary Goal</label>
-                      <textarea value={userProfile.goal || ''} onChange={e => setUserProfile({...userProfile, goal: e.target.value})} className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-3 outline-none text-xs font-medium leading-relaxed min-h-[100px] focus:border-indigo-400" required />
+                      <textarea value={userProfile.goal || ''} onChange={e => setUserProfile({...userProfile, goal: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-medium leading-relaxed min-h-[100px] focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
                     </div>
                     <div className="flex gap-3 pt-2 text-xs">
                       <button type="submit" disabled={profileSaving} className="flex-1 bg-teal-600 text-white font-extrabold py-3 border-0 rounded-xl hover:bg-teal-700 cursor-pointer flex items-center justify-center gap-1.5 shadow-md">
@@ -1343,50 +1523,6 @@ export default function StudentDashboard() {
                 </div>
               )}
             </div>
-          ) : (!liveCheckComplete && !isApproved) ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center min-h-[400px]">
-              <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-slate-500 text-xs font-bold">Verifying scholarship parameters...</p>
-            </div>
-          ) : isPending ? (
-            <div className="max-w-xl mx-auto bg-white rounded-3xl p-8 shadow-sm border border-slate-200 text-center space-y-5">
-              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center border border-amber-100 mx-auto">
-                <Clock className="w-8 h-8 text-amber-500 animate-pulse" />
-              </div>
-              <h2 className="text-xl font-black text-slate-800 tracking-tight">Application Selected & Pending Review 📋</h2>
-              
-              <div className="text-slate-650 text-xs md:text-sm leading-relaxed max-w-md mx-auto space-y-3">
-                <p>
-                  Hello <strong className="text-slate-800 font-black">{userProfile.fullName || 'Student'}</strong>! Thank you for lodging your request. Your onboarding metrics are currently under verification.
-                </p>
-                <p className="italic">
-                  Keep eye contact with your personal inbox because once checked, notification pathways automatically transmit the link. Checking junk mail ensures zero latency!
-                </p>
-              </div>
-
-              <div className="w-full">
-                <SubmissionDetailsCard profile={userProfile} />
-              </div>
-
-              <a href="https://chat.whatsapp.com/BzyYP0DyV2TFRqzfrrCXYi?s=cl&p=a&mlu=3" target="_blank" rel="noopener noreferrer" className="inline-flex px-6 py-3 bg-[#25D366] hover:bg-[#20ba5a] text-white font-black rounded-xl text-xs shadow-md transition-all justify-center items-center gap-2 border-0">
-                 <MessageCircle className="w-5 h-5 fill-white stroke-none" /> Join Our WhatsApp Community
-              </a>
-            </div>
-          ) : isDisapproved ? (
-            <div className="max-w-xl mx-auto bg-white rounded-3xl p-8 border border-slate-200 text-center space-y-4 shadow-sm">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center border border-red-100 mx-auto">
-                <X className="w-8 h-8 text-red-500" />
-              </div>
-              <h2 className="text-xl font-black text-slate-800 tracking-tight">Application Reviewed ❌</h2>
-              
-              <p className="text-slate-600 text-xs leading-relaxed max-w-md mx-auto">
-                Hello <strong>{userProfile.fullName || 'Student'}</strong>! After reviewing your submitted metrics, we regret to notify that you were not chosen for this specific cohort. We received a massive scale of scholarship requests. We track excellence and wish you rapid career velocity!
-              </p>
-
-              <div className="w-full">
-                <SubmissionDetailsCard profile={userProfile} />
-              </div>
-            </div>
           ) : (
             <>
               {selectedCourseId && selectedCourse ? (
@@ -1403,7 +1539,7 @@ export default function StudentDashboard() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
-                    className="relative overflow-hidden bg-gradient-to-r from-teal-500 via-emerald-600 to-indigo-650 rounded-3xl p-6 md:p-8 text-white shadow-xl shadow-teal-900/10 border border-teal-400/25 text-left"
+                    className="relative overflow-hidden bg-gradient-to-r from-teal-500 via-emerald-600 to-indigo-600 rounded-3xl p-6 md:p-8 text-white shadow-xl shadow-teal-900/10 border border-teal-400/25 text-left"
                   >
                     <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none -mr-12 -mt-12" />
                     
@@ -1413,7 +1549,7 @@ export default function StudentDashboard() {
                       </div>
                       <div className="space-y-1">
                         <span className="inline-block bg-emerald-400/25 border border-emerald-400/40 text-emerald-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full mb-1">
-                          SCHOLARSHIP VERIFIED & APPROVED 🎉
+                          TRAINING VERIFIED & APPROVED 🎉
                         </span>
                         <h1 className="text-lg md:text-xl font-black tracking-tight">
                           Congratulations on your selection, {userProfile.fullName || 'Scholar'}!
@@ -1537,6 +1673,56 @@ export default function StudentDashboard() {
           )}
         </div>
       </main>
+
+      {/* CONGRATULATORY OVERLAY MODAL */}
+      {showCongratsPopup && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl p-8 md:p-12 max-w-lg w-full text-center relative border border-slate-100 shadow-2xl overflow-hidden"
+          >
+            {/* Confetti border banner */}
+            <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-600" />
+            
+            <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-emerald-100 shadow-inner select-none text-4xl">
+              🎉
+            </div>
+
+            <div className="space-y-4">
+              <span className="inline-block bg-emerald-100 text-emerald-800 text-[10px] uppercase font-black tracking-wider px-3 py-1 rounded-full">
+                Training Activated!
+              </span>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">
+                Congratulations, {userProfile?.fullName ? userProfile.fullName.split(' ')[0] : 'Scholar'}!
+              </h2>
+              
+              <p className="text-slate-600 text-sm leading-relaxed">
+                Your admission profile and CIYA Five days Free Website Development Training benefits have been fully verified and activated. We are incredibly excited to welcome you into our intensive training cohort.
+              </p>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-left mt-6">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Your Enrolled Curriculum Pathway:</span>
+                <p className="font-extrabold text-slate-800 text-base md:text-lg mt-1 flex items-center gap-2">
+                  📚 {userProfile?.recommendedPath || userProfile?.courseType || "Custom Tech Track"}
+                </p>
+                <p className="text-xs text-slate-500 mt-1 italic">
+                  Course access has been fully unlocked. Your curriculum tracks, daily milestones, and training assets are ready in your portal.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <button
+                onClick={() => setShowCongratsPopup(false)}
+                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-lg rounded-xl transition-all shadow-xl shadow-slate-900/15 cursor-pointer transform active:scale-95"
+              >
+                Enter Dashboard 🚀
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

@@ -156,7 +156,7 @@ export default function CoursesAdmin() {
             <select
               value={filterSkill}
               onChange={e => setFilterSkill(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 cursor-pointer"
+              className="bg-white border-2 border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 cursor-pointer transition-all"
             >
               <option value="all">All Skills Category</option>
               {Object.entries(SKILLS).map(([k, v]) => (
@@ -169,7 +169,7 @@ export default function CoursesAdmin() {
             <select
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 cursor-pointer"
+              className="bg-white border-2 border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 cursor-pointer transition-all"
             >
               <option value="all">All Statuses</option>
               <option value="published">Published</option>
@@ -197,7 +197,7 @@ export default function CoursesAdmin() {
         <div className="bg-white rounded-3xl p-12 text-center border shadow-sm border-slate-200">
           <div className="text-4xl mb-3">📬</div>
           <h4 className="text-base font-black text-slate-700">No matching tracks in view</h4>
-          <p className="text-xs text-slate-455 max-w-sm mx-auto mt-1 leading-relaxed">
+          <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed font-medium">
             There are no courses currently uploaded that match your selection. Reset your dropdown parameters or append a fresh course tracking module!
           </p>
         </div>
@@ -258,7 +258,7 @@ export default function CoursesAdmin() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 whitespace-nowrap text-xs font-bold text-slate-450 font-mono">
+                    <td className="px-5 py-4 whitespace-nowrap text-xs font-bold text-slate-500 font-mono">
                       {formatFirestoreDate(c.createdAt)}
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-right">
@@ -276,7 +276,7 @@ export default function CoursesAdmin() {
                         </button>
                         <Link
                           to={`/admin/courses/${c.id}`}
-                          className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-650 hover:bg-slate-50 transition-all shadow-sm"
+                          className="px-3 py-1.5 bg-white border-2 border-slate-300 rounded-lg text-slate-800 font-extrabold hover:bg-slate-50 transition-all shadow-sm"
                         >
                           Edit
                         </Link>

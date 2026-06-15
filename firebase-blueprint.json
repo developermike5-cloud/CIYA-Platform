@@ -52,6 +52,9 @@
         "isActivated": { "type": "boolean" },
         "referralsCount": { "type": "number" },
         "approvalStatus": { "type": "string", "enum": ["Pending", "Approved", "Disapproved"] },
+        "isDashboardUnlocked": { "type": "boolean" },
+        "adminCode": { "type": "string" },
+        "progress": { "type": "object" },
         "createdAt": { "type": "string", "format": "timestamp" },
         "updatedAt": { "type": "string", "format": "timestamp" }
       },

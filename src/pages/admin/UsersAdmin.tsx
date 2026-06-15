@@ -62,6 +62,8 @@ interface UserProfile {
   isActivated?: boolean;
   referralsCount?: number;
   approvalStatus?: string;
+  adminCode?: string;
+  isDashboardUnlocked?: boolean;
   createdAt: any;
 }
 
@@ -93,6 +95,10 @@ export default function UsersAdmin() {
   const [actionLoading, setActionLoading] = useState<Record<string, 'approve' | 'disapprove' | 'delete' | null>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // Local states for activation code controls
+  const [editingCodes, setEditingCodes] = useState<Record<string, string>>({});
+  const [codeSuccessId, setCodeSuccessId] = useState<string | null>(null);
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -116,8 +122,13 @@ export default function UsersAdmin() {
   const handleApprove = async (userId: string) => {
     setActionLoading(prev => ({ ...prev, [userId]: 'approve' }));
     try {
-      await updateDoc(doc(db, 'users', userId), { approvalStatus: 'Approved' });
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Approved' } : u));
+      const userDoc = users.find(u => u.id === userId);
+      const generatedCode = userDoc?.adminCode || `CIYA-${Math.floor(100000 + Math.random() * 900000)}`;
+      await updateDoc(doc(db, 'users', userId), { 
+        approvalStatus: 'Approved',
+        adminCode: generatedCode
+      });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Approved', adminCode: generatedCode } : u));
     } catch (error) {
       console.error("Error approving user application:", error);
     } finally {
@@ -134,6 +145,29 @@ export default function UsersAdmin() {
       console.error("Error disapproving user application:", error);
     } finally {
       setActionLoading(prev => ({ ...prev, [userId]: null }));
+    }
+  };
+
+  const handleUpdateAdminCode = async (userId: string, newCode: string) => {
+    try {
+      const codeToSet = newCode.trim().toUpperCase();
+      if (!codeToSet) return;
+      await updateDoc(doc(db, 'users', userId), { adminCode: codeToSet });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, adminCode: codeToSet } : u));
+      setCodeSuccessId(userId);
+      setTimeout(() => setCodeSuccessId(null), 2000);
+    } catch (error) {
+      console.error("Error setting custom adminCode:", error);
+    }
+  };
+
+  const handleToggleDashboardUnlock = async (userId: string, currentUnlocked: boolean) => {
+    try {
+      const newStatus = !currentUnlocked;
+      await updateDoc(doc(db, 'users', userId), { isDashboardUnlocked: newStatus });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, isDashboardUnlocked: newStatus } : u));
+    } catch (error) {
+      console.error("Error toggling dashboard lock state:", error);
     }
   };
 
@@ -363,8 +397,25 @@ export default function UsersAdmin() {
                     <React.Fragment key={u.id}>
                       <tr className={`hover:bg-slate-50/50 transition-colors ${isUserExpanded ? 'bg-indigo-50/20' : ''}`}>
                         <td className="px-4 py-3">
-                          <div className="font-bold text-slate-900 leading-tight">{u.fullName || '-'}</div>
-                          <div className="text-slate-500 text-xs mt-0.5">{u.gender ? `${u.gender} • ` : ''}{u.state || '-'}</div>
+                          <div className="font-bold text-slate-900 leading-tight mb-1">{u.fullName || '-'}</div>
+                          <div className="text-slate-500 text-xs">{u.gender ? `${u.gender} • ` : ''}{u.state || '-'}</div>
+                          {u.adminCode && (
+                            <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                              <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/60 rounded font-mono font-black text-xs select-all shadow-sm">
+                                🔑 {u.adminCode}
+                              </span>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(u.adminCode || '');
+                                  alert(`Copied activation code: ${u.adminCode}`);
+                                }}
+                                className="text-[9px] text-slate-600 hover:text-slate-900 font-extrabold bg-slate-50 border border-slate-200/80 px-1.5 py-0.5 rounded cursor-pointer transition-all hover:bg-slate-100"
+                                title="Copy Core Student Code"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-slate-800">
                           <div className="font-semibold text-xs text-indigo-900">{u.email}</div>
@@ -420,7 +471,7 @@ export default function UsersAdmin() {
                               className={`p-1.5 rounded transition-all ${
                                 u.approvalStatus === 'Approved' 
                                   ? 'bg-emerald-50 text-emerald-300 cursor-not-allowed' 
-                                  : 'bg-emerald-50 border border-emerald-200 text-emerald-650 hover:bg-emerald-100'
+                                  : 'bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100'
                               }`}
                             >
                               <Check className="w-4 h-4 stroke-[3]" />
@@ -434,7 +485,7 @@ export default function UsersAdmin() {
                               className={`p-1.5 rounded transition-all ${
                                 u.approvalStatus === 'Disapproved' 
                                   ? 'bg-rose-50 text-rose-300 cursor-not-allowed' 
-                                  : 'bg-rose-50 border border-rose-200 text-rose-650 hover:bg-rose-100'
+                                  : 'bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100'
                               }`}
                             >
                               <X className="w-4 h-4 stroke-[3]" />
@@ -512,6 +563,58 @@ export default function UsersAdmin() {
                                       Choice selections: <strong className="text-slate-900">{u.courseType || ''} {u.pathwaySelection ? `(${u.pathwaySelection})` : ''}</strong>
                                     </span>
                                   </div>
+
+                                  <div className="pt-2.5 border-t border-slate-100 mt-2.5 space-y-2">
+                                    <span className="text-slate-500 block font-bold text-[9px] uppercase tracking-wider">🔑 Training Activation Code</span>
+                                    <div className="flex gap-2 items-center text-xs">
+                                      <input 
+                                        type="text"
+                                        placeholder="No code set"
+                                        value={editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || '')}
+                                        onChange={(e) => setEditingCodes(prev => ({ ...prev, [u.id]: e.target.value.toUpperCase() }))}
+                                        className="bg-white border-2 border-slate-400 rounded px-2.5 py-1 text-xs font-mono font-bold text-slate-950 focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-550/20 w-36 shadow-sm transition-all"
+                                      />
+                                      <button 
+                                        onClick={() => handleUpdateAdminCode(u.id, editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || ''))}
+                                        className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-750 px-2.5 py-1.5 rounded transition-colors"
+                                      >
+                                        Save
+                                      </button>
+                                      
+                                      <button 
+                                        onClick={() => {
+                                          const code = editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || '');
+                                          if (code) {
+                                            navigator.clipboard.writeText(code);
+                                            alert(`Copied activation code: ${code}`);
+                                          }
+                                        }}
+                                        className="text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded transition-colors"
+                                        title="Copy code to send to student"
+                                        disabled={!(editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || ''))}
+                                      >
+                                        Copy
+                                      </button>
+                                    </div>
+                                    {codeSuccessId === u.id && (
+                                      <span className="text-[10px] font-bold text-emerald-600 block">✓ Code saved successfully!</span>
+                                    )}
+
+                                    <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/50 mt-1">
+                                      <span className="text-slate-500 font-semibold">Dashboard Access:</span>
+                                      <button
+                                        onClick={() => handleToggleDashboardUnlock(u.id, u.isDashboardUnlocked === true)}
+                                        className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
+                                          u.isDashboardUnlocked 
+                                            ? 'bg-emerald-100 text-emerald-805' 
+                                            : 'bg-amber-100 text-amber-800'
+                                        }`}
+                                      >
+                                        {u.isDashboardUnlocked ? '🔓 Access Active (Lock)' : '🔒 Locked (Unlock)'}
+                                      </button>
+                                    </div>
+                                  </div>
+
                                 </div>
                               </div>
                             </div>
