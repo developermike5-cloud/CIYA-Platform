@@ -6,7 +6,7 @@ import {
   Lightbulb, Gift, Bot, Wallet, Check, Smartphone, Briefcase, Zap, TrendingUp, Globe, Film, Palette, Sparkles
 } from 'lucide-react';
 import { auth, db } from '../firebase';
-import { signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 function Typewriter({ texts }: { texts: string[] }) {
@@ -841,6 +841,23 @@ function Footer() {
 
 export default function App() {
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        if (user.email === 'developermike5@gmail.com') {
+          navigate('/admin');
+        } else {
+          const docSnap = await getDoc(doc(db, 'users', user.uid));
+          if (docSnap.exists()) {
+            navigate('/dashboard');
+          }
+        }
+      }
+    });
+    return () => unsub();
+  }, [navigate]);
 
   useEffect(() => {
     const handlePopupBlocked = () => {

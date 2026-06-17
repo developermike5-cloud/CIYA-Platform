@@ -68,7 +68,8 @@ export default function CoursesAdmin() {
           // Compatibility map
           skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
           tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
-          status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft')
+          status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
+          isLocked: d.isLocked || d.locked || false
         } as Course;
       });
       setCourses(data);
@@ -95,6 +96,20 @@ export default function CoursesAdmin() {
     } catch (e) {
       console.error(e);
       alert('Error updating course status.');
+    }
+  };
+
+  const handleToggleLock = async (courseId: string, currentLocked: boolean) => {
+    try {
+      const nextLocked = !currentLocked;
+      const docRef = doc(db, 'courses', courseId);
+      await updateDoc(docRef, {
+        isLocked: nextLocked,
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.error(e);
+      alert('Error updating course lock status.');
     }
   };
 
@@ -242,10 +257,15 @@ export default function CoursesAdmin() {
                         <div className="flex gap-1">
                           <TierBadge tier={c.tier || 'beginner'} />
                           <span className={`px-2 py-0.5 rounded text-[10px] items-center font-bold ${
-                            isPublished ? 'bg-emerald-55 bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
+                            isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
                           }`}>
                             {isPublished ? 'Published' : 'Draft'}
                           </span>
+                          {c.isLocked && (
+                            <span className="px-2 py-0.5 rounded text-[10px] items-center font-bold bg-amber-50 border border-amber-200 text-amber-800">
+                              🔒 Locked
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -266,11 +286,23 @@ export default function CoursesAdmin() {
                       <div className="flex items-center justify-end gap-1.5 text-xs font-bold">
                         <button
                           type="button"
+                          onClick={() => handleToggleLock(c.id!, !!c.isLocked)}
+                          className={`px-3 py-1.5 rounded-lg border font-bold text-xs cursor-pointer transition-all ${
+                            c.isLocked
+                              ? 'border-teal-200 bg-teal-50 text-teal-800 font-extrabold'
+                              : 'border-orange-200 bg-orange-50 text-orange-850 font-extrabold'
+                          }`}
+                          title={c.isLocked ? "Click to Unlock this Course" : "Click to Lock this Course"}
+                        >
+                          {c.isLocked ? '🔓 Unlock' : '🔒 Lock'}
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleTogglePublish(c.id!, c.status!)}
                           className={`px-3 py-1.5 rounded-lg border font-bold text-xs cursor-pointer transition-all ${
                             isPublished
-                              ? 'border-amber-200 bg-amber-50 text-amber-700'
-                              : 'border-emerald-200 bg-emerald-50 text-emerald-700 font-extrabold'
+                              ? 'border-amber-205 bg-amber-50 text-amber-700'
+                              : 'border-emerald-202 bg-emerald-50 text-emerald-700 font-extrabold'
                           }`}
                         >
                           {isPublished ? 'Unpublish' : 'Publish'}

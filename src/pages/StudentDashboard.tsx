@@ -358,24 +358,361 @@ function AssignmentPanel({ assignment, dayIndex, submissions, onSubmit }: Assign
   );
 }
 
-// Sidebar Player view
+// Formatting walkthrough description with paragraphs and spacing based on timestamp
+function formatWalkthroughDescription(descText: string) {
+  if (!descText) return null;
+  const lines = descText.split('\n');
+  return (
+    <div className="space-y-4 text-sm md:text-base font-semibold text-slate-800 leading-relaxed text-left">
+      {lines.map((line, idx) => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) return null;
+        
+        // Matches setup timestamps like [00:00], 01:23, or Day 1 - 02:40
+        const timestampRegex = /^(\[?\d{1,2}:\d{2}\]?|Day\s+\d+\s+-\s+\d{1,2}:\d{2})\s*(?:-)?\s*(.*)$/i;
+        const match = trimmedLine.match(timestampRegex);
+        
+        if (match) {
+          const stamp = match[1];
+          const rest = match[2];
+          return (
+            <div key={idx} className="flex gap-3 items-start pt-1">
+              <span className="font-mono text-xs font-black text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg mt-0.5 shrink-0 select-none">
+                ⏱ {stamp}
+              </span>
+              <p className="text-slate-900 font-extrabold leading-normal m-0">{rest}</p>
+            </div>
+          );
+        }
+        
+        return (
+          <p key={idx} className="leading-relaxed m-0 text-slate-900 font-extrabold">
+            {trimmedLine}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+// Unified lesson lock validator helper function
+function isLessonUnlockedUnified(di: number, vi: number, days: any[], completedKeys: string[], checkPassedKeys: string[]) {
+  if (di === 0 && vi === 0) return true;
+  
+  let predDi = di;
+  let predVi = vi - 1;
+  
+  if (vi === 0) {
+    predDi = di - 1;
+    const prevDayVideos = days[predDi]?.videos || [];
+    predVi = prevDayVideos.length - 1;
+  }
+  
+  if (predDi < 0) return true;
+  
+  const precedingKey = `${predDi}-${predVi}`;
+  const isPrecedingVideoWatched = completedKeys.includes(precedingKey);
+  
+  const prevDayVideos = days[predDi]?.videos || [];
+  const precedingVideo = prevDayVideos[predVi];
+  const hasQuiz = precedingVideo && precedingVideo.checkType && precedingVideo.checkType !== 'none';
+  const isQuizPassed = checkPassedKeys.includes(precedingKey);
+  
+  return isPrecedingVideoWatched && (!hasQuiz || isQuizPassed);
+}
+
+// Interactive Post-Video Engagement Check popup modal
+interface QuizModalProps {
+  check: any;
+  checkType: 'none' | 'mcq' | 'tf' | 'fact';
+  checkKey: string;
+  courseId: string;
+  currentUser: any;
+  userProfile: any;
+  onSuccess: () => void;
+  onClose: () => void;
+  showToast: (msg: string) => void;
+}
+
+function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProfile, onSuccess, onClose, showToast }: QuizModalProps) {
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, any>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [scorePercentage, setScorePercentage] = useState<number | null>(null);
+  const [hasPassed, setHasPassed] = useState(false);
+
+  if (!check) return null;
+
+  const checkItems: any[] = Array.isArray(check) ? check : [check];
+  const maxQuestions = checkItems.length;
+
+  const handleSubmittingQuiz = async () => {
+    let correctCount = 0;
+    checkItems.forEach((q, idx) => {
+      const chosen = selectedAnswers[idx];
+      if (checkType === 'mcq') {
+        if (chosen === q.correct) correctCount++;
+      } else if (checkType === 'tf') {
+        if (chosen === q.answer) correctCount++;
+      } else if (checkType === 'fact') {
+        correctCount++;
+      }
+    });
+
+    const finalPct = maxQuestions > 0 ? Math.round((correctCount / maxQuestions) * 100) : 100;
+    const passesQuiz = finalPct >= 80;
+
+    setScorePercentage(finalPct);
+    setHasPassed(passesQuiz);
+    setSubmitted(true);
+
+    try {
+      const dbScores = userProfile.progress?.[courseId]?.quizScores || {};
+      const existingScoreRecord = dbScores[checkKey];
+
+      const userRef = doc(db, 'users', currentUser.uid);
+
+      if (!existingScoreRecord) {
+        await updateDoc(userRef, {
+          [`progress.${courseId}.quizScores.${checkKey}`]: {
+            score: finalPct,
+            passed: passesQuiz,
+            answeredAt: new Date().toLocaleString(),
+            firstAttemptRecorded: true
+          },
+          updatedAt: serverTimestamp()
+        });
+        showToast(`First Attempt recorded: ${finalPct}%! 🎉`);
+      } else {
+        if (passesQuiz && !existingScoreRecord.passed) {
+          await updateDoc(userRef, {
+            [`progress.${courseId}.quizScores.${checkKey}.passed`]: true,
+            updatedAt: serverTimestamp()
+          });
+          showToast(`Module updated as passed!`);
+        }
+      }
+
+      if (passesQuiz) {
+        onSuccess();
+      }
+    } catch (err) {
+      console.error("Error saving score attempt:", err);
+    }
+  };
+
+  const activeQuestion = checkItems[currentIdx];
+
+  return (
+    <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white rounded-3xl p-6 md:p-8 max-w-xl w-full shadow-2xl relative border border-slate-100 text-left overflow-hidden max-h-[90vh] overflow-y-auto"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-transparent border-0 cursor-pointer font-bold text-lg select-none"
+        >
+          ✕
+        </button>
+
+        {!submitted ? (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full tracking-wider">
+                🧠 Knowledge Check ({checkType.toUpperCase()})
+              </span>
+              <span className="text-xs text-slate-400 font-bold">
+                Q {currentIdx + 1} of {maxQuestions}
+              </span>
+            </div>
+
+            <h4 className="font-extrabold text-slate-900 text-base leading-relaxed">
+              {checkType === 'mcq' ? activeQuestion.question : checkType === 'tf' ? activeQuestion.statement : (activeQuestion.headline || 'Read this factsheet:')}
+            </h4>
+
+            {checkType === 'mcq' && (
+              <div className="space-y-2.5">
+                {(activeQuestion.options || []).map((opt: string, optIdx: number) => {
+                  const isSelected = selectedAnswers[currentIdx] === optIdx;
+                  return (
+                    <button
+                      key={optIdx}
+                      type="button"
+                      onClick={() => setSelectedAnswers({ ...selectedAnswers, [currentIdx]: optIdx })}
+                      className={`w-full text-left p-3.5 border rounded-xl flex gap-3 items-center transition-all cursor-pointer ${
+                        isSelected 
+                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-900 font-bold' 
+                          : 'border-slate-200 hover:border-slate-350 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className={`w-5.5 h-5.5 rounded-full border text-[10px] font-black flex items-center justify-center shrink-0 ${
+                        isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 text-slate-400'
+                      }`}>
+                        {["A", "B", "C", "D"][optIdx]}
+                      </span>
+                      <span className="text-xs font-semibold">{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {checkType === 'tf' && (
+              <div className="grid grid-cols-2 gap-3">
+                {[true, false].map((v) => {
+                  const isSelected = selectedAnswers[currentIdx] === v;
+                  return (
+                    <button
+                      key={String(v)}
+                      type="button"
+                      onClick={() => setSelectedAnswers({ ...selectedAnswers, [currentIdx]: v })}
+                      className={`py-4 border rounded-xl text-center font-black uppercase tracking-wider text-xs transition-all cursor-pointer ${
+                        isSelected
+                          ? 'border-indigo-600 bg-indigo-50/15 text-indigo-900'
+                          : 'border-slate-200 hover:border-slate-350 hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      {v ? "True" : "False"}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {checkType === 'fact' && (
+              <div className="bg-amber-50 p-4 border border-amber-200 rounded-xl">
+                <p className="text-xs text-amber-900 font-semibold leading-relaxed mb-3">
+                  {activeQuestion.body}
+                </p>
+                {activeQuestion.explanation && (
+                  <p className="text-[11px] text-amber-800/80 font-bold italic border-t border-amber-200/50 pt-2 leading-relaxed">
+                    💡 {activeQuestion.explanation}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-2">
+              <button
+                type="button"
+                onClick={() => setCurrentIdx(prev => Math.max(0, prev - 1))}
+                disabled={currentIdx === 0}
+                className="px-4 py-2 text-xs font-bold text-slate-500 rounded-lg hover:bg-slate-50 cursor-pointer disabled:opacity-30 border"
+              >
+                Previous Question
+              </button>
+
+              {currentIdx + 1 < maxQuestions ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedAnswers[currentIdx] === undefined && checkType !== 'fact') {
+                      alert("Please select your answer to advance!");
+                      return;
+                    }
+                    setCurrentIdx(prev => prev + 1);
+                  }}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-wide rounded-xl cursor-pointer font-sans"
+                >
+                  Next Question →
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedAnswers[currentIdx] === undefined && checkType !== 'fact') {
+                      alert("Please select your answer to complete!");
+                      return;
+                    }
+                    handleSubmittingQuiz();
+                  }}
+                  className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-lg"
+                >
+                  Submit Answers & Grade ✓
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-5 text-center py-4">
+            <div className="text-4xl">{hasPassed ? "🎉" : "😅"}</div>
+            <div>
+              <h3 className={`text-xl font-black ${hasPassed ? 'text-emerald-700' : 'text-red-600'}`}>
+                {hasPassed ? 'Understanding Checked passed! 🎉' : 'Retake Required! 🔄'}
+              </h3>
+              <p className="text-xs text-slate-500 font-bold mt-1">
+                You scored <strong className="text-slate-900 text-sm font-black font-mono">{scorePercentage}%</strong> · (Minimum passing score: 80%)
+              </p>
+            </div>
+
+            {hasPassed ? (
+              <div className="bg-emerald-50 border border-emerald-150 rounded-2xl p-4 text-xs font-semibold text-emerald-950 leading-relaxed max-w-sm mx-auto">
+                Excellent comprehension of the course lessons! The lesson progress has been verified and registered on your student card. You are now cleared to proceed.
+              </div>
+            ) : (
+              <div className="bg-red-50 border border-red-150 rounded-2xl p-4 text-xs font-semibold text-rose-950 leading-relaxed max-w-sm mx-auto space-y-2">
+                <p>
+                  Comprehension check is below the 80% passing threshold. Please review the lesson walkthrough and notes with focus to pass successfully.
+                </p>
+                <p className="text-[11px] font-extrabold text-rose-800">
+                  Note: Remember, only your very FIRST score is documented on the profile scoresheet. Study first compiles better!
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-center pt-3">
+              {hasPassed ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase rounded-xl cursor-pointer border-0 shadow-lg font-sans"
+                >
+                  Confirm & Continue Study
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedAnswers({});
+                    setSubmitted(false);
+                    setCurrentIdx(0);
+                    setScorePercentage(null);
+                    setHasPassed(false);
+                  }}
+                  className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs uppercase rounded-xl cursor-pointer border-0 shadow-lg flex items-center gap-1.5"
+                >
+                  <span>🔄</span> Retake Understanding Check
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+// Full-width classroom viewer with responsive layout
 interface CourseViewerProps {
   course: Course;
   userProfile: any;
   currentUser: any;
   onBack: () => void;
+  showToast: (msg: string) => void;
+  handleResetProgress: (cId: string) => Promise<void>;
 }
 
-function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress }: CourseViewerProps) {
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [activeVideoIdx, setActiveVideoIdx] = useState(0);
-  const [showCheck, setShowCheck] = useState(false);
+  const [showQuizModal, setShowQuizModal] = useState(false);
   const [showAssignment, setShowAssignment] = useState(false);
-  const [showCourseGeneralInfo, setShowCourseGeneralInfo] = useState(false);
+  const [viewingSyllabus, setViewingSyllabus] = useState(true);
 
-  // Load status from nested userProfile representation to keep persistence synced
   const courseId = course.id || 'general';
-  const progressStore = userProfile.progress?.[courseId] || { watched: [], checkPassed: [], submissions: {} };
+  const progressStore = userProfile.progress?.[courseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
   
   const completedKeys: string[] = progressStore.watched || [];
   const checkPassedKeys: string[] = progressStore.checkPassed || [];
@@ -391,7 +728,6 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
   const isCheckPassed = checkPassedKeys.includes(checkKey);
   const hasCheck = !!(currentVideo && currentVideo.checkType && currentVideo.checkType !== 'none' && currentVideo.check);
 
-  // Total progression math
   const totalVideos = days.reduce((sum, d) => sum + (d.videos?.length || 0), 0);
   const totalWatchedCount = completedKeys.length;
   const progressRatio = totalVideos > 0 ? Math.round((totalWatchedCount / totalVideos) * 100) : 0;
@@ -399,33 +735,40 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
   const handleGoToVideo = (di: number, vi: number) => {
     setActiveDayIdx(di);
     setActiveVideoIdx(vi);
-    setShowCheck(false);
+    setShowQuizModal(false);
     setShowAssignment(false);
+    setViewingSyllabus(false);
   };
 
   const handleMarkComplete = async () => {
-    try {
-      const updatedWatched = [...completedKeys];
-      if (!updatedWatched.includes(checkKey)) {
-        updatedWatched.push(checkKey);
+    if (hasCheck && !isCheckPassed) {
+      setShowQuizModal(true);
+    } else {
+      try {
+        const updatedWatched = [...completedKeys];
+        if (!updatedWatched.includes(checkKey)) {
+          updatedWatched.push(checkKey);
+        }
+        
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, {
+          [`progress.${courseId}.watched`]: updatedWatched,
+          updatedAt: serverTimestamp()
+        });
+        showToast("Lesson marked as completed! ✓");
+      } catch (e) {
+        console.error("Error updating completed lessons list:", e);
       }
-      
-      const userRef = doc(db, 'users', currentUser.uid);
-      await updateDoc(userRef, {
-        [`progress.${courseId}.watched`]: updatedWatched,
-        updatedAt: serverTimestamp()
-      });
-
-      if (hasCheck && !isCheckPassed) {
-        setShowCheck(true);
-      }
-    } catch (e) {
-      console.error("Error updates completed lessons list:", e);
     }
   };
 
   const handleCheckCompletion = async () => {
     try {
+      const updatedWatched = [...completedKeys];
+      if (!updatedWatched.includes(checkKey)) {
+        updatedWatched.push(checkKey);
+      }
+
       const updatedPassed = [...checkPassedKeys];
       if (!updatedPassed.includes(checkKey)) {
         updatedPassed.push(checkKey);
@@ -433,39 +776,35 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
 
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
+        [`progress.${courseId}.watched`]: updatedWatched,
         [`progress.${courseId}.checkPassed`]: updatedPassed,
         updatedAt: serverTimestamp()
       });
 
-      setShowCheck(false);
-
-      // Auto progression logic
-      if (activeVideoIdx < videos.length - 1) {
-        setActiveVideoIdx(prev => prev + 1);
-      } else {
-        setShowAssignment(true);
-      }
+      setShowQuizModal(false);
+      showToast("Comprehension check passed! Lesson unlocked! 🎉");
     } catch (e) {
-      console.error(e);
+      console.error("Error verification passing state:", e);
     }
   };
 
   const handleGoNext = () => {
-    if (hasCheck && !isCheckPassed) {
-      handleMarkComplete();
+    const isUnlocked = isLessonUnlockedUnified(activeDayIdx, activeVideoIdx, days, completedKeys, checkPassedKeys);
+    if (!isUnlocked) {
+      alert("Lesson check is locked! Clear comprehension quiz of this lesson first.");
       return;
     }
 
     if (activeVideoIdx < videos.length - 1) {
       setActiveVideoIdx(prev => prev + 1);
-      setShowCheck(false);
+      setShowQuizModal(false);
     } else {
       setShowAssignment(true);
     }
   };
 
   const handleGoPrev = () => {
-    setShowCheck(false);
+    setShowQuizModal(false);
     setShowAssignment(false);
     if (activeVideoIdx > 0) {
       setActiveVideoIdx(prev => prev - 1);
@@ -484,6 +823,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
         [`progress.${courseId}.submissions.${key}`]: data,
         updatedAt: serverTimestamp()
       });
+      showToast("Assignment submitted successfully!");
     } catch (e) {
       console.error("Error submitting assignment:", e);
     }
@@ -492,359 +832,375 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
   const sk = SKILLS[course.skill || 'web'];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[90vh] font-sans">
-      {/* 1. CURRICULUM ACCORDION STREAM (SIDEBAR - 4 Cols) */}
-      <div className="lg:col-span-4 bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col h-fit lg:sticky lg:top-24 gap-4">
-        {/* Course identity header block with progress bar */}
-        <div className="space-y-4">
+    <div className="max-w-4xl mx-auto space-y-8 font-sans pb-16">
+      {/* 1. CLASSROOM TOP PORTAL SPECS CARD */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 w-full">
+        <div className="flex gap-3 items-center text-left min-w-0">
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:text-teal-800 transition-colors cursor-pointer bg-transparent border-0"
+            className="p-2.5 px-4 border border-slate-200 hover:bg-slate-50 text-slate-800 font-black text-xs rounded-xl transition-all cursor-pointer bg-white flex items-center justify-center shrink-0"
+            title="Back to curriculum"
           >
-            ← Back to curriculum portal
+            ← Back
           </button>
-
-          <div className="flex gap-3 items-start">
-            <span className="w-9 h-9 bg-slate-50 border rounded-xl flex items-center justify-center text-xl shrink-0 shadow-inner select-none font-bold">
-              {sk?.icon || "📘"}
-            </span>
-            <div className="min-w-0">
-              <h3 className="font-extrabold text-sm text-slate-800 leading-tight truncate">{course.title}</h3>
-              <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">{course.tagline || course.subtitle}</p>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-teal-600 h-full rounded-full transition-all duration-300"
-                style={{ width: `${progressRatio}%` }}
-              />
-            </div>
-            <div className="flex justify-between items-center text-[9px] font-black uppercase text-teal-600 tracking-wider">
-              <span>{progressRatio}% COMPLETE</span>
-              <span>{totalWatchedCount}/{totalVideos} LESSONS</span>
-            </div>
-          </div>
-
-          {/* Collapsible General Course Specifications inside classroom view */}
-          <div className="border border-indigo-200 rounded-2xl bg-indigo-50/35 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowCourseGeneralInfo(!showCourseGeneralInfo)}
-              className="w-full text-left p-3.5 flex items-center justify-between cursor-pointer border-0 bg-transparent text-[11px] font-black uppercase text-indigo-900 tracking-wider hover:bg-indigo-50/50"
-            >
-              <span className="flex items-center gap-1.5">
-                <span>📑</span> Show Course Details {showCourseGeneralInfo ? "▲" : "▼"}
-              </span>
-              <span className="text-[9.5px] bg-indigo-100/80 text-indigo-900 font-extrabold px-2.5 py-0.5 rounded-lg uppercase tracking-normal">Specs Info</span>
-            </button>
-
-            {showCourseGeneralInfo && (
-              <div className="p-4 border-t border-indigo-200/50 bg-white space-y-3.5 text-xs leading-relaxed max-h-[300px] overflow-y-auto">
-                {/* Course Overview */}
-                {(course.overview || course.description) && (
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase text-indigo-700 block tracking-wider">🎯 Overview Synopsis</span>
-                    <p className="text-[11px] text-slate-700 font-bold leading-normal whitespace-pre-line leading-relaxed">
-                      {course.overview || course.description}
-                    </p>
-                  </div>
-                )}
-
-                {/* Instructor */}
-                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                  <span className="text-base">🧑‍🏫</span>
-                  <div className="text-[10px] leading-snug">
-                    <span className="font-extrabold uppercase text-[9px] text-slate-400 block tracking-wider">Instructor Team</span>
-                    <span className="font-extrabold text-slate-800">{course.instructor || "CIYA Technical Team"}</span>
-                  </div>
-                </div>
-
-                {/* Price/Fee if any */}
-                {course.price ? (
-                  <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                    <span className="text-base">💰</span>
-                    <div className="text-[10px] leading-snug">
-                      <span className="font-extrabold uppercase text-[9px] text-slate-400 block tracking-wider">Course Price Status</span>
-                      <span className="font-extrabold text-slate-800">${course.price} USD</span>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Requirements / Prerequisite Tools */}
-                {course.requirements && (
-                  <div className="space-y-1 bg-amber-50/60 p-3 rounded-xl border border-amber-200/60">
-                    <span className="text-[10px] font-black uppercase text-amber-800 block tracking-wider">🛠️ Required Prep Tools</span>
-                    <p className="text-[11px] font-bold text-amber-900 leading-normal leading-relaxed">
-                      {course.requirements}
-                    </p>
-                  </div>
-                )}
-
-                {/* Learning Outcomes */}
-                {course.outcomes && (
-                  <div className="space-y-1 bg-teal-50/40 p-3 rounded-xl border border-teal-200/40">
-                    <span className="text-[10px] font-black uppercase text-teal-800 block tracking-wider">🚀 Professional Outcomes</span>
-                    <p className="text-[11px] font-bold text-teal-900 leading-normal leading-relaxed">
-                      {course.outcomes}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+          <div className="min-w-0 flex-1">
+            <h3 className="font-extrabold text-sm text-slate-900 leading-tight truncate sm:whitespace-normal sm:line-clamp-2">{course.title}</h3>
+            <p className="text-[10.5px] text-slate-600 font-extrabold truncate mt-0.5">{course.tagline || course.subtitle}</p>
           </div>
         </div>
 
-        <hr className="border-slate-100" />
+        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t border-slate-100 sm:border-0">
+          <div className="text-left sm:text-right">
+            <div className="text-[10px] font-black uppercase text-teal-700 tracking-wider">
+              {progressRatio}% COMPLETE · {totalWatchedCount}/{totalVideos} CLIPS
+            </div>
+          </div>
+          <button
+            onClick={() => handleResetProgress(courseId)}
+            className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[10.5px] font-black uppercase rounded-2xl transition-all cursor-pointer flex items-center gap-1.5 focus:ring-2 focus:ring-red-200"
+            title="Reset course progression and scores"
+          >
+            🔄 Reset Course Progress
+          </button>
+        </div>
+      </div>
 
-        {/* 5 Days Timeline Accordion List */}
-        <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
-          {days.map((d, di) => {
-            const isDayThemeActive = activeDayIdx === di;
-            return (
-              <div
-                key={di}
-                className={`rounded-2xl border transition-all ${
-                  isDayThemeActive
-                    ? 'border-teal-200 bg-teal-50/20'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
-                }`}
-              >
-                {/* Accordion trigger panel */}
-                <button
-                  type="button"
-                  onClick={() => handleGoToVideo(di, 0)}
-                  className="w-full text-left p-3.5 flex items-center justify-between cursor-pointer border-0 bg-transparent text-xs"
+      {/* 2. DAILY LESSONS TIMELINE Navigation (PROMOTED TO THE TOP OF THE VIDEO PAGE) */}
+      {!viewingSyllabus && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left">
+          <div className="border-b pb-3 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Course Syllabus Navigation</span>
+              <h4 className="text-base font-black text-slate-900">🗓️ Guided Training Daily Schedule</h4>
+            </div>
+            <span className="text-xs bg-slate-100 text-slate-800 px-3 py-1 rounded-lg font-extrabold border border-slate-200">
+              {totalWatchedCount} of {totalVideos} Clips Completed
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {days.map((d, di) => {
+              const isDayThemeActive = activeDayIdx === di;
+              const isDayCoveredOrUnlocked = di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys);
+              if (!isDayCoveredOrUnlocked) return null;
+
+              return (
+                <div
+                  key={di}
+                  className={`rounded-2xl border p-4.5 transition-all flex flex-col justify-between ${
+                    isDayThemeActive
+                      ? 'border-indigo-200 bg-indigo-50/15 ring-2 ring-indigo-500/5'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
                 >
-                  <div className="flex-1 pr-2">
-                    <span className="text-[9px] font-black text-teal-600 tracking-wider block uppercase">DAY {di + 1}</span>
-                    <h5 className="font-extrabold text-slate-800 leading-snug truncate mt-0.5">{d.title}</h5>
+                  <div className="space-y-1.5 mb-3 text-left">
+                    <div className="flex items-center justify-between font-sans">
+                      <span className="text-[10px] font-black text-indigo-805 tracking-wider uppercase">DAY {di + 1}</span>
+                      <span className="text-[9.5px] bg-indigo-50 text-indigo-850 font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-normal">
+                        {(d.videos || []).length} lessons
+                      </span>
+                    </div>
+                    <h5 className="font-extrabold text-slate-900 text-sm leading-snug">{d.title}</h5>
+                    {d.description && <p className="text-[11px] text-slate-700 leading-normal leading-relaxed font-bold">{d.description}</p>}
                   </div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase shrink-0">
-                    {(d.videos || []).length} Clips
-                  </span>
-                </button>
 
-                {/* Lessons Accordion details */}
-                {isDayThemeActive && (
-                  <div className="p-2 border-t border-slate-100 space-y-1 bg-slate-50/50 rounded-b-2xl">
+                  <div className="space-y-1 text-left">
                     {(d.videos || []).map((vid, vi) => {
                       const currentKey = `${di}-${vi}`;
-                      const isVidCurrent = activeVideoIdx === vi && !showAssignment && !showCheck;
+                      const isVidCurrent = activeDayIdx === di && activeVideoIdx === vi && !showAssignment;
                       const isVidWatched = completedKeys.includes(currentKey);
                       const isKeyCheckPassed = checkPassedKeys.includes(currentKey);
-                      
+                      const isUnlocked = isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys);
+
                       return (
-                        <div
+                        <button
                           key={vid.id || vi}
-                          className={`rounded-xl p-2.5 flex items-center justify-between text-xs transition-all ${
+                          type="button"
+                          onClick={() => {
+                            if (isUnlocked) {
+                              handleGoToVideo(di, vi);
+                            } else {
+                              alert("This lesson is locked! Complete preceding lesson's understanding check to unlock.");
+                            }
+                          }}
+                          disabled={!isUnlocked}
+                          className={`w-full rounded-xl p-2.5 flex items-center justify-between text-xs transition-all pointer-events-auto cursor-pointer border ${
                             isVidCurrent
-                              ? 'bg-teal-600 text-white font-black shadow-md'
-                              : 'text-slate-600 hover:bg-slate-200/50 hover:text-slate-900'
+                              ? 'bg-indigo-600 text-white border-indigo-600 font-black shadow-md'
+                              : isUnlocked
+                                ? 'bg-slate-50 text-slate-900 border-slate-200 hover:bg-slate-100 font-extrabold'
+                                : 'bg-slate-200 text-slate-800 border-slate-300 font-extrabold opacity-80 cursor-not-allowed'
                           }`}
                         >
-                          {/* Inner lesson trigger content */}
-                          <button
-                            type="button"
-                            onClick={() => handleGoToVideo(di, vi)}
-                            className="flex-1 text-left flex items-start gap-2 pr-2 cursor-pointer bg-transparent border-0 text-inherit"
-                          >
+                          <div className="flex items-start gap-2 pr-2 text-inherit min-w-0">
                             <span className={`w-4.5 h-4.5 rounded-full flex items-center justify-center font-black shrink-0 text-[10px] ${
-                              isVidCurrent ? 'bg-white text-slate-900 shadow-sm' : 'bg-slate-200 text-slate-400'
+                              isVidCurrent ? 'bg-white text-indigo-950 shadow-sm font-black' : 'bg-slate-200 text-slate-800 font-extrabold'
                             }`}>
                               {vi + 1}
                             </span>
-                            <div className="flex-1 leading-snug">
-                              <span className="line-clamp-2 truncate">{vid.title || `Lesson ${vi+1}`}</span>
-                            </div>
-                          </button>
-
-                          {/* Completed tick indicators */}
-                          <div className="flex items-center gap-1 shrink-0">
-                            {isKeyCheckPassed && (
-                              <span className="text-[9px] font-black text-teal-500 bg-teal-100/50 px-1 py-0.25 rounded" title="Check passed successfully!">✓ checked</span>
-                            )}
-                            <span className={`w-4 h-4 rounded-full border flex items-center justify-center font-bold text-[9.5px] ${
-                              isVidWatched ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-200 text-slate-300 bg-white'
-                            }`}>
-                              {isVidWatched && "✓"}
-                            </span>
+                            <span className="truncate font-bold text-left">{vid.title || `Lesson ${vi+1}`}</span>
                           </div>
-                        </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0 select-none">
+                            {!isUnlocked ? (
+                              <Lock className="w-3.5 h-3.5 text-slate-705" />
+                            ) : (
+                              <>
+                                {isKeyCheckPassed && (
+                                  <span className="text-[9px] font-black text-emerald-800 bg-emerald-100 px-1 rounded border border-emerald-200">✓ checked</span>
+                                )}
+                                <span className={`w-4 h-4 rounded-full border flex items-center justify-center font-bold text-[9px] ${
+                                  isVidWatched ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-400 text-slate-500 bg-white'
+                                }`}>
+                                  {isVidWatched && "✓"}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </button>
                       );
                     })}
 
                     {/* End of day assignment checklist marker */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAssignment(true);
-                        setShowCheck(false);
-                      }}
-                      className={`w-full p-2.5 border-0 rounded-xl cursor-pointer text-left flex items-center justification-between text-xs transition-all ${
-                        showAssignment
-                          ? 'bg-indigo-600 text-white font-black shadow-md'
-                          : 'text-teal-700 hover:bg-slate-200/50 font-bold'
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5 flex-1">
-                        <span>{submissions[`day-${di}`] ? "✅" : "📋"}</span>
-                        <span>Day Assignment Check</span>
-                      </span>
-                    </button>
+                    {d.assignment && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allVideosPassed = (d.videos || []).every((v, vi) => {
+                            const currentKey = `${di}-${vi}`;
+                            const isVidWatched = completedKeys.includes(currentKey);
+                            const hasQuiz = v.checkType && v.checkType !== 'none' && v.check;
+                            const isQuizPassed = checkPassedKeys.includes(currentKey);
+                            return isVidWatched && (!hasQuiz || isQuizPassed);
+                          });
+
+                          if (allVideosPassed) {
+                            setActiveDayIdx(di);
+                            setShowAssignment(true);
+                            setShowQuizModal(false);
+                            setViewingSyllabus(false);
+                          } else {
+                            alert("Complete all day's lessons and understanding checks first to unlock the end-of-day assignment!");
+                          }
+                        }}
+                        className={`w-full p-2.5 border rounded-xl cursor-pointer text-left flex items-center justify-between text-xs transition-all tracking-wide ${
+                          showAssignment && activeDayIdx === di
+                            ? 'bg-teal-600 text-white border-teal-600 font-black shadow-md'
+                            : 'text-teal-900 bg-teal-50 border-teal-200 hover:bg-teal-100 font-extrabold'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 flex-1">
+                          <span>{submissions[`day-${di}`] ? "✅" : "📋"}</span>
+                          <span>Day {di+1} Live Assignment</span>
+                        </span>
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* 2. PLAYER FRAME & INSTRUCTION MODULE (8 COLS) */}
-      <div className="lg:col-span-8 space-y-6">
-
-        {/* Dynamic Assignment Panel display */}
-        {showAssignment ? (
-          <AssignmentPanel
-            assignment={activeDay.assignment}
-            dayIndex={activeDayIdx}
-            submissions={submissions}
-            onSubmit={handleAssignmentSubmit}
-          />
-
-        // Dynamic Post-video interactive check display
-        ) : showCheck && hasCheck ? (
-          <div className="space-y-5">
-            <h4 className="text-base font-black text-slate-800 flex items-center gap-2">
-              <span>🧠</span> Lesson Understanding Check
-            </h4>
-            <PostVideoCheck
-              check={currentVideo.check}
-              checkType={currentVideo.checkType || 'none'}
-              checkKey={checkKey}
-              onPass={handleCheckCompletion}
-            />
-          </div>
-
-        // Standard Lesson Video Player frame
-        ) : currentVideo ? (
-          <div className="space-y-6 max-w-3xl">
-            {/* Embed Video iframe wrapper container */}
-            <div className="bg-slate-950 aspect-video rounded-3xl overflow-hidden relative shadow-2xl border border-slate-900 flex items-center justify-center">
-              {currentVideo.video_url || currentVideo.url ? (
-                <iframe
-                  src={getYouTubeEmbedUrl(currentVideo.video_url || currentVideo.url || "")}
-                  title={currentVideo.title}
-                  className="w-full h-full border-0 absolute inset-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
-              ) : (
-                <div className="text-center p-8">
-                  <Play className="w-12 h-12 text-slate-500 mx-auto fill-slate-800" />
-                  <p className="text-xs font-bold text-slate-400 mt-2">No video url added for this lesson segment yet.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Video description metadata actions panel */}
-            <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <span className="text-[9px] font-black uppercase text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full tracking-wider">
-                    DAY {activeDayIdx + 1} · LESSON {activeVideoIdx + 1}
-                  </span>
-                  <h3 className="font-extrabold text-slate-800 text-base md:text-lg mt-2 tracking-tight leading-snug">{currentVideo.title}</h3>
-                  {currentVideo.duration && <p className="text-[10px] font-semibold text-slate-400 font-mono mt-0.5">⏱ Duration: {currentVideo.duration}</p>}
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-                  {currentVideo.checkType && currentVideo.checkType !== 'none' && (
-                    <CheckTypeBadge type={currentVideo.checkType} />
-                  )}
-
-                  {!isVideoWatched ? (
-                    <button
-                      onClick={handleMarkComplete}
-                      className="px-4 py-2 bg-white border border-teal-600 hover:bg-teal-50 text-teal-700 font-bold text-xs rounded-lg shadow-sm transition-all cursor-pointer"
-                    >
-                      Complete Lesson ✓
-                    </button>
-                  ) : (
-                    <span className="text-xs text-emerald-600 font-bold bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg flex items-center gap-1 select-none font-semibold">
-                      Completed Correctly ✓
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {currentVideo.description && (
-                <div className="bg-slate-50 border text-xs text-slate-600 p-3.5 rounded-xl leading-relaxed">
-                  <h4 className="font-bold text-slate-800 text-sm mb-1.5"> Walkthrough Summary</h4>
-                  <p className="leading-relaxed">{currentVideo.description}</p>
-                </div>
-              )}
-
-              {currentVideo.funFact && currentVideo.funFact.body && (
-                <div className="bg-gradient-to-br from-amber-50 to-orange-50/60 border border-amber-200 rounded-2xl p-4 md:p-5 relative shadow-sm space-y-1.5 overflow-hidden">
-                  <div className="absolute right-3.5 top-3.5 text-2xl opacity-15 select-none font-sans">💡</div>
-                  <h4 className="text-[11px] font-black uppercase text-amber-800 tracking-wider flex items-center gap-1.5 font-sans">
-                    <span>💡</span> {currentVideo.funFact.headline || "Did you know?"}
-                  </h4>
-                  <p className="text-xs text-amber-900 leading-relaxed font-semibold">{currentVideo.funFact.body}</p>
-                </div>
-              )}
-
-               {currentVideo.resources && (
-                <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 mt-3">
-                  <span className="text-[10px] font-black text-teal-800 block uppercase">📎 Attached Resource Download Links</span>
-                  <p className="text-teal-900 italic font-mono text-xs mt-1.5 leading-snug truncate">
-                    {currentVideo.resources}
-                  </p>
-                </div>
-              )}
-
-              {/* Check Teaser Box Alert */}
-              {hasCheck && !isCheckPassed && (
-                <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex gap-3 items-center">
-                  <span className="text-2xl">🧠</span>
-                  <div>
-                    <h5 className="font-black text-xs text-indigo-800 leading-snug">Continuous Knowledge Check Linked!</h5>
-                    <p className="text-[11px] text-indigo-500 leading-relaxed mt-0.5">
-                      {isVideoWatched ? "Click 'Next' or advance the lesson block below to render the quick question." : "Complete studying this lesson to unlock the interactive check!"}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Prev/Next buttons footer */}
-              <div className="flex justify-between items-center border-t border-slate-100 pt-4 mt-6">
-                <button
-                  onClick={handleGoPrev}
-                  className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-xl transition-all shadow-sm"
-                >
-                  ← Previous Module
-                </button>
-                <button
-                  onClick={handleGoNext}
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer border-0"
-                >
-                  {activeVideoIdx === videos.length - 1 ? "End-of-Day Assignment →" : "Onward (Next) →"}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="max-w-xl mx-auto rounded-3xl border border-slate-200 bg-white p-8 text-center space-y-4 shadow-sm">
-            <span className="text-3xl">📚</span>
-            <h4 className="font-black text-slate-800">Empty Day Syllabus Block</h4>
-            <p className="text-xs text-slate-500">
-              The coach has not uploaded lesson videos for Day {activeDayIdx + 1} in this track yet. Choose a different study day on the left to review available content!
+      {viewingSyllabus ? (
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left">
+          <div>
+            <span className="text-[10px] font-black uppercase text-teal-805 bg-teal-50 px-3.5 py-1 rounded-full tracking-wider">
+              Full-Course Syllabus & Roadmap Info
+            </span>
+            <h2 className="font-extrabold text-slate-900 text-xl md:text-2xl mt-3 tracking-tight leading-snug">
+              {course.title}
+            </h2>
+            <p className="text-xs md:text-sm text-slate-805 font-extrabold leading-relaxed mt-1">
+              {course.tagline || course.subtitle || "Step-by-step masterclass syllabus curated by professional tech coaches."}
             </p>
           </div>
-        )}
-      </div>
+
+          <hr className="border-slate-100" />
+
+          {/* Course Overview / synopsis with deep high contrast text */}
+          {(course.overview || course.description) && (
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-2">
+              <span className="text-[11px] font-black uppercase text-indigo-700 tracking-wider block">🎯 Overview Synopsis</span>
+              <p className="text-xs md:text-sm text-slate-905 font-extrabold leading-relaxed whitespace-pre-line">
+                {course.overview || course.description}
+              </p>
+            </div>
+          )}
+
+          {/* General specs layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <span className="text-2xl select-none">🧑‍🏫</span>
+              <div className="text-xs leading-normal">
+                <span className="font-extrabold uppercase text-[9px] text-slate-400 block tracking-wider">Instructor Team</span>
+                <span className="font-black text-slate-900 block mt-0.5">{course.instructor || "CIYA Technical Team"}</span>
+              </div>
+            </div>
+
+            {course.price ? (
+              <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <span className="text-2xl select-none">💰</span>
+                <div className="text-xs leading-normal">
+                  <span className="font-extrabold uppercase text-[9px] text-slate-400 block tracking-wider">Course Price Status</span>
+                  <span className="font-black text-slate-900 block mt-0.5">${course.price} USD</span>
+                </div>
+              </div>
+            ) : null}
+
+            {course.requirements && (
+              <div className="md:col-span-2 space-y-1.5 bg-amber-50/60 p-4 md:p-5 rounded-2xl border border-amber-200">
+                <span className="text-[11px] font-black uppercase text-amber-800 tracking-wider block">🛠️ Required Prep Tools & Prerequisites</span>
+                <p className="text-xs md:text-sm font-extrabold text-amber-950 leading-relaxed whitespace-pre-line">
+                  {course.requirements}
+                </p>
+              </div>
+            )}
+
+            {course.outcomes && (
+              <div className="md:col-span-2 space-y-1.5 bg-teal-50/35 p-4 md:p-5 rounded-2xl border border-teal-200">
+                <span className="text-[11px] font-black uppercase text-teal-800 tracking-wider block">🚀 Core Professional Objectives & Outcomes</span>
+                <p className="text-xs md:text-sm font-extrabold text-teal-950 leading-relaxed whitespace-pre-line">
+                  {course.outcomes}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-4">
+            <button
+              onClick={() => setViewingSyllabus(false)}
+              className="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-sm uppercase rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer transform active:scale-[0.98] border-0"
+            >
+              📊 Enter Classroom & Begin Lessons →
+            </button>
+          </div>
+        </div>
+      ) : showAssignment ? (
+        <AssignmentPanel
+          assignment      ) : currentVideo ? (
+        <div className="space-y-6 text-left">
+          {/* Cinematic Video Player Frame positioned AFTER the course syllabus navigation and BEFORE the detail card */}
+          <div className="bg-slate-950 aspect-video rounded-3xl overflow-hidden relative shadow-2xl border border-slate-900 flex items-center justify-center">
+            {currentVideo.video_url || currentVideo.url ? (
+              <iframe
+                src={getYouTubeEmbedUrl(currentVideo.video_url || currentVideo.url || "")}
+                title={currentVideo.title}
+                className="w-full h-full border-0 absolute inset-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            ) : (
+              <div className="text-center p-8">
+                <Play className="w-12 h-12 text-slate-500 mx-auto fill-slate-800" />
+                <p className="text-xs font-bold text-slate-400 mt-2">No video URL added for this lesson segment yet.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Active play center stage (Walkthrough Outline & interactive action desk) */}
+          <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+              <div>
+                <span className="text-[9px] font-black uppercase text-teal-700 bg-teal-55 px-2.5 py-1 rounded-full tracking-wider">
+                  DAY {activeDayIdx + 1} · LESSON {activeVideoIdx + 1}
+                </span>
+                <h3 className="font-extrabold text-slate-900 text-base md:text-lg mt-2 tracking-tight leading-snug">{currentVideo.title}</h3>
+                {currentVideo.duration && <p className="text-[10px] font-semibold text-slate-400 font-mono mt-0.5">⏱ Duration: {currentVideo.duration}</p>}
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                {!isVideoWatched ? (
+                  <button
+                    onClick={handleMarkComplete}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all cursor-pointer border-0 font-sans"
+                  >
+                    Complete Lesson & Verify ✓
+                  </button>
+                ) : (
+                  <span className="text-xs text-emerald-650 font-bold bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg flex items-center gap-1 select-none font-sans">
+                    Completed Correctly ✓
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Walkthrough Summary (Plain text, well formulated paragraph spacing, no container frame block) */}
+            {currentVideo.description && (
+              <div className="pt-2">
+                <h4 className="font-black text-slate-950 text-xs md:text-sm uppercase tracking-wider mb-3">📖 Walkthrough Outline</h4>
+                {formatWalkthroughDescription(currentVideo.description)}
+              </div>
+            )}
+
+            {currentVideo.resources && (
+              <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 mt-3">
+                <span className="text-[10px] font-black text-teal-800 block uppercase">📎 Attached Resource Download Links</span>
+                <p className="text-teal-900 font-mono text-xs mt-1.5 leading-snug truncate">
+                  {currentVideo.resources}
+                </p>
+              </div>
+            )}
+
+            {/* Practice checklist alerting blocks */}
+            {hasCheck && !isCheckPassed && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex gap-3 items-center mt-4">
+                <span className="text-2xl">🧠</span>
+                <div>
+                  <h5 className="font-black text-xs text-indigo-800 leading-snug">Comprehension Check Available!</h5>
+                  <p className="text-[11px] text-indigo-500 leading-relaxed mt-0.5">
+                    Click "Complete Lesson & Verify" to trigger the understanding popup quiz. You must pass with at least 80% to proceed.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Prev / Next controls desk */}
+            <div className="flex justify-between items-center border-t border-slate-100 pt-4 mt-6">
+              <button
+                onClick={handleGoPrev}
+                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+              >
+                ← Previous Module
+              </button>
+              <button
+                onClick={handleGoNext}
+                className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer border-0"
+              >
+                {activeVideoIdx === videos.length - 1 ? "End-of-Day Assignment →" : "Onward (Next) →"}
+              </button>
+            </div>
+          </div>
+        </div>      {activeVideoIdx === videos.length - 1 ? "End-of-Day Assignment →" : "Onward (Next) →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-xl mx-auto rounded-3xl border border-slate-200 bg-white p-8 text-center space-y-4 shadow-sm text-left">
+          <span className="text-3xl">📚</span>
+          <h4 className="font-black text-slate-800">Empty Day Syllabus Block</h4>
+          <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+            The coach has not uploaded lesson videos for Day {activeDayIdx + 1} in this track yet. Choose a different study day below to review available content!
+          </p>
+        </div>
+      )}
+
+      {/* Renders the quiz popup modal on demand */}
+      {showQuizModal && currentVideo && currentVideo.check && (
+        <QuizModal
+          check={currentVideo.check}
+          checkType={currentVideo.checkType || 'none'}
+          checkKey={checkKey}
+          courseId={courseId}
+          currentUser={currentUser}
+          userProfile={userProfile}
+          onSuccess={handleCheckCompletion}
+          onClose={() => setShowQuizModal(false)}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }
@@ -934,13 +1290,12 @@ function getYouTubeEmbedUrl(url: string): string {
 function CourseCard({ course, isLocked, onSelect }: any) {
   const sk = SKILLS[course.skill || 'web'];
   const totalVideos = course.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
-  const totalChecks = course.days?.reduce((sum: number, d: any) => sum + (d.videos?.filter((v: any) => v.checkType && v.checkType !== 'none').length || 0), 0) || 0;
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div 
-      onClick={() => { if (!isLocked) onSelect(); }}
-      className="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-teal-900/5 hover:-translate-y-1 transition-all duration-350 cursor-pointer text-left"
+      onClick={onSelect}
+      className="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-teal-900/5 hover:-translate-y-1 transition-all duration-350 cursor-pointer text-left font-sans"
     >
       <div className="relative aspect-video bg-slate-100 overflow-hidden">
         {course.thumbnail ? (
@@ -961,11 +1316,11 @@ function CourseCard({ course, isLocked, onSelect }: any) {
       </div>
       
       <div className="p-5 flex-1 flex flex-col">
-        <h4 className="font-extrabold text-base text-slate-800 mb-1.5 line-clamp-2 leading-tight group-hover:text-teal-700 transition-colors">
+        <h4 className="font-extrabold text-base text-slate-900 mb-1.5 line-clamp-2 leading-tight group-hover:text-teal-700 transition-colors">
           {course.title}
         </h4>
-        <p className="text-xs text-slate-500 mb-4 line-clamp-2 leading-relaxed">
-          {course.tagline || course.subtitle || "Embark on structured study paths curated by Nigerian professional coaches."}
+        <p className="text-xs text-slate-800 mb-4 line-clamp-2 leading-relaxed font-extrabold">
+          {course.tagline || course.subtitle || "Embark on structured study paths curated by professional coaches."}
         </p>
 
         {/* Dropdown toggle button for general specs */}
@@ -975,96 +1330,86 @@ function CourseCard({ course, isLocked, onSelect }: any) {
             e.stopPropagation();
             setExpanded(!expanded);
           }}
-          className="w-full mb-4 px-3 py-2 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-[10.5px] font-black uppercase text-slate-600 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 bg-white"
+          className="w-full mb-4 px-3 py-2.5 border border-slate-200 hover:border-slate-350 hover:bg-slate-50 text-[10.5px] font-black uppercase text-slate-700 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 bg-white"
         >
           <span>📑</span>
           <span>{expanded ? "Hide course specifications ▲" : "View course specifications ▼"}</span>
         </button>
 
-        {expanded && (
-          <div 
-            onClick={(e) => e.stopPropagation()} 
-            className="mb-4 pt-3.5 border-t border-dashed border-slate-200 text-xs space-y-3 animate-fadeIn"
-          >
-            {/* Overview / synopsis */}
-            {(course.overview || course.description) && (
-              <div className="space-y-1">
-                <span className="text-[10px] font-black uppercase text-indigo-700 block tracking-wider">🎯 Overview Synopsis</span>
-                <p className="text-[11px] font-bold text-slate-650 leading-relaxed whitespace-pre-line">
-                  {course.overview || course.description}
-                </p>
-              </div>
-            )}
+        <div onClick={(e) => e.stopPropagation()} className="overflow-hidden">
+          {expanded && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="mb-4 pt-3.5 border-t border-dashed border-slate-200 text-xs space-y-3"
+            >
+              {/* Overview / synopsis with solid legibility colors */}
+              {(course.overview || course.description) && (
+                <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-black uppercase text-indigo-700 block tracking-wider">🎯 Overview Synopsis</span>
+                  <p className="text-[11.5px] font-extrabold text-slate-950 leading-relaxed whitespace-pre-line">
+                    {course.overview || course.description}
+                  </p>
+                </div>
+              )}
 
-            {/* Instructor */}
-            <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-              <span className="text-base">🧑‍🏫</span>
-              <div className="text-[11px] leading-snug">
-                <span className="font-extrabold uppercase text-[8.5px] text-slate-400 block tracking-wider">Instructor Team</span>
-                <span className="font-extrabold text-slate-850">{course.instructor || "CIYA Technical Team"}</span>
-              </div>
-            </div>
-
-            {/* Price/Fee if any */}
-            {course.price ? (
-              <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                <span className="text-base">💰</span>
+              {/* Instructor */}
+              <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <span className="text-base">🧑‍🏫</span>
                 <div className="text-[11px] leading-snug">
-                  <span className="font-extrabold uppercase text-[8.5px] text-slate-400 block tracking-wider">Course Price Status</span>
-                  <span className="font-extrabold text-slate-800">${course.price} USD</span>
+                  <span className="font-extrabold uppercase text-[8.5px] text-slate-400 block tracking-wider">Instructor Team</span>
+                  <span className="font-extrabold text-slate-950">{course.instructor || "CIYA Technical Team"}</span>
                 </div>
               </div>
-            ) : null}
 
-            {/* Requirements / Prerequisite Tools */}
-            {course.requirements && (
-              <div className="space-y-1 bg-amber-50/50 p-3 rounded-xl border border-amber-200">
-                <span className="text-[10px] font-black uppercase text-amber-800 block tracking-wider">🛠️ Required Prep Tools</span>
-                <p className="text-[11px] font-bold text-amber-900 leading-normal leading-relaxed">
-                  {course.requirements}
-                </p>
-              </div>
-            )}
-
-            {/* Learning Outcomes */}
-            {course.outcomes && (
-              <div className="space-y-1 bg-teal-50/40 p-3 rounded-xl border border-teal-200">
-                <span className="text-[10px] font-black uppercase text-teal-800 block tracking-wider">🚀 Professional Outcomes</span>
-                <p className="text-[11px] font-bold text-teal-900 leading-normal leading-relaxed">
-                  {course.outcomes}
-                </p>
-              </div>
-            )}
-
-            {/* Daily syllabus schedule summary */}
-            {course.days && course.days.length > 0 && (
-              <div className="space-y-2 pt-1">
-                <span className="text-[10px] font-black uppercase text-indigo-700 block tracking-wider">🗓️ Daily Syllabus Schedule</span>
-                <div className="space-y-2 border-l-2 border-indigo-400 pl-3">
-                  {course.days.map((day: any, dIdx: number) => (
-                    <div key={dIdx} className="text-[11.5px] leading-normal font-semibold">
-                      <span className="font-extrabold text-indigo-800">Day {dIdx + 1}:</span>{" "}
-                      <span className="text-slate-800 font-bold">{day.title}</span>
-                      {day.description && <p className="text-[10px] text-slate-500 font-medium leading-normal leading-relaxed">{day.description}</p>}
-                    </div>
-                  ))}
+              {/* Price/Fee if any */}
+              {course.price ? (
+                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-base">💰</span>
+                  <div className="text-[11px] leading-snug">
+                    <span className="font-extrabold uppercase text-[8.5px] text-slate-400 block tracking-wider">Course Price Status</span>
+                    <span className="font-extrabold text-slate-950">${course.price} USD</span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              ) : null}
+
+              {/* Requirements / Prerequisite Tools */}
+              {course.requirements && (
+                <div className="space-y-1 bg-amber-50/50 p-3 rounded-xl border border-amber-200">
+                  <span className="text-[10px] font-black uppercase text-amber-800 block tracking-wider">🛠️ Required Prep Tools</span>
+                  <p className="text-[11px] font-extrabold text-amber-950 leading-normal leading-relaxed">
+                    {course.requirements}
+                  </p>
+                </div>
+              )}
+
+              {/* Learning Outcomes */}
+              {course.outcomes && (
+                <div className="space-y-1 bg-teal-50/45 p-3 rounded-xl border border-teal-200">
+                  <span className="text-[10px] font-black uppercase text-teal-800 block tracking-wider">🚀 Professional Outcomes</span>
+                  <p className="text-[11px] font-extrabold text-teal-950 leading-normal leading-relaxed">
+                    {course.outcomes}
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </div>
         
         <div className="mt-auto pt-3.5 flex items-center justify-between border-t border-slate-100 text-[11.5px] text-slate-700 font-extrabold font-sans">
           <div className="space-y-1">
-            <div className="flex items-center gap-1">🎬 <span className="font-black text-teal-700">{totalVideos}</span> lesson clips</div>
-            <div className="flex items-center gap-1">🧠 <span className="font-black text-indigo-700">{totalChecks}</span> check quizes</div>
+            <div className="flex items-center gap-1.5 py-1.5 text-xs text-slate-900">
+              <span>🎬</span> 
+              <span><span className="font-black text-teal-700">{totalVideos}</span> lesson clips</span>
+            </div>
           </div>
           {isLocked ? (
              <button className="text-[11px] font-black uppercase tracking-wide text-slate-400 bg-slate-100 flex items-center gap-1 px-3 py-1.5 rounded-full cursor-not-allowed border-0">
                <Lock className="w-3.5 h-3.5" /> Locked
              </button>
            ) : (
-             <button className="text-[11px] font-black uppercase tracking-wide text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 hover:border-teal-305 px-3.5 py-2 rounded-xl transition-all cursor-pointer">
+             <button className="text-[11px] font-black uppercase tracking-wide text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3.5 py-2 rounded-xl transition-all cursor-pointer">
                Enter →
              </button>
           )}
@@ -1207,6 +1552,44 @@ export default function StudentDashboard() {
   
   const [activeSkillFilter, setActiveSkillFilter] = useState<string>('all');
   const navigate = useNavigate();
+
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  const handleResetProgress = async (cId: string) => {
+    if (!currentUser) return;
+    const isConfirmed = window.confirm("Are you absolutely sure you want to reset your learning progress and scores for this course? This action cannot be undone.");
+    if (!isConfirmed) return;
+
+    try {
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, {
+        [`progress.${cId}`]: {
+          watched: [],
+          textChecked: [],
+          watchedComplete: false,
+          watchedCount: 0,
+          watchedPercent: 0,
+          watchedRatio: 0,
+          watchedRatioPercent: 0,
+          checkedPassed: [],
+          submissions: {},
+          watchedList: [],
+          checkPassed: [],
+          quizScores: {}
+        },
+        updatedAt: serverTimestamp()
+      });
+      showToast("Lesson progression, quizzes, and score sheet successfully reset!");
+    } catch (err) {
+      console.error("Error resetting progress:", err);
+      showToast("Sync fail resetting progress, please try again.");
+    }
+  };
 
   // Selected Course playing state
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
@@ -1911,6 +2294,90 @@ export default function StudentDashboard() {
                   <div className="sm:col-span-2 pt-6 border-t border-slate-100">
                     <SubmissionDetailsCard profile={userProfile} />
                   </div>
+
+                  {/* Quizzes and Checks Score Sheet */}
+                  <div className="sm:col-span-2 pt-6 border-t border-slate-100 text-left">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-lg">📊</span>
+                      <div>
+                        <h3 className="font-extrabold text-slate-850 text-xs tracking-tight uppercase tracking-wider text-indigo-700">Course Quizzes Score Sheet</h3>
+                        <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                          Your first-attempt scores are locked in your profile. Click 'Reset Progress' below to start fresh.
+                        </p>
+                      </div>
+                    </div>
+
+                    {courses.some(c => userProfile.progress?.[c.id || '']?.quizScores) ? (
+                      <div className="space-y-4">
+                        {courses.map(course => {
+                          const courseId = course.id || '';
+                          const cScores = userProfile.progress?.[courseId]?.quizScores || {};
+                          if (Object.keys(cScores).length === 0) return null;
+
+                          return (
+                            <div key={courseId} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left">
+                              <div className="flex items-center justify-between border-b pb-2 mb-3">
+                                <span className="font-extrabold text-xs text-slate-900">📚 {course.title}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleResetProgress(courseId)}
+                                  className="text-[10px] font-black text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-0.75 rounded-md border-0 uppercase cursor-pointer transition-colors"
+                                >
+                                  Reset Progress & Scores
+                                </button>
+                              </div>
+
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-xs text-left text-slate-500 font-semibold">
+                                  <thead className="text-[9px] uppercase font-black tracking-wider text-slate-400 bg-white border border-slate-200">
+                                    <tr>
+                                      <th className="px-3 py-2">Day/Lesson</th>
+                                      <th className="px-3 py-2 text-center">First Attempt Score</th>
+                                      <th className="px-3 py-2 text-center">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 bg-white border-x border-b border-slate-200">
+                                    {Object.entries(cScores).map(([key, dataVal]: [string, any]) => {
+                                      const [diStr, viStr] = key.split('-');
+                                      const dIdx = parseInt(diStr);
+                                      const vIdx = parseInt(viStr);
+                                      const dayObj = course.days?.[dIdx];
+                                      const lessonVideo = dayObj?.videos?.[vIdx];
+                                      const label = lessonVideo?.title ? `Day ${dIdx+1} - ${lessonVideo.title}` : `Day ${dIdx+1} - Lesson ${vIdx+1}`;
+                                      const passed = dataVal.passed;
+                                      
+                                      return (
+                                        <tr key={key} className="hover:bg-slate-50">
+                                          <td className="px-3 py-2.5 font-bold text-slate-800 truncate max-w-[200px]" title={label}>{label}</td>
+                                          <td className="px-3 py-2.5 text-center font-bold text-slate-900 font-mono">
+                                            {dataVal.score}%
+                                          </td>
+                                          <td className="px-3 py-2.5 text-center">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                              passed 
+                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                            }`}>
+                                              {passed ? 'PASSED (>=80%)' : 'RETAKE REQUIRED'}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl">
+                        <span className="text-2xl block mb-1">📋</span>
+                        <p className="text-xs text-slate-400 font-semibold leading-relaxed">No quiz or knowledge checks submitted on your profile yet. Answer checks inside lessons to view your reports!</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -1922,6 +2389,8 @@ export default function StudentDashboard() {
                   userProfile={userProfile}
                   currentUser={currentUser}
                   onBack={() => setSelectedCourseId(null)}
+                  showToast={showToast}
+                  handleResetProgress={handleResetProgress}
                 />
               ) : (
                 <div className="space-y-8">
@@ -2029,11 +2498,13 @@ export default function StudentDashboard() {
                           <CourseCard 
                             key={course.id} 
                             course={course} 
-                            isLocked={isGuest} 
+                            isLocked={isGuest || course.isLocked || course.locked} 
                             onSelect={() => {
                               if (isGuest) {
                                 alert("This premium curriculum is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
                                 handleLogin();
+                              } else if (course.isLocked || course.locked) {
+                                alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
                               } else {
                                 setSelectedCourseId(course.id || null);
                               }
@@ -2055,19 +2526,19 @@ export default function StudentDashboard() {
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-xs md:text-sm">
                         <div>
                           <h4 className="font-extrabold text-teal-800 mb-2.5 uppercase tracking-wider text-[10.5px]">📢 Commercials & Brand Promote</h4>
-                          <p className="text-slate-500 leading-relaxed text-xs">High-converting social platform advertising formats: viral reels edits, Instagram commercial scripts, products reveal overlays, brand narrative vlogs, UGC promos, and Amazon pitch videos.</p>
+                          <p className="text-slate-800 leading-relaxed text-xs font-bold">High-converting social platform advertising formats: viral reels edits, Instagram commercial scripts, products reveal overlays, brand narrative vlogs, UGC promos, and Amazon pitch videos.</p>
                         </div>
                         <div>
                           <h4 className="font-extrabold text-indigo-700 mb-2.5 uppercase tracking-wider text-[10.5px]">📱 Short-form Social Hooks</h4>
-                          <p className="text-slate-500 leading-relaxed text-xs">Faceless faceless accounts clips, speaking avatar scripts, motivational edits, TikTok trends clips, podcast soundbites summaries, and YouTube shorts with automatic subtitles generator tools.</p>
+                          <p className="text-slate-800 leading-relaxed text-xs font-bold">Faceless faceless accounts clips, speaking avatar scripts, motivational edits, TikTok trends clips, podcast soundbites summaries, and YouTube shorts with automatic subtitles generator tools.</p>
                         </div>
                         <div>
                           <h4 className="font-extrabold text-rose-800 mb-2.5 uppercase tracking-wider text-[10.5px]">🎞️ Narrative Cinematic Clips</h4>
-                          <p className="text-slate-500 leading-relaxed text-xs">AI-synthesized cinema films, sci-fi/romantic teaser templates, looped background visuals, music lyric overlays, intro hooks for YouTube channels, and opening credits sequence generators.</p>
+                          <p className="text-slate-800 leading-relaxed text-xs font-bold">AI-synthesized cinema films, sci-fi/romantic teaser templates, looped background visuals, music lyric overlays, intro hooks for YouTube channels, and opening credits sequence generators.</p>
                         </div>
                         <div>
                           <h4 className="font-extrabold text-amber-700 mb-2.5 uppercase tracking-wider text-[10.5px]">🎨 Emerging Synthetic Media</h4>
-                          <p className="text-slate-500 leading-relaxed text-xs">Custom avatars generation lipsync, text-to-video cinematic camera directions scripting, virtual corporate trainers, synthetic voice cloner hooks, and generative looping graphics panels.</p>
+                          <p className="text-slate-800 leading-relaxed text-xs font-bold">Custom avatars generation lipsync, text-to-video cinematic camera directions scripting, virtual corporate trainers, synthetic voice cloner hooks, and generative looping graphics panels.</p>
                         </div>
                       </div>
                     </section>
@@ -2081,19 +2552,19 @@ export default function StudentDashboard() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 text-xs">
                         <div className="bg-slate-50 p-4.5 rounded-2xl border border-slate-200">
                            <h4 className="font-bold text-pink-600 mb-1.5 uppercase tracking-wider text-[10px]">Direct Marketing Cards</h4>
-                           <p className="text-slate-500 leading-relaxed text-[11px]">Dynamic flyer templates, custom high-contrast banner images, social media graphics packs, and print-ready brochures.</p>
+                           <p className="text-slate-800 leading-relaxed text-[11px] font-bold">Dynamic flyer templates, custom high-contrast banner images, social media graphics packs, and print-ready brochures.</p>
                         </div>
                         <div className="bg-slate-50 p-4.5 rounded-2xl border border-slate-200">
                            <h4 className="font-bold text-orange-600 mb-1.5 uppercase tracking-wider text-[10px]">Vibrant Brand Identity</h4>
-                           <p className="text-slate-500 leading-relaxed text-[11px]">Symbolic logos drafting with generative AI, customized corporate palettes, vector assets, and typography pairing sheets.</p>
+                           <p className="text-slate-800 leading-relaxed text-[11px] font-bold">Symbolic logos drafting with generative AI, customized corporate palettes, vector assets, and typography pairing sheets.</p>
                         </div>
                         <div className="bg-slate-50 p-4.5 rounded-2xl border border-slate-200">
                            <h4 className="font-bold text-teal-600 mb-1.5 uppercase tracking-wider text-[10px]">Premium UI/UX Portals</h4>
-                           <p className="text-slate-500 leading-relaxed text-[11px]">High-fidelity landing design drafts, dashboard outlines, SaaS wireframes modeling, and mobile screens mapping.</p>
+                           <p className="text-slate-800 leading-relaxed text-[11px] font-bold">High-fidelity landing design drafts, dashboard outlines, SaaS wireframes modeling, and mobile screens mapping.</p>
                         </div>
                         <div className="bg-slate-50 p-4.5 rounded-2xl border border-slate-200">
                            <h4 className="font-bold text-blue-600 mb-1.5 uppercase tracking-wider text-[10px]">Creator Channels Brand</h4>
-                           <p className="text-slate-500 leading-relaxed text-[11px]">Clickable high-CTR thumbnail layouts, Youtube channel banners, overlays, stream clips interfaces, and carousel designs.</p>
+                           <p className="text-slate-800 leading-relaxed text-[11px] font-bold">Clickable high-CTR thumbnail layouts, Youtube channel banners, overlays, stream clips interfaces, and carousel designs.</p>
                         </div>
                       </div>
                     </section>
@@ -2147,7 +2618,7 @@ export default function StudentDashboard() {
             <div className="mt-8">
               <button
                 onClick={() => setShowCongratsPopup(false)}
-                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-lg rounded-xl transition-all shadow-xl shadow-slate-900/15 cursor-pointer transform active:scale-95"
+                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-lg rounded-xl transition-all shadow-xl shadow-slate-900/15 cursor-pointer transform active:scale-95 border-0"
               >
                 Enter Dashboard 🚀
               </button>
@@ -2156,88 +2627,58 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* FLOATING engagement check fun-fact test trigger button */}
-      {selectedCourseId && (
-        <button
-          type="button"
-          onClick={() => {
-            const selectedCourse = courses.find(c => c.id === selectedCourseId);
-            const courseFunFacts: any[] = [];
-            if (selectedCourse && selectedCourse.days) {
-              selectedCourse.days.forEach((day: any) => {
-                if (day.videos) {
-                  day.videos.forEach((vid: any) => {
-                    if (vid.funFact?.headline?.trim() && vid.funFact?.body?.trim()) {
-                      courseFunFacts.push(vid.funFact);
-                    }
-                  });
-                }
-              });
-            }
-            const selectedFact = courseFunFacts.length > 0 
-              ? courseFunFacts[Math.floor(Math.random() * courseFunFacts.length)] 
-              : COMPLEMENTARY_FUN_FACTS[Math.floor(Math.random() * COMPLEMENTARY_FUN_FACTS.length)];
-            setCurrentFunFact(selectedFact);
-            setShowFunFactPopup(true);
-          }}
-          className="fixed bottom-6 right-6 z-50 p-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-full shadow-2xl transition-all flex items-center justify-center gap-1 hover:scale-105 active:scale-95 text-xs group border-0 cursor-pointer"
-          title="Test Fun Fact Trigger (Runs automatically every 5 min)"
-        >
-          <span className="text-lg">💡</span>
-          <span className="max-w-0 overflow-hidden group-hover:max-w-[150px] transition-all duration-300 ease-out whitespace-nowrap text-[10.5px] uppercase font-black tracking-wide pl-1">
-            Test Fact Popup
-          </span>
-        </button>
-      )}
-
-      {/* 5-MINUTE PERIODIC FUN FACT POPUP MODAL */}
+      {/* 5-MINUTE PERIODIC COMPACT FUN FACT POPUP CARD */}
       {showFunFactPopup && currentFunFact && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div className="fixed bottom-6 right-6 z-[120] p-4 max-w-sm w-full md:w-[350px]">
           <motion.div 
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-amber-50 border-4 border-amber-400/40 rounded-3xl p-6 md:p-8 max-w-md w-full text-center relative shadow-2xl overflow-hidden"
+            initial={{ y: 50, scale: 0.9, opacity: 0 }}
+            animate={{ y: 0, scale: 1, opacity: 1 }}
+            className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 shadow-2xl relative overflow-hidden text-left"
           >
-            {/* Top orange gradient bar */}
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-500" />
+            {/* Top orange gradient accent bar */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
             
-            {/* Close button with stop propagation */}
+            {/* Close button */}
             <button
               onClick={() => setShowFunFactPopup(false)}
-              className="absolute top-3.5 right-3.5 w-7 h-7 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-900 border-0 flex items-center justify-center cursor-pointer font-black text-sm transition-all"
+              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-900 border-0 flex items-center justify-center cursor-pointer font-black text-xs transition-all"
             >
               ✕
             </button>
 
-            <div className="w-16 h-16 bg-amber-100/80 border border-amber-300 rounded-2xl flex items-center justify-center mx-auto mb-4 select-none text-3xl font-bold">
-              💡
+            <div className="flex gap-3">
+              <div className="w-10 h-10 bg-amber-100 border border-amber-300 rounded-xl flex items-center justify-center shrink-0 select-none text-xl font-bold">
+                💡
+              </div>
+              <div className="space-y-1 pr-4">
+                <span className="inline-block text-[9.5px] font-black uppercase text-amber-800 tracking-wider">
+                  Engagement Fun Fact
+                </span>
+                <h3 className="text-xs md:text-sm font-black text-amber-950 tracking-tight leading-snug">
+                  {currentFunFact?.headline || "Did you know?"}
+                </h3>
+              </div>
             </div>
 
-            <span className="inline-block bg-amber-200/60 border border-amber-300 text-amber-900 text-[10.5px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-3">
-              Fascinating engagement fact
-            </span>
-
-            <h3 className="text-base md:text-lg font-black text-amber-950 tracking-tight leading-snug">
-              {currentFunFact?.headline || "Did you know?"}
-            </h3>
-
-            <p className="text-amber-900/90 text-xs md:text-sm leading-relaxed font-semibold mt-3 whitespace-pre-line bg-white/70 border border-amber-200/50 rounded-2xl p-4 shadow-inner text-left">
+            <p className="text-amber-900 text-[11px] leading-relaxed font-semibold mt-3 whitespace-pre-line bg-white/70 border border-amber-250 rounded-xl p-3 shadow-inner">
               {currentFunFact?.body}
             </p>
 
-            <div className="mt-5 flex gap-2">
-              <button
-                onClick={() => setShowFunFactPopup(false)}
-                className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl transition-all shadow-md cursor-pointer transform active:scale-95 border-0"
-              >
-                Amazing, Continue Study! 🚀
-              </button>
-            </div>
-            
-            <div className="mt-3.5 text-[10px] text-amber-700 font-extrabold uppercase tracking-wide">
-              Triggers automatically every 5 minutes for active engagement
-            </div>
+            <button
+              onClick={() => setShowFunFactPopup(false)}
+              className="mt-3.5 w-full py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[10px] tracking-wider uppercase rounded-lg transition-all shadow-sm cursor-pointer border-0"
+            >
+              Acknowledge Fact
+            </button>
           </motion.div>
+        </div>
+      )}
+
+      {/* Dynamic Toast feedback overlay */}
+      {toastMsg && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-slate-900 border border-slate-800 text-white font-extrabold text-xs px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 max-w-sm truncate select-none">
+          <span>🔔</span>
+          <span>{toastMsg}</span>
         </div>
       )}
     </div>

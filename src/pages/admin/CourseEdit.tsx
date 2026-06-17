@@ -83,6 +83,7 @@ const defaultInitialForm = (): Course => ({
   requirements: "",
   publish_status: "Draft",
   status: "draft",
+  isLocked: false,
   days: DAYS_RANGE.map(d => emptyDay(d))
 });
 
@@ -818,6 +819,7 @@ export default function CourseEdit() {
         requirements: form.requirements || '',
         publish_status: normPublishStatus,
         status: statusVal,
+        isLocked: !!form.isLocked,
         days: cleanedDays,
         updatedAt: serverTimestamp()
       };
@@ -889,6 +891,7 @@ export default function CourseEdit() {
             requirements: raw.requirements || '',
             publish_status: raw.publish_status || (raw.status === 'published' ? 'Published' : 'Draft'),
             status: raw.status || (raw.publish_status === 'Published' ? 'published' : 'draft'),
+            isLocked: !!raw.isLocked,
             days: DAYS_RANGE.map((dayNum, idx) => {
               const existingDay = raw.days?.find((d: any) => d.dayNumber === dayNum);
               return {
@@ -1071,6 +1074,7 @@ export default function CourseEdit() {
         requirements: form.requirements || '',
         publish_status: normPublishStatus,
         status: statusVal,
+        isLocked: !!form.isLocked,
         days: cleanedDays,
         updatedAt: serverTimestamp()
       };
@@ -1674,6 +1678,35 @@ export default function CourseEdit() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-xs font-black uppercase text-indigo-700">🔒 Course Access & Locking System</span>
+              <span className={`px-2.5 py-0.5 rounded text-[10px] items-center font-bold font-mono ${
+                form.isLocked ? 'bg-red-50 text-red-750 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              }`}>
+                {form.isLocked ? 'LOCKED' : 'UNLOCKED'}
+              </span>
+            </div>
+            
+            <div className="flex items-start gap-3 p-4 bg-slate-40/50 bg-slate-50 border rounded-2xl">
+              <input
+                type="checkbox"
+                id="admin-course-locked-toggle"
+                className="w-5 h-5 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer mt-0.5"
+                checked={!!form.isLocked}
+                onChange={e => setField("isLocked", e.target.checked)}
+              />
+              <div className="space-y-0.5">
+                <label htmlFor="admin-course-locked-toggle" className="text-sm font-bold text-slate-800 cursor-pointer select-none">
+                  Lock this course for students
+                </label>
+                <p className="text-xs text-slate-500 leading-relaxed font-semibold">
+                  When locked, students can still browse the course overview, but won't be able to enter the classroom or begin active lessons/checks until unlocked.
+                </p>
               </div>
             </div>
           </div>

@@ -19,6 +19,7 @@ export interface Course {
   requirements?: string;
   publish_status: 'Draft' | 'Published' | 'Archived';
   status?: 'draft' | 'published'; // guide property
+  isLocked?: boolean; // locking system
   createdAt?: any;
   updatedAt?: any;
   days?: CourseDay[];
