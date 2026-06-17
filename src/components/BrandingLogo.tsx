@@ -35,30 +35,30 @@ export default function BrandingLogo({ className = '', size = 'md', theme = 'dar
   }, []);
 
   // Dimensions
-  let svgSize = 100;
-  let textFontSize = "10px";
-  let iconSize = 52;
-  let iconOffset = 24; // (100 - 52) / 2
-  let pathRadius = 38; // text radius
+  let svgSize = 120;
+  let textFontSize = "11.5px";
+  let iconSize = 62;
+  let iconOffset = 29; // (120 - 62) / 2
+  let pathRadius = 45; // text radius
 
   if (size === 'xs') {
-    svgSize = 56;
-    textFontSize = "5.5px";
-    iconSize = 28;
-    iconOffset = 14;
-    pathRadius = 20;
+    svgSize = 64;
+    textFontSize = "6.5px";
+    iconSize = 34;
+    iconOffset = 15;
+    pathRadius = 24;
   } else if (size === 'sm') {
-    svgSize = 76;
-    textFontSize = "7.5px";
-    iconSize = 38;
-    iconOffset = 19;
-    pathRadius = 28;
+    svgSize = 88;
+    textFontSize = "9px";
+    iconSize = 46;
+    iconOffset = 21;
+    pathRadius = 33;
   } else if (size === 'lg') {
-    svgSize = 140;
-    textFontSize = "13px";
-    iconSize = 72;
-    iconOffset = 34;
-    pathRadius = 52;
+    svgSize = 160;
+    textFontSize = "14.5px";
+    iconSize = 84;
+    iconOffset = 38;
+    pathRadius = 60;
   }
 
   const center = svgSize / 2;

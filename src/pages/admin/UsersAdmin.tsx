@@ -90,6 +90,8 @@ export default function UsersAdmin() {
   const [filterApproval, setFilterApproval] = useState('');
   const [filterGender, setFilterGender] = useState('');
   const [sortDate, setSortDate] = useState('desc');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
 
   // Actions Toggle & States
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
@@ -103,6 +105,8 @@ export default function UsersAdmin() {
   // Admins state & Super Admin check
   const [admins, setAdmins] = useState<string[]>([]);
   const [adminsData, setAdminsData] = useState<Record<string, { email: string, role?: string, permissions?: string[] }>>({});
+  const [adminDrafts, setAdminDrafts] = useState<Record<string, { role: string, permissions: string[] }>>({});
+  const [savingAdminId, setSavingAdminId] = useState<string | null>(null);
   const isSuperAdmin = auth.currentUser?.email === 'developermike5@gmail.com';
 
   const cachedUserStr = localStorage.getItem('ciya_cached_user');
@@ -192,6 +196,11 @@ export default function UsersAdmin() {
           delete updated[targetUser.id];
           return updated;
         });
+        setAdminDrafts(prev => {
+          const next = { ...prev };
+          delete next[targetUser.id];
+          return next;
+        });
         alert(`${targetUser.fullName || 'User'} has been removed from CIYA admins.`);
       } else {
         const newAdmin = {
@@ -205,7 +214,7 @@ export default function UsersAdmin() {
           ...prev,
           [targetUser.id]: newAdmin
         }));
-        alert(`${targetUser.fullName || 'User'} has been upgraded to a CIYA Admin!`);
+        alert(`${targetUser.fullName || 'User'} has been upgraded to a CIYA Admin! Now configure custom permissions and titles below, then click Save.`);
       }
     } catch (e) {
       console.error("Error managing admin privileges:", e);
@@ -213,46 +222,96 @@ export default function UsersAdmin() {
     }
   };
 
-  const handleUpdateAdminFields = async (userId: string, field: string, value: any) => {
-    try {
-      const updatedAdmin = {
-        ...(adminsData[userId] || { email: '' }),
-        [field]: value
-      };
-      
-      await setDoc(doc(db, 'admins', userId), updatedAdmin, { merge: true });
-      
-      setAdminsData(prev => ({
-        ...prev,
-        [userId]: updatedAdmin
-      }));
-    } catch (err) {
-      console.error("Error updating admin fields:", err);
-      alert("Failed to update admin role.");
+  const getAdminRoleValue = (userId: string) => {
+    if (adminDrafts[userId]?.role !== undefined) {
+      return adminDrafts[userId].role;
     }
+    return adminsData[userId]?.role || 'CIYA Admin';
   };
 
-  const handleTogglePermission = async (userId: string, permission: string) => {
+  const getAdminPermissionsValue = (userId: string) => {
+    if (adminDrafts[userId]?.permissions !== undefined) {
+      return adminDrafts[userId].permissions;
+    }
+    return adminsData[userId]?.permissions || [];
+  };
+
+  const handleDraftRoleChange = (userId: string, value: string) => {
+    setAdminDrafts(prev => ({
+      ...prev,
+      [userId]: {
+        role: value,
+        permissions: getAdminPermissionsValue(userId)
+      }
+    }));
+  };
+
+  const handleDraftTogglePermission = (userId: string, permission: string) => {
+    const currentList = getAdminPermissionsValue(userId);
+    const updatedList = currentList.includes(permission)
+      ? currentList.filter(p => p !== permission)
+      : [...currentList, permission];
+    setAdminDrafts(prev => ({
+      ...prev,
+      [userId]: {
+        role: getAdminRoleValue(userId),
+        permissions: updatedList
+      }
+    }));
+  };
+
+  const handleSaveAdminPrivileges = async (userId: string, email: string) => {
+    const role = getAdminRoleValue(userId).trim();
+    const permissions = getAdminPermissionsValue(userId);
+
+    if (!role) {
+      alert("Admin Role/Title cannot be empty.");
+      return;
+    }
+
+    setSavingAdminId(userId);
     try {
-      const currentPermissions = adminsData[userId]?.permissions || [];
-      const updatedPermissions = currentPermissions.includes(permission)
-        ? currentPermissions.filter(p => p !== permission)
-        : [...currentPermissions, permission];
-        
       const updatedAdmin = {
-        ...(adminsData[userId] || { email: '' }),
-        permissions: updatedPermissions
+        email: email,
+        role: role,
+        permissions: permissions
       };
-      
+
+      // 1. Save to admins collection in Firestore
       await setDoc(doc(db, 'admins', userId), updatedAdmin, { merge: true });
-      
+
+      // 2. Reflect on local state immediately
       setAdminsData(prev => ({
         ...prev,
         [userId]: updatedAdmin
       }));
-    } catch (err) {
-      console.error("Error updating admin permissions:", err);
-      alert("Failed to update admin permissions.");
+
+      // 3. Clean up the draft state for this user
+      setAdminDrafts(prev => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+
+      // 4. Update corresponding cached user session if they are the currently logged in admin user
+      if (auth.currentUser?.uid === userId) {
+        const currentCache = localStorage.getItem('ciya_cached_user');
+        if (currentCache) {
+          try {
+            const parsed = JSON.parse(currentCache);
+            parsed.permissions = permissions;
+            parsed.adminRole = role;
+            localStorage.setItem('ciya_cached_user', JSON.stringify(parsed));
+          } catch (e) {}
+        }
+      }
+
+      alert("Admin privileges and configuration updated and saved successfully!");
+    } catch (err: any) {
+      console.error("Error saving admin config:", err);
+      alert("Failed to save admin privileges: " + err.message);
+    } finally {
+      setSavingAdminId(null);
     }
   };
 
@@ -384,7 +443,29 @@ export default function UsersAdmin() {
         filterApproval === 'disapproved' ? appStatus === 'Disapproved' : true
       ) : true;
 
-      return matchesSearch && matchesState && matchesCourse && matchesStatus && matchesApproval && matchesGender;
+      let matchesDateRange = true;
+      const timestamp = getFirestoreTime(u.createdAt);
+      if (timestamp > 0) {
+        // Formulate local YYYY-MM-DD string for comparison
+        const itemDate = new Date(timestamp);
+        const yyyy = itemDate.getFullYear();
+        const mm = String(itemDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(itemDate.getDate()).padStart(2, '0');
+        const itemDateStr = `${yyyy}-${mm}-${dd}`;
+
+        if (filterStartDate && itemDateStr < filterStartDate) {
+          matchesDateRange = false;
+        }
+        if (filterEndDate && itemDateStr > filterEndDate) {
+          matchesDateRange = false;
+        }
+      } else {
+        if (filterStartDate || filterEndDate) {
+          matchesDateRange = false;
+        }
+      }
+
+      return matchesSearch && matchesState && matchesCourse && matchesStatus && matchesApproval && matchesGender && matchesDateRange;
     });
 
     result.sort((a, b) => {
@@ -394,7 +475,7 @@ export default function UsersAdmin() {
     });
 
     return result;
-  }, [users, searchTerm, filterState, filterCourse, filterStatus, filterApproval, sortDate]);
+  }, [users, searchTerm, filterState, filterCourse, filterStatus, filterApproval, filterGender, sortDate, filterStartDate, filterEndDate]);
 
   return (
     <div>
@@ -531,8 +612,27 @@ export default function UsersAdmin() {
               <option key={s} value={s} className="text-slate-800">{s}</option>
             ))}
           </select>
+
+          <div className="flex items-center gap-1.5 border-l border-slate-200 pl-4 py-1">
+            <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Date range:</span>
+            <input 
+              type="date" 
+              value={filterStartDate}
+              onChange={(e) => setFilterStartDate(e.target.value)}
+              className="text-xs border border-slate-300 rounded-md px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white outline-none"
+              title="Start Registration Date"
+            />
+            <span className="text-xs text-slate-400">to</span>
+            <input 
+              type="date" 
+              value={filterEndDate}
+              onChange={(e) => setFilterEndDate(e.target.value)}
+              className="text-xs border border-slate-300 rounded-md px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white outline-none"
+              title="End Registration Date"
+            />
+          </div>
           
-          {(filterState || filterCourse || filterStatus || filterApproval || filterGender || sortDate !== 'desc') && (
+          {(filterState || filterCourse || filterStatus || filterApproval || filterGender || sortDate !== 'desc' || filterStartDate || filterEndDate) && (
             <button 
               onClick={() => {
                 setFilterState('');
@@ -541,8 +641,10 @@ export default function UsersAdmin() {
                 setFilterApproval('');
                 setFilterGender('');
                 setSortDate('desc');
+                setFilterStartDate('');
+                setFilterEndDate('');
               }}
-              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium ml-2"
+              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium ml-2 cursor-pointer border-0 bg-transparent outline-none"
             >
               Clear Filters
             </button>
@@ -844,13 +946,20 @@ export default function UsersAdmin() {
                                         {admins.includes(u.id) && (
                                           <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 mt-2 space-y-2.5 text-left">
                                             <div className="flex flex-col gap-1">
-                                              <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Custom Admin Role/Title</label>
+                                              <div className="flex justify-between items-center bg-transparent border-0 select-none">
+                                                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Custom Admin Role/Title</label>
+                                                {adminDrafts[u.id] !== undefined && (
+                                                  <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 animate-pulse">
+                                                    UNSAVED EDITS ⚠️
+                                                  </span>
+                                                )}
+                                              </div>
                                               <input
                                                 type="text"
                                                 className="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-teal-500 w-full"
                                                 placeholder="e.g. CIYA Admin, Content Editor"
-                                                value={adminsData[u.id]?.role || 'CIYA Admin'}
-                                                onChange={(e) => handleUpdateAdminFields(u.id, 'role', e.target.value)}
+                                                value={getAdminRoleValue(u.id)}
+                                                onChange={(e) => handleDraftRoleChange(u.id, e.target.value)}
                                               />
                                             </div>
                                             <div className="space-y-1">
@@ -859,8 +968,8 @@ export default function UsersAdmin() {
                                                 <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none">
                                                   <input 
                                                     type="checkbox"
-                                                    checked={adminsData[u.id]?.permissions?.includes('manage_courses') ?? false}
-                                                    onChange={() => handleTogglePermission(u.id, 'manage_courses')}
+                                                    checked={getAdminPermissionsValue(u.id).includes('manage_courses')}
+                                                    onChange={() => handleDraftTogglePermission(u.id, 'manage_courses')}
                                                     className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
                                                   />
                                                   Course Management
@@ -868,8 +977,8 @@ export default function UsersAdmin() {
                                                 <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none">
                                                   <input 
                                                     type="checkbox"
-                                                    checked={adminsData[u.id]?.permissions?.includes('manage_students') ?? false}
-                                                    onChange={() => handleTogglePermission(u.id, 'manage_students')}
+                                                    checked={getAdminPermissionsValue(u.id).includes('manage_students')}
+                                                    onChange={() => handleDraftTogglePermission(u.id, 'manage_students')}
                                                     className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
                                                   />
                                                   Student & Stats Management
@@ -877,13 +986,37 @@ export default function UsersAdmin() {
                                                 <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none">
                                                   <input 
                                                     type="checkbox"
-                                                    checked={adminsData[u.id]?.permissions?.includes('manage_branding') ?? false}
-                                                    onChange={() => handleTogglePermission(u.id, 'manage_branding')}
+                                                    checked={getAdminPermissionsValue(u.id).includes('manage_branding')}
+                                                    onChange={() => handleDraftTogglePermission(u.id, 'manage_branding')}
                                                     className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
                                                   />
                                                   Branding & Logo Management
                                                 </label>
                                               </div>
+                                            </div>
+
+                                            <div className="pt-2 border-t border-slate-250 flex justify-end">
+                                              <button
+                                                type="button"
+                                                disabled={savingAdminId === u.id}
+                                                onClick={() => handleSaveAdminPrivileges(u.id, u.email)}
+                                                className={`px-3 py-1.5 rounded-md text-xs font-black transition-all border-none flex items-center gap-1 cursor-pointer outline-none ${
+                                                  adminDrafts[u.id] !== undefined
+                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow shadow-emerald-600/25 ring-2 ring-emerald-450/15'
+                                                    : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                                                }`}
+                                              >
+                                                {savingAdminId === u.id ? (
+                                                  <>
+                                                    <span className="animate-spin inline-block w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full mr-1 animate-ping" />
+                                                    Saving...
+                                                  </>
+                                                ) : adminDrafts[u.id] !== undefined ? (
+                                                  "💾 Save Privileges"
+                                                ) : (
+                                                  "✓ Privileges Synced"
+                                                )}
+                                              </button>
                                             </div>
                                           </div>
                                         )}

@@ -18,9 +18,9 @@ service cloud.firestore {
     
     function isAdmin() { 
       // Bootstrap admin using email, or check if they are in the admins collection
-      return isSignedIn() && request.auth.token.email_verified == true && (
+      return isSignedIn() && (
         request.auth.token.email == 'developermike5@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        (request.auth.token.get('email_verified', false) == true && exists(/databases/$(database)/documents/admins/$(request.auth.uid)))
       );
     }
     
@@ -55,8 +55,10 @@ service cloud.firestore {
     
     // Entity Validation: AdminConfig
     function isValidAdminConfig(data) {
-      return data.keys().hasAll(['email']) && data.keys().size() == 1
-        && data.email is string && data.email.size() <= 200;
+      return data.keys().hasAll(['email'])
+        && data.email is string && data.email.size() <= 200
+        && (data.get('role', '') is string && data.get('role', '').size() <= 200)
+        && (data.get('permissions', []) is list);
     }
 
     // Entity Validation: UserProfile
@@ -91,7 +93,8 @@ service cloud.firestore {
       allow create: if isAdmin()
                     && isValidId(adminId)
                     && isValidAdminConfig(incoming());
-      allow update: if false; // immutable emails
+      allow update: if isAdmin()
+                    && isValidAdminConfig(incoming());
       allow delete: if isAdmin();
     }
 

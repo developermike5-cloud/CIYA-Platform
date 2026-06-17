@@ -220,13 +220,15 @@ function Navbar() {
   return (
     <motion.nav 
       initial="hidden" animate="visible" variants={navAnimation}
-      className={`fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-6 md:px-12 lg:px-24 h-24 shrink-0 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 flex flex-col md:flex-row justify-center md:justify-between items-center px-6 md:px-12 lg:px-24 py-4 md:py-0 h-auto md:h-24 shrink-0 transition-all duration-300 ${
         scrolled ? 'bg-teal-950/80 backdrop-blur-md border-b border-teal-900' : 'bg-transparent'
       }`}
     >
-      <a href="#" className="hover:opacity-85 transition-opacity">
-        <BrandingLogo size="sm" />
-      </a>
+      <div className="flex justify-center md:justify-start w-full md:w-auto">
+        <a href="#" className="hover:opacity-85 transition-opacity">
+          <BrandingLogo size="sm" />
+        </a>
+      </div>
       
       <div className="hidden md:flex items-center gap-10 text-sm font-medium text-teal-200">
         <a href="#mission" className="hover:text-amber-400 transition-colors">Mission</a>
@@ -785,11 +787,11 @@ function Footer() {
   return (
     <footer className="bg-teal-950 pt-20 pb-8 px-6 md:px-12 lg:px-24 border-t border-teal-900 shrink-0 mt-auto">
       <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-12 mb-16 w-full">
-        <div className="md:col-span-5 lg:col-span-4">
-          <a href="#" className="mb-6 block hover:opacity-85 transition-opacity">
+        <div className="md:col-span-5 lg:col-span-4 text-center md:text-left flex flex-col items-center md:items-start">
+          <a href="#" className="mb-6 flex justify-center md:justify-start hover:opacity-85 transition-opacity">
             <BrandingLogo size="sm" />
           </a>
-          <p className="text-sm text-teal-300 leading-relaxed max-w-xs mb-6">
+          <p className="text-sm text-teal-300 leading-relaxed max-w-xs mb-6 text-center md:text-left">
             Create It Yourself Academy — bridging the digital skill gap in Nigeria and Africa, one youth at a time.
           </p>
         </div>

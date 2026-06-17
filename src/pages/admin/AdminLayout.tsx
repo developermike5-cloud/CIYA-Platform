@@ -200,6 +200,16 @@ export default function AdminLayout() {
               Students & Stats
             </Link>
           )}
+
+          <div className="pt-2 border-t border-slate-800">
+            <Link 
+              to="/dashboard" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block w-full text-center px-4 py-2 rounded-md hover:bg-slate-800 text-teal-300 bg-teal-500/10 hover:text-white transition-all text-xs font-bold whitespace-nowrap"
+            >
+              🎓 Student Portal
+            </Link>
+          </div>
         </nav>
         <div className="p-4 border-t border-slate-800 bg-slate-950/40">
           <p className="text-sm text-slate-400 mb-2 truncate">{user.email}</p>

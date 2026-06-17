@@ -65,7 +65,9 @@
       "description": "Configuration to store admin user IDs",
       "type": "object",
       "properties": {
-        "email": { "type": "string" }
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "permissions": { "type": "array" }
       },
       "required": ["email"]
     }

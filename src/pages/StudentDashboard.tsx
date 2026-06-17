@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
-import { signOut, onAuthStateChanged } from 'firebase/auth';
+import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../types';
 import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles } from 'lucide-react';
@@ -966,6 +966,18 @@ export default function StudentDashboard() {
 
   const [timeLeft, setTimeLeft] = useState('');
   const [currentView, setCurrentView] = useState<'courses' | 'profile'>('courses');
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    const cached = localStorage.getItem('ciya_cached_user');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed && (parsed.role === 'admin' || parsed.role === 'super_admin')) {
+          return true;
+        }
+      } catch (e) {}
+    }
+    return false;
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -1021,6 +1033,58 @@ export default function StudentDashboard() {
     }
   };
 
+  const handleLogin = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await signInWithPopup(auth, provider);
+      if (result.user.email === 'developermike5@gmail.com') {
+        navigate('/admin');
+        return;
+      }
+      const adminSnap = await getDoc(doc(db, 'admins', result.user.uid));
+      const isUserAdmin = adminSnap.exists();
+      if (isUserAdmin) {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
+      const docSnap = await getDoc(doc(db, 'users', result.user.uid));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCurrentUser(result.user);
+        setUserProfile(data);
+        const userData = {
+          uid: result.user.uid,
+          email: result.user.email,
+          role: isUserAdmin ? 'admin' : 'student'
+        };
+        localStorage.setItem('ciya_cached_user', JSON.stringify(userData));
+        localStorage.setItem('ciya_cached_profile', JSON.stringify(data));
+        setLiveCheckComplete(true);
+      } else {
+        await signOut(auth);
+        alert("Your account is not registered. If you are an invited student, please complete the registration using the private onboarding link sent by your administrator.");
+      }
+    } catch (e: any) {
+      if (e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user') {
+        return;
+      }
+      console.error(e);
+      if (
+        e.code === 'auth/popup-blocked' || 
+        e.message?.toLowerCase().includes('popup-blocked') || 
+        e.message?.toLowerCase().includes('popup estuvo bloqueado') ||
+        e.message?.includes('Pending promise was never set') ||
+        e.message?.includes('INTERNAL ASSERTION FAILED')
+      ) {
+        alert("Google Login popup was blocked by your browser. Please allow popups for this site or open in a new tab to complete log in.");
+        return;
+      }
+      alert("An error occurred during log in: " + e.message);
+    }
+  };
+
   useEffect(() => {
     let unsubSnapshot: (() => void) | null = null;
 
@@ -1030,6 +1094,21 @@ export default function StudentDashboard() {
           navigate('/admin');
           return;
         }
+
+        // Check if upgraded admin
+        let isUserAdmin = false;
+        try {
+          const adminDocSnap = await getDoc(doc(db, 'admins', user.uid));
+          if (adminDocSnap.exists()) {
+            isUserAdmin = true;
+            setIsAdmin(true);
+          } else {
+            setIsAdmin(false);
+          }
+        } catch (err) {
+          console.error("Dashboard auth check failed for admin state:", err);
+        }
+
         setCurrentUser(user);
         
         // Listen to Firestore real-time profile changes
@@ -1043,7 +1122,7 @@ export default function StudentDashboard() {
             const userData = {
               uid: user.uid,
               email: user.email,
-              role: 'student'
+              role: isUserAdmin ? 'admin' : 'student'
             };
             localStorage.setItem('ciya_cached_user', JSON.stringify(userData));
             localStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
@@ -1074,7 +1153,9 @@ export default function StudentDashboard() {
             unsubSnapshot();
             unsubSnapshot = null;
           }
-          navigate('/');
+          setCurrentUser(null);
+          setUserProfile(null);
+          setAuthChecking(false);
         } else {
           setAuthChecking(false);
         }
@@ -1208,13 +1289,18 @@ export default function StudentDashboard() {
     localStorage.removeItem('ciya_cached_user');
     localStorage.removeItem('ciya_cached_profile');
     await signOut(auth);
-    navigate('/');
+    setCurrentUser(null);
+    setUserProfile(null);
   };
+
+  const isGuest = !currentUser || !userProfile;
 
   if (authChecking) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Validating Authorization Credentials...</div>;
   }
-  if (!userProfile) return null;
+  if (!userProfile && currentUser) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Retrieving Student Profile...</div>;
+  }
 
   const approvalStatus = userProfile?.approvalStatus || 'Pending';
   const isApproved = approvalStatus === 'Approved';
@@ -1226,7 +1312,7 @@ export default function StudentDashboard() {
   const selectedCourse = courses.find(c => c.id === selectedCourseId);
 
   // Master Full-Screen Gating Page for Unapproved or Locked Users (No dashboard UI visible)
-  if (userProfile?.isDashboardUnlocked !== true) {
+  if (!isGuest && userProfile?.isDashboardUnlocked !== true) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8 font-sans">
         {(!liveCheckComplete && !isApproved) ? (
@@ -1404,27 +1490,51 @@ export default function StudentDashboard() {
             <Compass className="w-4 h-4" />
             Explore Curriculum
           </button>
-          <button 
-            type="button"
-            onClick={() => { setCurrentView('profile'); setIsMobileMenuOpen(false); }}
-            className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'profile' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
-          >
-            <UserIcon className="w-4 h-4" />
-            My Profile Settings
-          </button>
+          {!isGuest && (
+            <button 
+              type="button"
+              onClick={() => { setCurrentView('profile'); setIsMobileMenuOpen(false); }}
+              className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'profile' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+            >
+              <UserIcon className="w-4 h-4" />
+              My Profile Settings
+            </button>
+          )}
+          {isAdmin && (
+            <Link 
+              to="/admin" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl transition-all border border-amber-500/10 hover:border-amber-500/20 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 text-xs font-black no-underline"
+            >
+              <span className="w-4 h-4 flex items-center justify-center">💻</span>
+              Admin Control Panel
+            </Link>
+          )}
         </nav>
 
-        <div className="p-4 border-t border-slate-800 mb-2">
-          <p className="text-[10px] font-mono font-semibold text-slate-400 px-3 py-1.5 truncate">
-            {currentUser?.email}
-          </p>
-          <button 
-            onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 bg-transparent border-0 text-left hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign Out
-          </button>
+        <div className="p-4 border-t border-slate-800 mb-2 font-bold text-xs">
+          {isGuest ? (
+            <button 
+              onClick={handleLogin}
+              className="flex items-center gap-3 w-full px-4 py-3.5 rounded-xl text-teal-300 bg-teal-500/10 hover:bg-teal-500/15 transition-all text-xs font-black cursor-pointer border border-teal-500/20 text-left outline-none"
+            >
+              <UserIcon className="w-4 h-4 text-teal-400" />
+              Sign In with Google
+            </button>
+          ) : (
+            <>
+              <p className="text-[10px] font-mono font-semibold text-slate-400 px-3 py-1.5 truncate">
+                {currentUser?.email}
+              </p>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 bg-transparent border-0 text-left hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </button>
+            </>
+          )}
         </div>
       </aside>
 
@@ -1443,7 +1553,22 @@ export default function StudentDashboard() {
             </h2>
           </div>
           <div className="flex items-center gap-4">
-             <button onClick={handleLogout} className="text-xs font-bold text-slate-500 hover:text-slate-800 border-0 bg-transparent cursor-pointer">Sign out</button>
+             {isGuest ? (
+               <button 
+                 onClick={handleLogin} 
+                 className="text-xs font-black text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 px-5 py-2.5 rounded-full border-none cursor-pointer flex items-center gap-1.5 transition-colors"
+               >
+                 <UserIcon className="w-3.5 h-3.5" />
+                 Sign In
+               </button>
+             ) : (
+               <button 
+                 onClick={handleLogout} 
+                 className="text-xs font-bold text-slate-500 hover:text-slate-800 border-0 bg-transparent cursor-pointer"
+               >
+                 Sign out
+               </button>
+             )}
           </div>
         </header>
         
@@ -1534,32 +1659,66 @@ export default function StudentDashboard() {
                 />
               ) : (
                 <div className="space-y-8">
-                  {/* Glowing Approved welcome banner */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="relative overflow-hidden bg-gradient-to-r from-teal-500 via-emerald-600 to-indigo-600 rounded-3xl p-6 md:p-8 text-white shadow-xl shadow-teal-900/10 border border-teal-400/25 text-left"
-                  >
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none -mr-12 -mt-12" />
-                    
-                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-5">
-                      <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center text-3xl shadow-inner border border-white/25 shrink-0 select-none font-bold">
-                        🎓
+                  {/* Glowing Approved welcome banner or Guest view */}
+                  {isGuest ? (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5 }}
+                      className="relative overflow-hidden bg-gradient-to-r from-teal-900 via-teal-850 to-indigo-950 rounded-3xl p-6 md:p-8 text-white shadow-xl shadow-teal-900/10 border border-teal-500/20 text-left"
+                    >
+                      <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16 animate-pulse" />
+                      
+                      <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="space-y-2">
+                          <span className="inline-block bg-amber-500 text-teal-950 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full">
+                            CIYA GUEST SPECTATOR MODE 👁️
+                          </span>
+                          <h1 className="text-xl md:text-2xl font-black tracking-tight leading-tight">
+                            Explore Nigeria's Premium AI Training Catalog
+                          </h1>
+                          <p className="text-xs text-teal-100 opacity-90 leading-relaxed max-w-2xl font-medium">
+                            You are currently exploring CIYA's training curriculum as a guest. General information is visible below, but training materials (quizzes, videos, submission options) are inaccessible until you are signed in.
+                          </p>
+                        </div>
+                        
+                        <button 
+                          onClick={handleLogin}
+                          className="shrink-0 flex items-center gap-2 px-6 py-3.5 bg-amber-505 hover:bg-amber-400 text-teal-950 font-extrabold rounded-2xl shadow-lg hover:-translate-y-0.5 transition-all text-xs cursor-pointer border-0"
+                          style={{ backgroundColor: '#f59e0b' }}
+                        >
+                          <UserIcon className="w-4 h-4" />
+                          Sign In with Google
+                        </button>
                       </div>
-                      <div className="space-y-1">
-                        <span className="inline-block bg-emerald-400/25 border border-emerald-400/40 text-emerald-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full mb-1">
-                          TRAINING VERIFIED & APPROVED 🎉
-                        </span>
-                        <h1 className="text-lg md:text-xl font-black tracking-tight">
-                          Congratulations on your selection, {userProfile.fullName || 'Scholar'}!
-                        </h1>
-                        <p className="text-xs text-teal-50 opacity-90 leading-relaxed max-w-2xl font-medium">
-                          You have unrestricted, free premium access to all active CIYA Academy daily curriculums below. Embark on systematic lessons, evaluate code, clear checkpoints, and hand in assignments directly to certified coaches!
-                        </p>
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5 }}
+                      className="relative overflow-hidden bg-gradient-to-r from-teal-500 via-emerald-600 to-indigo-600 rounded-3xl p-6 md:p-8 text-white shadow-xl shadow-teal-900/10 border border-teal-400/25 text-left"
+                    >
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none -mr-12 -mt-12" />
+                      
+                      <div className="relative z-10 flex flex-col md:flex-row items-center gap-5">
+                        <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center text-3xl shadow-inner border border-white/25 shrink-0 select-none font-bold">
+                          🎓
+                        </div>
+                        <div className="space-y-1">
+                          <span className="inline-block bg-emerald-400/25 border border-emerald-400/40 text-emerald-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full mb-1">
+                            TRAINING VERIFIED & APPROVED 🎉
+                          </span>
+                          <h1 className="text-lg md:text-xl font-black tracking-tight">
+                            Congratulations on your selection, {userProfile?.fullName || 'Scholar'}!
+                          </h1>
+                          <p className="text-xs text-teal-50 opacity-90 leading-relaxed max-w-2xl font-medium">
+                            You have unrestricted, free premium access to all active CIYA Academy daily curriculums below. Embark on systematic lessons, evaluate code, clear checkpoints, and hand in assignments directly to certified coaches!
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
+                    </motion.div>
+                  )}
 
                   <div className="space-y-4 text-left">
                     <div className="flex flex-wrap gap-2 items-center">
@@ -1604,8 +1763,15 @@ export default function StudentDashboard() {
                           <CourseCard 
                             key={course.id} 
                             course={course} 
-                            isLocked={false} 
-                            onSelect={() => setSelectedCourseId(course.id || null)} 
+                            isLocked={isGuest} 
+                            onSelect={() => {
+                              if (isGuest) {
+                                alert("This premium curriculum is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
+                                handleLogin();
+                              } else {
+                                setSelectedCourseId(course.id || null);
+                              }
+                            }} 
                           />
                         ))}
                       </div>
