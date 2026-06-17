@@ -45,6 +45,7 @@ export interface CourseVideo {
   resources?: string;
   checkType?: 'none' | 'mcq' | 'tf' | 'fact';
   check?: any; // MCQ, TF, or Fact object
+  funFact?: { headline: string; body: string } | null;
 }
 
 export interface Module {

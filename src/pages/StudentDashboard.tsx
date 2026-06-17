@@ -4,7 +4,7 @@ import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../types';
-import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles } from 'lucide-react';
+import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 
@@ -13,6 +13,14 @@ const SKILLS: Record<string, { label: string, icon: string, color: string, bg: s
   film: { label: "AI Film Studio", icon: "🎬", color: "#7c3aed", bg: "#ede9fe" },
   image: { label: "AI Image & Graphics", icon: "🎨", color: "#d97706", bg: "#fef3c7" },
 };
+
+const COMPLEMENTARY_FUN_FACTS = [
+  { headline: "The Speed of Learning", body: "Students who complete interactive micro-checks during technical courses retain up to 43% more operational sequence logic!" },
+  { headline: "AI Coding Assistant Multiplier", body: "Developers leveraging AI assistants like Gemini build production-ready full-stack layouts up to 3x faster than traditional coding!" },
+  { headline: "Visual Retention Metrics", body: "Visual walk-through animations paired with dual narrative captions boost average concept absorption rates from 20% to over 68%." },
+  { headline: "Continuous Incremental Upskilling", body: "Studying technical skills for just 15 minutes a day has a compounding value that dwarfs traditional quarterly cram sessions." },
+  { headline: "The 2.5-Flash Efficiency", body: "Modern flash models like Gemini 2.5-Flash execute structured syllabus analysis in under 800 milliseconds, ensuring zero lag for educators." }
+];
 
 function Badge({ text, color, bg }: { text: string, color: string, bg: string }) {
   return <span style={{ background: bg, color, fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 99, display: "inline-block" }}>{text}</span>;
@@ -53,27 +61,52 @@ interface PostVideoCheckProps {
 function PostVideoCheck({ check, checkType, checkKey, onPass }: PostVideoCheckProps) {
   const [selected, setSelected] = useState<any>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [currentIdx, setCurrentIdx] = useState(0);
 
-  // Clear selections when lesson changes
+  // Clear selections and reset index when lesson changes
   useEffect(() => {
     setSelected(null);
     setSubmitted(false);
+    setCurrentIdx(0);
   }, [checkKey]);
 
   if (!check) return null;
 
+  // Standardize checks into an array
+  const checkItems: any[] = Array.isArray(check) ? check : [check];
+  const activeCheck = checkItems[currentIdx];
+  
+  if (!activeCheck) return null;
+
+  const totalQuestions = checkItems.length;
+
+  const handleNextQuestion = () => {
+    if (currentIdx + 1 < totalQuestions) {
+      setSelected(null);
+      setSubmitted(false);
+      setCurrentIdx(prev => prev + 1);
+    } else {
+      onPass();
+    }
+  };
+
   // 1. FACT CHECK CARD
   if (checkType === "fact") {
     return (
-      <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 text-center max-w-xl mx-auto shadow-sm">
-        <div className="text-3xl mb-2">💡</div>
-        <h4 className="text-sm font-black text-amber-800 uppercase tracking-wider mb-2">{check.headline || 'Did you know?'}</h4>
-        <p className="text-xs text-amber-900 leading-relaxed mb-4 font-semibold">{check.body}</p>
+      <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-6 text-center max-w-xl mx-auto shadow-sm space-y-3">
+        <div className="text-3xl mb-1">💡</div>
+        {totalQuestions > 1 && (
+          <span className="text-[10px] bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+            Fact Check {currentIdx + 1} of {totalQuestions}
+          </span>
+        )}
+        <h4 className="text-sm font-black text-amber-800 uppercase tracking-wider mb-2">{activeCheck.headline || 'Did you know?'}</h4>
+        <p className="text-xs text-amber-900 leading-relaxed mb-4 font-semibold">{activeCheck.body}</p>
         <button
-          onClick={onPass}
+          onClick={handleNextQuestion}
           className="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold rounded-lg shadow-md text-xs cursor-pointer border-0"
         >
-          Acknowledge & continue →
+          {currentIdx + 1 < totalQuestions ? "Read Next Fact →" : "Acknowledge & continue →"}
         </button>
       </div>
     );
@@ -81,11 +114,18 @@ function PostVideoCheck({ check, checkType, checkKey, onPass }: PostVideoCheckPr
 
   // 2. TRUE OR FALSE
   if (checkType === "tf") {
-    const isCorrect = selected === check.answer;
+    const isCorrect = selected === activeCheck.answer;
     return (
       <div className="bg-white border text-sm border-slate-200 rounded-2xl p-6 max-w-xl mx-auto shadow-sm space-y-4">
-        <span className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-50 px-2 rounded-full tracking-wider">True or False?</span>
-        <p className="font-extrabold text-slate-800 text-sm leading-relaxed">{check.statement}</p>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-50 px-2 rounded-full tracking-wider">True or False?</span>
+          {totalQuestions > 1 && (
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest pl-2">
+              Question {currentIdx + 1} of {totalQuestions}
+            </span>
+          )}
+        </div>
+        <p className="font-extrabold text-slate-800 text-sm leading-relaxed">{activeCheck.statement}</p>
 
         {!submitted ? (
           <div className="space-y-3">
@@ -120,16 +160,16 @@ function PostVideoCheck({ check, checkType, checkKey, onPass }: PostVideoCheckPr
           <div className="space-y-4 text-center">
             <div className="text-3xl">{isCorrect ? "🎉" : "😅"}</div>
             <h5 className={`font-black uppercase text-xs ${isCorrect ? 'text-emerald-700' : 'text-red-600'}`}>
-              {isCorrect ? "Spot On! Correct" : `Not quite! The correct response is ${check.answer ? 'TRUE' : 'FALSE'}`}
+              {isCorrect ? "Spot On! Correct" : `Not quite! The correct response is ${activeCheck.answer ? 'TRUE' : 'FALSE'}`}
             </h5>
-            {check.explanation && (
-              <p className="text-xs text-slate-500 italic bg-slate-50 border p-3 rounded-lg leading-relaxed">{check.explanation}</p>
+            {activeCheck.explanation && (
+              <p className="text-xs text-slate-500 italic bg-slate-50 border p-3 rounded-lg leading-relaxed">{activeCheck.explanation}</p>
             )}
             <button
-              onClick={onPass}
+              onClick={handleNextQuestion}
               className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg cursor-pointer border-0 shadow-md"
             >
-              Onward & Continue →
+              {currentIdx + 1 < totalQuestions ? "Next Question →" : "Onward & Continue →"}
             </button>
           </div>
         )}
@@ -139,13 +179,20 @@ function PostVideoCheck({ check, checkType, checkKey, onPass }: PostVideoCheckPr
 
   // 3. MULTIPLE CHOICE QUESTION (MCQ)
   if (checkType === "mcq") {
-    const isCorrect = selected === check.correct;
-    const options = check.options || ["", "", "", ""];
+    const isCorrect = selected === activeCheck.correct;
+    const options = activeCheck.options || ["", "", "", ""];
     
     return (
       <div className="bg-white border text-sm border-slate-200 rounded-2xl p-6 max-w-xl mx-auto shadow-sm space-y-4">
-        <span className="text-[10px] font-black uppercase text-teal-700 bg-teal-50 px-2 rounded-full tracking-wider">Concept Check</span>
-        <p className="font-extrabold text-slate-800 text-sm leading-relaxed">{check.question}</p>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-black uppercase text-teal-700 bg-teal-50 px-2 rounded-full tracking-wider">Concept Check</span>
+          {totalQuestions > 1 && (
+            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest pl-2">
+              Question {currentIdx + 1} of {totalQuestions}
+            </span>
+          )}
+        </div>
+        <p className="font-extrabold text-slate-800 text-sm leading-relaxed">{activeCheck.question}</p>
 
         {!submitted ? (
           <div className="space-y-2">
@@ -183,7 +230,7 @@ function PostVideoCheck({ check, checkType, checkKey, onPass }: PostVideoCheckPr
         ) : (
           <div className="space-y-3">
             {options.map((opt: string, idx: number) => {
-              const matchesCorrect = idx === check.correct;
+              const matchesCorrect = idx === activeCheck.correct;
               const matchesChosen = idx === selected;
               const borderCol = matchesCorrect ? 'border-emerald-500 bg-emerald-50' : matchesChosen ? 'border-red-300 bg-red-50' : 'border-slate-100 opacity-60';
               return (
@@ -202,18 +249,18 @@ function PostVideoCheck({ check, checkType, checkKey, onPass }: PostVideoCheckPr
               <h5 className={`font-black text-xs uppercase ${isCorrect ? 'text-emerald-700' : 'text-amber-700'}`}>
                 {isCorrect ? "🎉 Spot On! Excellent" : "😅 Incorrect Option"}
               </h5>
-              {check.explanation && (
-                <p className="text-slate-500 text-xs italic leading-relaxed mt-1">{check.explanation}</p>
+              {activeCheck.explanation && (
+                <p className="text-slate-500 text-xs italic leading-relaxed mt-1">{activeCheck.explanation}</p>
               )}
             </div>
 
             <div className="text-center pt-3">
               <button
                 type="button"
-                onClick={onPass}
+                onClick={handleNextQuestion}
                 className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg cursor-pointer border-0 shadow-md"
               >
-                Onward & Continue →
+                {currentIdx + 1 < totalQuestions ? "Next Question →" : "Onward & Continue →"}
               </button>
             </div>
           </div>
@@ -324,6 +371,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
   const [activeVideoIdx, setActiveVideoIdx] = useState(0);
   const [showCheck, setShowCheck] = useState(false);
   const [showAssignment, setShowAssignment] = useState(false);
+  const [showCourseGeneralInfo, setShowCourseGeneralInfo] = useState(false);
 
   // Load status from nested userProfile representation to keep persistence synced
   const courseId = course.id || 'general';
@@ -477,6 +525,74 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
               <span>{progressRatio}% COMPLETE</span>
               <span>{totalWatchedCount}/{totalVideos} LESSONS</span>
             </div>
+          </div>
+
+          {/* Collapsible General Course Specifications inside classroom view */}
+          <div className="border border-indigo-200 rounded-2xl bg-indigo-50/35 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowCourseGeneralInfo(!showCourseGeneralInfo)}
+              className="w-full text-left p-3.5 flex items-center justify-between cursor-pointer border-0 bg-transparent text-[11px] font-black uppercase text-indigo-900 tracking-wider hover:bg-indigo-50/50"
+            >
+              <span className="flex items-center gap-1.5">
+                <span>📑</span> Show Course Details {showCourseGeneralInfo ? "▲" : "▼"}
+              </span>
+              <span className="text-[9.5px] bg-indigo-100/80 text-indigo-900 font-extrabold px-2.5 py-0.5 rounded-lg uppercase tracking-normal">Specs Info</span>
+            </button>
+
+            {showCourseGeneralInfo && (
+              <div className="p-4 border-t border-indigo-200/50 bg-white space-y-3.5 text-xs leading-relaxed max-h-[300px] overflow-y-auto">
+                {/* Course Overview */}
+                {(course.overview || course.description) && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase text-indigo-700 block tracking-wider">🎯 Overview Synopsis</span>
+                    <p className="text-[11px] text-slate-700 font-bold leading-normal whitespace-pre-line leading-relaxed">
+                      {course.overview || course.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Instructor */}
+                <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-150">
+                  <span className="text-base">🧑‍🏫</span>
+                  <div className="text-[10px] leading-snug">
+                    <span className="font-extrabold uppercase text-[9px] text-slate-400 block tracking-wider">Instructor Team</span>
+                    <span className="font-extrabold text-slate-800">{course.instructor || "CIYA Technical Team"}</span>
+                  </div>
+                </div>
+
+                {/* Price/Fee if any */}
+                {course.price ? (
+                  <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-150">
+                    <span className="text-base">💰</span>
+                    <div className="text-[10px] leading-snug">
+                      <span className="font-extrabold uppercase text-[9px] text-slate-400 block tracking-wider">Course Price Status</span>
+                      <span className="font-extrabold text-slate-800">${course.price} USD</span>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Requirements / Prerequisite Tools */}
+                {course.requirements && (
+                  <div className="space-y-1 bg-amber-50/60 p-3 rounded-xl border border-amber-200/60">
+                    <span className="text-[10px] font-black uppercase text-amber-800 block tracking-wider">🛠️ Required Prep Tools</span>
+                    <p className="text-[11px] font-bold text-amber-900 leading-normal leading-relaxed">
+                      {course.requirements}
+                    </p>
+                  </div>
+                )}
+
+                {/* Learning Outcomes */}
+                {course.outcomes && (
+                  <div className="space-y-1 bg-teal-50/40 p-3 rounded-xl border border-teal-200/40">
+                    <span className="text-[10px] font-black uppercase text-teal-800 block tracking-wider">🚀 Professional Outcomes</span>
+                    <p className="text-[11px] font-bold text-teal-900 leading-normal leading-relaxed">
+                      {course.outcomes}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -670,6 +786,16 @@ function CourseViewer({ course, userProfile, currentUser, onBack }: CourseViewer
                 </div>
               )}
 
+              {currentVideo.funFact && currentVideo.funFact.body && (
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50/60 border border-amber-200 rounded-2xl p-4 md:p-5 relative shadow-sm space-y-1.5 overflow-hidden">
+                  <div className="absolute right-3.5 top-3.5 text-2xl opacity-15 select-none font-sans">💡</div>
+                  <h4 className="text-[11px] font-black uppercase text-amber-800 tracking-wider flex items-center gap-1.5 font-sans">
+                    <span>💡</span> {currentVideo.funFact.headline || "Did you know?"}
+                  </h4>
+                  <p className="text-xs text-amber-900 leading-relaxed font-semibold">{currentVideo.funFact.body}</p>
+                </div>
+              )}
+
                {currentVideo.resources && (
                 <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 mt-3">
                   <span className="text-[10px] font-black text-teal-800 block uppercase">📎 Attached Resource Download Links</span>
@@ -809,6 +935,7 @@ function CourseCard({ course, isLocked, onSelect }: any) {
   const sk = SKILLS[course.skill || 'web'];
   const totalVideos = course.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
   const totalChecks = course.days?.reduce((sum: number, d: any) => sum + (d.videos?.filter((v: any) => v.checkType && v.checkType !== 'none').length || 0), 0) || 0;
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <div 
@@ -834,25 +961,111 @@ function CourseCard({ course, isLocked, onSelect }: any) {
       </div>
       
       <div className="p-5 flex-1 flex flex-col">
-        <h4 className="font-bold text-base text-slate-800 mb-1.5 line-clamp-2 leading-tight group-hover:text-teal-700 transition-colors">
+        <h4 className="font-extrabold text-base text-slate-800 mb-1.5 line-clamp-2 leading-tight group-hover:text-teal-700 transition-colors">
           {course.title}
         </h4>
         <p className="text-xs text-slate-500 mb-4 line-clamp-2 leading-relaxed">
-          {course.tagline || course.subtitle || "Embark on structured study paths curated by professional coaches."}
+          {course.tagline || course.subtitle || "Embark on structured study paths curated by Nigerian professional coaches."}
         </p>
+
+        {/* Dropdown toggle button for general specs */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(!expanded);
+          }}
+          className="w-full mb-4 px-3 py-2 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-[10.5px] font-black uppercase text-slate-600 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 bg-white"
+        >
+          <span>📑</span>
+          <span>{expanded ? "Hide course specifications ▲" : "View course specifications ▼"}</span>
+        </button>
+
+        {expanded && (
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="mb-4 pt-3.5 border-t border-dashed border-slate-200 text-xs space-y-3 animate-fadeIn"
+          >
+            {/* Overview / synopsis */}
+            {(course.overview || course.description) && (
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase text-indigo-700 block tracking-wider">🎯 Overview Synopsis</span>
+                <p className="text-[11px] font-bold text-slate-650 leading-relaxed whitespace-pre-line">
+                  {course.overview || course.description}
+                </p>
+              </div>
+            )}
+
+            {/* Instructor */}
+            <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-150">
+              <span className="text-base">🧑‍🏫</span>
+              <div className="text-[11px] leading-snug">
+                <span className="font-extrabold uppercase text-[8.5px] text-slate-400 block tracking-wider">Instructor Team</span>
+                <span className="font-extrabold text-slate-850">{course.instructor || "CIYA Technical Team"}</span>
+              </div>
+            </div>
+
+            {/* Price/Fee if any */}
+            {course.price ? (
+              <div className="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-150">
+                <span className="text-base">💰</span>
+                <div className="text-[11px] leading-snug">
+                  <span className="font-extrabold uppercase text-[8.5px] text-slate-400 block tracking-wider">Course Price Status</span>
+                  <span className="font-extrabold text-slate-800">${course.price} USD</span>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Requirements / Prerequisite Tools */}
+            {course.requirements && (
+              <div className="space-y-1 bg-amber-50/50 p-3 rounded-xl border border-amber-200">
+                <span className="text-[10px] font-black uppercase text-amber-800 block tracking-wider">🛠️ Required Prep Tools</span>
+                <p className="text-[11px] font-bold text-amber-900 leading-normal leading-relaxed">
+                  {course.requirements}
+                </p>
+              </div>
+            )}
+
+            {/* Learning Outcomes */}
+            {course.outcomes && (
+              <div className="space-y-1 bg-teal-50/40 p-3 rounded-xl border border-teal-200">
+                <span className="text-[10px] font-black uppercase text-teal-800 block tracking-wider">🚀 Professional Outcomes</span>
+                <p className="text-[11px] font-bold text-teal-900 leading-normal leading-relaxed">
+                  {course.outcomes}
+                </p>
+              </div>
+            )}
+
+            {/* Daily syllabus schedule summary */}
+            {course.days && course.days.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <span className="text-[10px] font-black uppercase text-indigo-700 block tracking-wider">🗓️ Daily Syllabus Schedule</span>
+                <div className="space-y-2 border-l-2 border-indigo-400 pl-3">
+                  {course.days.map((day: any, dIdx: number) => (
+                    <div key={dIdx} className="text-[11.5px] leading-normal font-semibold">
+                      <span className="font-extrabold text-indigo-800">Day {dIdx + 1}:</span>{" "}
+                      <span className="text-slate-800 font-bold">{day.title}</span>
+                      {day.description && <p className="text-[10px] text-slate-500 font-medium leading-normal leading-relaxed">{day.description}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         
-        <div className="mt-auto pt-3 flex items-center justify-between border-t border-slate-100 text-[10.5px] text-slate-400 font-bold">
-          <div className="space-y-0.5 font-mono">
-            <div>🎬 {totalVideos} mini-video clips</div>
-            <div>🧠 {totalChecks} engagement checks</div>
+        <div className="mt-auto pt-3.5 flex items-center justify-between border-t border-slate-100 text-[11.5px] text-slate-700 font-extrabold font-sans">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">🎬 <span className="font-black text-teal-700">{totalVideos}</span> lesson clips</div>
+            <div className="flex items-center gap-1">🧠 <span className="font-black text-indigo-700">{totalChecks}</span> check quizes</div>
           </div>
           {isLocked ? (
-             <button className="text-[10px] font-bold text-slate-400 bg-slate-100 flex items-center gap-1 px-3 py-1.5 rounded-full cursor-not-allowed border-0">
+             <button className="text-[11px] font-black uppercase tracking-wide text-slate-400 bg-slate-100 flex items-center gap-1 px-3 py-1.5 rounded-full cursor-not-allowed border-0">
                <Lock className="w-3.5 h-3.5" /> Locked
              </button>
            ) : (
-             <button className="text-[10px] font-bold text-teal-600 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-full transition-colors border-0 cursor-pointer">
-               Begin Training →
+             <button className="text-[11px] font-black uppercase tracking-wide text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 hover:border-teal-305 px-3.5 py-2 rounded-xl transition-all cursor-pointer">
+               Enter →
              </button>
           )}
         </div>
@@ -997,6 +1210,47 @@ export default function StudentDashboard() {
 
   // Selected Course playing state
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+
+  // 5 Minutes Fun Fact popup state
+  const [showFunFactPopup, setShowFunFactPopup] = useState(false);
+  const [currentFunFact, setCurrentFunFact] = useState<{ headline: string; body: string } | null>(null);
+
+  useEffect(() => {
+    // Only run this when a course is actively selected/loaded for study engagement
+    if (!selectedCourseId) return;
+    const selectedCourse = courses.find(c => c.id === selectedCourseId);
+    
+    const triggerFunFact = () => {
+      // Gather any fun facts configured in the lessons of the active course
+      const courseFunFacts: any[] = [];
+      if (selectedCourse && selectedCourse.days) {
+        selectedCourse.days.forEach((day: any) => {
+          if (day.videos) {
+            day.videos.forEach((vid: any) => {
+              if (vid.funFact?.headline?.trim() && vid.funFact?.body?.trim()) {
+                courseFunFacts.push(vid.funFact);
+              }
+            });
+          }
+        });
+      }
+
+      let selectedFact = null;
+      if (courseFunFacts.length > 0) {
+        selectedFact = courseFunFacts[Math.floor(Math.random() * courseFunFacts.length)];
+      } else {
+        selectedFact = COMPLEMENTARY_FUN_FACTS[Math.floor(Math.random() * COMPLEMENTARY_FUN_FACTS.length)];
+      }
+
+      setCurrentFunFact(selectedFact);
+      setShowFunFactPopup(true);
+    };
+
+    // Trigger popup every 5 minutes (300,000 milliseconds)
+    const interval = setInterval(triggerFunFact, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [selectedCourseId, courses]);
 
   // Activation Gating and Popup States
   const [activationCode, setActivationCode] = useState('');
@@ -1209,16 +1463,17 @@ export default function StudentDashboard() {
     }
   }, [userProfile]);
 
-  // Load published courses list
+  // Load published courses list with real-time sync
   useEffect(() => {
     if (authChecking) return;
-    const fetchCourses = async () => {
+    setLoading(true);
+    const q = query(
+      collection(db, 'courses'), 
+      where('publish_status', '==', 'Published')
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       try {
-        const q = query(
-          collection(db, 'courses'), 
-          where('publish_status', '==', 'Published')
-        );
-        const snapshot = await getDocs(q);
         const data = snapshot.docs.map(doc => {
           const d = doc.data();
           return {
@@ -1242,26 +1497,37 @@ export default function StudentDashboard() {
                 description: v.description || '',
                 resources: v.resources || '',
                 checkType: v.checkType || 'none',
-                check: v.check || null
+                check: v.check || null,
+                funFact: v.funFact || null
               }))
             }))
           } as Course;
         });
         
         data.sort((a, b) => {
-          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          return dateB - dateA;
+          // Normalize Firestore Timestamp vs JS Date strings for sorting
+          const getMills = (fieldVal: any) => {
+            if (!fieldVal) return 0;
+            if (typeof fieldVal.toDate === 'function') {
+              return fieldVal.toDate().getTime();
+            }
+            return new Date(fieldVal).getTime() || 0;
+          };
+          return getMills(b.createdAt) - getMills(a.createdAt);
         });
 
         setCourses(data);
       } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'courses');
+        console.error("Error formatting snapshot courses:", error);
       } finally {
         setLoading(false);
       }
-    };
-    fetchCourses();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'courses');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [authChecking]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
@@ -1885,6 +2151,91 @@ export default function StudentDashboard() {
               >
                 Enter Dashboard 🚀
               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* FLOATING engagement check fun-fact test trigger button */}
+      {selectedCourseId && (
+        <button
+          type="button"
+          onClick={() => {
+            const selectedCourse = courses.find(c => c.id === selectedCourseId);
+            const courseFunFacts: any[] = [];
+            if (selectedCourse && selectedCourse.days) {
+              selectedCourse.days.forEach((day: any) => {
+                if (day.videos) {
+                  day.videos.forEach((vid: any) => {
+                    if (vid.funFact?.headline?.trim() && vid.funFact?.body?.trim()) {
+                      courseFunFacts.push(vid.funFact);
+                    }
+                  });
+                }
+              });
+            }
+            const selectedFact = courseFunFacts.length > 0 
+              ? courseFunFacts[Math.floor(Math.random() * courseFunFacts.length)] 
+              : COMPLEMENTARY_FUN_FACTS[Math.floor(Math.random() * COMPLEMENTARY_FUN_FACTS.length)];
+            setCurrentFunFact(selectedFact);
+            setShowFunFactPopup(true);
+          }}
+          className="fixed bottom-6 right-6 z-50 p-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-full shadow-2xl transition-all flex items-center justify-center gap-1 hover:scale-105 active:scale-95 text-xs group border-0 cursor-pointer"
+          title="Test Fun Fact Trigger (Runs automatically every 5 min)"
+        >
+          <span className="text-lg">💡</span>
+          <span className="max-w-0 overflow-hidden group-hover:max-w-[150px] transition-all duration-300 ease-out whitespace-nowrap text-[10.5px] uppercase font-black tracking-wide pl-1">
+            Test Fact Popup
+          </span>
+        </button>
+      )}
+
+      {/* 5-MINUTE PERIODIC FUN FACT POPUP MODAL */}
+      {showFunFactPopup && currentFunFact && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-amber-50 border-4 border-amber-400/40 rounded-3xl p-6 md:p-8 max-w-md w-full text-center relative shadow-2xl overflow-hidden"
+          >
+            {/* Top orange gradient bar */}
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-500" />
+            
+            {/* Close button with stop propagation */}
+            <button
+              onClick={() => setShowFunFactPopup(false)}
+              className="absolute top-3.5 right-3.5 w-7 h-7 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-900 border-0 flex items-center justify-center cursor-pointer font-black text-sm transition-all"
+            >
+              ✕
+            </button>
+
+            <div className="w-16 h-16 bg-amber-100/80 border border-amber-300 rounded-2xl flex items-center justify-center mx-auto mb-4 select-none text-3xl font-bold">
+              💡
+            </div>
+
+            <span className="inline-block bg-amber-200/60 border border-amber-300 text-amber-900 text-[10.5px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full mb-3">
+              Fascinating engagement fact
+            </span>
+
+            <h3 className="text-base md:text-lg font-black text-amber-950 tracking-tight leading-snug">
+              {currentFunFact?.headline || "Did you know?"}
+            </h3>
+
+            <p className="text-amber-900/90 text-xs md:text-sm leading-relaxed font-semibold mt-3 whitespace-pre-line bg-white/70 border border-amber-200/50 rounded-2xl p-4 shadow-inner text-left">
+              {currentFunFact?.body}
+            </p>
+
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={() => setShowFunFactPopup(false)}
+                className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl transition-all shadow-md cursor-pointer transform active:scale-95 border-0"
+              >
+                Amazing, Continue Study! 🚀
+              </button>
+            </div>
+            
+            <div className="mt-3.5 text-[10px] text-amber-700 font-extrabold uppercase tracking-wide">
+              Triggers automatically every 5 minutes for active engagement
             </div>
           </motion.div>
         </div>

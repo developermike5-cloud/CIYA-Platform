@@ -108,15 +108,269 @@ interface CheckEditorProps {
   onTypeChange: (t: 'none' | 'mcq' | 'tf' | 'fact') => void;
 }
 
+// Helper parsers for copy-paste plain text importer
+const parseMCQBlocks = (text: string) => {
+  const blocks = text.split(/\n\s*\n+/);
+  const parsedItems: any[] = [];
+
+  for (const block of blocks) {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) continue;
+
+    let question = "";
+    const options: string[] = [];
+    let correct = 0;
+    let explanation = "";
+    let questionFound = false;
+
+    // Regex scanners
+    const optionRegex = /^(?:[a-dA-D1-4]\s*[\)\.\-]|[\*\-\•])\s*(.*)/i;
+    const correctRegex = /^(?:correct|answer|correct\s+answer|correct\s+index|ans):\s*([a-dA-D1-4]|\d+)/i;
+    const explanationRegex = /^(?:explanation|explain|reason):\s*(.*)/i;
+
+    for (const line of lines) {
+      const matchCorrect = line.match(correctRegex);
+      const matchExplanation = line.match(explanationRegex);
+      const matchOption = line.match(optionRegex);
+
+      if (matchCorrect) {
+        const val = matchCorrect[1].trim().toUpperCase();
+        if (val === "A" || val === "1") correct = 0;
+        else if (val === "B" || val === "2") correct = 1;
+        else if (val === "C" || val === "3") correct = 2;
+        else if (val === "D" || val === "4") correct = 3;
+        else {
+          const num = parseInt(val, 10);
+          if (!isNaN(num) && num >= 1 && num <= 4) {
+            correct = num - 1;
+          }
+        }
+      } else if (matchExplanation) {
+        explanation = matchExplanation[1].trim();
+      } else if (matchOption) {
+        const optionText = matchOption[1].trim();
+        const isMarkedCorrect = line.startsWith("*") || line.includes("(correct)") || line.toLowerCase().includes("[x]");
+        if (options.length < 4) {
+          options.push(optionText.replace(/\(correct\)/i, "").trim());
+          if (isMarkedCorrect) {
+            correct = options.length - 1;
+          }
+        }
+      } else {
+        if (!questionFound) {
+          question = line.replace(/^(?:question|q)\s*:\s*/i, "").trim();
+          questionFound = true;
+        } else {
+          if (explanation) {
+            explanation += " " + line;
+          } else {
+            explanation = line;
+          }
+        }
+      }
+    }
+
+    while (options.length < 4) {
+      options.push(`Option ${["A", "B", "C", "D"][options.length]}`);
+    }
+
+    parsedItems.push({
+      type: "mcq",
+      question: question || "Identify the correct concept:",
+      options,
+      correct,
+      explanation
+    });
+  }
+
+  return parsedItems;
+};
+
+const parseTFBlocks = (text: string) => {
+  const blocks = text.split(/\n\s*\n+/);
+  const parsedItems: any[] = [];
+
+  for (const block of blocks) {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) continue;
+
+    let statement = "";
+    let answer = true;
+    let explanation = "";
+    let statementFound = false;
+
+    const answerRegex = /^(?:answer|correct|val|ans):\s*(true|false|t|f|yes|no)/i;
+    const explanationRegex = /^(?:explanation|explain|reason):\s*(.*)/i;
+
+    for (const line of lines) {
+      const matchAnswer = line.match(answerRegex);
+      const matchExplanation = line.match(explanationRegex);
+
+      if (matchAnswer) {
+        const val = matchAnswer[1].trim().toLowerCase();
+        answer = ["true", "t", "yes", "1"].includes(val);
+      } else if (matchExplanation) {
+        explanation = matchExplanation[1].trim();
+      } else {
+        if (!statementFound) {
+          statement = line.replace(/^(?:statement|question|q)\s*:\s*/i, "").trim();
+          statementFound = true;
+        } else {
+          if (explanation) {
+            explanation += " " + line;
+          } else {
+            explanation = line;
+          }
+        }
+      }
+    }
+
+    parsedItems.push({
+      type: "tf",
+      statement: statement || "This statement is true.",
+      answer,
+      explanation
+    });
+  }
+
+  return parsedItems;
+};
+
+const parseFactBlocks = (text: string) => {
+  const blocks = text.split(/\n\s*\n+/);
+  const parsedItems: any[] = [];
+
+  for (const block of blocks) {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) continue;
+
+    let headline = "Did you know?";
+    let body = "";
+
+    if (lines.length === 1) {
+      body = lines[0].replace(/^(?:fact|body)\s*:\s*/i, "").trim();
+    } else {
+      const firstLineClean = lines[0].replace(/^(?:headline|title|fact|did you know\??)\s*:\s*/i, "").trim();
+      headline = firstLineClean;
+      body = lines.slice(1).join("\n").replace(/^(?:body|content)\s*:\s*/i, "").trim();
+    }
+
+    parsedItems.push({
+      type: "fact",
+      headline: headline || "Interesting Stat",
+      body: body || "No details provided."
+    });
+  }
+
+  return parsedItems;
+};
+
 function CheckEditor({ check, checkType, onChange, onTypeChange }: CheckEditorProps) {
+  const [activeCheckIdx, setActiveCheckIdx] = useState(0);
+  const [showImporter, setShowImporter] = useState(false);
+  const [importerText, setImporterText] = useState("");
+
+  // Derive structural items
+  const items: any[] = Array.isArray(check) ? check : (check ? [check] : []);
+  
+  // Guarantee at least one valid object if checkType is selected and not none
+  if (items.length === 0 && checkType !== 'none') {
+    const defaultCheck = checkType === "mcq" ? emptyQuiz() : checkType === "tf" ? emptyTF() : emptyFact();
+    items.push(defaultCheck);
+  }
+
+  const safeIdx = Math.min(activeCheckIdx, Math.max(0, items.length - 1));
+  const activeCheck = items[safeIdx];
+
+  const updateActiveCheck = (updatedValue: any) => {
+    const newItems = [...items];
+    newItems[newItems.indexOf(activeCheck) >= 0 ? newItems.indexOf(activeCheck) : safeIdx] = updatedValue;
+    onChange(newItems);
+  };
+
+  const addItem = () => {
+    const newItem = checkType === "mcq" ? emptyQuiz() : checkType === "tf" ? emptyTF() : emptyFact();
+    const newItems = [...items, newItem];
+    onChange(newItems);
+    setActiveCheckIdx(newItems.length - 1);
+  };
+
+  const deleteItem = (idxToDelete: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (items.length <= 1) return;
+    const newItems = items.filter((_, idx) => idx !== idxToDelete);
+    onChange(newItems);
+    setActiveCheckIdx(Math.max(0, safeIdx === idxToDelete ? idxToDelete - 1 : (safeIdx > idxToDelete ? safeIdx - 1 : safeIdx)));
+  };
+
+  // Perform heuristic text parsing in real-time
+  const getParsedSuggestions = (): any[] => {
+    if (!importerText.trim()) return [];
+    if (checkType === "mcq") return parseMCQBlocks(importerText);
+    if (checkType === "tf") return parseTFBlocks(importerText);
+    if (checkType === "fact") return parseFactBlocks(importerText);
+    return [];
+  };
+
+  const currentParsed = getParsedSuggestions();
+
+  const handleImport = (replace: boolean) => {
+    if (currentParsed.length === 0) {
+      alert("No valid check questions could be parsed from the pasted text. Please verify the format guidelines!");
+      return;
+    }
+    const updated = replace ? currentParsed : [...items.filter(it => it.question || it.statement || it.headline), ...currentParsed];
+    onChange(updated);
+    setActiveCheckIdx(0);
+    setImporterText("");
+    setShowImporter(false);
+  };
+
+  const loadExampleTemplate = () => {
+    if (checkType === "mcq") {
+      setImporterText(
+        `Question: What primary component holds the UI state in standard React components?\n` +
+        `A) Props\n` +
+        `B) State\n` +
+        `C) Inline Styles\n` +
+        `D) Class names\n` +
+        `Correct: B\n` +
+        `Explanation: The 'state' object is used to store components data that can change over time.\n\n` +
+        `Question: React was open-sourced in which year?\n` +
+        `A) 2011\n` +
+        `B) 2013\n` +
+        `C) 2015\n` +
+        `D) 2018\n` +
+        `Correct: B\n` +
+        `Explanation: Facebook released React in May 2013.`
+      );
+    } else if (checkType === "tf") {
+      setImporterText(
+        `Statement: Vite is a build tool that replaces global static refreshes with highly lightning fast ES module hot reload.\n` +
+        `Answer: True\n` +
+        `Explanation: Vite utilizes modern browser ES module capabilities to boot dev serves instantly.\n\n` +
+        `Statement: Redux can only be integrated into React frameworks.\n` +
+        `Answer: False\n` +
+        `Explanation: Redux is a standalone state engine usable with any frontend framework.`
+      );
+    } else if (checkType === "fact") {
+      setImporterText(
+        `Headline: Hot Module Replacement Speed\n` +
+        `Body: In Vite, HMR speeds remain relative only to compiling individual modified code structures, not bundle build volume sizes.\n\n` +
+        `Headline: Fast Syllabus Retention checks\n` +
+        `Body: Incorporating micro-checks during course lessons boosts average student skill retention metrics by 43%.`
+      );
+    }
+  };
+
   return (
     <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-3 space-y-3.5">
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1">
-          🧠 Lesson Engagement Check
+          🧠 Lesson Engagement Checks
         </span>
-        <span className="text-[10px] text-slate-405 italic underline decoration-dotted cursor-help" title="These micro-quizzes keep student retention high.">
-          Interactive Study Check
+        <span className="text-[10px] text-slate-400 italic underline decoration-dotted cursor-help" title="These micro-quizzes keep student retention high.">
+          Interactive Study Checks ({items.length || 0})
         </span>
       </div>
 
@@ -127,7 +381,10 @@ function CheckEditor({ check, checkType, onChange, onTypeChange }: CheckEditorPr
             <button
               type="button"
               key={t}
-              onClick={() => onTypeChange(t)}
+              onClick={() => {
+                setActiveCheckIdx(0);
+                onTypeChange(t);
+              }}
               className={`px-3 py-1.5 rounded-lg border font-bold transition-all ${
                 checkType === t
                   ? "border-teal-600 bg-teal-50 text-teal-700"
@@ -140,42 +397,186 @@ function CheckEditor({ check, checkType, onChange, onTypeChange }: CheckEditorPr
         </div>
       </div>
 
-      {checkType === "mcq" && check && (
-        <div className="space-y-3">
+      {checkType !== 'none' && (
+        <div className="bg-white border border-slate-200/60 rounded-xl p-3 flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mr-1">Study Questions:</span>
+          {items.map((_, idx) => (
+            <div key={idx} className="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-0.5 pl-2 select-none">
+              <span className={`text-[10px] font-extrabold pr-1.5 ${safeIdx === idx ? "text-teal-600" : "text-slate-500"}`}>
+                #{idx + 1}
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveCheckIdx(idx)}
+                className={`px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-all ${
+                  safeIdx === idx
+                    ? "bg-teal-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                Edit
+              </button>
+              {items.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => deleteItem(idx, e)}
+                  className="text-red-400 hover:text-red-700 font-extrabold text-[10px] px-1.5 cursor-pointer ml-1 scale-110 hover:scale-125 transition-transform"
+                  title="Remove this check"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addItem}
+            className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-black rounded-lg text-[11px] tracking-wide cursor-pointer transition-all flex items-center justify-center"
+          >
+            + Add Another Question
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowImporter(!showImporter);
+              setImporterText("");
+            }}
+            className={`px-2.5 py-1 border font-black rounded-lg text-[11px] tracking-wide cursor-pointer transition-all flex items-center gap-1 ${
+              showImporter 
+                ? "bg-slate-700 text-white border-slate-700 hover:bg-slate-800" 
+                : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+            }`}
+          >
+            📋 {showImporter ? "Close Paste Importer" : "Paste Text Importer"}
+          </button>
+        </div>
+      )}
+
+      {/* PASTE IMPORTER COLLAPSED/EXPANDED MODULE */}
+      {checkType !== 'none' && showImporter && (
+        <div className="bg-white border-2 border-dashed border-slate-300/80 rounded-xl p-4 space-y-3.5 transition-all">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <h5 className="text-[11px] font-black uppercase text-emerald-700 tracking-wider">📋 Copy-Paste Plain Text Importer (No AI)</h5>
+              <p className="text-[10px] text-slate-500 leading-relaxed font-semibold max-w-xl">
+                Avoid internet network/quota errors from AI. Paste standard formatted plaintext questions directly to parse and organize them. Break consecutive questions with a blank line.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadExampleTemplate}
+              className="px-2 py-1 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-700 text-[10px] font-extrabold rounded-md shadow-sm transition-all"
+            >
+              💡 Load Demo Template
+            </button>
+          </div>
+
+          <div className="space-y-1 bg-slate-100/50 p-2.5 rounded-lg border border-slate-200/40">
+            <span className="text-[9px] uppercase font-bold text-slate-400">Supported Format Guideline:</span>
+            {checkType === "mcq" && (
+              <pre className="text-[9px] font-mono text-slate-600 outline-none leading-normal">
+                Question: What component holds the UI state in React?<br/>
+                A) Props<br/>
+                B) State (correct answer)<br/>
+                C) Inline Styles<br/>
+                D) Class names<br/>
+                Correct: B<br/>
+                Explanation: State represents the local mutable values.
+              </pre>
+            )}
+            {checkType === "tf" && (
+              <pre className="text-[9px] font-mono text-slate-600 outline-none leading-normal">
+                Statement: Tailwind CSS runs completely on the server-side.<br/>
+                Answer: False<br/>
+                Explanation: Tailwind compiles class lists parsed directly from your frontend templates.
+              </pre>
+            )}
+            {checkType === "fact" && (
+              <pre className="text-[9px] font-mono text-slate-600 outline-none leading-normal">
+                Headline: Hot Module Reload Speed Fact<br/>
+                Body: Vite uses native ES modules to fetch files individually rather than bundling everything.
+              </pre>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Paste questions text here</label>
+            <textarea
+              rows={5}
+              value={importerText}
+              onChange={e => setImporterText(e.target.value)}
+              placeholder="Paste your questions block here... (Separate different questions with a blank line)"
+              className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-lg p-2.5 font-mono text-[11px] leading-relaxed outline-none focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+            <div className="text-[10px] font-black text-slate-500 flex items-center gap-1.5">
+              <span className={`w-2.5 h-2.5 rounded-full ${currentParsed.length > 0 ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`}></span>
+              Parsed: <span className="text-emerald-600 font-extrabold text-xs">{currentParsed.length}</span> question{currentParsed.length !== 1 ? 's' : ''} detected
+            </div>
+            
+            <div className="flex gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => handleImport(false)}
+                disabled={currentParsed.length === 0}
+                className="px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-100 font-extrabold rounded-lg cursor-pointer transition-all"
+              >
+                Append as New ({currentParsed.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => handleImport(true)}
+                disabled={currentParsed.length === 0}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:cursor-not-allowed font-extrabold rounded-lg cursor-pointer transition-all shadow-sm"
+              >
+                Clear & Replace All ({currentParsed.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {checkType === "mcq" && activeCheck && (
+        <div className="space-y-3 border-t border-slate-200/50 pt-3.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-indigo-600 uppercase tracking-wide">Editing MCQ Question #{safeIdx + 1}</span>
+          </div>
           <div>
             <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Quiz Question *</label>
             <input
               type="text"
               className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2.5 text-sm font-semibold outline-none focus:border-indigo-500"
-              value={check.question || ""}
-              onChange={e => onChange({ ...check, question: e.target.value })}
+              value={activeCheck.question || ""}
+              onChange={e => updateActiveCheck({ ...activeCheck, question: e.target.value })}
               placeholder="e.g., What is the primary focus of a high-converting Landing Page?"
             />
           </div>
           
           <div className="space-y-2">
             <label className="block text-[10px] uppercase font-bold text-slate-500">Form Options (Check correct radio option) *</label>
-            {(check.options || ["", "", "", ""]).map((opt: string, idx: number) => (
+            {(activeCheck.options || ["", "", "", ""]).map((opt: string, idx: number) => (
               <div key={idx} className="flex gap-2 items-center">
                 <button
                   type="button"
-                  onClick={() => onChange({ ...check, correct: idx })}
+                  onClick={() => updateActiveCheck({ ...activeCheck, correct: idx })}
                   className={`w-6 h-6 rounded-full border flex items-center justify-center font-bold text-xs cursor-pointer select-none transition-all ${
-                    check.correct === idx
+                    activeCheck.correct === idx
                       ? "border-emerald-600 bg-emerald-50 text-emerald-700"
                       : "border-slate-200 bg-white text-slate-400 hover:border-slate-300"
                   }`}
                 >
-                  {check.correct === idx ? "✓" : ["A", "B", "C", "D"][idx]}
+                  {activeCheck.correct === idx ? "✓" : ["A", "B", "C", "D"][idx]}
                 </button>
                 <input
                   type="text"
                   className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2 text-sm font-semibold outline-none focus:border-indigo-500"
                   value={opt}
                   onChange={e => {
-                    const updatedOptions = [...(check.options || ["", "", "", ""])];
+                    const updatedOptions = [...(activeCheck.options || ["", "", "", ""])];
                     updatedOptions[idx] = e.target.value;
-                    onChange({ ...check, options: updatedOptions });
+                    updateActiveCheck({ ...activeCheck, options: updatedOptions });
                   }}
                   placeholder={`Option ${["A", "B", "C", "D"][idx]}`}
                 />
@@ -188,23 +589,26 @@ function CheckEditor({ check, checkType, onChange, onTypeChange }: CheckEditorPr
             <input
               type="text"
               className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2.5 text-sm font-medium outline-none focus:border-indigo-500"
-              value={check.explanation || ""}
-              onChange={e => onChange({ ...check, explanation: e.target.value })}
+              value={activeCheck.explanation || ""}
+              onChange={e => updateActiveCheck({ ...activeCheck, explanation: e.target.value })}
               placeholder="Explain why this option is correct to aid student understanding..."
             />
           </div>
         </div>
       )}
 
-      {checkType === "tf" && check && (
-        <div className="space-y-3">
+      {checkType === "tf" && activeCheck && (
+        <div className="space-y-3 border-t border-slate-200/50 pt-3.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-indigo-600 uppercase tracking-wide">Editing True / False #{safeIdx + 1}</span>
+          </div>
           <div>
             <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Statement *</label>
             <input
               type="text"
               className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2.5 text-sm font-semibold outline-none focus:border-indigo-500"
-              value={check.statement || ""}
-              onChange={e => onChange({ ...check, statement: e.target.value })}
+              value={activeCheck.statement || ""}
+              onChange={e => updateActiveCheck({ ...activeCheck, statement: e.target.value })}
               placeholder="e.g., AI website builders require deep professional coding experience."
             />
           </div>
@@ -216,9 +620,9 @@ function CheckEditor({ check, checkType, onChange, onTypeChange }: CheckEditorPr
                 <button
                   type="button"
                   key={String(val)}
-                  onClick={() => onChange({ ...check, answer: val })}
+                  onClick={() => updateActiveCheck({ ...activeCheck, answer: val })}
                   className={`flex-1 py-1.5 rounded-lg border font-bold text-xs transition-all ${
-                    check.answer === val
+                    activeCheck.answer === val
                       ? "border-teal-600 bg-teal-50 text-teal-700"
                       : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
                   }`}
@@ -234,23 +638,26 @@ function CheckEditor({ check, checkType, onChange, onTypeChange }: CheckEditorPr
             <input
               type="text"
               className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2.5 text-sm font-medium outline-none focus:border-indigo-500"
-              value={check.explanation || ""}
-              onChange={e => onChange({ ...check, explanation: e.target.value })}
+              value={activeCheck.explanation || ""}
+              onChange={e => updateActiveCheck({ ...activeCheck, explanation: e.target.value })}
               placeholder="Provide a statement outline..."
             />
           </div>
         </div>
       )}
 
-      {checkType === "fact" && check && (
-        <div className="space-y-3">
+      {checkType === "fact" && activeCheck && (
+        <div className="space-y-3 border-t border-slate-200/50 pt-3.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-black text-indigo-600 uppercase tracking-wide">Editing Fun Fact Trigger #{safeIdx + 1}</span>
+          </div>
           <div>
             <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Fact Headline *</label>
             <input
               type="text"
               className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2.5 text-sm font-semibold outline-none focus:border-indigo-500"
-              value={check.headline || ""}
-              onChange={e => onChange({ ...check, headline: e.target.value })}
+              value={activeCheck.headline || ""}
+              onChange={e => updateActiveCheck({ ...activeCheck, headline: e.target.value })}
               placeholder="e.g., Mind-bending fact!"
             />
           </div>
@@ -259,8 +666,8 @@ function CheckEditor({ check, checkType, onChange, onTypeChange }: CheckEditorPr
             <textarea
               rows={5}
               className="w-full bg-white text-slate-900 border border-slate-200 rounded-lg p-2.5 text-sm font-medium outline-none focus:border-indigo-500"
-              value={check.body || ""}
-              onChange={e => onChange({ ...check, body: e.target.value })}
+              value={activeCheck.body || ""}
+              onChange={e => updateActiveCheck({ ...activeCheck, body: e.target.value })}
               placeholder="The interesting piece of evidence or stat scholars will read after finishing this clip..."
             />
           </div>
@@ -283,6 +690,170 @@ export default function CourseEdit() {
   const [form, setForm] = useState<Course>(defaultInitialForm());
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [activeSection, setActiveSection] = useState<'info' | 'curriculum' | 'settings'>('info');
+
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+  const [lessonSavingId, setLessonSavingId] = useState<string | null>(null);
+  const [lessonSavedId, setLessonSavedId] = useState<string | null>(null);
+
+  const generateWithAi = async (dayIdx: number, videoIndex: number, videoObj: CourseVideo) => {
+    const videoUrl = videoObj.video_url || videoObj.url;
+    if (!videoUrl) {
+      alert("Please enter a valid Lesson Video URL first!");
+      return;
+    }
+
+    const videoIdKey = videoObj.id || String(videoIndex);
+    setAiLoading(prev => ({ ...prev, [videoIdKey]: true }));
+
+    try {
+      const response = await fetch("/api/ai/youtube-lesson-gen", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          url: videoUrl,
+          checkType: videoObj.checkType && videoObj.checkType !== "none" ? videoObj.checkType : "mcq"
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to consult Gemini AI. Please check server logs.");
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+
+      setForm(prev => {
+        const updatedDays = [...(prev.days || DAYS_RANGE.map(d => emptyDay(d)))];
+        const videos = [...(updatedDays[dayIdx].videos || [])];
+        const v = videos[videoIndex];
+        
+        videos[videoIndex] = {
+          ...v,
+          title: data.title || v.title,
+          duration: data.duration || v.duration,
+          description: data.description || v.description,
+          check: data.checks || v.check,
+          checkType: v.checkType && v.checkType !== "none" ? v.checkType : "mcq"
+        };
+
+        updatedDays[dayIdx] = {
+          ...updatedDays[dayIdx],
+          videos
+        };
+        return { ...prev, days: updatedDays };
+      });
+
+    } catch (err: any) {
+      console.error(err);
+      alert("AI Generation failed: " + err.message);
+    } finally {
+      setAiLoading(prev => ({ ...prev, [videoIdKey]: false }));
+    }
+  };
+
+  const handleSaveLessonSilently = async (videoIndex: number) => {
+    const video = (form.days?.[activeDayIdx]?.videos || [])[videoIndex];
+    if (!video) return;
+    const vidId = video.id || String(videoIndex);
+    
+    setLessonSavingId(vidId);
+    setError(null);
+    setLessonSavedId(null);
+    
+    try {
+      if (!video.title?.trim()) {
+        throw new Error(`Please provide a title for Lesson #${videoIndex + 1} before saving.`);
+      }
+      if (!video.video_url?.trim() && !video.url?.trim()) {
+        throw new Error(`Please provide a video URL for Lesson #${videoIndex + 1} before saving.`);
+      }
+
+      const statusVal = form.status || 'draft';
+      const normSkill = form.skill || 'web';
+      const normCategory = normSkill === 'web' ? 'AI Website development' : normSkill === 'film' ? 'AI Film Studio' : normSkill === 'image' ? 'AI Image & Graphics' : 'AI Website development';
+      const normTier = form.tier || 'beginner';
+      const normLevel = normTier === 'beginner' ? 'Beginner' : normTier === 'advanced' ? 'Advanced' : normTier === 'masterclass' ? 'Masterclass' : 'Beginner';
+      const normPublishStatus = statusVal === 'published' ? 'Published' : 'Draft';
+
+      const cleanedDays = (form.days || []).map((day, dIdx) => ({
+        dayNumber: dIdx + 1,
+        title: day.title || `Day ${dIdx + 1}`,
+        description: day.description || '',
+        assignment: day.assignment || { prompt: '', dueNote: '' },
+        videos: (day.videos || []).map((v) => ({
+          id: v.id || Math.random().toString(36).substring(2, 9),
+          title: v.title || '',
+          video_url: v.video_url || v.url || '',
+          url: v.video_url || v.url || '',
+          duration: v.duration || '10 min',
+          description: v.description || '',
+          resources: v.resources || '',
+          checkType: v.checkType || 'none',
+          check: v.check || null,
+          funFact: v.funFact || null
+        }))
+      }));
+
+      const payload = {
+        title: form.title || '',
+        subtitle: form.tagline || form.subtitle || '',
+        tagline: form.tagline || form.subtitle || '',
+        thumbnail: form.thumbnail || '',
+        description: form.overview || form.description || '',
+        overview: form.overview || form.description || '',
+        category: normCategory,
+        skill: normSkill,
+        subskill: form.subskill || '',
+        level: normLevel,
+        tier: normTier,
+        price: Number(form.price) || 0,
+        instructor: form.instructor || 'CIYA Team',
+        outcomes: form.outcomes || '',
+        requirements: form.requirements || '',
+        publish_status: normPublishStatus,
+        status: statusVal,
+        days: cleanedDays,
+        updatedAt: serverTimestamp()
+      };
+
+      // Sanitize fields to make sure no undefined properties go to Firestore
+      const cleanedPayload: Record<string, any> = {};
+      Object.entries(payload).forEach(([k, v]) => {
+        if (v !== undefined) {
+          cleanedPayload[k] = v;
+        }
+      });
+
+      const generatedId = Math.random().toString(36).substring(2, 11);
+      const id = isNew ? (form.id || generatedId) : (courseId as string);
+      const docRef = doc(db, 'courses', id);
+
+      if (isNew) {
+        cleanedPayload.createdAt = serverTimestamp();
+        await setDoc(docRef, cleanedPayload);
+        setForm(prev => ({ ...prev, id }));
+        navigate(`/admin/courses/${id}`, { replace: true });
+      } else {
+        await updateDoc(docRef, cleanedPayload);
+      }
+
+      setLessonSavedId(vidId);
+      setTimeout(() => {
+        setLessonSavedId(null);
+      }, 3000);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'An error occurred while saving the lesson to Firestore.');
+    } finally {
+      setLessonSavingId(null);
+    }
+  };
 
   // Load and map course from Firestore
   useEffect(() => {
@@ -334,7 +905,8 @@ export default function CourseEdit() {
                   description: v.description || '',
                   resources: v.resources || '',
                   checkType: v.checkType || 'none',
-                  check: v.check || null
+                  check: v.check || null,
+                  funFact: v.funFact || null
                 }))
               };
             })
@@ -476,7 +1048,8 @@ export default function CourseEdit() {
           description: v.description || '',
           resources: v.resources || '',
           checkType: v.checkType || 'none',
-          check: v.check || null
+          check: v.check || null,
+          funFact: v.funFact || null
         }))
       }));
 
@@ -847,16 +1420,37 @@ export default function CourseEdit() {
                 {((form.days || [])[activeDayIdx]?.videos || []).map((v, vIdx) => (
                   <div key={v.id || vIdx} className="border border-slate-200 hover:border-slate-300 rounded-2xl p-4 md:p-5 relative shadow-sm transition-all bg-white relative">
                     <div className="flex items-center justify-between mb-4 pb-2 border-b border-dashed">
-                      <span className="w-6 h-6 rounded-lg bg-slate-900 text-amber-400 flex items-center justify-center font-black text-xs leading-none">
-                        #{vIdx + 1}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeVideoFromDay(activeDayIdx, vIdx)}
-                        className="text-xs font-semibold px-2.5 py-1 border border-red-200 rounded-lg text-red-500 hover:bg-red-500 hover:text-white transition-all cursor-pointer bg-transparent"
-                      >
-                        Delete Lesson
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-slate-900 text-amber-400 flex items-center justify-center font-black text-xs leading-none">
+                          #{vIdx + 1}
+                        </span>
+                        {lessonSavingId === (v.id || String(vIdx)) && (
+                          <span className="text-[10px] text-teal-600 bg-teal-50 border border-teal-200 px-2.5 py-0.5 rounded font-black uppercase animate-pulse">
+                            Saving...
+                          </span>
+                        )}
+                        {lessonSavedId === (v.id || String(vIdx)) && (
+                          <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded font-black uppercase">
+                            ✓ Saved & Sync'd
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveLessonSilently(vIdx)}
+                          className="px-3 py-1 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700 font-extrabold text-xs rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1"
+                        >
+                          💾 Save & Update Lesson
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeVideoFromDay(activeDayIdx, vIdx)}
+                          className="text-xs font-semibold px-2.5 py-1 border border-red-200 rounded-lg text-red-500 hover:bg-red-500 hover:text-white transition-all cursor-pointer bg-transparent"
+                        >
+                          Delete Lesson
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -885,7 +1479,20 @@ export default function CourseEdit() {
 
                     <div className="grid grid-cols-1 gap-4 mt-3">
                       <div>
-                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-0.5">Lesson Video URL (YouTube / Drive / General URL) *</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[10px] uppercase font-bold text-slate-500">Lesson Video URL (YouTube / Drive / General URL) *</label>
+                          <button
+                            type="button"
+                            onClick={() => generateWithAi(activeDayIdx, vIdx, v)}
+                            disabled={aiLoading[v.id || String(vIdx)]}
+                            className={`bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 disabled:opacity-60 rounded-lg px-2.5 py-1 text-[11px] font-black flex items-center gap-1 transition-all cursor-pointer ${
+                              aiLoading[v.id || String(vIdx)] ? "animate-pulse" : ""
+                            }`}
+                          >
+                            <Sparkles className={`w-3 h-3 text-indigo-600 ${aiLoading[v.id || String(vIdx)] ? "animate-spin" : ""}`} />
+                            <span>{aiLoading[v.id || String(vIdx)] ? "Analyzing YouTube Link..." : "Auto-Fill with Gemini AI ✨"}</span>
+                          </button>
+                        </div>
                         <input
                           type="text"
                           required
@@ -925,6 +1532,71 @@ export default function CourseEdit() {
                       onChange={c => setVideoField(activeDayIdx, vIdx, 'check', c)}
                       onTypeChange={t => setVideoCheckType(activeDayIdx, vIdx, t)}
                     />
+
+                    {/* Separate independent Fun Fact Card section */}
+                    <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-4 mt-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase text-amber-800 flex items-center gap-1.5 font-sans">
+                          💡 Separate Lesson Fun Fact
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`has-fun-fact-${vIdx}`}
+                            className="w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500 cursor-pointer"
+                            checked={!!v.funFact}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setVideoField(activeDayIdx, vIdx, 'funFact', {
+                                  headline: "Did you know?",
+                                  body: ""
+                                });
+                              } else {
+                                setVideoField(activeDayIdx, vIdx, 'funFact', null);
+                              }
+                            }}
+                          />
+                          <label htmlFor={`has-fun-fact-${vIdx}`} className="text-[11px] font-black uppercase text-amber-800 cursor-pointer select-none">
+                            Include Fun Fact
+                          </label>
+                        </div>
+                      </div>
+
+                      {v.funFact && (
+                        <div className="space-y-3 pt-2.5 border-t border-amber-200/40 animate-fadeIn">
+                          <div>
+                            <label className="block text-[10px] uppercase font-bold text-amber-850 mb-1">Headline *</label>
+                            <input
+                              type="text"
+                              className="w-full bg-white text-slate-950 border border-amber-200 rounded-lg p-2.5 text-sm font-semibold outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20"
+                              value={v.funFact.headline || ""}
+                              onChange={e => {
+                                setVideoField(activeDayIdx, vIdx, 'funFact', {
+                                  ...v.funFact,
+                                  headline: e.target.value
+                                });
+                              }}
+                              placeholder="e.g., Mind-blowing productivity stat!"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase font-bold text-amber-850 mb-1">Fun Fact Content/Stat *</label>
+                            <textarea
+                              rows={3}
+                              className="w-full bg-white text-slate-900 border border-amber-200 rounded-lg p-2.5 text-xs font-semibold outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 leading-relaxed"
+                              value={v.funFact.body || ""}
+                              onChange={e => {
+                                setVideoField(activeDayIdx, vIdx, 'funFact', {
+                                  ...v.funFact,
+                                  body: e.target.value
+                                });
+                              }}
+                              placeholder="Describe an intriguing stat or historical snippet for this lesson point..."
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

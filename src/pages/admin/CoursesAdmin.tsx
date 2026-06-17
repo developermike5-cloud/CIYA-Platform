@@ -203,7 +203,8 @@ export default function CoursesAdmin() {
         </div>
       ) : (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-slate-100">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100">
             <thead className="bg-slate-50/50">
               <tr>
                 <th className="px-5 py-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Course Concept</th>
@@ -294,7 +295,8 @@ export default function CoursesAdmin() {
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       )}
     </div>
