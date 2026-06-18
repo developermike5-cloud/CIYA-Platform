@@ -702,9 +702,10 @@ interface CourseViewerProps {
   onBack: () => void;
   showToast: (msg: string) => void;
   handleResetProgress: (cId: string) => Promise<void>;
+  isAdmin?: boolean;
 }
 
-function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false }: CourseViewerProps) {
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [activeVideoIdx, setActiveVideoIdx] = useState(0);
   const [showQuizModal, setShowQuizModal] = useState(false);
@@ -722,6 +723,37 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   const activeDay: any = days[activeDayIdx] || { dayNumber: activeDayIdx + 1, title: 'Study Module', videos: [], assignment: { prompt: '', dueNote: '' } };
   const videos: CourseVideo[] = activeDay.videos || [];
   const currentVideo = videos[activeVideoIdx] || null;
+
+  const [showFunFactPopup, setShowFunFactPopup] = useState(false);
+  const [currentFunFact, setCurrentFunFact] = useState<{ headline: string; body: string } | null>(null);
+
+  useEffect(() => {
+    if (!currentVideo) return;
+
+    // Immediately load the current video's funFact if exists
+    if (currentVideo.funFact && currentVideo.funFact.headline?.trim() && currentVideo.funFact.body?.trim()) {
+      setCurrentFunFact(currentVideo.funFact);
+    } else {
+      // Otherwise, pick a high-quality educational dynamic complementary fact, but never random facts from other chapters/lessons
+      const fallback = COMPLEMENTARY_FUN_FACTS[(activeDayIdx + activeVideoIdx) % COMPLEMENTARY_FUN_FACTS.length];
+      setCurrentFunFact(fallback);
+    }
+
+    const triggerFunFact = () => {
+      if (currentVideo.funFact && currentVideo.funFact.headline?.trim() && currentVideo.funFact.body?.trim()) {
+        setCurrentFunFact(currentVideo.funFact);
+      } else {
+        const fallback = COMPLEMENTARY_FUN_FACTS[(activeDayIdx + activeVideoIdx) % COMPLEMENTARY_FUN_FACTS.length];
+        setCurrentFunFact(fallback);
+      }
+      setShowFunFactPopup(true);
+    };
+
+    // Trigger popup every 5 minutes (300,000 milliseconds) as requested
+    const interval = setInterval(triggerFunFact, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [currentVideo, activeDayIdx, activeVideoIdx]);
 
   const checkKey = `${activeDayIdx}-${activeVideoIdx}`;
   const isVideoWatched = completedKeys.includes(checkKey);
@@ -789,7 +821,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   };
 
   const handleGoNext = () => {
-    const isUnlocked = isLessonUnlockedUnified(activeDayIdx, activeVideoIdx, days, completedKeys, checkPassedKeys);
+    const isUnlocked = isAdmin || isLessonUnlockedUnified(activeDayIdx, activeVideoIdx, days, completedKeys, checkPassedKeys);
     if (!isUnlocked) {
       alert("Lesson check is locked! Clear comprehension quiz of this lesson first.");
       return;
@@ -868,13 +900,13 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
       {viewingSyllabus ? (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left">
           <div>
-            <span className="text-[10px] font-black uppercase text-teal-805 bg-teal-50 px-3.5 py-1 rounded-full tracking-wider">
+            <span className="text-xs font-black uppercase text-teal-800 bg-teal-50 px-3.5 py-1.5 rounded-full tracking-wider">
               Full-Course Syllabus & Roadmap Info
             </span>
-            <h2 className="font-extrabold text-slate-900 text-xl md:text-2xl mt-3 tracking-tight leading-snug">
+            <h2 className="font-extrabold text-slate-900 text-xl md:text-2xl mt-4 tracking-tight leading-snug">
               {course.title}
             </h2>
-            <p className="text-xs md:text-sm text-slate-805 font-extrabold leading-relaxed mt-1">
+            <p className="text-sm md:text-base text-slate-700 font-extrabold leading-relaxed mt-2.5">
               {course.tagline || course.subtitle || "Step-by-step masterclass syllabus curated by professional tech coaches."}
             </p>
           </div>
@@ -884,8 +916,8 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
           {/* Course Overview / synopsis with deep high contrast text */}
           {(course.overview || course.description) && (
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-2">
-              <span className="text-[11px] font-black uppercase text-indigo-700 tracking-wider block">🎯 Overview Synopsis</span>
-              <p className="text-xs md:text-sm text-slate-905 font-extrabold leading-relaxed whitespace-pre-line">
+              <span className="text-xs md:text-sm font-black uppercase text-indigo-700 tracking-wider block">🎯 Overview Synopsis</span>
+              <p className="text-sm md:text-base text-slate-800 font-extrabold leading-relaxed whitespace-pre-line">
                 {course.overview || course.description}
               </p>
             </div>
@@ -896,7 +928,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
             <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
               <span className="text-2xl select-none">🧑‍🏫</span>
               <div className="text-xs leading-normal">
-                <span className="font-extrabold uppercase text-[9px] text-slate-400 block tracking-wider">Instructor Team</span>
+                <span className="font-extrabold uppercase text-xs text-slate-500 block tracking-wider">Instructor Team</span>
                 <span className="font-black text-slate-900 block mt-0.5">{course.instructor || "CIYA Technical Team"}</span>
               </div>
             </div>
@@ -952,23 +984,23 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
           <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
               <div>
-                <span className="text-[9px] font-black uppercase text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full tracking-wider">
+                <span className="text-xs font-black uppercase text-teal-800 bg-teal-50 px-3.5 py-1.5 rounded-full tracking-wider border border-teal-200">
                   DAY {activeDayIdx + 1} · LESSON {activeVideoIdx + 1}
                 </span>
-                <h3 className="font-extrabold text-slate-900 text-base md:text-lg mt-2 tracking-tight leading-snug">{currentVideo.title}</h3>
-                {currentVideo.duration && <p className="text-[10px] font-semibold text-slate-400 font-mono mt-0.5">⏱ Duration: {currentVideo.duration}</p>}
+                <h3 className="font-extrabold text-slate-900 text-lg md:text-xl mt-3 tracking-tight leading-snug">{currentVideo.title}</h3>
+                {currentVideo.duration && <p className="text-xs font-semibold text-slate-500 font-mono mt-1">⏱ Duration: {currentVideo.duration}</p>}
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+              <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto max-w-full">
                 {!isVideoWatched ? (
                   <button
                     onClick={handleMarkComplete}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all cursor-pointer border-0 font-sans"
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs md:text-sm rounded-xl shadow-md transition-all cursor-pointer border-0 font-sans"
                   >
                     Complete Lesson & Verify ✓
                   </button>
                 ) : (
-                  <span className="text-xs text-emerald-650 font-bold bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg flex items-center gap-1 select-none font-sans">
+                  <span className="text-xs md:text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-xl flex items-center gap-1.5 select-none font-sans font-black">
                     Completed Correctly ✓
                   </span>
                 )}
@@ -978,15 +1010,15 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
             {/* Walkthrough Summary (Plain text, well formulated paragraph spacing, no container frame block) */}
             {currentVideo.description && (
               <div className="pt-2">
-                <h4 className="font-black text-slate-955 text-xs md:text-sm uppercase tracking-wider mb-3">📖 Walkthrough Outline</h4>
+                <h4 className="font-extrabold text-slate-900 text-sm md:text-base uppercase tracking-wider mb-3">📖 Walkthrough Outline</h4>
                 {formatWalkthroughDescription(currentVideo.description)}
               </div>
             )}
 
             {currentVideo.resources && (
-              <div className="bg-teal-50 border border-teal-205 rounded-xl p-3 mt-3">
-                <span className="text-[10px] font-black text-teal-800 block uppercase">📎 Attached Resource Download Links</span>
-                <p className="text-teal-900 font-mono text-xs mt-1.5 leading-snug truncate">
+              <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 mt-4">
+                <span className="text-xs md:text-sm font-black text-teal-900 block uppercase">📎 Attached Resource Download Links</span>
+                <p className="text-teal-950 font-mono text-sm mt-2 leading-relaxed font-semibold">
                   {currentVideo.resources}
                 </p>
               </div>
@@ -994,12 +1026,12 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
 
             {/* Practice checklist alerting blocks */}
             {hasCheck && !isCheckPassed && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex gap-3 items-center mt-4">
-                <span className="text-2xl">🧠</span>
+              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 flex gap-4 items-center mt-4 text-left">
+                <span className="text-3xl">🧠</span>
                 <div>
-                  <h5 className="font-black text-xs text-indigo-805 leading-snug">Comprehension Check Available!</h5>
-                  <p className="text-[11px] text-indigo-505 leading-relaxed mt-0.5">
-                    Click "Complete Lesson & Verify" to trigger the understanding popup quiz. You must pass with at least 80% to proceed.
+                  <h5 className="font-black text-xs md:text-sm text-indigo-950 leading-snug">Comprehension Check Available!</h5>
+                  <p className="text-xs md:text-sm text-indigo-900 leading-relaxed mt-1 font-bold">
+                    Click "Complete Lesson & Verify" to trigger the understanding popup quiz.
                   </p>
                 </div>
               </div>
@@ -1051,51 +1083,51 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
       )}
 
       {/* 2. DAILY LESSONS TIMELINE Navigation (Moved to the bottom sequentially, only covered days showing) */}
-      {!viewingSyllabus && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left">
+      {true && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left animate-fade-in">
           <div className="border-b pb-3 flex items-center justify-between">
             <div className="space-y-0.5">
-              <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Course Syllabus Navigation</span>
-              <h4 className="text-base font-black text-slate-900 animate-pulse-subtle">🗓️ Guided Training Daily Schedule</h4>
+              <span className="text-xs font-black uppercase text-indigo-700 tracking-wider">Course Syllabus Navigation</span>
+              <h4 className="text-base md:text-lg font-black text-slate-900">🗓️ Guided Training Daily Schedule</h4>
             </div>
-            <span className="text-xs bg-slate-100 text-slate-800 px-3 py-1 rounded-lg font-extrabold border border-slate-200">
+            <span className="text-sm bg-slate-100 text-slate-800 px-3 py-1 rounded-lg font-extrabold border border-slate-200">
               {totalWatchedCount} of {totalVideos} Clips Completed
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
+            {/* 1. Selected Day card at the top */}
             {days.map((d, di) => {
-              const isDayThemeActive = activeDayIdx === di;
-              const isDayCoveredOrUnlocked = di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys);
+              if (activeDayIdx !== di) return null;
+              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys);
               if (!isDayCoveredOrUnlocked) return null;
 
               return (
                 <div
-                  key={di}
-                  className={`rounded-2xl border p-4.5 transition-all flex flex-col justify-between ${
-                    isDayThemeActive
-                      ? 'border-indigo-200 bg-indigo-50/15 ring-2 ring-indigo-500/5'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
-                  }`}
+                  key={`day-active-${di}`}
+                  className="rounded-3xl border-2 border-indigo-300 bg-indigo-50/20 ring-4 ring-indigo-500/5 p-5 md:p-6 transition-all flex flex-col justify-between"
                 >
-                  <div className="space-y-1.5 mb-3 text-left">
+                  <div className="space-y-2 mb-4 text-left">
                     <div className="flex items-center justify-between font-sans">
-                      <span className="text-[10px] font-black text-indigo-805 tracking-wider uppercase">DAY {di + 1}</span>
-                      <span className="text-[9.5px] bg-indigo-55 text-indigo-850 font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-normal">
+                      <span className="text-xs md:text-sm font-black text-indigo-700 tracking-wider uppercase flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping" />
+                        Day {di + 1} (In View)
+                      </span>
+                      <span className="text-xs bg-indigo-100 text-indigo-800 font-extrabold px-3 py-1 rounded-full uppercase tracking-normal">
                         {(d.videos || []).length} lessons
                       </span>
                     </div>
-                    <h5 className="font-extrabold text-slate-900 text-sm leading-snug">{d.title}</h5>
-                    {d.description && <p className="text-[11px] text-slate-700 leading-normal leading-relaxed font-bold">{d.description}</p>}
+                    <h5 className="font-extrabold text-slate-900 text-sm md:text-base leading-snug">{d.title}</h5>
+                    {d.description && <p className="text-xs md:text-sm text-slate-700 leading-relaxed font-semibold">{d.description}</p>}
                   </div>
 
-                  <div className="space-y-1 text-left">
+                  <div className="space-y-2 text-left">
                     {(d.videos || []).map((vid, vi) => {
                       const currentKey = `${di}-${vi}`;
                       const isVidCurrent = activeDayIdx === di && activeVideoIdx === vi && !showAssignment;
                       const isVidWatched = completedKeys.includes(currentKey);
                       const isKeyCheckPassed = checkPassedKeys.includes(currentKey);
-                      const isUnlocked = isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys);
+                      const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys);
 
                       return (
                         <button
@@ -1109,16 +1141,16 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                             }
                           }}
                           disabled={!isUnlocked}
-                          className={`w-full rounded-xl p-2.5 flex items-center justify-between text-xs transition-all pointer-events-auto cursor-pointer border ${
+                          className={`w-full rounded-xl p-3 flex items-center justify-between text-xs md:text-sm transition-all pointer-events-auto cursor-pointer border ${
                             isVidCurrent
                               ? 'bg-indigo-600 text-white border-indigo-600 font-black shadow-md'
                               : isUnlocked
                                 ? 'bg-slate-50 text-slate-900 border-slate-200 hover:bg-slate-100 font-extrabold'
-                                : 'bg-slate-200 text-slate-800 border-slate-305 font-extrabold opacity-80 cursor-not-allowed'
+                                : 'bg-slate-200 text-slate-800 border-slate-300 font-extrabold opacity-80 cursor-not-allowed'
                           }`}
                         >
-                          <div className="flex items-start gap-2 pr-2 text-inherit min-w-0">
-                            <span className={`w-4.5 h-4.5 rounded-full flex items-center justify-center font-black shrink-0 text-[10px] ${
+                          <div className="flex items-start gap-2.5 pr-2 text-inherit min-w-0">
+                            <span className={`w-5 h-5 rounded-full flex items-center justify-center font-black shrink-0 text-xs ${
                               isVidCurrent ? 'bg-white text-indigo-950 shadow-sm font-black' : 'bg-slate-200 text-slate-800 font-extrabold'
                             }`}>
                               {vi + 1}
@@ -1128,13 +1160,13 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
 
                           <div className="flex items-center gap-1.5 shrink-0 select-none">
                             {!isUnlocked ? (
-                              <Lock className="w-3.5 h-3.5 text-slate-400" />
+                              <Lock className="w-4 h-4 text-slate-400" />
                             ) : (
                               <>
                                 {isKeyCheckPassed && (
-                                  <span className="text-[9px] font-black text-emerald-800 bg-emerald-110 px-1 rounded border border-emerald-200">✓ checked</span>
+                                  <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded border border-emerald-200">✓ checked</span>
                                 )}
-                                <span className={`w-4 h-4 rounded-full border flex items-center justify-center font-bold text-[9px] ${
+                                <span className={`w-5 h-5 rounded-full border flex items-center justify-center font-bold text-xs ${
                                   isVidWatched ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-400 text-slate-500 bg-white'
                                 }`}>
                                   {isVidWatched && "✓"}
@@ -1168,13 +1200,13 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                             alert("Complete all day's lessons and understanding checks first to unlock the end-of-day assignment!");
                           }
                         }}
-                        className={`w-full p-2.5 border rounded-xl cursor-pointer text-left flex items-center justify-between text-xs transition-all tracking-wide ${
+                        className={`w-full p-3 border rounded-xl cursor-pointer text-left flex items-center justify-between text-xs md:text-sm transition-all tracking-wide ${
                           showAssignment && activeDayIdx === di
                             ? 'bg-teal-600 text-white border-teal-600 font-black shadow-md'
-                            : 'text-teal-900 bg-teal-55 border-teal-200 hover:bg-teal-100 font-extrabold'
+                            : 'text-teal-950 bg-teal-50 border-teal-200 hover:bg-teal-100 font-extrabold'
                         }`}
                       >
-                        <span className="flex items-center gap-1.5 flex-1">
+                        <span className="flex items-center gap-2 flex-1 font-bold">
                           <span>{submissions[`day-${di}`] ? "✅" : "📋"}</span>
                           <span>Day {di+1} Live Assignment</span>
                         </span>
@@ -1184,6 +1216,45 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                 </div>
               );
             })}
+
+            {/* Inactive Remaining Days listing at the bottom */}
+            {days.some((_, idx) => idx !== activeDayIdx && (isAdmin || idx === 0 || isLessonUnlockedUnified(idx, 0, days, completedKeys, checkPassedKeys))) && (
+              <div className="mt-4 border-t border-slate-100 pt-5 space-y-3">
+                <span className="text-xs md:text-sm font-black uppercase text-slate-500 tracking-wider block mb-1">Click to Switch Active Day in View:</span>
+                <div className="grid grid-cols-1 gap-4">
+                  {days.map((d, di) => {
+                    if (activeDayIdx === di) return null;
+                    const isDayCoveredOrUnlocked = isAdmin || di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys);
+                    if (!isDayCoveredOrUnlocked) return null;
+
+                    return (
+                      <div
+                        key={`day-inactive-${di}`}
+                        className="rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-indigo-200 p-4 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer"
+                        onClick={() => handleGoToVideo(di, 0)}
+                      >
+                        <div className="space-y-1.5 text-left flex-1">
+                          <div className="flex items-center justify-between font-sans">
+                            <span className="text-xs font-black text-indigo-700 tracking-wider uppercase">Day {di + 1}</span>
+                            <span className="text-xs bg-slate-100 text-slate-700 font-extrabold px-3 py-1 rounded-full uppercase tracking-normal">
+                              {(d.videos || []).length} lessons
+                            </span>
+                          </div>
+                          <h5 className="font-extrabold text-slate-900 text-sm leading-snug">{d.title}</h5>
+                          {d.description && <p className="text-xs text-slate-700 leading-relaxed font-semibold">{d.description}</p>}
+                        </div>
+
+                        <div className="flex justify-end shrink-0">
+                          <span className="text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer">
+                            📅 View Day {di + 1} Syllabus →
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1201,6 +1272,52 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
           onClose={() => setShowQuizModal(false)}
           showToast={showToast}
         />
+      )}
+
+      {/* CIRCULAR FUN FACT POPUP CARD (Restricted strictly to the lesson number the user is on) */}
+      {showFunFactPopup && currentFunFact && (
+        <div className="fixed bottom-6 right-6 z-[9999] p-2 select-none">
+          <motion.div 
+            initial={{ y: 50, scale: 0.9, opacity: 0 }}
+            animate={{ y: 0, scale: 1, opacity: 1 }}
+            className="w-64 h-64 md:w-72 md:h-72 rounded-full bg-amber-50 border-4 border-amber-300 p-6 shadow-2xl flex flex-col items-center justify-center text-center relative overflow-hidden text-amber-950"
+          >
+            {/* Top orange gradient accent bar (decorative inside circle) */}
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-500" />
+            
+            {/* Close button in top-right area of circle */}
+            <button
+              onClick={() => setShowFunFactPopup(false)}
+              className="absolute top-4 right-4 w-6 h-6 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-950 border-0 flex items-center justify-center cursor-pointer font-black text-xs transition-all focus:outline-none"
+            >
+              ✕
+            </button>
+
+            <span className="text-2xl mb-1.5 select-none animate-bounce">💡</span>
+            
+            <div className="space-y-0.5">
+              <span className="inline-block text-[9px] font-black uppercase text-amber-950 tracking-wider bg-amber-200 px-2 py-0.5 rounded-full border border-amber-300">
+                Lesson {activeVideoIdx + 1} Fun Fact
+              </span>
+              <h3 className="text-xs md:text-sm font-extrabold text-amber-950 tracking-tight leading-tight max-w-[140px] md:max-w-[165px] mx-auto">
+                {currentFunFact?.headline || "Did you know?"}
+              </h3>
+            </div>
+
+            <div className="max-h-[55px] md:max-h-[70px] overflow-y-auto px-1 mt-1.5 scrollbar-thin scrollbar-thumb-amber-200 text-left">
+              <p className="text-amber-950 text-[10px] md:text-xs leading-relaxed font-bold whitespace-pre-line text-center">
+                {currentFunFact?.body}
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowFunFactPopup(false)}
+              className="mt-2.5 px-4 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-extrabold text-[10px] tracking-wider uppercase rounded-full transition-all shadow-md cursor-pointer border-0 shrink-0"
+            >
+              Acknowledge Fact
+            </button>
+          </motion.div>
+        </div>
       )}
     </div>
   );
@@ -1596,45 +1713,13 @@ export default function StudentDashboard() {
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
   // 5 Minutes Fun Fact popup state
-  const [showFunFactPopup, setShowFunFactPopup] = useState(false);
-  const [currentFunFact, setCurrentFunFact] = useState<{ headline: string; body: string } | null>(null);
 
-  useEffect(() => {
-    // Only run this when a course is actively selected/loaded for study engagement
-    if (!selectedCourseId) return;
-    const selectedCourse = courses.find(c => c.id === selectedCourseId);
+
+
+
     
-    const triggerFunFact = () => {
-      // Gather any fun facts configured in the lessons of the active course
-      const courseFunFacts: any[] = [];
-      if (selectedCourse && selectedCourse.days) {
-        selectedCourse.days.forEach((day: any) => {
-          if (day.videos) {
-            day.videos.forEach((vid: any) => {
-              if (vid.funFact?.headline?.trim() && vid.funFact?.body?.trim()) {
-                courseFunFacts.push(vid.funFact);
-              }
-            });
-          }
-        });
-      }
 
-      let selectedFact = null;
-      if (courseFunFacts.length > 0) {
-        selectedFact = courseFunFacts[Math.floor(Math.random() * courseFunFacts.length)];
-      } else {
-        selectedFact = COMPLEMENTARY_FUN_FACTS[Math.floor(Math.random() * COMPLEMENTARY_FUN_FACTS.length)];
-      }
 
-      setCurrentFunFact(selectedFact);
-      setShowFunFactPopup(true);
-    };
-
-    // Trigger popup every 5 minutes (300,000 milliseconds)
-    const interval = setInterval(triggerFunFact, 5 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [selectedCourseId, courses]);
 
   // Activation Gating and Popup States
   const [activationCode, setActivationCode] = useState('');
@@ -2441,6 +2526,7 @@ export default function StudentDashboard() {
                   onBack={() => setSelectedCourseId(null)}
                   showToast={showToast}
                   handleResetProgress={handleResetProgress}
+                  isAdmin={isAdmin}
                 />
               ) : (
                 <div className="space-y-8">
@@ -2537,10 +2623,10 @@ export default function StudentDashboard() {
                         <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                       </div>
                     ) : filteredCourses.length === 0 ? (
-                      <div className="text-center py-16 bg-white border rounded-3xl shadow-sm">
-                        <span className="text-3xl block mb-2">🎬</span>
-                        <h4 className="text-sm font-black text-slate-800">Bootcamp starts on June 1st, 2026</h4>
-                        <p className="text-xs text-slate-400 mt-0.5">Assigned course paths will reveal shortly.</p>
+                      <div className="text-center py-16 bg-slate-50 border border-slate-200/60 rounded-3xl">
+                        <span className="text-3xl block mb-2 select-none">🎓</span>
+                        <h4 className="text-sm font-black text-slate-800">No Premium Curriculum Paths Assigned Yet</h4>
+                        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto font-semibold">Assigned active tracks to your student profile will reveal here shortly.</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -2548,9 +2634,11 @@ export default function StudentDashboard() {
                           <CourseCard 
                             key={course.id} 
                             course={course} 
-                            isLocked={isGuest || course.isLocked || course.locked} 
+                            isLocked={isAdmin ? false : (isGuest || course.isLocked || course.locked)} 
                             onSelect={() => {
-                              if (isGuest) {
+                              if (isAdmin) {
+                                setSelectedCourseId(course.id || null);
+                              } else if (isGuest) {
                                 alert("This premium curriculum is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
                                 handleLogin();
                               } else if (course.isLocked || course.locked) {
@@ -2687,52 +2775,7 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* 5-MINUTE PERIODIC COMPACT FUN FACT POPUP CARD */}
-      {showFunFactPopup && currentFunFact && (
-        <div className="fixed bottom-6 right-6 z-[120] p-4 max-w-sm w-full md:w-[350px]">
-          <motion.div 
-            initial={{ y: 50, scale: 0.9, opacity: 0 }}
-            animate={{ y: 0, scale: 1, opacity: 1 }}
-            className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 shadow-2xl relative overflow-hidden text-left"
-          >
-            {/* Top orange gradient accent bar */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
-            
-            {/* Close button */}
-            <button
-              onClick={() => setShowFunFactPopup(false)}
-              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-900 border-0 flex items-center justify-center cursor-pointer font-black text-xs transition-all"
-            >
-              ✕
-            </button>
 
-            <div className="flex gap-3">
-              <div className="w-10 h-10 bg-amber-100 border border-amber-300 rounded-xl flex items-center justify-center shrink-0 select-none text-xl font-bold">
-                💡
-              </div>
-              <div className="space-y-1 pr-4">
-                <span className="inline-block text-[9.5px] font-black uppercase text-amber-800 tracking-wider">
-                  Engagement Fun Fact
-                </span>
-                <h3 className="text-xs md:text-sm font-black text-amber-950 tracking-tight leading-snug">
-                  {currentFunFact?.headline || "Did you know?"}
-                </h3>
-              </div>
-            </div>
-
-            <p className="text-amber-900 text-[11px] leading-relaxed font-semibold mt-3 whitespace-pre-line bg-white/70 border border-amber-250 rounded-xl p-3 shadow-inner">
-              {currentFunFact?.body}
-            </p>
-
-            <button
-              onClick={() => setShowFunFactPopup(false)}
-              className="mt-3.5 w-full py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[10px] tracking-wider uppercase rounded-lg transition-all shadow-sm cursor-pointer border-0"
-            >
-              Acknowledge Fact
-            </button>
-          </motion.div>
-        </div>
-      )}
 
       {/* Dynamic Toast feedback overlay */}
       {toastMsg && (

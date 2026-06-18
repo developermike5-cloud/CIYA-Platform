@@ -780,7 +780,7 @@ export default function UsersAdmin() {
                               title="Approve User Application"
                               className={`p-1.5 rounded transition-all ${
                                 u.approvalStatus === 'Approved' 
-                                  ? 'bg-emerald-50 text-emerald-300 cursor-not-allowed' 
+                                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed' 
                                   : 'bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100'
                               }`}
                             >
@@ -794,7 +794,7 @@ export default function UsersAdmin() {
                               title="Disapprove User Application"
                               className={`p-1.5 rounded transition-all ${
                                 u.approvalStatus === 'Disapproved' 
-                                  ? 'bg-rose-50 text-rose-300 cursor-not-allowed' 
+                                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed' 
                                   : 'bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100'
                               }`}
                             >
