@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { Course, CourseDay, CourseVideo } from '../../types';
 import { ArrowLeft, Save, Sparkles, AlertCircle, Plus, Trash2, HelpCircle } from 'lucide-react';
@@ -691,6 +691,83 @@ export default function CourseEdit() {
   const [form, setForm] = useState<Course>(defaultInitialForm());
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [activeSection, setActiveSection] = useState<'info' | 'curriculum' | 'settings'>('info');
+
+  const [coursesList, setCoursesList] = useState<Course[]>([]);
+  const [importSelectedCourseId, setImportSelectedCourseId] = useState<Record<number, string>>({});
+  const [importSelectedLessonIdx, setImportSelectedLessonIdx] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    const fetchCoursesList = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'courses'));
+        const list: Course[] = [];
+        snap.forEach((doc) => {
+          list.push({ id: doc.id, ...doc.data() } as Course);
+        });
+        setCoursesList(list);
+      } catch (err) {
+        console.error("Error loading courses for import:", err);
+      }
+    };
+    fetchCoursesList();
+  }, []);
+
+  const handleDoImportLesson = (targetVideoIdx: number) => {
+    const srcCourseId = importSelectedCourseId[targetVideoIdx];
+    const srcLessonKey = importSelectedLessonIdx[targetVideoIdx];
+    if (!srcCourseId || !srcLessonKey) return;
+
+    const srcCourse = coursesList.find(c => c.id === srcCourseId);
+    if (!srcCourse) return;
+
+    const [srcDayIdx, srcVidIdx] = srcLessonKey.split('-').map(Number);
+    const srcDay = (srcCourse.days || [])[srcDayIdx];
+    if (!srcDay) return;
+
+    const srcVideo = (srcDay.videos || [])[srcVidIdx];
+    if (!srcVideo) return;
+
+    if (!confirm(`Are you sure you want to copy the details of "${srcVideo.title}" into this lesson slot? This will overwrite the current title, URL, description, resources, comprehension quiz, and fun facts for this slot.`)) {
+      return;
+    }
+
+    setForm(prev => {
+      const updatedDays = [...(prev.days || DAYS_RANGE.map(d => emptyDay(d)))];
+      const videos = [...(updatedDays[activeDayIdx].videos || [])];
+      
+      videos[targetVideoIdx] = {
+        ...videos[targetVideoIdx],
+        title: srcVideo.title || "",
+        video_url: srcVideo.video_url || srcVideo.url || "",
+        url: srcVideo.url || srcVideo.video_url || "",
+        duration: srcVideo.duration || "10 min",
+        description: srcVideo.description || "",
+        resources: srcVideo.resources || "",
+        checkType: srcVideo.checkType || "none",
+        check: srcVideo.check ? JSON.parse(JSON.stringify(srcVideo.check)) : null,
+        funFact: srcVideo.funFact ? { ...srcVideo.funFact } : null
+      };
+
+      updatedDays[activeDayIdx] = {
+        ...updatedDays[activeDayIdx],
+        videos
+      };
+      return { ...prev, days: updatedDays };
+    });
+
+    setImportSelectedCourseId(prev => {
+      const copy = { ...prev };
+      delete copy[targetVideoIdx];
+      return copy;
+    });
+    setImportSelectedLessonIdx(prev => {
+      const copy = { ...prev };
+      delete copy[targetVideoIdx];
+      return copy;
+    });
+
+    alert("🎉 Existing lesson details successfully imported! Don't forget to click 'Save & Update Lesson' to write these changes permanently.");
+  };
 
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [lessonSavingId, setLessonSavingId] = useState<string | null>(null);
@@ -1454,6 +1531,89 @@ export default function CourseEdit() {
                         >
                           Delete Lesson
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Lesson Details Import Integration */}
+                    <div className="mb-4 bg-teal-50/20 p-3.5 rounded-xl border border-dashed border-teal-200 text-left space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                        <span className="text-[10px] sm:text-xs font-black uppercase text-teal-850 tracking-wider flex items-center gap-1 shrink-0">
+                          📥 Reuse & Import Existing Lesson Details
+                        </span>
+                        <span className="text-[9px] sm:text-[10px] text-slate-500 font-bold">
+                          Quickly copy walkthrough text, resources, quizzes & fun facts
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                        {/* Course Selector */}
+                        <div>
+                          <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">Source Track Module</label>
+                          <select
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setImportSelectedCourseId(prev => ({ ...prev, [vIdx]: val }));
+                              setImportSelectedLessonIdx(prev => ({ ...prev, [vIdx]: "" }));
+                            }}
+                            value={importSelectedCourseId[vIdx] || ""}
+                            className="w-full text-xs font-semibold p-2 rounded-lg border border-slate-200 bg-white focus:ring-1 focus:ring-teal-500 text-slate-800"
+                          >
+                            <option value="">-- Choose Course --</option>
+                            {coursesList
+                              .filter(c => !courseId || c.id !== courseId)
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.title}
+                                </option>
+                              ))
+                            }
+                          </select>
+                        </div>
+
+                        {/* Lesson Selector */}
+                        <div>
+                          <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">Source Lesson</label>
+                          <select
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setImportSelectedLessonIdx(prev => ({ ...prev, [vIdx]: val }));
+                            }}
+                            value={importSelectedLessonIdx[vIdx] || ""}
+                            disabled={!importSelectedCourseId[vIdx]}
+                            className="w-full text-xs font-semibold p-2 rounded-lg border border-slate-200 bg-white focus:ring-1 focus:ring-teal-500 text-slate-800 disabled:opacity-40"
+                          >
+                            <option value="">-- Select Lesson --</option>
+                            {(() => {
+                              const srcCourse = coursesList.find(c => c.id === importSelectedCourseId[vIdx]);
+                              if (!srcCourse) return null;
+                              
+                              const optionsList: { dayIdx: number, videoIdx: number, video: CourseVideo }[] = [];
+                              (srcCourse.days || []).forEach((day, dI) => {
+                                (day.videos || []).forEach((vid, vI) => {
+                                  optionsList.push({ dayIdx: dI, videoIdx: vI, video: vid });
+                                });
+                              });
+                              
+                              return optionsList.map((item, optI) => (
+                                <option key={optI} value={`${item.dayIdx}-${item.videoIdx}`}>
+                                  Day {item.dayIdx + 1}: {item.video.title || `Lesson ${item.videoIdx + 1}`}
+                                </option>
+                              ));
+                            })()}
+                          </select>
+                        </div>
+
+                        {/* Trigger button */}
+                        <div className="flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => handleDoImportLesson(vIdx)}
+                            disabled={!importSelectedCourseId[vIdx] || !importSelectedLessonIdx[vIdx]}
+                            className="w-full py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-200 text-white font-extrabold text-[10px] sm:text-xs uppercase tracking-wider rounded-lg border-0 transition-all cursor-pointer shadow-sm disabled:cursor-not-allowed"
+                          >
+                            ⚡ Copy Lesson Details
+                          </button>
+                        </div>
                       </div>
                     </div>
 

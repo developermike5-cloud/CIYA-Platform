@@ -528,7 +528,7 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
               </span>
             </div>
 
-            <h4 className="font-extrabold text-slate-900 text-base leading-relaxed">
+            <h4 className="font-black text-slate-950 text-base md:text-lg leading-relaxed">
               {checkType === 'mcq' ? activeQuestion.question : checkType === 'tf' ? activeQuestion.statement : (activeQuestion.headline || 'Read this factsheet:')}
             </h4>
 
@@ -543,16 +543,18 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
                       onClick={() => setSelectedAnswers({ ...selectedAnswers, [currentIdx]: optIdx })}
                       className={`w-full text-left p-3.5 border rounded-xl flex gap-3 items-center transition-all cursor-pointer ${
                         isSelected 
-                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-900 font-bold' 
-                          : 'border-slate-200 hover:border-slate-350 hover:bg-slate-50'
+                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 font-extrabold shadow-sm' 
+                          : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                       }`}
                     >
                       <span className={`w-5.5 h-5.5 rounded-full border text-[10px] font-black flex items-center justify-center shrink-0 ${
-                        isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 text-slate-400'
+                        isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-100 text-slate-700 font-bold border-slate-300'
                       }`}>
                         {["A", "B", "C", "D"][optIdx]}
                       </span>
-                      <span className="text-xs font-semibold">{opt}</span>
+                      <span className={`text-xs md:text-sm font-bold ${isSelected ? 'text-indigo-950 font-black' : 'text-slate-900'}`}>
+                        {opt}
+                      </span>
                     </button>
                   );
                 })}
@@ -570,8 +572,8 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
                       onClick={() => setSelectedAnswers({ ...selectedAnswers, [currentIdx]: v })}
                       className={`py-4 border rounded-xl text-center font-black uppercase tracking-wider text-xs transition-all cursor-pointer ${
                         isSelected
-                          ? 'border-indigo-600 bg-indigo-50/15 text-indigo-900'
-                          : 'border-slate-200 hover:border-slate-350 hover:bg-slate-50 text-slate-600'
+                          ? 'border-indigo-600 bg-indigo-50/20 text-indigo-950 font-black'
+                          : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-900 font-extrabold'
                       }`}
                     >
                       {v ? "True" : "False"}
@@ -582,12 +584,12 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
             )}
 
             {checkType === 'fact' && (
-              <div className="bg-amber-50 p-4 border border-amber-200 rounded-xl">
-                <p className="text-xs text-amber-900 font-semibold leading-relaxed mb-3">
+              <div className="bg-amber-50 p-5 border border-amber-300 rounded-xl text-left">
+                <p className="text-xs md:text-sm text-slate-900 font-extrabold leading-relaxed mb-3">
                   {activeQuestion.body}
                 </p>
                 {activeQuestion.explanation && (
-                  <p className="text-[11px] text-amber-800/80 font-bold italic border-t border-amber-200/50 pt-2 leading-relaxed">
+                  <p className="text-xs text-amber-950 font-bold italic border-t border-amber-250 pt-2.5 leading-relaxed">
                     💡 {activeQuestion.explanation}
                   </p>
                 )}
@@ -652,12 +654,9 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
                 Excellent comprehension of the course lessons! The lesson progress has been verified and registered on your student card. You are now cleared to proceed.
               </div>
             ) : (
-              <div className="bg-red-50 border border-red-150 rounded-2xl p-4 text-xs font-semibold text-rose-950 leading-relaxed max-w-sm mx-auto space-y-2">
+              <div className="bg-red-50 border border-red-150 rounded-2xl p-4 text-xs font-semibold text-rose-950 leading-relaxed max-w-sm mx-auto">
                 <p>
                   Comprehension check is below the 80% passing threshold. Please review the lesson walkthrough and notes with focus to pass successfully.
-                </p>
-                <p className="text-[11px] font-extrabold text-rose-800">
-                  Note: Remember, only your very FIRST score is documented on the profile scoresheet. Study first compiles better!
                 </p>
               </div>
             )}
@@ -978,112 +977,29 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
           submissions={submissions}
           onSubmit={handleAssignmentSubmit}
         />
-      ) : currentVideo ? (
-        <div className="space-y-6 text-left">
-          {/* Active play center stage FIRST (Day, Lesson walkthrough outline card & verify) */}
-          <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
-              <div>
-                <span className="text-xs font-black uppercase text-teal-800 bg-teal-50 px-3.5 py-1.5 rounded-full tracking-wider border border-teal-200">
-                  DAY {activeDayIdx + 1} · LESSON {activeVideoIdx + 1}
-                </span>
-                <h3 className="font-extrabold text-slate-900 text-lg md:text-xl mt-3 tracking-tight leading-snug">{currentVideo.title}</h3>
-                {currentVideo.duration && <p className="text-xs font-semibold text-slate-500 font-mono mt-1">⏱ Duration: {currentVideo.duration}</p>}
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto max-w-full">
-                {!isVideoWatched ? (
-                  <button
-                    onClick={handleMarkComplete}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs md:text-sm rounded-xl shadow-md transition-all cursor-pointer border-0 font-sans"
-                  >
-                    Complete Lesson & Verify ✓
-                  </button>
-                ) : (
-                  <span className="text-xs md:text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-xl flex items-center gap-1.5 select-none font-sans font-black">
-                    Completed Correctly ✓
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Walkthrough Summary (Plain text, well formulated paragraph spacing, no container frame block) */}
-            {currentVideo.description && (
-              <div className="pt-2">
-                <h4 className="font-extrabold text-slate-900 text-sm md:text-base uppercase tracking-wider mb-3">📖 Walkthrough Outline</h4>
-                {formatWalkthroughDescription(currentVideo.description)}
-              </div>
-            )}
-
-            {currentVideo.resources && (
-              <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 mt-4">
-                <span className="text-xs md:text-sm font-black text-teal-900 block uppercase">📎 Attached Resource Download Links</span>
-                <p className="text-teal-950 font-mono text-sm mt-2 leading-relaxed font-semibold">
-                  {currentVideo.resources}
-                </p>
-              </div>
-            )}
-
-            {/* Practice checklist alerting blocks */}
-            {hasCheck && !isCheckPassed && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 flex gap-4 items-center mt-4 text-left">
-                <span className="text-3xl">🧠</span>
-                <div>
-                  <h5 className="font-black text-xs md:text-sm text-indigo-950 leading-snug">Comprehension Check Available!</h5>
-                  <p className="text-xs md:text-sm text-indigo-900 leading-relaxed mt-1 font-bold">
-                    Click "Complete Lesson & Verify" to trigger the understanding popup quiz.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Prev / Next controls desk */}
-            <div className="flex justify-between items-center border-t border-slate-100 pt-4 mt-6">
-              <button
-                onClick={handleGoPrev}
-                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer bg-white"
-              >
-                ← Previous Module
-              </button>
-              <button
-                onClick={handleGoNext}
-                className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer border-0"
-              >
-                {activeVideoIdx === videos.length - 1 ? "End-of-Day Assignment →" : "Onward (Next) →"}
-              </button>
-            </div>
-          </div>
-
-          {/* Cinematic Video Player Frame SECOND (Positioned beautifully inbetween the outlines and the schedule at bottom) */}
-          <div className="bg-slate-950 aspect-video rounded-3xl overflow-hidden relative shadow-2xl border border-slate-900 flex items-center justify-center">
-            {currentVideo.video_url || currentVideo.url ? (
-              <iframe
-                src={getYouTubeEmbedUrl(currentVideo.video_url || currentVideo.url || "")}
-                title={currentVideo.title}
-                className="w-full h-full border-0 absolute inset-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            ) : (
-              <div className="text-center p-8">
-                <Play className="w-12 h-12 text-slate-500 mx-auto fill-slate-800" />
-                <p className="text-xs font-bold text-slate-400 mt-2">No video URL added for this lesson segment yet.</p>
-              </div>
-            )}
-          </div>
-        </div>
       ) : (
-        <div className="max-w-xl mx-auto rounded-3xl border border-slate-200 bg-white p-8 text-center space-y-4 shadow-sm text-left">
-          <span className="text-3xl">📚</span>
-          <h4 className="font-black text-slate-800">Empty Day Syllabus Block</h4>
-          <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-            The coach has not uploaded lesson videos for Day {activeDayIdx + 1} in this track yet. Choose a different study day below to review available content!
-          </p>
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-indigo-950 to-slate-900 text-white rounded-3xl p-6 md:p-8 text-left shadow-lg relative overflow-hidden border border-indigo-900/40">
+            <div className="relative z-10 max-w-xl space-y-2">
+              <span className="text-[10px] md:text-xs font-black uppercase text-indigo-300 tracking-wider bg-indigo-950/60 px-3.5 py-1.5 rounded-full border border-indigo-500/30">
+                ACTIVE WORKSPACE CLASSROOM
+              </span>
+              <h2 className="text-xl md:text-2xl font-black tracking-tight leading-none mt-2">
+                Interactive Learning Portal
+              </h2>
+              <p className="text-xs md:text-sm text-indigo-150 font-bold leading-relaxed max-w-lg">
+                Proceed sequentially. Tap on any unlocked lesson card in the timeline below to open the walkthrough, play the video lecture, and verify your comprehension.
+              </p>
+            </div>
+            <div className="absolute right-6 bottom-0 top-0 opacity-15 flex items-center select-none text-[150px] pointer-events-none font-sans">
+              🎓
+            </div>
+          </div>
         </div>
       )}
 
       {/* 2. DAILY LESSONS TIMELINE Navigation (Moved to the bottom sequentially, only covered days showing) */}
-      {true && (
+      {!viewingSyllabus && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left animate-fade-in">
           <div className="border-b pb-3 flex items-center justify-between">
             <div className="space-y-0.5">
@@ -1130,51 +1046,189 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                       const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys);
 
                       return (
-                        <button
-                          key={vid.id || vi}
-                          type="button"
-                          onClick={() => {
-                            if (isUnlocked) {
-                              handleGoToVideo(di, vi);
-                            } else {
-                              alert("This lesson is locked! Complete preceding lesson's understanding check to unlock.");
-                            }
-                          }}
-                          disabled={!isUnlocked}
-                          className={`w-full rounded-xl p-3 flex items-center justify-between text-xs md:text-sm transition-all pointer-events-auto cursor-pointer border ${
-                            isVidCurrent
-                              ? 'bg-indigo-600 text-white border-indigo-600 font-black shadow-md'
-                              : isUnlocked
-                                ? 'bg-slate-50 text-slate-900 border-slate-200 hover:bg-slate-100 font-extrabold'
-                                : 'bg-slate-200 text-slate-800 border-slate-300 font-extrabold opacity-80 cursor-not-allowed'
-                          }`}
-                        >
-                          <div className="flex items-start gap-2.5 pr-2 text-inherit min-w-0">
-                            <span className={`w-5 h-5 rounded-full flex items-center justify-center font-black shrink-0 text-xs ${
-                              isVidCurrent ? 'bg-white text-indigo-950 shadow-sm font-black' : 'bg-slate-200 text-slate-800 font-extrabold'
-                            }`}>
-                              {vi + 1}
-                            </span>
-                            <span className="truncate font-bold text-left">{vid.title || `Lesson ${vi+1}`}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0 select-none">
-                            {!isUnlocked ? (
-                              <Lock className="w-4 h-4 text-slate-400" />
-                            ) : (
-                              <>
-                                {isKeyCheckPassed && (
-                                  <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded border border-emerald-200">✓ checked</span>
-                                )}
-                                <span className={`w-5 h-5 rounded-full border flex items-center justify-center font-bold text-xs ${
-                                  isVidWatched ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-400 text-slate-500 bg-white'
-                                }`}>
-                                  {isVidWatched && "✓"}
+                        <div key={vid.id || vi} className="space-y-3 bg-slate-50/40 p-1.5 rounded-2xl border border-slate-100 shadow-sm">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isUnlocked) {
+                                handleGoToVideo(di, vi);
+                              } else {
+                                alert("This lesson is locked! Complete preceding lesson's understanding check to unlock.");
+                              }
+                            }}
+                            disabled={!isUnlocked}
+                            className={`w-full rounded-xl p-3 md:p-4 flex items-center justify-between text-xs md:text-sm transition-all pointer-events-auto cursor-pointer border ${
+                              isVidCurrent
+                                ? 'bg-indigo-600 text-white border-indigo-600 font-extrabold shadow-md'
+                                : isUnlocked
+                                  ? 'bg-white text-slate-950 border-slate-200 hover:bg-slate-50 font-extrabold'
+                                  : 'bg-slate-200 text-slate-600 border-slate-300 font-extrabold opacity-75 cursor-not-allowed'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 pr-2 text-inherit min-w-0">
+                              <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black shrink-0 text-xs ${
+                                isVidCurrent ? 'bg-white text-indigo-950 shadow-sm' : 'bg-slate-200 text-slate-800'
+                              }`}>
+                                {vi + 1}
+                              </span>
+                              <span className="truncate font-black text-left text-xs md:text-sm">{vid.title || `Lesson ${vi+1}`}</span>
+                              {vid.duration && (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 font-bold ${isVidCurrent ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}>
+                                  ⏱ {vid.duration}
                                 </span>
-                              </>
-                            )}
-                          </div>
-                        </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0 select-none">
+                              {!isUnlocked ? (
+                                <Lock className="w-4 h-4 text-slate-400" />
+                              ) : (
+                                <>
+                                  {isKeyCheckPassed && (
+                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded border ${isVidCurrent ? 'bg-white/20 border-white/40 text-white' : 'text-emerald-800 bg-emerald-100 border-emerald-200'}`}>
+                                      ✓ PASSED
+                                    </span>
+                                  )}
+                                  <span className={`w-5.5 h-5.5 rounded-full border flex items-center justify-center font-bold text-xs ${
+                                    isVidWatched ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-400 text-slate-500 bg-white'
+                                  }`}>
+                                    {isVidWatched && "✓"}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Beautiful Animated Dropdown */}
+                          {isVidCurrent && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                              className="overflow-hidden space-y-4 px-1 pb-2 pt-1.5"
+                            >
+                              {/* 1. Cinematic Video Frame FIRST (very tall aspect-ratio on mobile, aspect-video on desktop) */}
+                              <div className="bg-slate-950 aspect-[3/4.5] sm:aspect-video rounded-2xl overflow-hidden relative shadow-lg border border-slate-900 flex items-center justify-center w-full">
+                                {vid.video_url || vid.url ? (
+                                  <iframe
+                                    src={getYouTubeEmbedUrl(vid.video_url || vid.url || "")}
+                                    title={vid.title}
+                                    className="w-full h-full border-0 absolute inset-0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowFullScreen
+                                  />
+                                ) : (
+                                  <div className="text-center p-8">
+                                    <Play className="w-11 h-11 text-slate-500 mx-auto fill-slate-800 animate-pulse" />
+                                    <p className="text-xs font-bold text-slate-400 mt-2">No video URL added for this lesson segment yet.</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* 2. Walkthrough outline & resources SECOND */}
+                              <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm space-y-4 text-left text-slate-900">
+                                <div>
+                                  <h4 className="font-extrabold text-slate-900 text-sm md:text-base uppercase tracking-wider">📖 Walkthrough Outline</h4>
+                                  {vid.description ? (
+                                    <div className="pt-2 text-xs md:text-sm text-slate-800 leading-relaxed font-semibold">
+                                      {formatWalkthroughDescription(vid.description)}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-slate-500 italic pt-1">No separate walkthrough text provided.</p>
+                                  )}
+                                </div>
+
+                                {vid.resources && (
+                                  <div className="bg-teal-50 border border-teal-100 rounded-xl p-3.5">
+                                    <span className="text-xs font-black text-teal-900 block uppercase">📎 Attached Resource Download Links</span>
+                                    <p className="text-teal-950 font-mono text-[11px] md:text-xs mt-1.5 leading-relaxed font-bold whitespace-pre-wrap">
+                                      {vid.resources}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Comprehension check action bar */}
+                                {vid.checkType && vid.checkType !== 'none' && vid.check && (
+                                  <div className={`rounded-xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 ${
+                                    isKeyCheckPassed 
+                                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-950' 
+                                      : 'bg-indigo-50 border border-indigo-200 text-indigo-950'
+                                  }`}>
+                                    <div className="flex gap-3 items-start text-left">
+                                      <span className="text-2xl pt-0.5">🧠</span>
+                                      <div>
+                                        <h5 className="font-black text-xs md:text-[13px] text-indigo-950 leading-none">
+                                          {isKeyCheckPassed ? "Comprehension Quiz Cleared!" : "Comprehension Check Available!"}
+                                        </h5>
+                                        <p className="text-[11px] md:text-xs text-slate-700 leading-relaxed mt-1.5 font-bold">
+                                          {isKeyCheckPassed 
+                                            ? "Fantastic work! You have successfully validated this module with a passing score."
+                                            : "Verify your conceptual understanding with a quick popup quiz."}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {!isKeyCheckPassed ? (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleMarkComplete();
+                                        }}
+                                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs md:text-sm rounded-xl shadow-md transition-all cursor-pointer border-0 w-full sm:w-auto shrink-0"
+                                      >
+                                        Complete Lesson & Verify ✓
+                                      </button>
+                                    ) : (
+                                      <span className="text-xs font-black text-emerald-900 bg-emerald-100/80 px-4 py-2 rounded-xl border border-emerald-200/60 flex items-center justify-center shrink-0">
+                                        ✓ Score Recorded
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Manual mark complete button if no quiz is bound */}
+                                {(!vid.checkType || vid.checkType === 'none') && !isVidWatched && (
+                                  <div className="pt-2 border-t border-slate-100 flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleMarkComplete();
+                                      }}
+                                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs md:text-sm rounded-xl shadow-md transition-all cursor-pointer border-0"
+                                    >
+                                      Mark Lesson Complete ✓
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Inline Day Progression Controls inside active block for perfect pagination */}
+                                <div className="flex justify-between items-center border-t border-slate-100 pt-4 mt-5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleGoPrev();
+                                    }}
+                                    className="px-4 py-2 border border-slate-205 hover:bg-slate-50 text-slate-650 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer bg-white"
+                                  >
+                                    ← Previous Module
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleGoNext();
+                                    }}
+                                    className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer border-0"
+                                  >
+                                    {vi === (d.videos || []).length - 1 ? "End-of-Day Assignment →" : "Onward (Next) →"}
+                                  </button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </div>
                       );
                     })}
 
@@ -1276,45 +1330,45 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
 
       {/* CIRCULAR FUN FACT POPUP CARD (Restricted strictly to the lesson number the user is on) */}
       {showFunFactPopup && currentFunFact && (
-        <div className="fixed bottom-6 right-6 z-[9999] p-2 select-none">
+        <div className="fixed bottom-4 right-4 z-[9999] p-1 select-none">
           <motion.div 
-            initial={{ y: 50, scale: 0.9, opacity: 0 }}
+            initial={{ y: 30, scale: 0.9, opacity: 0 }}
             animate={{ y: 0, scale: 1, opacity: 1 }}
-            className="w-64 h-64 md:w-72 md:h-72 rounded-full bg-amber-50 border-4 border-amber-300 p-6 shadow-2xl flex flex-col items-center justify-center text-center relative overflow-hidden text-amber-950"
+            className="w-44 h-44 md:w-48 md:h-48 rounded-full bg-amber-50 border-2 border-amber-300 p-4 shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden text-amber-950"
           >
-            {/* Top orange gradient accent bar (decorative inside circle) */}
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-500" />
+            {/* Top orange gradient accent bar */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
             
             {/* Close button in top-right area of circle */}
             <button
               onClick={() => setShowFunFactPopup(false)}
-              className="absolute top-4 right-4 w-6 h-6 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-950 border-0 flex items-center justify-center cursor-pointer font-black text-xs transition-all focus:outline-none"
+              className="absolute top-2.5 right-2.5 w-4.5 h-4.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-950 border-0 flex items-center justify-center cursor-pointer font-black text-[9px] transition-all focus:outline-none"
             >
               ✕
             </button>
 
-            <span className="text-2xl mb-1.5 select-none animate-bounce">💡</span>
+            <span className="text-lg mb-0.5 select-none animate-bounce">💡</span>
             
             <div className="space-y-0.5">
-              <span className="inline-block text-[9px] font-black uppercase text-amber-950 tracking-wider bg-amber-200 px-2 py-0.5 rounded-full border border-amber-300">
-                Lesson {activeVideoIdx + 1} Fun Fact
+              <span className="inline-block text-[8px] font-black uppercase text-amber-950 tracking-wider bg-amber-200 px-1.5 py-0.25 rounded-full border border-amber-300">
+                Lesson {activeVideoIdx + 1} Fact
               </span>
-              <h3 className="text-xs md:text-sm font-extrabold text-amber-950 tracking-tight leading-tight max-w-[140px] md:max-w-[165px] mx-auto">
+              <h3 className="text-[10px] md:text-[11px] font-black text-amber-950 tracking-tight leading-tight max-w-[100px] md:max-w-[115px] mx-auto truncate">
                 {currentFunFact?.headline || "Did you know?"}
               </h3>
             </div>
 
-            <div className="max-h-[55px] md:max-h-[70px] overflow-y-auto px-1 mt-1.5 scrollbar-thin scrollbar-thumb-amber-200 text-left">
-              <p className="text-amber-950 text-[10px] md:text-xs leading-relaxed font-bold whitespace-pre-line text-center">
+            <div className="max-h-[35px] md:max-h-[45px] overflow-y-auto px-1 mt-1 scrollbar-none text-left">
+              <p className="text-amber-950 text-[8px] md:text-[9px] leading-relaxed font-bold text-center">
                 {currentFunFact?.body}
               </p>
             </div>
 
             <button
               onClick={() => setShowFunFactPopup(false)}
-              className="mt-2.5 px-4 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-extrabold text-[10px] tracking-wider uppercase rounded-full transition-all shadow-md cursor-pointer border-0 shrink-0"
+              className="mt-1.5 px-3 py-1 bg-amber-700 hover:bg-amber-800 text-white font-extrabold text-[8px] tracking-wider uppercase rounded-full transition-all shadow-md cursor-pointer border-0 shrink-0"
             >
-              Acknowledge Fact
+              Got it
             </button>
           </motion.div>
         </div>
@@ -1413,31 +1467,31 @@ function CourseCard({ course, isLocked, onSelect }: any) {
   return (
     <div 
       onClick={onSelect}
-      className="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-teal-900/5 hover:-translate-y-1 transition-all duration-350 cursor-pointer text-left font-sans"
+      className="group flex flex-col bg-white border-2 border-slate-200/90 rounded-3xl overflow-hidden hover:shadow-2xl hover:shadow-teal-950/10 hover:-translate-y-1.5 transition-all duration-350 cursor-pointer text-left font-sans w-full"
     >
-      <div className="relative aspect-video bg-slate-100 overflow-hidden">
+      <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
         {course.thumbnail ? (
           <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-teal-50 to-amber-50 flex items-center justify-center text-4xl select-none">
+          <div className="w-full h-full bg-gradient-to-br from-teal-50 via-indigo-50/50 to-amber-50 flex items-center justify-center text-5xl select-none">
             {sk?.icon || "📕"}
           </div>
         )}
-        <div className="absolute top-3 right-3 flex flex-col gap-1 items-end">
+        <div className="absolute top-4 right-4 flex flex-col gap-1 items-end">
           <TierBadge tier={course.tier || 'beginner'} />
         </div>
         {isLocked && (
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center z-10 transition-all opacity-0 group-hover:opacity-100">
-            <Lock className="w-10 h-10 text-white drop-shadow-md" />
+            <Lock className="w-12 h-12 text-white drop-shadow-md" />
           </div>
         )}
       </div>
       
-      <div className="p-5 flex-1 flex flex-col">
-        <h4 className="font-extrabold text-base text-slate-900 mb-1.5 line-clamp-2 leading-tight group-hover:text-teal-700 transition-colors">
+      <div className="p-6 md:p-7 flex-1 flex flex-col">
+        <h4 className="font-extrabold text-base md:text-lg lg:text-xl text-slate-900 mb-2 line-clamp-2 leading-snug group-hover:text-teal-700 transition-colors">
           {course.title}
         </h4>
-        <p className="text-xs text-slate-800 mb-4 line-clamp-2 leading-relaxed font-extrabold">
+        <p className="text-xs md:text-sm text-slate-800 mb-5 line-clamp-2 leading-relaxed font-extrabold">
           {course.tagline || course.subtitle || "Embark on structured study paths curated by professional coaches."}
         </p>
 
@@ -1448,7 +1502,7 @@ function CourseCard({ course, isLocked, onSelect }: any) {
             e.stopPropagation();
             setExpanded(!expanded);
           }}
-          className="w-full mb-4 px-3 py-2.5 border border-slate-200 hover:border-slate-350 hover:bg-slate-50 text-[10.5px] font-black uppercase text-slate-700 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 bg-white"
+          className="w-full mb-5 px-4 py-3 border border-slate-200 hover:border-slate-350 hover:bg-slate-50 text-[11px] font-black uppercase text-slate-700 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 bg-white"
         >
           <span>📑</span>
           <span>{expanded ? "Hide course specifications ▲" : "View course specifications ▼"}</span>
@@ -2629,7 +2683,7 @@ export default function StudentDashboard() {
                         <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto font-semibold">Assigned active tracks to your student profile will reveal here shortly.</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
                         {filteredCourses.map(course => (
                           <CourseCard 
                             key={course.id} 
