@@ -24,6 +24,7 @@
         "requirements": { "type": "string" },
         "publish_status": { "type": "string", "enum": ["Draft", "Published", "Archived"] },
         "status": { "type": "string", "enum": ["draft", "published"] },
+        "isLocked": { "type": "boolean" },
         "days": { "type": "array", "description": "5 days of videos and themes" },
         "createdAt": { "type": "string", "format": "timestamp" },
         "updatedAt": { "type": "string", "format": "timestamp" }

@@ -30,7 +30,7 @@ service cloud.firestore {
 
     // Entity Validation: Course
     function isValidCourse(data) {
-      return data.keys().hasAll(['title', 'publish_status', 'createdAt', 'updatedAt']) 
+      return data.keys().hasAll(['title', 'publish_status']) 
         && data.title is string && data.title.size() > 0 && data.title.size() <= 200
         && data.publish_status in ['Draft', 'Published', 'Archived']
         && (data.get('subtitle', '') is string && data.get('subtitle', '').size() <= 1000)
@@ -50,6 +50,7 @@ service cloud.firestore {
         && (data.get('outcomes', '') is string && data.get('outcomes', '').size() <= 10000)
         && (data.get('requirements', '') is string && data.get('requirements', '').size() <= 10000)
         && (data.get('status', '') is string && data.get('status', '').size() <= 100)
+        && (data.get('isLocked', false) is bool)
         && (data.get('days', []) is list && data.get('days', []).size() <= 15);
     }
     
@@ -149,13 +150,13 @@ service cloud.firestore {
       
       allow update: if isAdmin()
                     && isValidCourse(incoming())
-                    && incoming().createdAt == existing().createdAt
-                    && incoming().updatedAt == request.time
+                    && (!existing().keys().hasAll(['createdAt']) || incoming().createdAt == existing().createdAt)
+                    && (incoming().updatedAt == request.time || !incoming().keys().hasAll(['updatedAt']))
                     && incoming().diff(existing()).affectedKeys().hasOnly([
                       'title', 'subtitle', 'tagline', 'slug', 'thumbnail', 'description', 
                       'overview', 'category', 'skill', 'subskill', 'youtube_link', 
                       'level', 'tier', 'price', 'instructor', 'outcomes', 
-                      'requirements', 'publish_status', 'status', 'days', 'updatedAt'
+                      'requirements', 'publish_status', 'status', 'isLocked', 'days', 'updatedAt', 'createdAt'
                     ]);
                     
       allow delete: if isAdmin();
