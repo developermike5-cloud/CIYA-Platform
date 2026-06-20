@@ -20,6 +20,7 @@ service cloud.firestore {
       // Bootstrap admin using email, or check if they are in the admins collection
       return isSignedIn() && (
         request.auth.token.email == 'developermike5@gmail.com' ||
+        request.auth.token.get('email', '').lower() == 'developermike5@gmail.com' ||
         (request.auth.token.get('email_verified', false) == true && exists(/databases/$(database)/documents/admins/$(request.auth.uid)))
       );
     }
@@ -85,6 +86,16 @@ service cloud.firestore {
         && (data.get('isDashboardUnlocked', false) is bool)
         && (data.get('adminCode', '') is string)
         && (data.get('progress', {}) is map);
+    }
+    
+    // Entity Validation: KycbQuestionnaire
+    function isValidKycbQuestionnaire(data) {
+      return data.keys().hasAll(['clientName', 'type', 'businessName', 'createdAt', 'data'])
+        && data.clientName is string && data.clientName.size() > 0 && data.clientName.size() <= 200
+        && data.type in ['lp', 'ec']
+        && data.businessName is string && data.businessName.size() > 0 && data.businessName.size() <= 200
+        && (data.get('dateCompleted', '') is string && data.get('dateCompleted', '').size() <= 100)
+        && data.data is map;
     }
 
     // Collections Routes
@@ -159,6 +170,18 @@ service cloud.firestore {
                       'requirements', 'publish_status', 'status', 'isLocked', 'days', 'updatedAt', 'createdAt'
                     ]);
                     
+      allow delete: if isAdmin();
+    }
+
+    match /kycb_questionnaires/{questionnaireId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+                    && isValidId(questionnaireId)
+                    && isValidKycbQuestionnaire(incoming())
+                    && incoming().createdAt == request.time;
+      allow update: if isAdmin()
+                    && isValidKycbQuestionnaire(incoming())
+                    && incoming().createdAt == request.time;
       allow delete: if isAdmin();
     }
 

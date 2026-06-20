@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
@@ -125,6 +125,57 @@ export default function UsersAdmin() {
   const [currentLogo, setCurrentLogo] = useState<string | null>(() => {
     return localStorage.getItem('ciya_brand_logo');
   });
+
+  // Section locking state
+  const [lockedSections, setLockedSections] = useState<{ courses: boolean; prompts: boolean }>({ courses: false, prompts: false });
+  const [loadingLocks, setLoadingLocks] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setLoadingLocks(true);
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'app'));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && data.lockedSections) {
+            setLockedSections({
+              courses: !!data.lockedSections.courses,
+              prompts: !!data.lockedSections.prompts
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching section locks in UsersAdmin:", err);
+      } finally {
+        setLoadingLocks(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const handleToggleSectionLock = async (section: 'courses' | 'prompts') => {
+    if (!isSuperAdmin) {
+      alert("Only the super admin can lock or unlock website sections.");
+      return;
+    }
+    const newVal = !lockedSections[section];
+    const updatedLocked = {
+      ...lockedSections,
+      [section]: newVal
+    };
+    setLockedSections(updatedLocked);
+    try {
+      await setDoc(doc(db, 'settings', 'app'), {
+        lockedSections: updatedLocked,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (err) {
+      console.error("Error updating section lock status:", err);
+      alert("Failed to synchronize section lock with the database.");
+      // Roll back
+      setLockedSections(prev => ({ ...prev, [section]: !newVal }));
+    }
+  };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -536,6 +587,91 @@ export default function UsersAdmin() {
                 disabled={logoUploading}
               />
             </label>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Portal Section Locking Safeguards (Super Admin only) */}
+      {isSuperAdmin && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 mb-8 text-white shadow-xl font-sans">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl">
+              <span className="text-xl">🔒</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-white tracking-tight">Portal Section Locks & Safeguards</h2>
+              <p className="text-xs text-slate-400 font-bold">
+                Instantly control student access permissions to key system areas. Locked sections will display a polished lock state page to students.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            <div className={`p-5 rounded-2xl border transition-all duration-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+              lockedSections.courses 
+                ? 'bg-rose-500/5 border-rose-500/35 shadow-md shadow-rose-950/10' 
+                : 'bg-slate-850/40 border-slate-800/85 hover:border-slate-800'
+            }`}>
+              <div className="space-y-1">
+                <span className="text-xs font-black uppercase text-slate-400 tracking-wider">Explore Curriculum Arena</span>
+                <p className="text-[11px] text-slate-300 font-medium">
+                  Governs full courses display. When active, students can explore lectures and take quiz checkpoints.
+                </p>
+                <div className="pt-1">
+                  <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                    lockedSections.courses 
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+                      : 'bg-teal-500/10 text-teal-300 border border-teal-500/20'
+                  }`}>
+                    {lockedSections.courses ? "● LOCKED" : "○ ACTIVE"}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleToggleSectionLock('courses')}
+                className={`px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wide cursor-pointer border-0 transition-all outline-none shrink-0 ${
+                  lockedSections.courses 
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/15' 
+                    : 'bg-slate-750 hover:bg-slate-700 text-slate-200'
+                }`}
+              >
+                {lockedSections.courses ? "Unlock Section" : "Lock Section"}
+              </button>
+            </div>
+
+            <div className={`p-5 rounded-2xl border transition-all duration-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+              lockedSections.prompts 
+                ? 'bg-rose-500/5 border-rose-500/35 shadow-md shadow-rose-950/10' 
+                : 'bg-slate-850/40 border-slate-800/85 hover:border-slate-800'
+            }`}>
+              <div className="space-y-1">
+                <span className="text-xs font-black uppercase text-slate-400 tracking-wider">Website Prompt Generator</span>
+                <p className="text-[11px] text-slate-300 font-medium">
+                  Dynamic tool for compiling Landing or eCommerce structure guides of student businesses.
+                </p>
+                <div className="pt-1">
+                  <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                    lockedSections.prompts 
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+                      : 'bg-teal-500/10 text-teal-300 border border-teal-500/20'
+                  }`}>
+                    {lockedSections.prompts ? "● LOCKED" : "○ ACTIVE"}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleToggleSectionLock('prompts')}
+                className={`px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wide cursor-pointer border-0 transition-all outline-none shrink-0 ${
+                  lockedSections.prompts 
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/15' 
+                    : 'bg-slate-750 hover:bg-slate-700 text-slate-200'
+                }`}
+              >
+                {lockedSections.prompts ? "Unlock Section" : "Lock Section"}
+              </button>
+            </div>
           </div>
         </div>
       )}

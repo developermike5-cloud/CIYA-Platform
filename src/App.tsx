@@ -5,6 +5,8 @@ import AdminLayout from './pages/admin/AdminLayout';
 import CoursesAdmin from './pages/admin/CoursesAdmin';
 import CourseEdit from './pages/admin/CourseEdit';
 import UsersAdmin from './pages/admin/UsersAdmin';
+import AdminKycbQuestionnaire from './pages/admin/AdminKycbQuestionnaire';
+import PromptsAdmin from './pages/admin/PromptsAdmin';
 import Onboarding from './pages/Onboarding';
 import GetStarted from './pages/GetStarted';
 
@@ -19,6 +21,8 @@ export default function App() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<CoursesAdmin />} />
           <Route path="users" element={<UsersAdmin />} />
+          <Route path="kycb" element={<AdminKycbQuestionnaire />} />
+          <Route path="prompts" element={<PromptsAdmin />} />
           <Route path="courses/new" element={<CourseEdit />} />
           <Route path="courses/:courseId" element={<CourseEdit />} />
         </Route>

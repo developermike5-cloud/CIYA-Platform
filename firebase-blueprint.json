@@ -71,9 +71,38 @@
         "permissions": { "type": "array" }
       },
       "required": ["email"]
+    },
+    "KycbQuestionnaire": {
+      "title": "KYCB Questionnaire",
+      "description": "Know your client business questionnaire document containing target audience, project goals, branding, content, and dynamic features",
+      "type": "object",
+      "properties": {
+        "clientName": { "type": "string" },
+        "dateCompleted": { "type": "string" },
+        "type": { "type": "string", "enum": ["lp", "ec"] },
+        "businessName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "timestamp" },
+        "data": { "type": "object" }
+      },
+      "required": ["clientName", "type", "businessName", "createdAt", "data"]
+    },
+    "AppSettings": {
+      "title": "Application Settings",
+      "description": "Dynamic configurations for prompt generator templates, shufflers, and modular options",
+      "type": "object",
+      "properties": {
+        "landing": { "type": "array" },
+        "ecommerce": { "type": "array" },
+        "templates": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      }
     }
   },
   "firestore": {
+    "/settings/{settingsDoc}": {
+      "schema": { "$ref": "#/entities/AppSettings" },
+      "description": "Global config documents for general templates, locks and prompt shuffling definitions."
+    },
     "/courses/{courseId}": {
       "schema": { "$ref": "#/entities/Course" },
       "description": "The main collection for all courses."
@@ -85,6 +114,10 @@
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "User profiles and onboarding data."
+    },
+    "/kycb_questionnaires/{questionnaireId}": {
+      "schema": { "$ref": "#/entities/KycbQuestionnaire" },
+      "description": "Questionnaire sheets for active client systems."
     }
   }
 }

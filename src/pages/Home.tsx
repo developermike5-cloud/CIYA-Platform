@@ -233,6 +233,10 @@ function Navbar() {
       <div className="hidden md:flex items-center gap-10 text-sm font-medium text-teal-200">
         <a href="#mission" className="hover:text-amber-400 transition-colors">Mission</a>
         <a href="#courses" className="hover:text-amber-400 transition-colors">Courses</a>
+        <Link to="/dashboard?view=prompts" className="hover:text-amber-400 transition-colors flex items-center gap-1">
+          <Sparkles className="w-3.5 h-3.5 text-amber-450" />
+          <span>Prompt Generator</span>
+        </Link>
         <a href="#how" className="hover:text-amber-400 transition-colors">How it works</a>
         <a href="#why" className="hover:text-amber-400 transition-colors">Why CIYA</a>
       </div>
@@ -807,9 +811,10 @@ function Footer() {
         
         <div className="md:col-span-2 lg:col-span-2">
           <h5 className="font-semibold uppercase tracking-wider text-teal-500 text-xs mb-5">Academy</h5>
-          <ul className="space-y-4">
+          <ul className="space-y-2">
             <li><a href="#" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">About CIYA</a></li>
             <li><a href="#mission" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">Our Mission</a></li>
+            <li><Link to="/dashboard?view=prompts" className="text-sm text-amber-400 hover:text-amber-200 transition-colors font-bold block">✨ Prompt Generator Track</Link></li>
             <li><a href="#" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">Community</a></li>
             <li><a href="#" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">Blog</a></li>
           </ul>

@@ -7,6 +7,8 @@ import { Course, CourseDay, CourseVideo } from '../types';
 import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
+import SecureYoutubePlayer from '../components/SecureYoutubePlayer';
+import PromptGenerator from '../components/PromptGenerator';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -1107,23 +1109,11 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                               className="overflow-hidden space-y-4 px-1 pb-2 pt-1.5"
                             >
-                              {/* 1. Cinematic Video Frame FIRST (very tall aspect-ratio on mobile, aspect-video on desktop) */}
-                              <div className="bg-slate-950 aspect-[3/4.5] sm:aspect-video rounded-2xl overflow-hidden relative shadow-lg border border-slate-900 flex items-center justify-center w-full">
-                                {vid.video_url || vid.url ? (
-                                  <iframe
-                                    src={getYouTubeEmbedUrl(vid.video_url || vid.url || "")}
-                                    title={vid.title}
-                                    className="w-full h-full border-0 absolute inset-0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                    allowFullScreen
-                                  />
-                                ) : (
-                                  <div className="text-center p-8">
-                                    <Play className="w-11 h-11 text-slate-500 mx-auto fill-slate-800 animate-pulse" />
-                                    <p className="text-xs font-bold text-slate-400 mt-2">No video URL added for this lesson segment yet.</p>
-                                  </div>
-                                )}
-                              </div>
+                              {/* 1. Cinematic Video Frame FIRST (very tall aspect-ratio on mobile, aspect-video on desktop with secure secure masking templates) */}
+                              <SecureYoutubePlayer 
+                                url={vid.video_url || vid.url || ""} 
+                                title={vid.title || "Lesson Video"} 
+                              />
 
                               {/* 2. Walkthrough outline & resources SECOND */}
                               <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm space-y-4 text-left text-slate-900">
@@ -1663,6 +1653,67 @@ function SubmissionDetailsCard({ profile }: { profile: any }) {
   );
 }
 
+function TrainingCountdown({ targetDateStr }: { targetDateStr: string }) {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, isReady: false });
+
+  useEffect(() => {
+    const target = new Date(targetDateStr).getTime();
+    
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const diff = target - now;
+      
+      if (diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isReady: true });
+        return;
+      }
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      setTimeLeft({ days, hours, minutes, seconds, isReady: true });
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+    return () => clearInterval(timer);
+  }, [targetDateStr]);
+
+  if (!timeLeft.isReady) return null;
+
+  const parts = [
+    { label: "Days", value: timeLeft.days, color: "from-amber-400 to-yellow-500", glow: "shadow-amber-500/20" },
+    { label: "Hours", value: timeLeft.hours, color: "from-teal-400 to-emerald-500", glow: "shadow-teal-500/20" },
+    { label: "Minutes", value: timeLeft.minutes, color: "from-indigo-400 to-blue-500", glow: "shadow-indigo-500/20" },
+    { label: "Seconds", value: timeLeft.seconds, color: "from-pink-500 to-rose-500", glow: "shadow-pink-500/20 animate-pulse" },
+  ];
+
+  return (
+    <div className="grid grid-cols-4 gap-2.5 sm:gap-4 md:gap-5 w-full max-w-lg mx-auto py-3">
+      {parts.map((p) => (
+        <div 
+          key={p.label} 
+          className="bg-slate-950/90 border border-indigo-500/25 rounded-2xl p-3 md:p-4 text-center shadow-lg shadow-indigo-950/50 flex flex-col justify-center items-center relative overflow-hidden"
+        >
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-indigo-400/40 to-transparent" />
+          <motion.div
+            key={p.value}
+            initial={{ scale: 0.85, opacity: 0.5 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className={`text-2xl md:text-3xl lg:text-4xl font-black bg-gradient-to-r ${p.color} bg-clip-text text-transparent font-mono`}
+          >
+            {String(p.value).padStart(2, "0")}
+          </motion.div>
+          <span className="text-[8px] md:text-[9px] font-black text-indigo-300 uppercase tracking-widest mt-1.5">{p.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function StudentDashboard() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1694,8 +1745,62 @@ export default function StudentDashboard() {
     return !(localStorage.getItem('ciya_cached_user') && localStorage.getItem('ciya_cached_profile'));
   });
 
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    const calculateCountdown = () => {
+      const target = new Date("2026-06-22T00:00:00");
+      const diff = target.getTime() - Date.now();
+      if (diff <= 0) {
+        return { days: 0, hours: 0, minutes: 0, seconds: 0 };
+      }
+      return {
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / 1000 / 60) % 60),
+        seconds: Math.floor((diff / 1000) % 60)
+      };
+    };
+
+    setCountdown(calculateCountdown());
+    const interval = setInterval(() => {
+      setCountdown(calculateCountdown());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'prompts'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    if (view === 'prompts') return 'prompts';
+    if (view === 'profile') return 'profile';
+    return 'courses';
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    if (view === 'prompts') {
+      setCurrentView('prompts');
+    } else if (view === 'profile') {
+      setCurrentView('profile');
+    } else if (view === 'courses') {
+      setCurrentView('courses');
+    }
+  }, [window.location.search]);
+
+  const [appSettings, setAppSettings] = useState<{ lockedSections?: { courses?: boolean; prompts?: boolean } }>({});
+
+  useEffect(() => {
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
+      if (docSnap.exists()) {
+        setAppSettings(docSnap.data() || {});
+      }
+    });
+    return () => unsubSettings();
+  }, []);
+
   const [timeLeft, setTimeLeft] = useState('');
-  const [currentView, setCurrentView] = useState<'courses' | 'profile'>('courses');
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     const cached = localStorage.getItem('ciya_cached_user');
     if (cached) {
@@ -1724,6 +1829,11 @@ export default function StudentDashboard() {
   
   const [activeSkillFilter, setActiveSkillFilter] = useState<string>('all');
   const navigate = useNavigate();
+
+  const handleViewChange = (view: 'courses' | 'profile' | 'prompts') => {
+    setCurrentView(view);
+    navigate(`/dashboard?view=${view}`, { replace: true });
+  };
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -2322,16 +2432,35 @@ export default function StudentDashboard() {
         <nav className="flex-1 px-4 space-y-1.5 mt-5 text-xs font-bold">
           <button 
             type="button"
-            onClick={() => { setCurrentView('courses'); setSelectedCourseId(null); setIsMobileMenuOpen(false); }}
-            className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'courses' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+            onClick={() => { handleViewChange('courses'); setSelectedCourseId(null); setIsMobileMenuOpen(false); }}
+            className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'courses' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
           >
-            <Compass className="w-4 h-4" />
-            Explore Curriculum
+            <div className="flex items-center gap-3">
+              <Compass className="w-4 h-4" />
+              <span>Explore Curriculum</span>
+            </div>
+            {!isAdmin && appSettings?.lockedSections?.courses && (
+              <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            )}
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => { handleViewChange('prompts'); setSelectedCourseId(null); setIsMobileMenuOpen(false); }}
+            className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'prompts' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+          >
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-4 h-4 text-teal-400" />
+              <span>Prompt Generator</span>
+            </div>
+            {!isAdmin && appSettings?.lockedSections?.prompts && (
+              <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            )}
           </button>
           {!isGuest && (
             <button 
               type="button"
-              onClick={() => { setCurrentView('profile'); setIsMobileMenuOpen(false); }}
+              onClick={() => { handleViewChange('profile'); setIsMobileMenuOpen(false); }}
               className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'profile' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
             >
               <UserIcon className="w-4 h-4" />
@@ -2387,7 +2516,11 @@ export default function StudentDashboard() {
               <Menu className="w-5 h-5" />
             </button>
             <h2 className="text-base md:text-lg font-black text-slate-800 tracking-tight">
-              {currentView === 'courses' ? 'CIYA Learning Arena' : 'My Student Profile'}
+              {currentView === 'courses' 
+                ? 'CIYA Learning Arena' 
+                : currentView === 'profile' 
+                  ? 'My Student Profile' 
+                  : 'Prompt Generator Lab'}
             </h2>
           </div>
           <div className="flex items-center gap-4">
@@ -2412,7 +2545,9 @@ export default function StudentDashboard() {
         
         {/* Core content scroll container */}
         <div className="flex-1 overflow-auto p-6 md:p-8">
-          {currentView === 'profile' ? (
+          {currentView === 'prompts' ? (
+            <PromptGenerator isLocked={!isAdmin && appSettings?.lockedSections?.prompts} />
+          ) : currentView === 'profile' ? (
             <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 md:p-8 max-w-2xl mx-auto shadow-sm">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-black text-slate-800">Profile Settings</h3>
@@ -2570,6 +2705,19 @@ export default function StudentDashboard() {
                 </div>
               )}
             </div>
+          ) : !isAdmin && appSettings?.lockedSections?.courses ? (
+            <div className="bg-white border border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
+              <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Lock className="w-8 h-8 text-rose-500" />
+              </div>
+              <h3 className="text-xl font-black text-slate-800 tracking-tight">CIYA Learning Arena Locked</h3>
+              <p className="text-slate-500 mt-3 text-sm leading-relaxed font-semibold">
+                The main curriculum and learning arena are temporarily locked by the course administrators. Unlocks are periodically timed with training syllabus parameters and live cohorts schedules. Please reach out to your instructor for detail coordinates.
+              </p>
+              <div className="mt-8 pt-6 border-t border-slate-100 flex justify-center items-center gap-2 text-xs text-slate-400 font-bold">
+                <span>🛡️ CIYA Guarded Academy Portal</span>
+              </div>
+            </div>
           ) : (
             <>
               {selectedCourseId && selectedCourse ? (
@@ -2713,48 +2861,58 @@ export default function StudentDashboard() {
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.8, ease: "easeOut" }}
-                      className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 text-white rounded-3xl p-8 md:p-10 border border-slate-800 shadow-xl"
+                      className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 text-white rounded-3xl p-8 md:p-12 border-2 border-indigo-500/40 shadow-2xl shadow-indigo-950/50"
                     >
                       {/* Decorative glowing backdrops */}
-                      <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
-                      <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20" />
+                      <div className="absolute top-0 right-0 w-96 h-96 bg-teal-500/15 rounded-full blur-3xl pointer-events-none -mr-24 -mt-24" />
+                      <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none -ml-24 -mb-24 animate-pulse" />
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
                       
-                      <div className="relative z-10 flex flex-col items-center text-center max-w-3xl mx-auto space-y-6">
+                      <div className="relative z-10 flex flex-col items-center text-center max-w-3xl mx-auto space-y-6 md:space-y-8">
                         
                         {/* Info details column centered */}
-                        <div className="space-y-4 text-center">
-                          <div className="inline-flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-bold text-[10px] uppercase tracking-wider">
-                            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping" />
+                        <div className="space-y-5 text-center">
+                          <div className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-indigo-500/15 border-2 border-indigo-400/30 text-indigo-200 font-extrabold text-[10.5px] uppercase tracking-wider shadow-inner">
+                            <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
                             Launch Sequence Active
                           </div>
                           
-                          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight leading-snug bg-gradient-to-r from-white via-indigo-100 to-teal-200 bg-clip-text text-transparent">
+                          <h2 className="text-3xl md:text-5xl font-black tracking-tight leading-none bg-gradient-to-r from-white via-indigo-100 to-teal-200 bg-clip-text text-transparent font-sans">
                             System Training Beginning Soon
                           </h2>
+
+                          <p className="font-mono text-xs md:text-sm font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2 inline-flex items-center gap-1.5 shadow-sm">
+                            ⏰ Countdown to June 22, 2026 
+                          </p>
                           
-                          <p className="text-xs md:text-sm text-slate-300 leading-relaxed font-semibold max-w-2xl mx-auto">
+                          <p className="text-xs md:text-sm text-slate-350 leading-relaxed font-bold max-w-2xl mx-auto text-slate-200">
                             Preparation checks are underway. Certified tech coaches are finalising and reviewing your personalized curriculum tracks, milestones checks, and interactive walkthrough modules.
                           </p>
 
-                          <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs">
-                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl p-2.5">
-                              <span className="text-emerald-400 select-none font-bold">✓</span>
-                              <span className="font-semibold text-slate-200">Student Profile Verified</span>
+                          {/* Beautiful Dynamic Real-Time Countdown Timer */}
+                          <div className="pt-2">
+                            <TrainingCountdown targetDateStr="2026-06-22T00:00:00" />
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-center gap-3 pt-4 text-xs">
+                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl px-3.5 py-2.5">
+                              <span className="text-emerald-400 select-none font-bold text-sm">✓</span>
+                              <span className="font-extrabold text-slate-200">Student Profile Verified</span>
                             </div>
-                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl p-2.5">
-                              <span className="text-teal-300 select-none font-bold">✦</span>
-                              <span className="font-semibold text-slate-200">Track Prerequisites Loaded</span>
+                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl px-3.5 py-2.5">
+                              <span className="text-teal-300 select-none font-bold text-sm">✦</span>
+                              <span className="font-extrabold text-slate-200">Track Prerequisites Loaded</span>
                             </div>
-                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl p-2.5">
-                              <span className="text-indigo-300 select-none font-bold">📡</span>
-                              <span className="font-semibold text-slate-200">Synchronizer Active</span>
+                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl px-3.5 py-2.5">
+                              <span className="text-indigo-300 select-none font-bold text-sm">📡</span>
+                              <span className="font-extrabold text-slate-200">Synchronizer Active</span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Animated progress bar, no timer */}
-                        <div className="w-full max-w-md mx-auto pt-2">
-                          <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                        {/* Animated progress bar, with timer details unified */}
+                        <div className="w-full max-w-md mx-auto pt-3">
+                          <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden p-[1px] border border-white/5 shadow-inner">
                             <motion.div 
                               initial={{ width: "0%" }}
                               animate={{ width: "95%" }}
@@ -2762,9 +2920,9 @@ export default function StudentDashboard() {
                               className="bg-gradient-to-r from-teal-400 via-indigo-400 to-pink-500 h-full rounded-full"
                             />
                           </div>
-                          <div className="flex justify-between w-full text-[9px] font-bold text-slate-400 mt-1.5">
+                          <div className="flex justify-between w-full text-[9.5px] font-extrabold text-slate-400 mt-2">
                             <span>Integration Phase</span>
-                            <span className="text-teal-300">95% Server Ready</span>
+                            <span className="text-teal-300 font-black">95% Server Ready</span>
                           </div>
                         </div>
 

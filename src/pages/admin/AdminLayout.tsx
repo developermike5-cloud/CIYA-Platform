@@ -201,6 +201,32 @@ export default function AdminLayout() {
             </Link>
           )}
 
+          <Link 
+            to="/admin/kycb" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/kycb') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+          >
+            KYCB Questionnaire
+          </Link>
+
+          {isSuperAdmin && (
+            <Link 
+              to="/admin/prompts" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/prompts') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+            >
+              📝 Prompts & Templates
+            </Link>
+          )}
+
+          <Link 
+            to="/dashboard?view=prompts" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="block px-4 py-2 rounded-md hover:bg-slate-800 text-teal-300"
+          >
+            ✨ Prompt Generator Tool
+          </Link>
+
           <div className="pt-2 border-t border-slate-800">
             <Link 
               to="/dashboard" 
