@@ -98,6 +98,16 @@ service cloud.firestore {
         && data.data is map;
     }
 
+    // Entity Validation: SavedPrompt
+    function isValidSavedPrompt(data) {
+      return data.keys().hasAll(['userId', 'industry', 'promptText', 'websiteType', 'createdAt'])
+        && data.userId is string && data.userId.size() <= 128
+        && data.industry is string && data.industry.size() <= 200
+        && data.promptText is string && data.promptText.size() <= 100000
+        && data.websiteType in ['landing', 'ecommerce']
+        && (data.get('businessName', '') is string && data.get('businessName', '').size() <= 200);
+    }
+
     // Collections Routes
     match /admins/{adminId} {
       // Only root admin can manage admins
@@ -183,6 +193,23 @@ service cloud.firestore {
                     && isValidKycbQuestionnaire(incoming())
                     && incoming().createdAt == request.time;
       allow delete: if isAdmin();
+    }
+
+    match /saved_prompts/{promptId} {
+      allow read, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn()
+                    && isValidId(promptId)
+                    && isValidSavedPrompt(incoming())
+                    && incoming().userId == request.auth.uid
+                    && incoming().createdAt == request.time;
+      allow update: if isSignedIn()
+                    && isValidId(promptId)
+                    && isValidSavedPrompt(incoming())
+                    && incoming().userId == request.auth.uid
+                    && incoming().userId == existing().userId
+                    && incoming().createdAt == existing().createdAt
+                    && incoming().promptText == existing().promptText;
     }
 
     match /settings/{settingsDoc} {

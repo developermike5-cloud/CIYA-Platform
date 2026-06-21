@@ -2,6 +2,7 @@
 
 html {
   scroll-behavior: smooth;
+  font-size: 18px; /* Increases default root font size so all rem classes scale up */
 }
 
 @layer utilities {

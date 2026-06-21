@@ -86,6 +86,20 @@
       },
       "required": ["clientName", "type", "businessName", "createdAt", "data"]
     },
+    "SavedPrompt": {
+      "title": "Saved Student Prompt",
+      "description": "Student generated and stored full prompt with industry annotations",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The student user ID" },
+        "industry": { "type": "string", "description": "The industry/niche of the prompt" },
+        "promptText": { "type": "string", "description": "The exact full compiled prompt" },
+        "websiteType": { "type": "string", "enum": ["landing", "ecommerce"] },
+        "businessName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["userId", "industry", "promptText", "websiteType", "createdAt"]
+    },
     "AppSettings": {
       "title": "Application Settings",
       "description": "Dynamic configurations for prompt generator templates, shufflers, and modular options",
@@ -118,6 +132,10 @@
     "/kycb_questionnaires/{questionnaireId}": {
       "schema": { "$ref": "#/entities/KycbQuestionnaire" },
       "description": "Questionnaire sheets for active client systems."
+    },
+    "/saved_prompts/{promptId}": {
+      "schema": { "$ref": "#/entities/SavedPrompt" },
+      "description": "Exhaustive developer prompts saved by students."
     }
   }
 }

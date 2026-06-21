@@ -1,7 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { Copy, Check, Sparkles, Globe, ShoppingBag, Code, ArrowRight, Download, RefreshCw, AlertCircle, Layers, Clipboard, HelpCircle, X } from 'lucide-react';
+import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import { 
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  query, 
+  where, 
+  serverTimestamp,
+  doc,
+  getDocs
+} from 'firebase/firestore';
+import { 
+  Copy, 
+  Check, 
+  Sparkles, 
+  Globe, 
+  ShoppingBag, 
+  Code, 
+  ArrowRight, 
+  Download, 
+  RefreshCw, 
+  AlertCircle, 
+  Layers, 
+  Clipboard, 
+  X, 
+  FolderHeart, 
+  Save, 
+  Trash2, 
+  BookOpen, 
+  Briefcase 
+} from 'lucide-react';
 
 interface PromptGeneratorProps {
   isLocked?: boolean;
@@ -13,33 +42,28 @@ interface FullTemplate {
   template: string;
 }
 
-interface ModularTemplate {
-  id: string;
-  name: string;
-  type: 'landing' | 'ecommerce' | 'any';
-  description: string;
-  template: string;
-}
-
 const PRESETS = [
   {
     name: 'Luxe Flora',
     type: 'ecommerce',
+    industry: 'Floristry & Gifting Boutique',
     desc: 'Luxe Flora - A premium boutique flower delivery service based in Manchester. We specialize in luxury organic roses, seasonal hand-wrapped wildflower bouquets, and hand-poured aromatherapy soy candles. Target audience: Couples, event planners, and luxury gifts buyers. Brand vibe: Minimalist, clean, elegant, with soft pink, sage green, and warm cream palettes. Font pairing: Playfair Display for headings and Inter for description copy.'
   },
   {
     name: 'Apex Strength Gear',
     type: 'ecommerce',
+    industry: 'Strength & Athletics Equipment',
     desc: 'Apex Strength Gear - High-performance weightlifting gear and wraps designed for powerlifters and strength athletes. Products include neoprene knee sleeves, heavy-duty lever lifting belts, wrist wraps, and industrial-strength athletic shirts. Target audience: Intense gym-goers, competitive weightlifters. Brand vibe: Aggressive, high-contrast, modern brutalist, industrial charcoal dark background, with glowing amber-yellow accents. Font pairing: Space Grotesk and Fira Code.'
   },
   {
     name: 'EcoClean Janitor Services',
     type: 'landing',
+    industry: 'Eco-Friendly Cleaning Services',
     desc: 'EcoClean Solutions - A neighborhood-first commercial and residential cleaning service using 100% biodegradable, certified non-toxic green cleaning formulas. Based in Vancouver. Target audience: Health-conscious families, local boutique retail stores, and offices wanting sustainable corporate social responsibility. Brand vibe: Trustworthy, fresh, light, featuring vibrant forest green and sky blue highlights on a pure off-white canvas. Font pairing: Outfit and Inter.'
   }
 ];
 
-// High fidelity default fallback full templates if admin hasn't created any
+// Fallback high-fidelity full templates
 const FALLBACK_LP_TEMPLATE = `System Instruction:
 You are an expert senior web designer, brand strategist, and front-end developer specializing in High-Converting modern Landing Pages. Your job is to draft a comprehensive, step-by-step production plan and compile the production-ready code for a stunning custom website based on the following business profile:
 
@@ -126,51 +150,302 @@ PHASE 4: CLIENT-SIDE STATE MANAGEMENT SPECIFICATION
 PHASE 5: HIGH-QUALITY CODE GENERATION GUIDE USING REACT & TAILWIND
 - Outline clean React functional templates incorporating lucide-react icons and standard Tailwind UI utilities.`;
 
-const FALLBACK_MODULAR_TEMPLATES: ModularTemplate[] = [
-  {
-    id: 'mod_1',
-    name: 'Hero Section Refinement Card',
-    type: 'any',
-    description: 'Perfect for tuning the primary focus segment, custom call-to-actions, and background stylizations.',
-    template: 'Optimize the Hero focal component for {name} based in {location}. Rewrite the primary headline to be highly conversational, propose a soft-focused radial glassmorphism container, and add dual response buttons that animate with custom hover translates.'
+interface ModularPromptItem {
+  sectionName: string;
+  description: string;
+  prompt: string;
+}
+
+const MODULAR_PROMPTS_MATRIX: Record<string, Record<string, ModularPromptItem[]>> = {
+  visuals: {
+    healthcare: [
+      {
+        sectionName: "Hero Banner Segment with Doctor Trust Indicators",
+        description: "Focuses on developing a trustworthy visual hero section featuring modern patient appointment links.",
+        prompt: "System Instruction:\nYou are an expert UI designer. Generate a high-converting Hero banner section for a health/medical platform. Structure a 2-column layout. Column 1: A premium typography pairing (Outfit for display, Inter for body) stating a clear patient-first value proposition, with dual-actions for 'Schedule Online' and 'Our Doctors' styled as bold pills. Column 2: A floating glassmorphic clinic details card with green ambient badges indicating '24/7 Support Available' and 'Verified Medical Partners'. Use a clean, sterile teal and pure off-white color scheme."
+      },
+      {
+        sectionName: "Clinical Departments Grid with Hover Transitions",
+        description: "Creates an interactive layout for medical departments or specialties with elegant icon overlays.",
+        prompt: "System Instruction:\nDesign a beautiful, responsive 4-column clinical specialties grid. Each card must feature a micro-hover scale effect, generous padding, custom lucide-react icons (Stethoscope, Heart, Brain, Baby), a bold Department title, and a list of key treatable symptoms. Style with high-contrast slate background, border outlines, and subtle glow highlights."
+      },
+      {
+        sectionName: "Interactive Specialist Profiles Carousel",
+        description: "Layout for physician profiles with filters, rating scores, and direct booking click prompts.",
+        prompt: "System Instruction:\nDraft a modular physician spotlight section. Structure responsive cards each with an circular verified profile avatar, verified medical credentials, custom experience metrics, and a direct reservation link. Animate card exits with smooth fade transitions."
+      }
+    ],
+    realestate: [
+      {
+        sectionName: "Grand Residential Hero Portfolio View",
+        description: "Designs a massive high-contrast slider layout for luxury properties.",
+        prompt: "System Instruction:\nCraft a visually stunning luxury Real Estate Hero layout. Propose an asymmetric split banner featuring a high-definition property backdrop, glassmorphism info box outlining 'Price', 'Location', and 'Beds/Baths' metrics, and a premium sliding dark button 'Schedule Private Viewing'."
+      },
+      {
+        sectionName: "Bento Grid Property Showcase",
+        description: "Features different listings in a modern, mismatched bento grid format.",
+        prompt: "System Instruction:\nBuild an asymmetric 3-column Bento Grid container showcasing premier residential properties. Ensure the center card occupies double height/width for featured listings, featuring tag badges like 'Hot Deal' or 'Newly Listed', with elegant background gradient overlays."
+      },
+      {
+        sectionName: "Neighborhood Highlights Interactive Card",
+        description: "Section to highlight nearby schools, parks, and convenience facilities.",
+        prompt: "System Instruction:\nDesign a neighborhood lifestyle section. Create a 3-part layout showcasing nearby amenities (Schools, Transit, Dining) using bold metrics, custom service cards, and rich spacing."
+      }
+    ],
+    ecommerce: [
+      {
+        sectionName: "Luxury Boutique Welcome Hero banner",
+        description: "Premium welcome slider showcasing high-end products with minimal designs.",
+        prompt: "System Instruction:\nGenerate a minimalist fashion eCommerce Hero section. Style a pure Warm Sand background, featuring large editorial serif headings, high-contrast black action buttons with immediate scale-on-hover triggers, and secondary luxury brand attributes."
+      },
+      {
+        sectionName: "Category Spotlight Bubble Grid",
+        description: "Visual entry points for browsing different shop categories.",
+        prompt: "System Instruction:\nDesign a gorgeous Category Grid displaying shop highlights (e.g. Summer Collections, Accessories, Footwear). Use rounded borders, center brand labels, and zoom effects on mouse enter."
+      },
+      {
+        sectionName: "Premium Product Detail Hero Focal Panel",
+        description: "Focus layout to highlight a single flagship product with color options.",
+        prompt: "System Instruction:\nFormulate an premium 2-column flagship product detail layout. Include interactive color picker dots, clear price discount indicators, verified stock labels, and a striking 'Add to Shopping Bag' button."
+      }
+    ],
+    software: [
+      {
+        sectionName: "Modern SaaS Console Hero Section",
+        description: "Visual mock-up of an app dashboard inside a clean browser shell.",
+        prompt: "System Instruction:\nDesign a high-tech SaaS Hero container. Left side: Bold premium font 'Space Grotesk' headings emphasizing developer speed, with orange accents and verified security badges. Right side: A stunning glass-look mockup showcasing metric charts and telemetry summaries."
+      },
+      {
+        sectionName: "Integration Partners Logo Cloud",
+        description: "Smooth horizontal ticker showing logos of supported software tools.",
+        prompt: "System Instruction:\nBuild a clean horizontal list of client/partner integration logo clouds. Use grayscale utility filters that transition to colored on hover, framed with subtle gradients for a fading infinite scroll feeling."
+      },
+      {
+        sectionName: "Features Bento Grid Block",
+        description: "Arranges technical feature benefits in a clean interactive grid.",
+        prompt: "System Instruction:\nCreate a high-contrast developer feature Bento Grid with responsive cards. Each grid block represents a SaaS solution with custom JetBrains Mono code tags, and border glowing animations."
+      }
+    ],
+    services: [
+      {
+        sectionName: "Home Services Hero with Instant Quote Input",
+        description: "Hero split section with a quick ZIP-code check or cost estimator.",
+        prompt: "System Instruction:\nCraft a Commercial Services Hero interface. Include an instant booking ZIP code validator form to verify service range availability, a clear rating gauge ('5-Star Rated Neighborhood Cleaner'), and a bold CTA button."
+      },
+      {
+        sectionName: "Service Coverage Area Flex Grid",
+        description: "Visual layout showing regions and neighborhoods served with maps references.",
+        prompt: "System Instruction:\nBuild a multi-region service coverage area selector. Structure elegant cards indicating service availability, with checkmark indicators and customized regional guides."
+      },
+      {
+        sectionName: "Before & After Interactive Work Card",
+        description: "Showcases professional work quality using slider elements.",
+        prompt: "System Instruction:\nDesign a high-fidelity 'Before & After' work gallery section. Propose clean slider controls to swap images, with descriptive results cards, metrics achieved, and a free estimate request form."
+      }
+    ]
   },
-  {
-    id: 'mod_2',
-    name: 'High-Impact Bento Grid Benefits',
-    type: 'landing',
-    description: 'Structure user advantages & service proofs inside an asymmetrical modern bento framework.',
-    template: 'Design an premium 3-column asymmetrical Bento Grid section detailing key benefits of {name} utilizing beautiful card headers, custom icons, and individual border glow parameters. Ensure full standard responsiveness.'
+  interactivity: {
+    healthcare: [
+      {
+        sectionName: "Dynamic Patient Booking System Popup",
+        description: "Appointment scheduling layout with step indicators and slot selection.",
+        prompt: "System Instruction:\nExplain the React state flow and render the UI code for a modern patient booking modal. Show calendar date slots, specialty departments list, physician selects, and secure submit actions."
+      },
+      {
+        sectionName: "Interactive Diagnosis Helper Card",
+        description: "Self-screening quiz layout to point patients to the right specialty.",
+        prompt: "System Instruction:\nFormulate a clinical diagnostic recommendation wizard component. Create clean radio select groups, step progress bar, and final customized care recommendations with matching doctor booking triggers."
+      },
+      {
+        sectionName: "Patient Portal Intake Form Sheet",
+        description: "Secure intake forms with validation and private-data protection notices.",
+        prompt: "System Instruction:\nBuild a beautiful patient registration form sheet. Create organized grid fields for profile info, medical history, and pre-arrival questionnaires, styled with clear visual validation boundaries."
+      }
+    ],
+    realestate: [
+      {
+        sectionName: "Direct Property Tour Coordinator Panel",
+        description: "Appointment scheduler specifically tailored for scheduling on-site visits.",
+        prompt: "System Instruction:\nCreate a dynamic property showing booking panel. Allow prospects to choose 'In Person' or 'Virtual Video Tour', picker dates, preferred tour hours, and direct phone/email contact fields."
+      },
+      {
+        sectionName: "Real Estate Financial Estimator",
+        description: "An interactive calculator to estimate monthly mortgage or installment rates.",
+        prompt: "System Instruction:\nDraft a mortgage installment estimator widget. Structure slider components for 'Property Valuation', 'Down Payment', and 'Interest Rate'. Provide instant calculations for monthly billing fees on change."
+      },
+      {
+        sectionName: "Agent Consultation Chat Overlay",
+        description: "Live consultation widget simulating real agent chat queues.",
+        prompt: "System Instruction:\nCreate an interactive expert agent callback drawer. Features circular expert profile photos, list of active agents, custom messaging inputs, and instant callback scheduler."
+      }
+    ],
+    ecommerce: [
+      {
+        sectionName: "Mini Shopping Cart Drawer with Quantity Modifiers",
+        description: "A sliding side-panel list of items in cart with real-time math calculations.",
+        prompt: "System Instruction:\nDesign a professional persistent shopping cart slide-drawer. Features additions and subtractions of items, automatic coupon input field, dynamic line item subtotals, and a direct Checkout button."
+      },
+      {
+        sectionName: "Inside Checkout Order Wizard",
+        description: "Fast customer checkout experience with validation and card input fields.",
+        prompt: "System Instruction:\nDraft a multi-step checkout form flow. Step 1: Shipment address; Step 2: Payment options with custom security icons; Step 3: Receipt order checklist. Include responsive validation states."
+      },
+      {
+        sectionName: "Product Grid Filter Sidebar",
+        description: "Sidebar with slider for price, checkboxes for categories and colors.",
+        prompt: "System Instruction:\nStructure an exhaustive Catalog Filtering sidebar. Include checkboxes for Brand Collections, range sliders for Price, color swatch bubble selectors, and clear-all filter buttons."
+      }
+    ],
+    software: [
+      {
+        sectionName: "Dynamic SaaS Pricing Slider with Tier Calculator",
+        description: "Slide to select active users and see pricing changes across all tiers.",
+        prompt: "System Instruction:\nDesign a beautiful SaaS price level calculator sliding widget. As the range bar slides (e.g. from 10 to 1000 users), adjust dynamic prices for Hobbyist, Growth, and Unlimited tiers instantly with custom highlighted tags."
+      },
+      {
+        sectionName: "Interactive Live API Code Snippet Switcher",
+        description: "Selector to change code languages between JS, Python, Go in a styled terminal.",
+        prompt: "System Instruction:\nBuild a high-fidelity code playground viewer. Include tabs for 'Node.js', 'Python', 'Go'. When users swap tabs, display custom syntax-colored blocks in a styled console with copy-code buttons."
+      },
+      {
+        sectionName: "Interactive Feature Accordion Tabs",
+        description: "Swaps active feature tabs with screenshot mockups or diagrams beautifully.",
+        prompt: "System Instruction:\nCraft a modern tabbed features panel. Left side: lists 3 product characteristics. On clicking a characteristic, scale up the title and update the right-side graphic mock representation."
+      }
+    ],
+    services: [
+      {
+        sectionName: "Dynamic Service Cost Calculator Flow",
+        description: "Form selector to choose room count, service frequency and compute live prices.",
+        prompt: "System Instruction:\nCreate a commercial cost calculator form. Let the client select 'Rooms to Clean', 'Service Frequency (weekly, biweekly)', and compute direct subtotal estimates with checkout booking buttons."
+      },
+      {
+        sectionName: "Zip Code Serviceability Checker Form",
+        description: "Instant address verification form displaying custom success or waitlist cards.",
+        prompt: "System Instruction:\nDesign a Zip Code Checker container. Users type their area ZIP code. On submit, play a temporary loading state, then render either a green approved service badge or a waitlist signup form."
+      },
+      {
+        sectionName: "Interactive Cleaning Package Selector Grid",
+        description: "Sleek tab control comparing Deep Clean, Standard Clean, and Office packages.",
+        prompt: "System Instruction:\nBuild a beautiful service standard package selector tab layout. Swapping tabs updates direct feature comparison checklist grids with matching price metrics and booking links."
+      }
+    ]
   },
-  {
-    id: 'mod_3',
-    name: 'Smart Dynamic Shopping Cart Drawer',
-    type: 'ecommerce',
-    description: 'Polish checkout entry points and persistent sliding panels.',
-    template: 'Explain the state mechanisms and layout steps to implement a sleek persistent slide-out shopping cart for {name}. Include standard quantity modifiers, discount calculation sections, subtotal tags, and direct checkout call-to-action triggers styled with Tailwind CSS.'
-  },
-  {
-    id: 'mod_4',
-    name: 'Interactive Accordion FAQ',
-    type: 'any',
-    description: 'Handles customer questions with smooth micro-interaction expandable tabs.',
-    template: 'Formulate an elegant accordion FAQ list containing 4 critical answers tailored to {name}. Build with clean state controllers, micro-animations on expands, and highlighted border outlines.'
+  conversion: {
+    healthcare: [
+      {
+        sectionName: "Clinic Trust Seals & Accreditation Cloud",
+        description: "Showcases verified hospital partner logos, HIPAA compliance tags, and clinic awards.",
+        prompt: "System Instruction:\nFormulate a trustworthy medical accreditation cloud. Render high-contrast custom badges for 'HIPAA Compliant', 'Certified Pediatric Care', and national hospital partner outlines."
+      },
+      {
+        sectionName: "Patient Verified Testimonials Carousel",
+        description: "Elegant testimonial card slider with high patient satisfaction scores.",
+        prompt: "System Instruction:\nDesign a verified patient success carousel. Display high ratings, patient quote, and doctor response segments to establish strong professional credibility."
+      },
+      {
+        sectionName: "Comprehensive FAQ Accordion with Clinic Policies",
+        description: "Collapsible accordion addressing clinical payments, medical insurance, and parking details.",
+        prompt: "System Instruction:\nCraft a robust medical FAQ accordion. Pre-populate 4 critical clinical queries regarding insurance support and appointment rescheduling constraints with highlight effects."
+      }
+    ],
+    realestate: [
+      {
+        sectionName: "Realtor Sales Performance Stats Grid",
+        description: "Sleek card showcasing total deals closed, years expert, and average buyer reviews.",
+        prompt: "System Instruction:\nDesign a high-contrast Agent Performance statistics strip. Use large bold display digits (e.g. '98%', '$400M+') reporting verified sales volume, with subtle descriptors."
+      },
+      {
+        sectionName: "Client Success Story Spotlight & Video Tour Review",
+        description: "Deep testimonial layout highlighting real families purchasing homes.",
+        prompt: "System Instruction:\nBuild a house-buying success spotlight section. Features family quote, custom profile tags, pictures of bought home, and direct review references."
+      },
+      {
+        sectionName: "Real Estate Trust & Risk Reversal Guarantees",
+        description: "Cards outlining professional agent fiduciary duties, free valuations, and escrow protections.",
+        prompt: "System Instruction:\nFormulate a real estate trust and warranty feature row. Present 3 primary fiduciary guarantees using bold outlines, certified seals, and premium typography."
+      }
+    ],
+    ecommerce: [
+      {
+        sectionName: "E-Commerce Risk Reversal Guarantees Banner",
+        description: "Row of quick tags confirming free delivery, money-back guarantees, and secure gateways.",
+        prompt: "System Instruction:\nConstruct a prominent eCommerce trust guarantee strip. Highlight 'Free 30-Day Returns', '100% Organic Cotton Certified', and 'SSL Encrypted Payment' badges with clean spacing."
+      },
+      {
+        sectionName: "Dynamic Verified Buyer Review Grid with Avatars",
+        description: "Visual masonry grid of customer reviews with verified purchase badges.",
+        prompt: "System Instruction:\nDesign an verified buyer reviews masonry grid. Render modern feedback cards showing star ratings, profile photos, and 'Verified Buyer' green indicators."
+      },
+      {
+        sectionName: "Dynamic Product FAQ & Guarantee Checklist",
+        description: "Combines product FAQs with shipment time grids to prevent checkout drop-offs.",
+        prompt: "System Instruction:\nStructure an in-context shopping checkout FAQ grid. List answers to common freight constraints, delivery times, and size exchanges to maximize conversion."
+      }
+    ],
+    software: [
+      {
+        sectionName: "Interactive Enterprise Pricing Table with Sliders",
+        description: "High-conversion billing cards comparing free, pro, and custom setup tiers.",
+        prompt: "System Instruction:\nCraft a high-converting dual pricing card grid. Feature a dominant 'Most Popular' Pro card overlay with animated premium glowing border options and clear call-to-actions."
+      },
+      {
+        sectionName: "GDPR, SOC2, & Security Compliance Trust Badge Strip",
+        description: "Grid of technical trust indicators such as SOC2 certified, GDPR compliant, and 256-bit encryption.",
+        prompt: "System Instruction:\nDesign a security-first developer trust badge strip. Feature custom layouts indicating SOC2, ISO 27001, and HIPAA compliance to build trust with technical buyers."
+      },
+      {
+        sectionName: "Case Study Snippet Highlight & Success Metrics",
+        description: "Clean bento section proving 10x developer velocity or 40% cloud cost savings.",
+        prompt: "System Instruction:\nBuild a customer case study spotlight grid. Showcase a clear developer success statement, verified telemetry graphs, and client referral signatures."
+      }
+    ],
+    services: [
+      {
+        sectionName: "Satisfaction Guarantee Trust Seal Area",
+        description: "Highlighting bonded & insured certifications, police-checked cleaners, and money-back vows.",
+        prompt: "System Instruction:\nFormulate an official home service trust and license board. Present clear seals for 'Fully Bonded & Insured', 'Background Checked Professionals', and 'Satisfaction Guarantee' outlines."
+      },
+      {
+        sectionName: "Customer Love Gallery & Stars",
+        description: "Aggregates localized Google Maps and Yelp reviews with high ranking scores.",
+        prompt: "System Instruction:\nDesign a neighborhood review carousel pulling local yelp/google star reviews. Highlight client suburb location, rating stars, and exact helpfulness check tags with generous padding."
+      },
+      {
+        sectionName: "Transparent Service Booking Policy & FAQs",
+        description: "FAQ grid resolving queries about keys, pet-safety, and cleaning equipment requirements.",
+        prompt: "System Instruction:\nCreate a commercial service booking FAQ panel. Address concerns about room key management, pet-friendly cleaning chemicals, and customized service rescheduling limits in a pristine accordion format."
+      }
+    ]
   }
-];
+};
 
 export default function PromptGenerator({ isLocked = false }: PromptGeneratorProps) {
+  // Navigation states
+  const [promptMode, setPromptMode] = useState<'full' | 'modular'>('full');
+
+  // Full Prompt states
   const [websiteType, setWebsiteType] = useState<'landing' | 'ecommerce'>('landing');
   const [businessInfo, setBusinessInfo] = useState('');
+  const [fullIndustry, setFullIndustry] = useState('');
   const [generatedPrompt, setGeneratedPrompt] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
 
-  // Firestore templates states
+  // Modular Prompt exploration states
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedIndustry, setSelectedIndustry] = useState<string>('');
+
+  // Firestore templates configurations
   const [customLpTemplates, setCustomLpTemplates] = useState<FullTemplate[]>([]);
   const [customEcTemplates, setCustomEcTemplates] = useState<FullTemplate[]>([]);
-  const [customModTemplates, setCustomModTemplates] = useState<ModularTemplate[]>([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
 
-  // States for active modular modal popup
+  // Stored Prompt lists inside Firestore Vault
+  const [savedPrompts, setSavedPrompts] = useState<any[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Active modal popups
   const [activeModPopup, setActiveModPopup] = useState<{
     name: string;
     description: string;
@@ -179,35 +454,59 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
   } | null>(null);
   const [modCopySuccess, setModCopySuccess] = useState(false);
 
-  // 1. Fetch Admin templates from Firestore
+  // 1. Fetch any Admin templates from Firestore Settings (for shuffler options)
   useEffect(() => {
-    async function fetchTemplates() {
-      setLoadingTemplates(true);
+    async function fetchAdminTemplates() {
       try {
         const fullDocRef = doc(db, 'settings', 'full_prompts');
-        const fullSnap = await getDoc(fullDocRef);
-        if (fullSnap.exists()) {
-          const data = fullSnap.data();
+        const fullSnap = await getDocs(collection(db, 'settings'));
+        const configDoc = fullSnap.docs.find(d => d.id === 'full_prompts');
+        if (configDoc && configDoc.exists()) {
+          const data = configDoc.data();
           setCustomLpTemplates(data.landing || []);
           setCustomEcTemplates(data.ecommerce || []);
         }
-
-        const modDocRef = doc(db, 'settings', 'modular_prompts');
-        const modSnap = await getDoc(modDocRef);
-        if (modSnap.exists()) {
-          const data = modSnap.data();
-          setCustomModTemplates(data.templates || []);
-        }
       } catch (err) {
-        console.error("Error reading admin configured prompts:", err);
-      } finally {
-        setLoadingTemplates(false);
+        console.error("Admin prompt retrieval skipped, falling back:", err);
       }
     }
-    fetchTemplates();
+    fetchAdminTemplates();
   }, []);
 
-  // Parse key details for high-fidelity fallback placeholder injection
+  // 2. Load Student's Stored Prompt Archives from own Firestore Collection
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setLoadingSaved(true);
+    // Standard Firestore query mapping to student owner uid
+    const qSnapshot = query(
+      collection(db, 'saved_prompts'),
+      where('userId', '==', user.uid)
+    );
+
+    const unsubscribe = onSnapshot(qSnapshot, (snapshot) => {
+      const list = snapshot.docs.map(dRef => {
+        const itemData = dRef.data();
+        return {
+          id: dRef.id,
+          ...itemData,
+          createdDate: itemData.createdAt?.toDate ? itemData.createdAt.toDate() : new Date()
+        };
+      });
+      // Sort in-memory descending by createdDate safely to avoid Firestore index configuration requirements
+      list.sort((a, b) => b.createdDate.getTime() - a.createdDate.getTime());
+      setSavedPrompts(list);
+      setLoadingSaved(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'saved_prompts');
+      setLoadingSaved(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Wildcard parsing
   const extractDetail = (text: string, label: string, fallback: string) => {
     if (!text) return fallback;
     const lines = text.split(/[.\n]+/);
@@ -232,15 +531,17 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
   const handleApplyPreset = (preset: typeof PRESETS[0]) => {
     setWebsiteType(preset.type as 'landing' | 'ecommerce');
     setBusinessInfo(preset.desc);
+    setFullIndustry(preset.industry);
     setGeneratedPrompt('');
   };
 
   const handleClear = () => {
     setBusinessInfo('');
+    setFullIndustry('');
     setGeneratedPrompt('');
   };
 
-  // 2. Main Shuffling compile handler
+  // Full Prompt compiler
   const handleCompilePrompt = () => {
     if (!businessInfo.trim()) {
       alert("Please paste some details about your business first!");
@@ -248,23 +549,19 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
     }
 
     setIsCompiling(true);
-
     const { name: bizName, location: bizLocation, vibe: bizVibe } = currentParams;
 
     setTimeout(() => {
       let selectedTemplateText = '';
 
       if (websiteType === 'landing') {
-        // If there are admin configured templates for landing pages, shuffle and pick one.
         if (customLpTemplates.length > 0) {
           const randomIndex = Math.floor(Math.random() * customLpTemplates.length);
           selectedTemplateText = customLpTemplates[randomIndex].template;
         } else {
-          // Fallback to beautiful standard template
           selectedTemplateText = FALLBACK_LP_TEMPLATE;
         }
       } else {
-        // Shuffling eCommerce configurations
         if (customEcTemplates.length > 0) {
           const randomIndex = Math.floor(Math.random() * customEcTemplates.length);
           selectedTemplateText = customEcTemplates[randomIndex].template;
@@ -273,7 +570,6 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
         }
       }
 
-      // Perform Tailoring wildcard replacements
       const promptText = selectedTemplateText
         .replace(/{name}/g, bizName)
         .replace(/{location}/g, bizLocation)
@@ -282,7 +578,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
 
       setGeneratedPrompt(promptText);
       setIsCompiling(false);
-    }, 750);
+    }, 600);
   };
 
   const handleCopy = () => {
@@ -301,26 +597,63 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
     document.body.removeChild(element);
   };
 
-  // Modular Suggestion card calculation
-  const currentModularSuggestions = React.useMemo(() => {
-    const list = customModTemplates.length > 0 ? customModTemplates : FALLBACK_MODULAR_TEMPLATES;
-    return list.filter(item => item.type === 'any' || item.type === websiteType);
-  }, [customModTemplates, websiteType]);
+  // Save full prompt to Firestore Stored Archives
+  const handleSaveFullPrompt = async () => {
+    if (!generatedPrompt) {
+      alert("Please generate a developer prompt first!");
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Authentication required. Please log in to store prompts.");
+      return;
+    }
+    if (!fullIndustry.trim()) {
+      alert("Please specify or annotate the Industry this prompt belongs to before saving!");
+      return;
+    }
 
-  const handleTriggerModularPopup = (mod: ModularTemplate) => {
-    const { name: bizName, location: bizLocation, vibe: bizVibe } = currentParams;
-    const compiled = mod.template
-      .replace(/{name}/g, bizName)
-      .replace(/{location}/g, bizLocation)
-      .replace(/{vibe}/g, bizVibe)
-      .replace(/{details}/g, businessInfo);
+    setIsSaving(true);
+    try {
+      const { name: bizName } = currentParams;
+      const docData = {
+        userId: user.uid,
+        industry: fullIndustry.trim(),
+        promptText: generatedPrompt,
+        websiteType: websiteType,
+        businessName: bizName || "Custom Brand Business",
+        createdAt: serverTimestamp()
+      };
 
-    setActiveModPopup({
-      name: mod.name,
-      description: mod.description,
-      rawTemplate: mod.template,
-      compiledPrompt: compiled
-    });
+      await addDoc(collection(db, 'saved_prompts'), docData);
+      alert(`Prompt successfully saved under "${fullIndustry}" in your Stored Prompts Vault!`);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'saved_prompts');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Delete Prompt from Firestore
+  const handleDeleteSavedPrompt = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this prompt from your saved collection?")) {
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'saved_prompts', id));
+      alert("Prompt deleted successfully from your Vault.");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `saved_prompts/${id}`);
+    }
+  };
+
+  // Load Prompt into active editor
+  const handleLoadSavedPrompt = (item: any) => {
+    setWebsiteType(item.websiteType);
+    setFullIndustry(item.industry);
+    setGeneratedPrompt(item.promptText);
+    alert(`Loaded saved prompt for ${item.businessName} (${item.industry})!`);
   };
 
   const handleCopyModPrompt = () => {
@@ -332,15 +665,15 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
 
   if (isLocked) {
     return (
-      <div className="bg-white border border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans text-left">
-        <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <AlertCircle className="w-8 h-8 text-rose-500" />
+      <div className="bg-white border-2 border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans text-left">
+        <div className="w-20 h-20 bg-rose-50 border-2 border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <AlertCircle className="w-10 h-10 text-rose-500" />
         </div>
-        <h3 className="text-xl font-black text-slate-800 tracking-tight">Website Prompt Generator Locked</h3>
-        <p className="text-slate-500 mt-3 text-sm leading-relaxed font-semibold">
+        <h3 className="text-2xl font-black text-slate-800 tracking-tight">Website Prompt Generator Locked</h3>
+        <p className="text-slate-500 mt-3 text-lg leading-relaxed font-semibold">
           This customized workshop tool is temporarily locked by the course administrators. Unlocks are periodically timed with curriculum milestones. Please reach out to your CIYA instructor for guidance.
         </p>
-        <div className="mt-8 pt-6 border-t border-slate-100 flex justify-center items-center gap-2 text-xs text-slate-400 font-bold">
+        <div className="mt-8 pt-6 border-t border-slate-100 flex justify-center items-center gap-2 text-sm text-slate-400 font-bold">
           <span>🛡️ CIYA Guarded Academy Portal</span>
         </div>
       </div>
@@ -348,275 +681,537 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto font-sans pb-20 text-left">
+    <div className="space-y-8 max-w-7xl mx-auto font-sans pb-24 text-left leading-relaxed">
+      
       {/* Intro Header */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-md border border-slate-800">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-xs font-black text-teal-400">
-            <Sparkles className="w-3.5 h-3.5" /> Prompt Generator Lab
+      <div className="bg-slate-900 text-white rounded-3xl p-8 md:p-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-md border-2 border-slate-800">
+        <div className="space-y-4">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-500/10 border-2 border-teal-500/20 text-sm font-black text-teal-400">
+            <Sparkles className="w-4 h-4" /> Prompt Generator Lab
           </div>
-          <h2 className="text-xl md:text-2xl font-black tracking-tight text-white">Dynamic AI Prompt Architect</h2>
-          <p className="text-xs md:text-sm text-slate-400 leading-relaxed max-w-2xl font-semibold">
-            Convert standard raw business details into exhaustive, industrial-strength developer prompt models. Paste your KYCB notes or ideas below to instantly assemble custom visual styling and architecture specifications.
+          <h2 className="text-2xl md:text-3.5xl font-black tracking-tight text-white">Dynamic AI Prompt Architect</h2>
+          <p className="text-base md:text-lg text-slate-350 leading-relaxed max-w-4xl font-semibold">
+            Convert raw commercial configurations and target details into exhaustive, developer prompts. Choose between comprehensive workspace prompts or load selective category & industry modular codes to redesign micro-components.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Input panel */}
-        <div className="lg:col-span-12 xl:col-span-5 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-5">
-          <div className="space-y-2">
-            <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">1. Select Website Category</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setWebsiteType('landing')}
-                className={`py-3 px-4 rounded-xl text-xs font-black border transition-all flex items-center justify-center gap-2 cursor-pointer outline-none ${
-                  websiteType === 'landing'
-                    ? 'bg-teal-50 text-teal-700 border-teal-600 shadow-sm font-black'
-                    : 'bg-transparent text-slate-500 border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <Globe className="w-4 h-4" />
-                Landing Page
-              </button>
-              <button
-                type="button"
-                onClick={() => setWebsiteType('ecommerce')}
-                className={`py-3 px-4 rounded-xl text-xs font-black border transition-all flex items-center justify-center gap-2 cursor-pointer outline-none ${
-                  websiteType === 'ecommerce'
-                    ? 'bg-teal-50 text-teal-700 border-teal-600 shadow-sm font-black'
-                    : 'bg-transparent text-slate-500 border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <ShoppingBag className="w-4 h-4" />
-                eCommerce Hub
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">2. Raw Business Description or Ideas</label>
-              <button 
-                type="button"
-                onClick={handleClear}
-                className="text-[10px] uppercase font-bold text-slate-400 hover:text-red-500 transition-colors bg-transparent border-0 cursor-pointer"
-              >
-                Clear Field
-              </button>
-            </div>
-            <textarea
-              value={businessInfo}
-              onChange={(e) => setBusinessInfo(e.target.value)}
-              placeholder="Paste details about your client's business here (e.g. name, location, products, target customers, preferred colors, logo style, custom features)..."
-              rows={8}
-              className="w-full text-xs bg-slate-50/50 hover:bg-slate-50/80 border border-slate-200 rounded-xl p-4 text-slate-800 font-medium placeholder:text-slate-400 outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all font-sans leading-relaxed"
-            />
-          </div>
-
-          {/* Quick presets list */}
-          <div className="space-y-2 pt-2 border-t border-slate-100">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Need an idea? Try a workshop preset:</span>
-            <div className="grid grid-cols-1 gap-2">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.name}
-                  type="button"
-                  onClick={() => handleApplyPreset(p)}
-                  className="text-left text-xs p-3 rounded-xl border border-slate-150 hover:border-teal-300 hover:bg-teal-50/20 text-slate-700 bg-white cursor-pointer transition-all flex justify-between items-center shadow-sm hover:shadow-md"
-                >
-                  <div className="space-y-0.5 max-w-[85%]">
-                    <span className="font-extrabold text-slate-800 text-xs block">{p.name}</span>
-                    <span className="text-[10px] text-slate-500 truncate block">{p.desc}</span>
-                  </div>
-                  <span className="text-[9px] font-black bg-slate-100 text-slate-600 px-2 py-0.5 rounded uppercase font-mono tracking-wider">
-                    {p.type === 'landing' ? 'Landing' : 'eCom'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleCompilePrompt}
-            disabled={isCompiling}
-            className="w-full py-4 px-5 bg-teal-600 hover:bg-teal-700 hover:-translate-y-0.5 transition-all outline-none rounded-xl text-white font-black text-xs uppercase tracking-wider shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer border-0"
+      {/* DROPDOWN SELECTOR FOR PROMPT MODE */}
+      <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="space-y-1">
+          <label htmlFor="prompt-mode" className="text-lg md:text-xl font-black tracking-wider uppercase text-slate-700 block">
+            Select Prompt Workspace Mode
+          </label>
+          <p className="text-base md:text-lg text-slate-505 font-bold">
+            Choose complete full workspace prompt generation or select categorized modular refiners.
+          </p>
+        </div>
+        <div className="w-full md:w-auto min-w-[320px]">
+          <select
+            id="prompt-mode"
+            value={promptMode}
+            onChange={(e) => setPromptMode(e.target.value as 'full' | 'modular')}
+            className="w-full bg-slate-50 border-2 border-slate-300 text-slate-900 rounded-2xl px-5 py-4 font-black transition-all outline-none focus:bg-white focus:border-teal-600 focus:ring-4 focus:ring-teal-100 text-lg md:text-xl shadow-inner cursor-pointer"
           >
-            {isCompiling ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                Shuffling & tailoring templates...
-              </>
-            ) : (
-              <>
-                Generate Dynamic Prompt
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Output pane */}
-        <div className="lg:col-span-12 xl:col-span-7 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm min-h-[500px] flex flex-col items-stretch space-y-6">
-          <div className="border-b border-slate-100 pb-4 flex justify-between items-center shrink-0">
-            <div>
-              <span className="text-xs font-black text-slate-700 uppercase tracking-wider block">3. Tailored AI Developer Prompt</span>
-              <span className="text-[10px] text-slate-400 font-bold">Generated from expert admin presets using shuffling. Copy directly into your builder AI!</span>
-            </div>
-            {generatedPrompt && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="flex items-center gap-1 bg-slate-150 hover:bg-teal-50 text-slate-700 hover:text-teal-700 border-0 px-3 py-2 rounded-xl transition-all cursor-pointer font-extrabold text-xs"
-                  title="Copy Prompt to Clipboard"
-                >
-                  {copySuccess ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-teal-600" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      Copy
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border-0 px-3 py-2 rounded-xl transition-all cursor-pointer font-extrabold text-xs"
-                  title="Download File"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Save
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 flex flex-col justify-stretch">
-            {generatedPrompt ? (
-              <div className="space-y-4">
-                <pre className="w-full bg-slate-900 border border-slate-800 text-teal-100/90 text-xs font-mono p-5 rounded-2xl overflow-auto select-all h-[360px] shadow-inner leading-relaxed whitespace-pre-wrap text-left font-semibold">
-                  {generatedPrompt}
-                </pre>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 select-none py-20">
-                <div className="w-12 h-12 rounded-full border border-slate-150 flex items-center justify-center bg-slate-50/50 mb-4 animate-pulse">
-                  <Code className="w-6 h-6 text-slate-300" />
-                </div>
-                <h4 className="text-sm font-black text-slate-700 font-sans">Waiting for Data Output</h4>
-                <p className="text-[11px] text-slate-400 max-w-xs mt-2 leading-relaxed font-bold font-sans">
-                  Select a category, paste details about your business profile on the left, and click generate to assemble customized interactive blueprints.
-                </p>
-              </div>
-            )}
-          </div>
+            <option value="full">✨ Complete Full Prompt Mode</option>
+            <option value="modular">🧱 Category & Industry Modular Refiners</option>
+          </select>
         </div>
       </div>
 
-      {/* MODULAR SUB-PROMPT SUGGESTIONS SECTION */}
-      <div className="bg-slate-50 rounded-3xl p-6 md:p-8 border border-slate-200 mt-6 text-left">
-        <div className="flex items-center gap-2 mb-4 border-b border-slate-200 pb-3">
-          <Layers className="w-5 h-5 text-indigo-600" />
-          <div>
-            <h3 className="font-extrabold text-slate-850 text-sm uppercase tracking-tight">Sectional Refinement Modular Prompts</h3>
-            <p className="text-[11px] text-slate-500 font-bold leading-none mt-1">
-              Select any modular suggestion card below to get tailored sub-prompts for specific segments of your {websiteType === 'landing' ? 'Landing Page' : 'eCommerce Store'}!
-            </p>
-          </div>
-        </div>
+      {/* FULL PROMPT MODE VIEW */}
+      {promptMode === 'full' ? (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Input panel */}
+            <div className="lg:col-span-12 xl:col-span-5 bg-white border-2 border-slate-200 rounded-3xl p-7 shadow-sm space-y-6">
+              
+              <div className="space-y-2">
+                <label className="text-base md:text-lg font-black text-slate-700 uppercase tracking-widest block">
+                  1. Select Website Category
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setWebsiteType('landing')}
+                    className={`py-4 px-5 rounded-2xl text-base font-black border-2 transition-all flex items-center justify-center gap-2 cursor-pointer outline-none ${
+                      websiteType === 'landing'
+                        ? 'bg-teal-50 text-teal-800 border-teal-600 shadow-sm font-black'
+                        : 'bg-transparent text-slate-500 border-slate-205 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Globe className="w-5 h-5" />
+                    Landing Page
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWebsiteType('ecommerce')}
+                    className={`py-4 px-5 rounded-2xl text-base font-black border-2 transition-all flex items-center justify-center gap-2 cursor-pointer outline-none ${
+                      websiteType === 'ecommerce'
+                        ? 'bg-teal-50 text-teal-800 border-teal-600 shadow-sm font-black'
+                        : 'bg-transparent text-slate-500 border-slate-205 hover:bg-slate-50'
+                    }`}
+                  >
+                    <ShoppingBag className="w-5 h-5" />
+                    eCommerce Hub
+                  </button>
+                </div>
+              </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {currentModularSuggestions.map((mod) => (
-            <div 
-              key={mod.id} 
-              onClick={() => handleTriggerModularPopup(mod)}
-              className="bg-white border border-slate-200 hover:border-indigo-400 p-5 rounded-2xl shadow-sm hover:shadow-md cursor-pointer transition-all duration-300 flex flex-col justify-between group"
-            >
-              <div className="space-y-1">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full inline-block">
-                    {mod.type === 'any' ? 'Universal Refiner' : mod.type === 'landing' ? 'Landing Section' : 'eCommerce Section'}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label htmlFor="business-description" className="text-base md:text-lg font-black text-slate-700 uppercase tracking-widest block">
+                    2. Raw Business Description / Details
+                  </label>
+                  <button 
+                    type="button"
+                    onClick={handleClear}
+                    className="text-sm uppercase font-extrabold text-slate-400 hover:text-red-500 transition-colors bg-transparent border-0 cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <textarea
+                  id="business-description"
+                  value={businessInfo}
+                  onChange={(e) => setBusinessInfo(e.target.value)}
+                  placeholder="Paste details about your client's business here (e.g. name, location, products, target customers, preferred colors, logo style, custom features)..."
+                  rows={8}
+                  className="w-full text-base md:text-lg bg-slate-50/50 hover:bg-slate-50/80 border-2 border-slate-200 rounded-2xl p-5 text-slate-800 font-semibold placeholder:text-slate-400 outline-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all font-sans leading-relaxed"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="full-industry" className="text-base md:text-lg font-black text-slate-700 uppercase tracking-widest block">
+                  3. Indicated Industry / Niche <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="full-industry"
+                  value={fullIndustry}
+                  onChange={(e) => setFullIndustry(e.target.value)}
+                  placeholder="e.g. Floristry Boutique, High-End Fitness, Clean Tech..."
+                  className="w-full text-base md:text-lg bg-slate-50/50 hover:bg-slate-50/80 border-2 border-slate-205 rounded-2xl p-4 text-slate-850 font-bold placeholder:text-slate-400 outline-none focus:bg-white focus:border-teal-550 focus:ring-4 focus:ring-teal-100 transition-all font-sans"
+                />
+              </div>
+
+              {/* Quick presets list */}
+              <div className="space-y-3 pt-4 border-t-2 border-slate-100">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-widest block">
+                  Select a practice preset:
+                </span>
+                <div className="grid grid-cols-1 gap-3">
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p.name}
+                      type="button"
+                      onClick={() => handleApplyPreset(p)}
+                      className="text-left text-base p-4 rounded-2xl border-2 border-slate-100 hover:border-teal-300 hover:bg-teal-50/20 text-slate-700 bg-white cursor-pointer transition-all flex justify-between items-center shadow-xs hover:shadow-md"
+                    >
+                      <div className="space-y-1 max-w-[80%]">
+                        <span className="font-extrabold text-slate-900 text-base block">{p.name}</span>
+                        <span className="text-sm text-slate-550 truncate block">{p.desc}</span>
+                        <span className="text-xs font-bold text-teal-600 block">💼 {p.industry}</span>
+                      </div>
+                      <span className="text-xs font-black bg-slate-100 text-slate-650 px-3 py-1 rounded-lg uppercase font-mono tracking-wider">
+                        {p.type === 'landing' ? 'Landing' : 'eCom'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCompilePrompt}
+                disabled={isCompiling}
+                className="w-full py-5 px-6 bg-teal-600 hover:bg-teal-700 hover:-translate-y-0.5 transition-all outline-none rounded-2xl text-white font-black text-base uppercase tracking-wider shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer border-0"
+              >
+                {isCompiling ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Compiling Developer Prompts...
+                  </>
+                ) : (
+                  <>
+                    Generate Dynamic Prompt
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Output panel */}
+            <div className="lg:col-span-12 xl:col-span-7 bg-white border-2 border-slate-200 rounded-3xl p-7 shadow-sm min-h-[550px] flex flex-col items-stretch space-y-6">
+              
+              <div className="border-b-2 border-slate-100 pb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0">
+                <div>
+                  <span className="text-base md:text-lg font-black text-slate-800 uppercase tracking-widest block">
+                    Tailored Workspace Developer Prompt
                   </span>
-                  <span className="text-[10px] text-teal-600 opacity-0 group-hover:opacity-100 transition-opacity font-extrabold">Generate &rarr;</span>
+                  <span className="text-sm text-slate-400 font-bold mt-1 block">
+                    Indestructible instruction set tailored for your compiler.
+                  </span>
                 </div>
-                <h4 className="font-extrabold text-slate-800 text-xs transition-colors group-hover:text-indigo-600">{mod.name}</h4>
-                <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
-                  {mod.description || 'Section refinement prompt modifier.'}
-                </p>
+                {generatedPrompt && (
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCopy}
+                      className="flex items-center gap-2 bg-slate-100 hover:bg-teal-50 text-slate-850 hover:text-teal-800 border-2 border-slate-200 px-4 py-2.5 rounded-xl transition-all cursor-pointer font-extrabold text-base"
+                    >
+                      {copySuccess ? (
+                        <>
+                          <Check className="w-4 h-4 text-teal-650" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          Copy
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border-2 border-slate-200 px-4 py-2.5 rounded-xl transition-all cursor-pointer font-extrabold text-base"
+                    >
+                      <Download className="w-4 h-4" />
+                      Save
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="pt-3 mt-3 border-t border-slate-100 text-[10px] text-slate-400 font-mono truncate">
-                {mod.template}
+
+              <div className="flex-1 flex flex-col justify-stretch">
+                {generatedPrompt ? (
+                  <div className="space-y-6">
+                    <pre className="w-full bg-slate-950 border-2 border-slate-800 text-teal-100 text-base md:text-lg font-mono p-6 rounded-2xl overflow-auto select-all h-[380px] shadow-inner leading-relaxed whitespace-pre-wrap text-left font-semibold">
+                      {generatedPrompt}
+                    </pre>
+
+                    {/* Prominent Save to Vault option */}
+                    <div className="bg-teal-50 border-2 border-teal-200 rounded-3xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-teal-100 text-teal-700 rounded-2xl">
+                          <FolderHeart className="w-7 h-7" />
+                        </div>
+                        <div className="space-y-1 text-left">
+                          <h4 className="text-base md:text-lg font-black text-teal-950 uppercase tracking-tight">Store Prompt in Vault</h4>
+                          <p className="text-sm md:text-base text-teal-700 font-bold">
+                            Save this compiled prompt under industry "<span className="underline font-black">{fullIndustry || 'Not Specified'}</span>" for subsequent studies.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSaveFullPrompt}
+                        disabled={isSaving}
+                        className="w-full sm:w-auto px-6 py-4 bg-teal-700 hover:bg-teal-800 text-white font-black text-base uppercase rounded-2xl border-0 cursor-pointer transition-all flex items-center justify-center gap-2 shadow-md hover:-translate-y-0.5 shrink-0"
+                      >
+                        {isSaving ? (
+                          <>
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-5 h-5" />
+                            Save Prompt
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 select-none py-24 border-2 border-dashed border-slate-150 rounded-3xl">
+                    <div className="w-16 h-16 rounded-full border-2 border-slate-200 flex items-center justify-center bg-slate-50 mb-4 animate-pulse">
+                      <Code className="w-8 h-8 text-slate-300" />
+                    </div>
+                    <h4 className="text-lg font-black text-slate-700">Awaiting Business Configuration</h4>
+                    <p className="text-base text-slate-400 max-w-sm mt-2 leading-relaxed font-bold">
+                      Select landing or eCommerce, state niche details, specify the Industry, and click generate to launch.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* POPUP MODAL FOR MODULAR COMPILED SUB-PROMPT */}
+          {/* SECURE STORED PROMPTS VAULT - MATCHES STYLE OF KYCB ARCHIVES */}
+          <div className="bg-slate-50 rounded-3xl p-7 md:p-10 border-2 border-slate-200 text-left space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b-2 border-slate-200 pb-5 gap-4">
+              <div className="flex items-center gap-3">
+                <FolderHeart className="w-7 h-7 text-teal-650" />
+                <div>
+                  <h3 className="font-black text-slate-900 text-lg md:text-2xl uppercase tracking-tight">Stored Workspace Prompts Vault</h3>
+                  <p className="text-sm md:text-base text-slate-500 font-bold mt-1">
+                    Your personal library of custom-tailored developer prompts, stored secure on Firestore.
+                  </p>
+                </div>
+              </div>
+              <span className="text-base bg-teal-100 text-teal-900 font-black px-4 py-1.5 rounded-full border-2 border-teal-200 shadow-sm">
+                {savedPrompts.length} Sheets Saved
+              </span>
+            </div>
+
+            {loadingSaved ? (
+              <div className="py-16 text-center text-lg text-slate-500 font-bold flex items-center justify-center gap-3 bg-white rounded-3xl border">
+                <RefreshCw className="w-6 h-6 animate-spin text-teal-600" /> Connecting to Firestore archives...
+              </div>
+            ) : savedPrompts.length === 0 ? (
+              <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl py-16 text-center text-base md:text-lg text-slate-400 font-bold italic shadow-inner">
+                No saved prompts. Generate a full workspace prompt, indicate its industry field, and click Save to build your workspace archives!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {savedPrompts.map((item) => (
+                  <div 
+                    key={item.id}
+                    className="bg-white border-2 border-slate-100 hover:border-teal-400 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between relative group"
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="px-3 py-1 bg-amber-50 text-amber-850 border border-amber-200 rounded-lg text-xs font-black uppercase tracking-wider">
+                          💼 {item.industry}
+                        </span>
+                        <span className="text-xs text-slate-400 font-mono font-bold">
+                          {item.createdDate ? item.createdDate.toLocaleDateString() : 'Recent'}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="font-extrabold text-slate-900 text-base md:text-lg truncate">{item.businessName}</h4>
+                        <span className="text-xs font-black text-slate-450 uppercase tracking-widest block font-mono">
+                          {item.websiteType === 'landing' ? '🌐 Landing Page' : '🛒 eCommerce Hub'}
+                        </span>
+                      </div>
+                      <p className="text-sm md:text-base text-slate-500 line-clamp-3 font-semibold bg-slate-50/70 p-4 rounded-xl border border-slate-100">
+                        {item.promptText}
+                      </p>
+                    </div>
+                    
+                    <div className="flex gap-2 mt-5 pt-4 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleLoadSavedPrompt(item)}
+                        className="flex-1 py-3 px-4 bg-teal-50 hover:bg-teal-100 text-teal-900 border-0 rounded-xl text-xs md:text-sm font-black cursor-pointer transition-all uppercase tracking-wider"
+                      >
+                        🔄 Load Prompt
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(item.promptText);
+                          alert("Prompt copied to clipboard successfully!");
+                        }}
+                        className="py-3 px-4 bg-slate-100 hover:bg-slate-205 text-slate-800 border-0 rounded-xl text-xs md:text-sm font-black cursor-pointer transition-all uppercase"
+                      >
+                        Copy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteSavedPrompt(item.id, e)}
+                        className="p-3 text-slate-400 hover:text-red-650 hover:bg-red-50 rounded-xl border-0 cursor-pointer transition-all"
+                        title="Delete Prompt"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* MODULAR PROMPT MODE VIEW */
+        <div className="space-y-8">
+          <div className="bg-white border-2 border-slate-200 rounded-3xl p-7 md:p-9 shadow-sm space-y-6">
+            <div className="flex items-center gap-3 border-b-2 border-slate-105 pb-4">
+              <Layers className="w-7 h-7 text-indigo-600" />
+              <h3 className="font-black text-slate-900 text-xl md:text-2xl uppercase tracking-tight">
+                Configure Sectional Refiner Prompts
+              </h3>
+            </div>
+            
+            <p className="text-base md:text-lg text-slate-500 font-semibold leading-relaxed">
+              Modular Prompting provides code instructions specifically designed to refine individual portions of your web application (for example, header modules, bento pricing columns, trust blocks, or diagnosis widgets). Choose BOTH a Category and Target Industry below to populate the interactive database library.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Category Select Dropdown */}
+              <div className="space-y-2">
+                <label htmlFor="modular-category-select" className="text-base md:text-lg font-black text-slate-705 uppercase tracking-widest block">
+                  1. Select Section Category
+                </label>
+                <select
+                  id="modular-category-select"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full bg-slate-50 border-2 border-slate-350 text-slate-900 rounded-2xl px-5 py-4 text-base md:text-lg font-black transition-all outline-none focus:bg-white focus:border-indigo-550 focus:ring-4 focus:ring-indigo-150 cursor-pointer"
+                >
+                  <option value="">-- Choose Category --</option>
+                  <option value="visuals">🎨 UI Layout & Visual Components</option>
+                  <option value="interactivity">⚡ Interactive Features & User Flows</option>
+                  <option value="conversion">🎯 Conversion & Trust Boosters</option>
+                </select>
+              </div>
+
+              {/* Industry Select Dropdown */}
+              <div className="space-y-2">
+                <label htmlFor="modular-industry-select" className="text-base md:text-lg font-black text-slate-705 uppercase tracking-widest block">
+                  2. Select Target Industry
+                </label>
+                <select
+                  id="modular-industry-select"
+                  value={selectedIndustry}
+                  onChange={(e) => setSelectedIndustry(e.target.value)}
+                  className="w-full bg-slate-50 border-2 border-slate-350 text-slate-900 rounded-2xl px-5 py-4 text-base md:text-lg font-black transition-all outline-none focus:bg-white focus:border-indigo-550 focus:ring-4 focus:ring-indigo-150 cursor-pointer"
+                >
+                  <option value="">-- Choose Industry --</option>
+                  <option value="healthcare">🏥 Healthcare & Medical Services</option>
+                  <option value="realestate">🏠 Real Estate & Property Agencies</option>
+                  <option value="ecommerce">🛍️ E-Commerce & Luxury Retail</option>
+                  <option value="software">💻 SaaS & Modern Tech Platforms</option>
+                  <option value="services">🛠️ Corporate Field Services</option>
+                </select>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Conditional Rendering based on double-selection requirement */}
+          {(!selectedCategory || !selectedIndustry) ? (
+            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center py-20 space-y-4">
+              <div className="w-18 h-18 rounded-full border-2 border-slate-200 flex items-center justify-center bg-slate-100/60 mx-auto animate-bounce duration-1000">
+                <Layers className="w-8 h-8 text-indigo-400" />
+              </div>
+              <h4 className="text-lg md:text-xl font-black text-slate-750 uppercase tracking-wider">Awaiting Selection Parameters</h4>
+              <p className="text-base md:text-lg text-slate-450 leading-relaxed max-w-xl mx-auto font-bold">
+                You must select both a Section Category and a Target Industry from the dropdown lists above to generate and load custom modular developer sub-prompts.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2.5 px-4.5 py-2 rounded-full bg-indigo-50 border-2 border-indigo-255 text-base font-black text-indigo-800">
+                <BookOpen className="w-5 h-5 text-indigo-700" /> 
+                Ready &bull; Showing {MODULAR_PROMPTS_MATRIX[selectedCategory]?.[selectedIndustry]?.length || 0} Segment blueprints
+              </div>
+
+              {/* Grid lists */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {(MODULAR_PROMPTS_MATRIX[selectedCategory]?.[selectedIndustry] || []).map((section, idx) => (
+                  <div 
+                    key={idx}
+                    className="bg-white border-2 border-slate-100 hover:border-indigo-400 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group cursor-pointer relative"
+                    onClick={() => {
+                      setActiveModPopup({
+                        name: section.sectionName,
+                        description: section.description,
+                        rawTemplate: section.prompt,
+                        compiledPrompt: section.prompt
+                      });
+                    }}
+                  >
+                    <div className="space-y-4 text-left">
+                      <div className="flex justify-between items-center">
+                        <span className="px-3 py-1 bg-indigo-50 text-indigo-805 rounded-lg text-xs md:text-sm font-black uppercase tracking-wider border border-indigo-150">
+                          Segment {idx + 1}
+                        </span>
+                        <span className="text-sm md:text-base text-indigo-600 font-extrabold group-hover:translate-x-1 transition-transform">
+                          Refine &rarr;
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h4 className="font-extrabold text-slate-850 text-lg md:text-xl group-hover:text-indigo-650 transition-colors leading-snug">
+                          {section.sectionName}
+                        </h4>
+                        <p className="text-base text-slate-500 font-semibold leading-relaxed">
+                          {section.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-slate-100">
+                      <span className="block text-xs font-black uppercase text-slate-400 tracking-wider mb-1">
+                        Prompt Code Sample:
+                      </span>
+                      <p className="text-sm md:text-base text-slate-450 font-mono truncate bg-slate-50 p-3 rounded-lg border">
+                        {section.prompt}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* POPUP MODAL FOR MODULAR BLUEPRINT COPY */}
       {activeModPopup && (
-        <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl relative animate-in fade-in zoom-in duration-200 text-left">
+        <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-slate-200 rounded-3xl p-8 max-w-3xl w-full shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 text-left">
             <button
               onClick={() => setActiveModPopup(null)}
               className="absolute top-6 right-6 p-2 rounded-full border-0 bg-transparent hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer transition-colors outline-none"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
             
-            <div className="flex items-center gap-3 mb-4 font-sans">
-              <div className="p-2 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl">
-                <Layers className="w-5 h-5" />
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-3 bg-indigo-50 border-2 border-indigo-100 text-indigo-650 rounded-2xl">
+                <Layers className="w-6 h-6" />
               </div>
-              <div>
-                <h3 className="text-base font-black text-slate-800">
-                  {activeModPopup.name} (Modular Suggestion)
+              <div className="space-y-1">
+                <h3 className="text-lg md:text-xl font-black text-slate-900">
+                  {activeModPopup.name} (Section Modular Prompt)
                 </h3>
-                <p className="text-[11px] text-slate-400 font-bold">{activeModPopup.description}</p>
+                <p className="text-base text-slate-500 font-semibold">{activeModPopup.description}</p>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="bg-slate-50 p-3 rounded-xl border text-[10px] font-bold text-slate-500 leading-relaxed font-sans">
-                💡 <span className="text-slate-700">How to use:</span> Copy this section-specific prompt and input it directly into your builder workspace to refine, rewrite, or redesign just that specific part of your page.
+            <div className="space-y-6">
+              <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-150 text-sm md:text-base font-bold text-indigo-850 leading-relaxed">
+                💡 <span className="font-black">Implementation Strategy:</span> Copy and paste this focused chunk description into your development model workspace to instantly build, refine, or restyle this specific layout section.
               </div>
 
-              <div className="space-y-1.5 font-sans">
-                <span className="block text-[10px] font-black uppercase text-slate-450 tracking-wider">Tailored Modular Prompt Code:</span>
-                <pre className="w-full bg-slate-900 text-lime-400 text-xs font-mono p-4 rounded-xl overflow-auto border border-slate-800 leading-relaxed h-[180px] select-all whitespace-pre-wrap leading-relaxed font-semibold">
+              <div className="space-y-2">
+                <span className="block text-xs md:text-sm font-black uppercase text-slate-400 tracking-wider">
+                  Targeted Modular Code Instruction Blueprint:
+                </span>
+                <pre className="w-full bg-slate-950 text-teal-100 text-base md:text-lg font-mono p-5 rounded-2xl overflow-auto border-2 border-slate-800 leading-relaxed h-[200px] select-all whitespace-pre-wrap font-semibold">
                   {activeModPopup.compiledPrompt}
                 </pre>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-slate-100 mt-6 justify-end font-sans">
+            <div className="flex gap-4 pt-5 border-t border-slate-100 mt-6 justify-end">
               <button
                 type="button"
                 onClick={() => setActiveModPopup(null)}
-                className="px-4 py-2 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-extrabold rounded-xl cursor-pointer"
+                className="px-5 py-3 border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-base font-black rounded-xl cursor-pointer"
               >
-                Close
+                Close View
               </button>
               <button
                 type="button"
                 onClick={handleCopyModPrompt}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl border-0 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-750 text-white text-base font-black rounded-xl border-0 cursor-pointer flex items-center gap-2 shadow-sm"
               >
                 {modCopySuccess ? (
                   <>
-                    <Check className="w-3.5 h-3.5" />
+                    <Check className="w-4 h-4" />
                     Copied!
                   </>
                 ) : (
                   <>
-                    <Clipboard className="w-3.5 h-3.5" />
-                    Copy Sub-Prompt
+                    <Clipboard className="w-4 h-4" />
+                    Copy Modular Code
                   </>
                 )}
               </button>

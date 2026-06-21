@@ -2371,7 +2371,7 @@ export default function StudentDashboard() {
               <div className="mt-3">
                 {(() => {
                   const reqMsg = `Hello Admission Team! My CIYA Free Website Development Training profile has been approved. Could you please send me my custom Dashboard Activation Code for my studies? My name is ${userProfile.fullName || ''} (${userProfile.email || currentUser?.email || ''}).`;
-                  const whatsappUrl = `https://api.whatsapp.com/send?phone=2349153846786&text=${encodeURIComponent(reqMsg)}`;
+                  const whatsappUrl = `https://api.whatsapp.com/send?phone=2349042544355&text=${encodeURIComponent(reqMsg)}`;
                   return (
                     <a 
                       href={whatsappUrl}

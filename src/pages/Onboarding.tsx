@@ -243,7 +243,7 @@ export default function Onboarding() {
 
         // Send registration details formatted for WhatsApp straight to the Admin's Chat
         try {
-          const adminWhatsapp = "2349153846786";
+          const adminWhatsapp = "2349042544355";
           const messageText = `*🆕 NEW CIYA STUDENT REGISTRATION*
 
 *👤 PERSONAL DETAILS:*
@@ -625,7 +625,7 @@ _Action: Please review and approve my student profile for CIYA Five days Free We
 
                     return (
                       <a 
-                        href={getWhatsAppLink("2349153846786")}
+                        href={getWhatsAppLink("2349042544355")}
                         target="_blank" 
                         rel="noopener noreferrer" 
                         className="flex items-center justify-center gap-3 px-6 py-4.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-base md:text-lg transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-emerald-600/30 w-full cursor-pointer border-0"
