@@ -530,53 +530,25 @@ export default function UsersAdmin() {
 
   return (
     <div>
-      {/* Onboarding Registration Link panel */}
-      <div className="bg-indigo-50 border border-indigo-200/60 rounded-2xl p-6 md:p-8 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-6 shadow-sm">
-        <div className="space-y-1">
-          <h2 className="text-lg font-extrabold text-indigo-900 tracking-tight">Invite New Students (Copy Onboarding Link) 👩‍💻</h2>
-          <p className="text-sm text-indigo-700/90 leading-relaxed max-w-2xl">
-            To register new qualified students, copy the onboarding link below and send it directly to them. They will be guided through the profile creation wizard to request registration review.
-          </p>
-          <div className="pt-2">
-            <span className="inline-block bg-white border border-indigo-200 font-mono text-xs text-indigo-800 px-3.5 py-1.5 rounded-lg select-all shadow-inner">
-              {onboardingUrl}
-            </span>
-          </div>
-        </div>
-        <button 
-          onClick={handleCopyLink}
-          className={`shrink-0 px-6 py-3.5 rounded-xl text-sm font-extrabold shadow-md transition-all duration-200 ${copiedLink ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/10' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/10 hover:-translate-y-0.5'}`}
-        >
-          {copiedLink ? 'Copied Invitation Link ✓' : 'Copy Onboarding Link'}
-        </button>
-      </div>
-
       {/* Website Branding Logo Uploader */}
       {hasBrandingPermission && (
-        <div className="bg-amber-50 border border-amber-200/60 rounded-2xl p-6 md:p-8 mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 shadow-sm">
-          <div className="space-y-2">
-            <h2 className="text-lg font-extrabold text-amber-900 tracking-tight">Website Brand Logo Settings 🎨</h2>
-            <p className="text-sm text-slate-700 leading-relaxed max-w-2xl">
-              Upload the custom website logo image here. Supported formats: PNG, JPG, or SVG, ideally with a transparent background. This logo will take effect immediately across all landing & student portal pages!
-            </p>
-            <div className="pt-2 flex flex-wrap items-center gap-3">
-              <span className="text-xs font-bold text-slate-700">Current active logo preview:</span>
-              <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-2xl border border-slate-700 shadow-inner">
-                <BrandingLogo size="xs" />
-                {currentLogo && (
-                  <button 
-                    onClick={handleResetLogo}
-                    title="Reset to default text logo"
-                    className="p-1.5 hover:bg-slate-800 text-rose-450 hover:text-rose-355 rounded-lg transition-colors bg-transparent border-0 cursor-pointer ml-1"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 mb-6 flex items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 bg-slate-900 p-2.5 rounded-2xl border border-slate-700 shadow-inner">
+              <BrandingLogo size="xs" />
+              {currentLogo && (
+                <button 
+                  onClick={handleResetLogo}
+                  title="Reset to default text logo"
+                  className="p-1.5 hover:bg-slate-800 text-rose-450 hover:text-rose-355 rounded-lg transition-colors bg-transparent border-0 cursor-pointer ml-1"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
           <div className="shrink-0 flex items-center gap-3">
-            <label className="flex items-center gap-2 px-5 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-sm rounded-xl shadow-md transition-all duration-200 hover:-translate-y-0.5 cursor-pointer">
+            <label className="flex items-center gap-2 px-5 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-0.5">
               <Upload className="w-4 h-4" />
               {logoUploading ? "Uploading..." : "Upload Real Logo"}
               <input 
@@ -587,91 +559,6 @@ export default function UsersAdmin() {
                 disabled={logoUploading}
               />
             </label>
-          </div>
-        </div>
-      )}
-
-      {/* Dynamic Portal Section Locking Safeguards (Super Admin only) */}
-      {isSuperAdmin && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 mb-8 text-white shadow-xl font-sans">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-2xl">
-              <span className="text-xl">🔒</span>
-            </div>
-            <div>
-              <h2 className="text-lg font-black text-white tracking-tight">Portal Section Locks & Safeguards</h2>
-              <p className="text-xs text-slate-400 font-bold">
-                Instantly control student access permissions to key system areas. Locked sections will display a polished lock state page to students.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-            <div className={`p-5 rounded-2xl border transition-all duration-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-              lockedSections.courses 
-                ? 'bg-rose-500/5 border-rose-500/35 shadow-md shadow-rose-950/10' 
-                : 'bg-slate-850/40 border-slate-800/85 hover:border-slate-800'
-            }`}>
-              <div className="space-y-1">
-                <span className="text-xs font-black uppercase text-slate-400 tracking-wider">Explore Curriculum Arena</span>
-                <p className="text-[11px] text-slate-300 font-medium">
-                  Governs full courses display. When active, students can explore lectures and take quiz checkpoints.
-                </p>
-                <div className="pt-1">
-                  <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                    lockedSections.courses 
-                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
-                      : 'bg-teal-500/10 text-teal-300 border border-teal-500/20'
-                  }`}>
-                    {lockedSections.courses ? "● LOCKED" : "○ ACTIVE"}
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToggleSectionLock('courses')}
-                className={`px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wide cursor-pointer border-0 transition-all outline-none shrink-0 ${
-                  lockedSections.courses 
-                    ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/15' 
-                    : 'bg-slate-750 hover:bg-slate-700 text-slate-200'
-                }`}
-              >
-                {lockedSections.courses ? "Unlock Section" : "Lock Section"}
-              </button>
-            </div>
-
-            <div className={`p-5 rounded-2xl border transition-all duration-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-              lockedSections.prompts 
-                ? 'bg-rose-500/5 border-rose-500/35 shadow-md shadow-rose-950/10' 
-                : 'bg-slate-850/40 border-slate-800/85 hover:border-slate-800'
-            }`}>
-              <div className="space-y-1">
-                <span className="text-xs font-black uppercase text-slate-400 tracking-wider">Website Prompt Generator</span>
-                <p className="text-[11px] text-slate-300 font-medium">
-                  Dynamic tool for compiling Landing or eCommerce structure guides of student businesses.
-                </p>
-                <div className="pt-1">
-                  <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                    lockedSections.prompts 
-                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
-                      : 'bg-teal-500/10 text-teal-300 border border-teal-500/20'
-                  }`}>
-                    {lockedSections.prompts ? "● LOCKED" : "○ ACTIVE"}
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleToggleSectionLock('prompts')}
-                className={`px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wide cursor-pointer border-0 transition-all outline-none shrink-0 ${
-                  lockedSections.prompts 
-                    ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/15' 
-                    : 'bg-slate-750 hover:bg-slate-700 text-slate-200'
-                }`}
-              >
-                {lockedSections.prompts ? "Unlock Section" : "Lock Section"}
-              </button>
-            </div>
           </div>
         </div>
       )}

@@ -108,6 +108,41 @@ service cloud.firestore {
         && (data.get('businessName', '') is string && data.get('businessName', '').size() <= 200);
     }
 
+    // Entity Validation: AssignmentSubmission
+    function isValidAssignmentSubmission(data) {
+      return data.keys().hasAll(['userId', 'courseId', 'dayIndex', 'status', 'createdAt'])
+        && data.userId is string
+        && data.courseId is string
+        && data.dayIndex is number
+        && data.status in ['Pending', 'Approved', 'Disapproved']
+        && (data.get('userName', '') is string)
+        && (data.get('userEmail', '') is string)
+        && (data.get('submittedText', '') is string)
+        && (data.get('fileUrl', '') is string)
+        && (data.get('fileName', '') is string)
+        && (data.get('adminReason', '') is string)
+        && (data.get('gradedBy', '') is string);
+    }
+
+    // Entity Validation: Notification
+    function isValidNotification(data) {
+      return data.keys().hasAll(['userId', 'title', 'message', 'isRead', 'createdAt'])
+        && data.userId is string
+        && data.title is string
+        && data.message is string
+        && data.isRead is bool;
+    }
+
+    // Entity Validation: NotificationTemplate
+    function isValidNotificationTemplate(data) {
+      return data.keys().hasAll(['id', 'title', 'message', 'triggerType', 'eventType', 'createdAt'])
+        && data.id is string
+        && data.title is string
+        && data.message is string
+        && data.triggerType is string
+        && data.eventType is string;
+    }
+
     // Collections Routes
     match /admins/{adminId} {
       // Only root admin can manage admins
@@ -210,6 +245,31 @@ service cloud.firestore {
                     && incoming().userId == existing().userId
                     && incoming().createdAt == existing().createdAt
                     && incoming().promptText == existing().promptText;
+    }
+
+    match /assignments/{submissionId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn()
+                    && isValidId(submissionId)
+                    && isValidAssignmentSubmission(incoming())
+                    && incoming().userId == request.auth.uid
+                    && incoming().createdAt == request.time;
+      allow update: if isSignedIn()
+                    && (isAdmin() || (incoming().userId == request.auth.uid && existing().userId == request.auth.uid && existing().status == "Pending"));
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn()
+                    && (incoming().userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /notification_templates/{templateId} {
+      allow read, list: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /settings/{settingsDoc} {

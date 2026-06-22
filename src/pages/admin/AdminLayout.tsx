@@ -202,6 +202,30 @@ export default function AdminLayout() {
           )}
 
           <Link 
+            to="/admin/assignments" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/assignments') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+          >
+            📥 Assignments Inbox
+          </Link>
+
+          <Link 
+            to="/admin/notifications" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/notifications') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+          >
+            📢 Notifications Console
+          </Link>
+
+          <Link 
+            to="/admin/locks" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/locks') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+          >
+            🔒 Portal Locks Control
+          </Link>
+
+          <Link 
             to="/admin/kycb" 
             onClick={() => setIsMobileMenuOpen(false)}
             className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/kycb') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}

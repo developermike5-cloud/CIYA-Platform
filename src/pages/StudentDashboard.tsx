@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../firebase';
 import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { useNavigate, Link } from 'react-router';
+import { useNavigate, Link, useLocation } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../types';
-import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText } from 'lucide-react';
 import { motion } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 import SecureYoutubePlayer from '../components/SecureYoutubePlayer';
@@ -398,7 +398,26 @@ function formatWalkthroughDescription(descText: string) {
 }
 
 // Unified lesson lock validator helper function
-function isLessonUnlockedUnified(di: number, vi: number, days: any[], completedKeys: string[], checkPassedKeys: string[]) {
+function isLessonUnlockedUnified(
+  di: number, 
+  vi: number, 
+  days: any[], 
+  completedKeys: string[], 
+  checkPassedKeys: string[],
+  dbSubmissions: any[] = [],
+  isAdmin: boolean = false
+) {
+  if (isAdmin) return true;
+
+  // Day-level lock check: For Day di (di > 0), preceding Day's (di-1) assignment must be Approved
+  if (di > 0) {
+    const prevDayIdx = di - 1;
+    const prevDaySubmission = dbSubmissions.find(sub => sub.dayIndex === prevDayIdx);
+    if (!prevDaySubmission || prevDaySubmission.status !== 'Approved') {
+      return false; // Parent Day is locked, so all lessons inside this day are locked!
+    }
+  }
+
   if (di === 0 && vi === 0) return true;
   
   let predDi = di;
@@ -706,16 +725,100 @@ interface CourseViewerProps {
   isAdmin?: boolean;
 }
 
+function renderBulletList(text: string, icon: string, textClass: string = "text-sm text-slate-800") {
+  if (!text) return null;
+  const items = text
+    .split(/\n+/)
+    .map(item => item.replace(/^[•\*\-\s\d\.\)]+/, '').trim())
+    .filter(item => item.length > 0);
+
+  return (
+    <ul className="space-y-3 mt-2.5 text-left">
+      {items.map((item, idx) => (
+        <li key={idx} className="flex items-start gap-2.5">
+          <span className="text-indigo-600 mt-1 select-none shrink-0 text-xs font-black">{icon}</span>
+          <span className={`${textClass} leading-relaxed font-extrabold`}>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false }: CourseViewerProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [activeVideoIdx, setActiveVideoIdx] = useState(0);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [showAssignment, setShowAssignment] = useState(false);
   const [viewingSyllabus, setViewingSyllabus] = useState(true);
 
+  // Sync from URL params on search changes:
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    
+    const dayParam = params.get('day');
+    const videoParam = params.get('video');
+    const syllabusParam = params.get('syllabus');
+    const assignmentParam = params.get('assignment');
+
+    if (dayParam !== null) {
+      setActiveDayIdx(Number(dayParam));
+    } else {
+      setActiveDayIdx(0);
+    }
+
+    if (videoParam !== null) {
+      setActiveVideoIdx(Number(videoParam));
+    } else {
+      setActiveVideoIdx(0);
+    }
+
+    if (syllabusParam === 'false') {
+      setViewingSyllabus(false);
+    } else {
+      setViewingSyllabus(true);
+    }
+
+    if (assignmentParam === 'true') {
+      setShowAssignment(true);
+    } else {
+      setShowAssignment(false);
+    }
+  }, [location.search]);
+
+  const updateParams = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(window.location.search);
+    Object.entries(updates).forEach(([key, val]) => {
+      if (val === null) {
+        params.delete(key);
+      } else {
+        params.set(key, val);
+      }
+    });
+    navigate(`/dashboard?${params.toString()}`);
+  };
+
   const courseId = course.id || 'general';
   const progressStore = userProfile.progress?.[courseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
   
+  const [dbSubmissions, setDbSubmissions] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!currentUser || !courseId) return;
+    const q = query(
+      collection(db, 'assignments'),
+      where('userId', '==', currentUser.uid),
+      where('courseId', '==', courseId)
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setDbSubmissions(list);
+    });
+    return () => unsubscribe();
+  }, [currentUser, courseId]);
+
   const completedKeys: string[] = progressStore.watched || [];
   const checkPassedKeys: string[] = progressStore.checkPassed || [];
   const submissions: Record<string, any> = progressStore.submissions || {};
@@ -766,11 +869,12 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   const progressRatio = totalVideos > 0 ? Math.round((totalWatchedCount / totalVideos) * 100) : 0;
 
   const handleGoToVideo = (di: number, vi: number) => {
-    setActiveDayIdx(di);
-    setActiveVideoIdx(vi);
-    setShowQuizModal(false);
-    setShowAssignment(false);
-    setViewingSyllabus(false);
+    updateParams({
+      day: String(di),
+      video: String(vi),
+      syllabus: 'false',
+      assignment: 'false'
+    });
   };
 
   const handleMarkComplete = async () => {
@@ -822,7 +926,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   };
 
   const handleGoNext = () => {
-    const isUnlocked = isAdmin || isLessonUnlockedUnified(activeDayIdx, activeVideoIdx, days, completedKeys, checkPassedKeys);
+    const isUnlocked = isAdmin || isLessonUnlockedUnified(activeDayIdx, activeVideoIdx, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin);
     if (!isUnlocked) {
       alert("Lesson check is locked! Clear comprehension quiz of this lesson first.");
       return;
@@ -856,6 +960,21 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
         [`progress.${courseId}.submissions.${key}`]: data,
         updatedAt: serverTimestamp()
       });
+
+      // Also append to global assignments collection
+      await addDoc(collection(db, 'assignments'), {
+        userId: currentUser.uid,
+        userEmail: currentUser.email || userProfile?.email || 'student@ciya.com',
+        userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
+        courseId: courseId,
+        dayIndex: Number(key.replace('day-', '')),
+        submittedText: data.text,
+        fileUrl: data.link || '',
+        fileName: data.link ? 'Live URL Link' : '',
+        status: 'Pending',
+        createdAt: serverTimestamp()
+      });
+
       showToast("Assignment submitted successfully!");
     } catch (e) {
       console.error("Error submitting assignment:", e);
@@ -870,7 +989,13 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
       <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 w-full">
         <div className="flex gap-3 items-center text-left min-w-0">
           <button
-            onClick={onBack}
+            onClick={() => {
+              if (!viewingSyllabus) {
+                updateParams({ syllabus: 'true', assignment: 'false' });
+              } else {
+                onBack();
+              }
+            }}
             className="p-2.5 px-4 border border-slate-200 hover:bg-slate-50 text-slate-800 font-black text-xs rounded-xl transition-all cursor-pointer bg-white flex items-center justify-center shrink-0"
             title="Back to curriculum"
           >
@@ -888,20 +1013,13 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
               {progressRatio}% COMPLETE · {totalWatchedCount}/{totalVideos} CLIPS
             </div>
           </div>
-          <button
-            onClick={() => handleResetProgress(courseId)}
-            className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[10.5px] font-black uppercase rounded-2xl transition-all cursor-pointer flex items-center gap-1.5 focus:ring-2 focus:ring-red-200"
-            title="Reset course progression and scores"
-          >
-            🔄 Reset Course Progress
-          </button>
         </div>
       </div>
 
       {viewingSyllabus ? (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left">
+        <div className="bg-gradient-to-br from-indigo-50/40 via-purple-50/20 to-slate-100/35 border-2 border-indigo-100/65 rounded-3xl p-6 md:p-8 shadow-md space-y-6 text-left">
           <div>
-            <span className="text-xs font-black uppercase text-teal-800 bg-teal-50 px-3.5 py-1.5 rounded-full tracking-wider">
+            <span className="text-xs font-black uppercase text-indigo-800 bg-indigo-50 px-3.5 py-1.5 rounded-full tracking-wider">
               Full-Course Syllabus & Roadmap Info
             </span>
             <h2 className="font-extrabold text-slate-900 text-xl md:text-2xl mt-4 tracking-tight leading-snug">
@@ -916,17 +1034,15 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
 
           {/* Course Overview / synopsis with deep high contrast text */}
           {(course.overview || course.description) && (
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-2">
+            <div className="bg-white p-5 rounded-2xl border border-indigo-100/80 space-y-2.5">
               <span className="text-xs md:text-sm font-black uppercase text-indigo-700 tracking-wider block">🎯 Overview Synopsis</span>
-              <p className="text-sm md:text-base text-slate-800 font-extrabold leading-relaxed whitespace-pre-line">
-                {course.overview || course.description}
-              </p>
+              {renderBulletList(course.overview || course.description, "⚡", "text-sm md:text-base text-slate-800")}
             </div>
           )}
 
           {/* General specs layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-indigo-100/40">
               <span className="text-2xl select-none">🧑‍🏫</span>
               <div className="text-xs leading-normal">
                 <span className="font-extrabold uppercase text-xs text-slate-500 block tracking-wider">Instructor Team</span>
@@ -935,7 +1051,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
             </div>
 
             {course.price ? (
-              <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-indigo-100/40">
                 <span className="text-2xl select-none">💰</span>
                 <div className="text-xs leading-normal">
                   <span className="font-extrabold uppercase text-[9px] text-slate-400 block tracking-wider">Course Price Status</span>
@@ -945,27 +1061,27 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
             ) : null}
 
             {course.requirements && (
-              <div className="md:col-span-2 space-y-1.5 bg-amber-50/60 p-4 md:p-5 rounded-2xl border border-amber-200">
-                <span className="text-[11px] font-black uppercase text-amber-800 tracking-wider block">🛠️ Required Prep Tools & Prerequisites</span>
-                <p className="text-xs md:text-sm font-extrabold text-amber-950 leading-relaxed whitespace-pre-line">
-                  {course.requirements}
-                </p>
+              <div className="md:col-span-2 space-y-2.5 bg-amber-50/60 p-4 md:p-5 rounded-2xl border border-amber-200">
+                <span className="text-xs md:text-sm font-black uppercase text-amber-850 tracking-wider block">🛠️ Required Prep Tools & Prerequisites</span>
+                <div className="text-sm md:text-base text-amber-950 leading-relaxed font-extrabold">
+                  {renderBulletList(course.requirements, "✦", "text-sm md:text-base text-amber-950")}
+                </div>
               </div>
             )}
 
             {course.outcomes && (
-              <div className="md:col-span-2 space-y-1.5 bg-teal-50/35 p-4 md:p-5 rounded-2xl border border-teal-200">
-                <span className="text-[11px] font-black uppercase text-teal-800 tracking-wider block">🚀 Core Professional Objectives & Outcomes</span>
-                <p className="text-xs md:text-sm font-extrabold text-teal-950 leading-relaxed whitespace-pre-line">
-                  {course.outcomes}
-                </p>
+              <div className="md:col-span-2 space-y-2.5 bg-teal-50/35 p-4 md:p-5 rounded-2xl border border-teal-200">
+                <span className="text-xs md:text-sm font-black uppercase text-teal-850 tracking-wider block">🚀 Core Professional Objectives & Outcomes</span>
+                <div className="text-sm md:text-base text-teal-950 leading-relaxed font-extrabold">
+                  {renderBulletList(course.outcomes, "✦", "text-sm md:text-base text-teal-950")}
+                </div>
               </div>
             )}
           </div>
 
           <div className="pt-4">
             <button
-              onClick={() => setViewingSyllabus(false)}
+              onClick={() => updateParams({ syllabus: 'false', assignment: 'false' })}
               className="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-sm uppercase rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer transform active:scale-[0.98] border-0"
             >
               📊 Enter Classroom & Begin Lessons →
@@ -1002,7 +1118,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
 
       {/* 2. DAILY LESSONS TIMELINE Navigation (Moved to the bottom sequentially, only covered days showing) */}
       {!viewingSyllabus && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left animate-fade-in">
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left animate-fade-in -mx-6 md:mx-0 rounded-none md:rounded-3xl border-x-0 md:border-x">
           <div className="border-b pb-3 flex items-center justify-between">
             <div className="space-y-0.5">
               <span className="text-xs font-black uppercase text-indigo-700 tracking-wider">Course Syllabus Navigation</span>
@@ -1017,7 +1133,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
             {/* 1. Selected Day card at the top */}
             {days.map((d, di) => {
               if (activeDayIdx !== di) return null;
-              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys);
+              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin);
               if (!isDayCoveredOrUnlocked) return null;
 
               return (
@@ -1045,7 +1161,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                       const isVidCurrent = activeDayIdx === di && activeVideoIdx === vi && !showAssignment;
                       const isVidWatched = completedKeys.includes(currentKey);
                       const isKeyCheckPassed = checkPassedKeys.includes(currentKey);
-                      const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys);
+                      const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin);
 
                       return (
                         <div key={vid.id || vi} className="space-y-3 bg-slate-50/40 p-1.5 rounded-2xl border border-slate-100 shadow-sm">
@@ -1236,10 +1352,11 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                           });
 
                           if (allVideosPassed) {
-                            setActiveDayIdx(di);
-                            setShowAssignment(true);
-                            setShowQuizModal(false);
-                            setViewingSyllabus(false);
+                            updateParams({
+                              day: String(di),
+                              assignment: 'true',
+                              syllabus: 'false'
+                            });
                           } else {
                             alert("Complete all day's lessons and understanding checks first to unlock the end-of-day assignment!");
                           }
@@ -1251,7 +1368,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                         }`}
                       >
                         <span className="flex items-center gap-2 flex-1 font-bold">
-                          <span>{submissions[`day-${di}`] ? "✅" : "📋"}</span>
+                          <span>{dbSubmissions.find(sub => sub.dayIndex === di)?.status === 'Approved' ? "✅" : "📋"}</span>
                           <span>Day {di+1} Live Assignment</span>
                         </span>
                       </button>
@@ -1262,24 +1379,36 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
             })}
 
             {/* Inactive Remaining Days listing at the bottom */}
-            {days.some((_, idx) => idx !== activeDayIdx && (isAdmin || idx === 0 || isLessonUnlockedUnified(idx, 0, days, completedKeys, checkPassedKeys))) && (
-              <div className="mt-4 border-t border-slate-100 pt-5 space-y-3">
+            {days.length > 1 && (
+              <div className="mt-4 border-t border-slate-100 pt-5 space-y-3 animate-fade-in">
                 <span className="text-xs md:text-sm font-black uppercase text-slate-500 tracking-wider block mb-1">Click to Switch Active Day in View:</span>
                 <div className="grid grid-cols-1 gap-4">
                   {days.map((d, di) => {
                     if (activeDayIdx === di) return null;
-                    const isDayCoveredOrUnlocked = isAdmin || di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys);
-                    if (!isDayCoveredOrUnlocked) return null;
+                    const isDayUnlocked = di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin);
 
                     return (
                       <div
                         key={`day-inactive-${di}`}
-                        className="rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-indigo-200 p-4 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer"
-                        onClick={() => handleGoToVideo(di, 0)}
+                        className={`rounded-2xl border p-4 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer ${
+                          isDayUnlocked 
+                            ? 'border-slate-200 bg-slate-50/50 hover:bg-white hover:border-indigo-200' 
+                            : 'border-slate-100 bg-slate-100/40 opacity-75'
+                        }`}
+                        onClick={() => {
+                          if (isDayUnlocked) {
+                            handleGoToVideo(di, 0);
+                          } else {
+                            alert(`⚠️ Day ${di + 1} lessons are locked! First submit your Day ${di} assignment and wait for coach approval to unlock Day ${di + 1} training.`);
+                          }
+                        }}
                       >
                         <div className="space-y-1.5 text-left flex-1">
                           <div className="flex items-center justify-between font-sans">
-                            <span className="text-xs font-black text-indigo-700 tracking-wider uppercase">Day {di + 1}</span>
+                            <span className="text-xs font-black text-indigo-700 tracking-wider uppercase flex items-center gap-1.5">
+                              Day {di + 1} 
+                              {!isDayUnlocked && <span className="text-slate-500 text-xs font-normal">🔒 Locked (Pending Assignment Approval)</span>}
+                            </span>
                             <span className="text-xs bg-slate-100 text-slate-700 font-extrabold px-3 py-1 rounded-full uppercase tracking-normal">
                               {(d.videos || []).length} lessons
                             </span>
@@ -1289,9 +1418,15 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                         </div>
 
                         <div className="flex justify-end shrink-0">
-                          <span className="text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer">
-                            📅 View Day {di + 1} Syllabus →
-                          </span>
+                          {isDayUnlocked ? (
+                            <span className="text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer">
+                              📅 View Day {di + 1} Syllabus →
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold text-slate-400 bg-slate-150 border px-4 py-2 rounded-xl flex items-center gap-1.5 cursor-not-allowed">
+                              🔒 Locked
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
@@ -1769,13 +1904,27 @@ export default function StudentDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'prompts'>(() => {
+  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments'>(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
     if (view === 'prompts') return 'prompts';
     if (view === 'profile') return 'profile';
+    if (view === 'notifications') return 'notifications';
+    if (view === 'assignments') return 'assignments';
     return 'courses';
   });
+
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('courseId') || null;
+  });
+
+  const [submitDayIndex, setSubmitDayIndex] = useState<number>(0);
+  const [submitLink, setSubmitLink] = useState('');
+  const [submitText, setSubmitText] = useState('');
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [submittingAssignment, setSubmittingAssignment] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1786,10 +1935,64 @@ export default function StudentDashboard() {
       setCurrentView('profile');
     } else if (view === 'courses') {
       setCurrentView('courses');
+    } else if (view === 'assignments') {
+      setCurrentView('assignments');
+    } else {
+      setCurrentView('courses');
     }
+
+    const cId = params.get('courseId') || null;
+    setSelectedCourseId(cId);
   }, [window.location.search]);
 
-  const [appSettings, setAppSettings] = useState<{ lockedSections?: { courses?: boolean; prompts?: boolean } }>({});
+  const [appSettings, setAppSettings] = useState<{ lockedSections?: { courses?: boolean; prompts?: boolean; assignments?: boolean } }>({});
+  const [allMySubmissions, setAllMySubmissions] = useState<any[]>([]);
+  const [selectedAssignCourseId, setSelectedAssignCourseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'assignments'),
+      where('userId', '==', currentUser.uid)
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAllMySubmissions(list);
+    }, (error) => {
+      console.error("Error loading student assignments:", error);
+    });
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  const handleDashboardAssignmentSubmit = async (dayIndex: number, data: any) => {
+    const activeCId = selectedAssignCourseId || courses[0]?.id;
+    if (!activeCId) return;
+    try {
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, {
+        [`progress.${activeCId}.submissions.day-${dayIndex}`]: data,
+        updatedAt: serverTimestamp()
+      });
+
+      // Also append to global assignments collection so it displays in Assignments Inbox
+      await addDoc(collection(db, 'assignments'), {
+        userId: currentUser.uid,
+        userEmail: currentUser.email || userProfile?.email || 'student@ciya.com',
+        userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
+        courseId: activeCId,
+        dayIndex: dayIndex,
+        submittedText: data.text,
+        fileUrl: data.link || '',
+        fileName: data.link ? 'Live URL Link' : '',
+        status: 'Pending',
+        createdAt: serverTimestamp()
+      });
+
+      showToast("Assignment submitted successfully!");
+    } catch (e) {
+      console.error("Error submitting assignment:", e);
+    }
+  };
 
   useEffect(() => {
     const unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
@@ -1813,6 +2016,53 @@ export default function StudentDashboard() {
     }
     return false;
   });
+
+  const [dbNotifications, setDbNotifications] = useState<any[]>([]);
+
+  // Subscriptions to notifications
+  useEffect(() => {
+    if (!currentUser) return;
+    const targets = ['all', currentUser.uid];
+    if (isAdmin) {
+      targets.push('admins_group');
+    }
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', 'in', targets)
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      list.sort((a: any, b: any) => {
+        const timeA = a.createdAt?.seconds || 0;
+        const timeB = b.createdAt?.seconds || 0;
+        return timeB - timeA;
+      });
+      setDbNotifications(list);
+    });
+    return () => unsubscribe();
+  }, [currentUser, isAdmin]);
+
+  const unreadNotificationsCount = dbNotifications.filter(x => !x.isRead).length;
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', id), { isRead: true });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const unreadList = dbNotifications.filter(x => !x.isRead);
+      for (const item of unreadList) {
+        await updateDoc(doc(db, 'notifications', item.id), { isRead: true });
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -1830,9 +2080,18 @@ export default function StudentDashboard() {
   const [activeSkillFilter, setActiveSkillFilter] = useState<string>('all');
   const navigate = useNavigate();
 
-  const handleViewChange = (view: 'courses' | 'profile' | 'prompts') => {
+  const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments') => {
     setCurrentView(view);
-    navigate(`/dashboard?view=${view}`, { replace: true });
+    navigate(`/dashboard?view=${view}`);
+  };
+
+  const handleSelectCourseId = (cId: string | null) => {
+    setSelectedCourseId(cId);
+    if (cId) {
+      navigate(`/dashboard?view=${currentView}&courseId=${cId}`);
+    } else {
+      navigate(`/dashboard?view=${currentView}`);
+    }
   };
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -1873,8 +2132,71 @@ export default function StudentDashboard() {
     }
   };
 
-  // Selected Course playing state
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  // Selected Course playing state (Managed via URL parameters sync in useEffect above)
+
+  const handleCustomAssignmentSubmit = async () => {
+    if (!currentUser) return;
+    const registeredCourse = coursesToSee[0];
+    if (!registeredCourse) {
+      alert("No active course path assigned to submit an assignment for.");
+      return;
+    }
+    if (uploadedImages.length < 2 || uploadedImages.length > 3) {
+      alert("Please upload exactly 2 or 3 screenshot images of your workspace checkpoints to submit.");
+      return;
+    }
+    if (!submitLink.trim()) {
+      alert("Please paste your assignment live URL link.");
+      return;
+    }
+    if (!submitText.trim()) {
+      alert("Please enter the copied text or answers to complete the submission.");
+      return;
+    }
+
+    setSubmittingAssignment(true);
+    try {
+      // 1. Submit to assignments collection
+      await addDoc(collection(db, 'assignments'), {
+        userId: currentUser.uid,
+        userEmail: currentUser.email || userProfile?.email || 'student@ciya.com',
+        userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
+        courseId: registeredCourse.id,
+        dayIndex: submitDayIndex,
+        submittedText: submitText,
+        fileUrl: submitLink,
+        images: uploadedImages,
+        fileName: 'Live URL Link',
+        status: 'Pending',
+        createdAt: serverTimestamp()
+      });
+
+      // 2. Submit to student progress in users doc
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, {
+        [`progress.${registeredCourse.id}.submissions.day-${submitDayIndex}`]: {
+          text: submitText,
+          link: submitLink,
+          images: uploadedImages,
+          submittedAt: new Date().toISOString()
+        },
+        updatedAt: serverTimestamp()
+      });
+
+      // 3. Trigger success popup!
+      setShowSuccessPopup(true);
+
+      // Clear fields
+      setSubmitLink('');
+      setSubmitText('');
+      setUploadedImages([]);
+    } catch (e: any) {
+      console.error(e);
+      alert("Error submitting assignment: " + e.message);
+    } finally {
+      setSubmittingAssignment(false);
+    }
+  };
 
   // 5 Minutes Fun Fact popup state
 
@@ -2044,7 +2366,7 @@ export default function StudentDashboard() {
             localStorage.removeItem('ciya_cached_profile');
             alert('No profile found. Please complete the registration process.');
             setLiveCheckComplete(false);
-            navigate('/onboarding');
+            navigate('/onboarding', { replace: true });
             setAuthChecking(false);
           }
         }, (error: any) => {
@@ -2248,8 +2570,38 @@ export default function StudentDashboard() {
   const isPending = approvalStatus === 'Pending';
   const isDisapproved = approvalStatus === 'Disapproved';
 
+  // Filter courses by registration
+  const registeredCoursesList = courses.filter(c => {
+    if (isAdmin) return true;
+    
+    // Check progressed course keys
+    if (userProfile?.progress && userProfile.progress[c.id]) {
+      return true;
+    }
+    
+    const selection = (userProfile?.pathwaySelection || '').toLowerCase().trim();
+    const title = (c.title || '').toLowerCase().trim();
+    const category = (c.category || '').toLowerCase().trim();
+    const recommended = (userProfile?.recommendedPath || '').toLowerCase().trim();
+
+    if (selection && (title.includes(selection) || selection.includes(title))) {
+      return true;
+    }
+    if (recommended && (title.includes(recommended) || recommended.includes(title))) {
+      return true;
+    }
+    if (selection && (category.includes(selection) || selection.includes(category))) {
+      return true;
+    }
+    
+    return false;
+  });
+
+  // If unregistered list is empty for a registered/approved student, gracefully fall back to all standard published courses to avoid blank states
+  const coursesToSee = (isAdmin || registeredCoursesList.length > 0) ? registeredCoursesList : courses;
+
   // Apply Skill tags sorting filters & locking courses visibility logic (locked courses only visible to admins)
-  const filteredCourses = courses.filter(c => {
+  const filteredCourses = coursesToSee.filter(c => {
     if (activeSkillFilter !== 'all' && c.skill !== activeSkillFilter) return false;
     const isCourseLocked = c.isLocked || c.locked;
     if (isCourseLocked && !isAdmin) {
@@ -2257,7 +2609,7 @@ export default function StudentDashboard() {
     }
     return true;
   });
-  const selectedCourse = courses.find(c => c.id === selectedCourseId);
+  const selectedCourse = coursesToSee.find(c => c.id === selectedCourseId);
 
   // Master Full-Screen Gating Page for Unapproved or Locked Users (No dashboard UI visible)
   if (!isGuest && userProfile?.isDashboardUnlocked !== true) {
@@ -2432,7 +2784,7 @@ export default function StudentDashboard() {
         <nav className="flex-1 px-4 space-y-1.5 mt-5 text-xs font-bold">
           <button 
             type="button"
-            onClick={() => { handleViewChange('courses'); setSelectedCourseId(null); setIsMobileMenuOpen(false); }}
+            onClick={() => { handleViewChange('courses'); handleSelectCourseId(null); setIsMobileMenuOpen(false); }}
             className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'courses' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
           >
             <div className="flex items-center gap-3">
@@ -2444,9 +2796,25 @@ export default function StudentDashboard() {
             )}
           </button>
 
+          {!isGuest && (
+            <button 
+              type="button"
+              onClick={() => { handleViewChange('assignments'); handleSelectCourseId(null); setIsMobileMenuOpen(false); }}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'assignments' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 text-indigo-400" />
+                <span>My Assignments</span>
+              </div>
+              {!isAdmin && appSettings?.lockedSections?.assignments && (
+                <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              )}
+            </button>
+          )}
+
           <button 
             type="button"
-            onClick={() => { handleViewChange('prompts'); setSelectedCourseId(null); setIsMobileMenuOpen(false); }}
+            onClick={() => { handleViewChange('prompts'); handleSelectCourseId(null); setIsMobileMenuOpen(false); }}
             className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'prompts' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
           >
             <div className="flex items-center gap-3">
@@ -2457,6 +2825,24 @@ export default function StudentDashboard() {
               <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
             )}
           </button>
+
+          {!isGuest && (
+            <button 
+              type="button"
+              onClick={() => { handleViewChange('notifications'); setIsMobileMenuOpen(false); }}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'notifications' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+            >
+              <div className="flex items-center gap-3">
+                <Bell className="w-4 h-4 text-amber-400" />
+                <span>Notification Desk</span>
+              </div>
+              {unreadNotificationsCount > 0 && (
+                <span className="bg-rose-550 text-white text-[9px] font-black px-2 py-0.5 rounded-full shrink-0">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+          )}
           {!isGuest && (
             <button 
               type="button"
@@ -2520,10 +2906,32 @@ export default function StudentDashboard() {
                 ? 'CIYA Learning Arena' 
                 : currentView === 'profile' 
                   ? 'My Student Profile' 
-                  : 'Prompt Generator Lab'}
+                  : currentView === 'notifications'
+                    ? 'Notification Desk'
+                    : currentView === 'assignments'
+                      ? 'My Assignments Workspace'
+                      : 'Prompt Generator Lab'}
             </h2>
           </div>
           <div className="flex items-center gap-4">
+            {!isGuest && (
+              <button 
+                onClick={() => handleViewChange('notifications')}
+                className={`p-2.5 rounded-full cursor-pointer transition-all relative border-0 flex items-center justify-center outline-none ${
+                  currentView === 'notifications' 
+                    ? 'bg-amber-50 text-amber-600 ring-2 ring-amber-500/20' 
+                    : 'text-slate-500 bg-slate-50 hover:bg-slate-100 hover:text-slate-700'
+                }`}
+                title="View Alerts & Notifications"
+              >
+                <Bell className="w-4.5 h-4.5" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[8px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center ring-2 ring-white">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+            )}
              {isGuest ? (
                <button 
                  onClick={handleLogin} 
@@ -2631,9 +3039,9 @@ export default function StudentDashboard() {
                       </div>
                     </div>
 
-                    {courses.some(c => userProfile.progress?.[c.id || '']?.quizScores) ? (
+                    {coursesToSee.some(c => userProfile.progress?.[c.id || '']?.quizScores) ? (
                       <div className="space-y-4">
-                        {courses.map(course => {
+                        {coursesToSee.map(course => {
                           const courseId = course.id || '';
                           const cScores = userProfile.progress?.[courseId]?.quizScores || {};
                           if (Object.keys(cScores).length === 0) return null;
@@ -2705,6 +3113,320 @@ export default function StudentDashboard() {
                 </div>
               )}
             </div>
+          ) : currentView === 'notifications' ? (
+            <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 md:p-8 max-w-2xl mx-auto shadow-sm space-y-4 animate-fade-in">
+              <div className="flex items-center justify-between border-b pb-4 mb-2">
+                <div className="space-y-0.5 text-left">
+                  <span className="text-[10px] uppercase tracking-wider text-teal-600 font-black block">Notification Desk</span>
+                  <h3 className="text-base md:text-lg font-black text-slate-800">🔔 My Inbox & Announcements</h3>
+                </div>
+                {unreadNotificationsCount > 0 && (
+                  <button 
+                    onClick={handleMarkAllAsRead}
+                    className="text-xs font-black text-teal-600 hover:text-teal-700 bg-teal-50 px-3.5 py-1.5 rounded-full border-0 cursor-pointer transition-colors"
+                  >
+                    Mark all read ✓
+                  </button>
+                )}
+              </div>
+
+              {dbNotifications.length === 0 ? (
+                <div className="text-center py-16 text-slate-400 uppercase font-black text-xs space-y-3">
+                  <div className="text-3xl animate-pulse">🔔</div>
+                  <p className="tracking-widest">Your Inbox is silent.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {dbNotifications.map((notif) => (
+                    <div 
+                      key={notif.id} 
+                      onClick={() => !notif.isRead && handleMarkAsRead(notif.id)}
+                      className={`p-4 border rounded-2xl text-left transition-colors relative overflow-hidden cursor-pointer ${
+                        notif.isRead 
+                          ? 'bg-slate-50/40 border-slate-200' 
+                          : 'bg-indigo-50/10 border-indigo-200 ring-2 ring-indigo-550/40'
+                      }`}
+                    >
+                      {!notif.isRead && (
+                        <span className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600" />
+                      )}
+                      <div className="flex items-center justify-between gap-3 font-sans">
+                        <strong className="text-slate-900 font-extrabold text-xs md:text-sm">{notif.title}</strong>
+                        <span className="text-[9px] text-slate-400 font-mono font-bold">
+                          {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString() : 'Just Now'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-700 font-semibold leading-relaxed mt-2 whitespace-pre-wrap bg-white/70 p-3 rounded-xl border border-slate-100">{notif.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : currentView === 'assignments' ? (
+            (!isAdmin && appSettings?.lockedSections?.assignments) ? (
+              <div className="bg-white border text-sm border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
+                <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Lock className="w-8 h-8 text-rose-500" />
+                </div>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight">Assignment Submission Desk Locked</h3>
+                <p className="text-slate-500 mt-3 text-sm leading-relaxed font-semibold">
+                  The dedicated assignment submission portal is temporarily locked by administrators. Please contact your certified coach or coordinator to unlock assignments review!
+                </p>
+                <div className="mt-8 pt-6 border-t border-slate-100 flex justify-center items-center gap-2 text-xs text-slate-400 font-bold">
+                  <span>🛡️ CIYA Guarded Academy Portal</span>
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-2xl mx-auto space-y-6 font-sans pb-16 text-left">
+                {/* Clean, descriptive Title without course selection tabs or course description/detail cards */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-2">
+                  <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200/55 font-black px-3 py-1 rounded-full uppercase tracking-wider">
+                    Academy Assignment Portal
+                  </span>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">📥 Assignment Submission Desk</h3>
+                  <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                    Submit your daily workspace checklists and live deployments below. Your registered curriculum track is automatically mapped.
+                  </p>
+                </div>
+
+                {/* Main Form Fields */}
+                {(() => {
+                  // Find registered course
+                  const registeredCourse = coursesToSee[0];
+                  if (!registeredCourse) {
+                    return (
+                      <div className="bg-white border text-center p-8 rounded-3xl text-xs font-black text-slate-400 uppercase">
+                        No active course path assigned to submit assignments for.
+                      </div>
+                    );
+                  }
+
+                  const daysList = registeredCourse.days || [];
+                  const matchedSubForSelectedDay = allMySubmissions.find(s => s.courseId === registeredCourse.id && s.dayIndex === submitDayIndex);
+
+                  return (
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
+                      <h4 className="text-sm font-black text-slate-900 border-b pb-3 flex items-center gap-2">
+                        <span>📝 Submit Draft Form</span>
+                        <span className="text-xs font-bold text-slate-400">({registeredCourse.title})</span>
+                      </h4>
+
+                      {/* Day Selection dropdown */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Select Assignment Day</label>
+                        <select
+                          value={submitDayIndex}
+                          onChange={(e) => setSubmitDayIndex(Number(e.target.value))}
+                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-2xl py-3 px-4 font-bold text-xs focus:border-indigo-500 outline-none transition-all shadow-inner border-box"
+                        >
+                          {Array.from({ length: daysList.length || 5 }).map((_, idx) => (
+                            <option key={idx} value={idx}>Day {idx + 1}: {daysList[idx]?.title || `Module Study Checklist`}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Day status indicator */}
+                      {matchedSubForSelectedDay && (
+                        <div className={`p-4 rounded-2xl border text-xs font-semibold leading-relaxed ${
+                          matchedSubForSelectedDay.status === 'Approved'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-205'
+                            : matchedSubForSelectedDay.status === 'Disapproved'
+                              ? 'bg-rose-50 text-rose-800 border-rose-205'
+                              : 'bg-amber-50 text-amber-850 border-amber-205'
+                        }`}>
+                          <div className="flex items-center justify-between font-black uppercase tracking-wider text-[10px] mb-1.5">
+                            <span>Status for Day {submitDayIndex + 1} Assignment:</span>
+                            <span className={
+                              matchedSubForSelectedDay.status === 'Approved' ? 'text-emerald-700' :
+                              matchedSubForSelectedDay.status === 'Disapproved' ? 'text-rose-700' :
+                              'text-amber-700'
+                            }>
+                              ● {matchedSubForSelectedDay.status === 'Approved' ? 'APPROVED ✓' : matchedSubForSelectedDay.status === 'Disapproved' ? 'DISAPPROVED ✗' : 'PENDING REVIEW'}
+                            </span>
+                          </div>
+                          <p className="font-bold text-xs text-slate-700 whitespace-pre-wrap">
+                            Description: {matchedSubForSelectedDay.submittedText}
+                          </p>
+                          {matchedSubForSelectedDay.fileUrl && (
+                            <p className="font-mono text-indigo-600 mt-1">
+                              🔗 Link: <a href={matchedSubForSelectedDay.fileUrl} target="_blank" rel="noreferrer" className="underline">{matchedSubForSelectedDay.fileUrl}</a>
+                            </p>
+                          )}
+                          {matchedSubForSelectedDay.adminReason && (
+                            <div className="mt-3 pt-2.5 border-t border-dashed border-slate-200">
+                              <strong className="text-slate-850 block mb-0.5">ℹ️ Feedback:</strong>
+                              {matchedSubForSelectedDay.adminReason}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {(!matchedSubForSelectedDay || matchedSubForSelectedDay.status === 'Disapproved') ? (
+                        <div className="space-y-5">
+                          {matchedSubForSelectedDay?.status === 'Disapproved' && (
+                            <div className="bg-rose-55 border border-rose-200 p-4 rounded-2xl text-xs font-semibold text-rose-800 leading-relaxed">
+                              Your previous submission was disapproved. Please update the details and resubmit below.
+                            </div>
+                          )}
+
+                          {/* Link to paste */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Paste Assignment Link</label>
+                            <input
+                              type="url"
+                              value={submitLink}
+                              onChange={(e) => setSubmitLink(e.target.value)}
+                              placeholder="https://your-deployment-link.com or Google Drive url"
+                              className="w-full bg-slate-50 border border-slate-200 text-slate-850 rounded-2xl py-3 px-4 text-xs font-semibold focus:border-indigo-500 outline-none transition-all shadow-inner"
+                            />
+                          </div>
+
+                          {/* Copied text */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Copied Text / Workspace Summary</label>
+                            <textarea
+                              value={submitText}
+                              onChange={(e) => setSubmitText(e.target.value)}
+                              rows={4}
+                              placeholder="Describe your workspace, findings, or paste your completed script copy answers here..."
+                              className="w-full bg-slate-50 border border-slate-200 text-slate-850 rounded-2xl py-3.5 px-4 text-xs font-semibold focus:border-indigo-500 outline-none transition-all shadow-inner resize-none"
+                            />
+                          </div>
+
+                          {/* 2 or 3 Image uploading area */}
+                          <div className="space-y-2">
+                            <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider block">
+                              Screenshot Uploads <span className="text-indigo-650 font-extrabold">(Exactly 2 or 3 screenshot images required)</span>
+                            </label>
+
+                            <div 
+                              onDragOver={(e) => { e.preventDefault(); }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                const files = (Array.from(e.dataTransfer.files) as File[]).filter(f => f.type.startsWith('image/'));
+                                const slots = 3 - uploadedImages.length;
+                                if (slots <= 0) {
+                                  alert("Maximum limit of 3 uploaded screenshot images reached!");
+                                  return;
+                                }
+                                files.slice(0, slots).forEach(file => {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    if (typeof reader.result === 'string') {
+                                      setUploadedImages(prev => [...prev, reader.result as string]);
+                                    }
+                                  };
+                                  reader.readAsDataURL(file);
+                                });
+                              }}
+                              onClick={() => document.getElementById('assignment-images-upload-input')?.click()}
+                              className="border-2 border-dashed border-slate-200 bg-slate-50/50 hover:bg-slate-50 rounded-2xl p-6 text-center cursor-pointer transition-all"
+                            >
+                              <input
+                                id="assignment-images-upload-input"
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                onChange={(e) => {
+                                  if (e.target.files) {
+                                    const files = Array.from(e.target.files) as File[];
+                                    const slots = 3 - uploadedImages.length;
+                                    if (slots <= 0) {
+                                      alert("Maximum limit of 3 uploaded screenshot images reached!");
+                                      return;
+                                    }
+                                    files.slice(0, slots).forEach(file => {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        if (typeof reader.result === 'string') {
+                                          setUploadedImages(prev => [...prev, reader.result as string]);
+                                        }
+                                      };
+                                      reader.readAsDataURL(file);
+                                    });
+                                  }
+                                }}
+                                className="hidden"
+                              />
+                              <span className="text-2xl block mb-2 select-none">📸</span>
+                              <p className="text-xs font-bold text-slate-800">Drag & Drop images or click to browse</p>
+                              <p className="text-[10px] text-slate-400 mt-1">Upload exactly 2 or 3 screenshots confirming your active workspace outputs.</p>
+                            </div>
+
+                            {uploadedImages.length > 0 && (
+                              <div className="grid grid-cols-3 gap-3 pt-2">
+                                {uploadedImages.map((imgBase64, imgIdx) => (
+                                  <div key={imgIdx} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video">
+                                    <img src={imgBase64} alt={`Upload preview ${imgIdx + 1}`} className="w-full h-full object-cover" />
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setUploadedImages(prev => prev.filter((_, i) => i !== imgIdx));
+                                      }}
+                                      className="absolute top-1 right-1 bg-rose-600 text-white p-1 rounded-full text-[9px] font-black w-4.5 h-4.5 flex items-center justify-center hover:bg-rose-700 transition-colors border-0 cursor-pointer animate-none"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Submit button */}
+                          <div className="pt-4">
+                            <button
+                              type="button"
+                              onClick={handleCustomAssignmentSubmit}
+                              disabled={submittingAssignment}
+                              className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer rounded-2xl shadow-md transform hover:-translate-y-0.5 active:translate-y-0 transition-all border-0"
+                            >
+                              {submittingAssignment ? 'Disbursing to Coach & Admin...' : 'Submit Assignment Proof 🚀'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-5 text-center text-xs font-bold text-emerald-805">
+                          🎉 Your Day {submitDayIndex + 1} Assignment has been successfully approved! Clean slate accomplished.
+                        </div>
+                      )}
+
+                      {/* Display Submission History List */}
+                      {(() => {
+                        const filteredMySubs = allMySubmissions.filter(s => s.courseId === registeredCourse.id);
+                        if (filteredMySubs.length === 0) return null;
+
+                        return (
+                          <div className="pt-6 border-t border-slate-100 space-y-3.5 text-left">
+                            <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Your Submitted Checkpoints</h4>
+                            <div className="space-y-2">
+                              {filteredMySubs.sort((a,b) => b.dayIndex - a.dayIndex).map((sub, sIdx) => (
+                                <div key={sub.id || sIdx} className="bg-slate-50 border p-3.5 rounded-2xl flex justify-between items-center gap-4 text-xs font-bold">
+                                  <div className="space-y-0.5 min-w-0">
+                                    <span className="bg-slate-205 text-slate-700 font-extrabold px-1.5 py-0.5 rounded text-[8px] uppercase">
+                                      Day {sub.dayIndex + 1} Assignment
+                                    </span>
+                                    <p className="text-slate-800 truncate">{sub.submittedText}</p>
+                                  </div>
+                                  <span className={`inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
+                                    sub.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                                    sub.status === 'Disapproved' ? 'bg-rose-100 text-rose-800' :
+                                    'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {sub.status || 'Pending'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  );
+                })()}
+              </div>
+            )
           ) : !isAdmin && appSettings?.lockedSections?.courses ? (
             <div className="bg-white border border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
               <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -2725,7 +3447,7 @@ export default function StudentDashboard() {
                   course={selectedCourse}
                   userProfile={userProfile}
                   currentUser={currentUser}
-                  onBack={() => setSelectedCourseId(null)}
+                  onBack={() => handleSelectCourseId(null)}
                   showToast={showToast}
                   handleResetProgress={handleResetProgress}
                   isAdmin={isAdmin}
@@ -2839,14 +3561,14 @@ export default function StudentDashboard() {
                             isLocked={isAdmin ? false : (isGuest || course.isLocked || course.locked)} 
                             onSelect={() => {
                               if (isAdmin) {
-                                setSelectedCourseId(course.id || null);
+                                handleSelectCourseId(course.id || null);
                               } else if (isGuest) {
                                 alert("This premium curriculum is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
                                 handleLogin();
                               } else if (course.isLocked || course.locked) {
                                 alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
                               } else {
-                                setSelectedCourseId(course.id || null);
+                                handleSelectCourseId(course.id || null);
                               }
                             }} 
                           />
@@ -2936,6 +3658,47 @@ export default function StudentDashboard() {
           )}
         </div>
       </main>
+
+      {/* SUCCESSFUL ASSIGNMENT SUBMISSION POPUP */}
+      {showSuccessPopup && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full text-center relative border border-slate-100 shadow-2xl"
+          >
+            {/* Gradient top accent */}
+            <div className="absolute top-0 left-0 w-full h-2 rounded-t-3xl bg-gradient-to-r from-teal-400 via-indigo-500 to-indigo-600" />
+            
+            <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-emerald-100 shadow-inner select-none text-2xl">
+              🎉
+            </div>
+
+            <h3 className="text-lg font-black text-slate-800 tracking-tight">Assignment Submitted Successfully!</h3>
+            
+            <div className="text-slate-600 text-xs md:text-sm leading-relaxed mt-3 space-y-3 font-semibold text-left">
+              <p>
+                Your daily workspace checklist checkpoint has been successfully compiled and sent to our certified tech coaches and administrators for reviews.
+              </p>
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-left font-bold text-slate-700 mt-2 space-y-1">
+                <span className="text-indigo-600 font-extrabold text-[11px] block uppercase tracking-wider">🗓️ Next steps:</span>
+                <p className="font-semibold text-slate-500 text-xs leading-normal">
+                  Our administrators and instructors are actively reviewing your live workspace and screenshot proof. Keep an eye on your <strong className="text-indigo-600 font-extrabold">Notification Desk</strong> inbox for approval outcomes or personalized feedback.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={() => setShowSuccessPopup(false)}
+                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-sm rounded-xl cursor-pointer border-0 transition-all shadow-md active:scale-95"
+              >
+                Continue Tracking Modules 🚀
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* CONGRATULATORY OVERLAY MODAL */}
       {showCongratsPopup && (

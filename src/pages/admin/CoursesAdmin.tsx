@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle } from 'lucide-react';
 
@@ -58,29 +59,48 @@ export default function CoursesAdmin() {
 
   // Load courses in real-time
   useEffect(() => {
-    const q = query(collection(db, 'courses'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          ...d,
-          // Compatibility map
-          skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
-          tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
-          status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
-          isLocked: d.isLocked || d.locked || false
-        } as Course;
-      });
-      setCourses(data);
-      setLoading(false);
-    }, (error) => {
-      console.error(error);
-      handleFirestoreError(error, OperationType.LIST, 'courses');
-      setLoading(false);
+    let qUnsubscribe: (() => void) | null = null;
+
+    const authUnsubscribe = onAuthStateChanged(auth, (user) => {
+      if (qUnsubscribe) {
+        qUnsubscribe();
+        qUnsubscribe = null;
+      }
+
+      if (user) {
+        const q = query(collection(db, 'courses'), orderBy('createdAt', 'desc'));
+        qUnsubscribe = onSnapshot(q, (snapshot) => {
+          const data = snapshot.docs.map(doc => {
+            const d = doc.data();
+            return {
+              id: doc.id,
+              ...d,
+              // Compatibility map
+              skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
+              tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
+              status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
+              isLocked: d.isLocked || d.locked || false
+            } as Course;
+          });
+          setCourses(data);
+          setLoading(false);
+        }, (error) => {
+          console.error(error);
+          handleFirestoreError(error, OperationType.LIST, 'courses');
+          setLoading(false);
+        });
+      } else {
+        setCourses([]);
+        setLoading(false);
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      authUnsubscribe();
+      if (qUnsubscribe) {
+        qUnsubscribe();
+      }
+    };
   }, []);
 
   // Inline DB Actions

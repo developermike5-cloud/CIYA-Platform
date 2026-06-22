@@ -100,6 +100,58 @@
       },
       "required": ["userId", "industry", "promptText", "websiteType", "createdAt"]
     },
+    "AssignmentSubmission": {
+      "title": "Assignment Submission",
+      "description": "A submission made by a student for a specific lesson/day assignment",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "courseId": { "type": "string" },
+        "dayIndex": { "type": "number" },
+        "submittedText": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Disapproved"] },
+        "adminReason": { "type": "string" },
+        "gradedBy": { "type": "string" },
+        "gradedAt": { "type": "string", "format": "timestamp" },
+        "createdAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["userId", "courseId", "dayIndex", "status", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notification system for students and admins",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "timestamp" },
+        "triggeredBy": { "type": "string" },
+        "triggerType": { "type": "string", "enum": ["manual", "automatic"] }
+      },
+      "required": ["userId", "title", "message", "isRead", "createdAt"]
+    },
+    "NotificationTemplate": {
+      "title": "Notification Template",
+      "description": "Admin configured notification layouts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "triggerType": { "type": "string" },
+        "eventType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "timestamp" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "title", "message", "triggerType", "eventType", "createdAt"]
+    },
     "AppSettings": {
       "title": "Application Settings",
       "description": "Dynamic configurations for prompt generator templates, shufflers, and modular options",
@@ -136,6 +188,18 @@
     "/saved_prompts/{promptId}": {
       "schema": { "$ref": "#/entities/SavedPrompt" },
       "description": "Exhaustive developer prompts saved by students."
+    },
+    "/assignments/{submissionId}": {
+      "schema": { "$ref": "#/entities/AssignmentSubmission" },
+      "description": "Submissions made by students for assignments."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "System or personal student/admin notifications."
+    },
+    "/notification_templates/{templateId}": {
+      "schema": { "$ref": "#/entities/NotificationTemplate" },
+      "description": "Custom templates for manual and automatic notifications."
     }
   }
 }

@@ -59,11 +59,11 @@ export default function Onboarding() {
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
       if (result.user.email === 'developermike5@gmail.com') {
-        navigate('/admin');
+        navigate('/admin', { replace: true });
       } else {
         const docSnap = await getDoc(doc(db, 'users', result.user.uid));
         if (docSnap.exists()) {
-           navigate('/dashboard');
+           navigate('/dashboard', { replace: true });
         } else {
            await auth.signOut();
            alert("No registered account found under this email. Let's guide you through the registration setup questions to create your student profile!");
@@ -158,7 +158,7 @@ export default function Onboarding() {
       
       if (user) {
         if (user.email === 'developermike5@gmail.com') {
-          navigate('/admin');
+          navigate('/admin', { replace: true });
           return;
         }
 
@@ -166,7 +166,7 @@ export default function Onboarding() {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-           navigate('/dashboard');
+           navigate('/dashboard', { replace: true });
            return;
         }
 
