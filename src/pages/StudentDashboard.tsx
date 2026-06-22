@@ -320,13 +320,12 @@ function AssignmentPanel({ assignment, dayIndex, submissions, onSubmit }: Assign
 
       <div className="space-y-3 text-xs">
         <div>
-          <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Response Description *</label>
+          <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Response Description (Optional)</label>
           <textarea
             rows={3}
             value={text}
             onChange={e => setText(e.target.value)}
             className="w-full bg-white border border-slate-300 shadow-sm outline-none p-3 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl transition-all"
-            required
             placeholder="Describe what you built today, what obstacles you overcame, or outline your next study milestone..."
           />
         </div>
@@ -343,14 +342,14 @@ function AssignmentPanel({ assignment, dayIndex, submissions, onSubmit }: Assign
 
         <button
           onClick={() => {
-            if (!text.trim()) return;
+            if (!text.trim() && !link.trim()) return;
             onSubmit(`day-${dayIndex}`, {
               text,
               link,
               submittedAt: new Date().toLocaleString()
             });
           }}
-          disabled={!text.trim()}
+          disabled={!text.trim() && !link.trim()}
           className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-xl transition-all shadow-md cursor-pointer text-xs uppercase disabled:opacity-40 border-0"
         >
           Submit Live Assignment →
@@ -1850,6 +1849,7 @@ function TrainingCountdown({ targetDateStr }: { targetDateStr: string }) {
 }
 
 export default function StudentDashboard() {
+  const location = useLocation();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -1927,7 +1927,7 @@ export default function StudentDashboard() {
   const [submittingAssignment, setSubmittingAssignment] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const view = params.get('view');
     if (view === 'prompts') {
       setCurrentView('prompts');
@@ -1943,7 +1943,7 @@ export default function StudentDashboard() {
 
     const cId = params.get('courseId') || null;
     setSelectedCourseId(cId);
-  }, [window.location.search]);
+  }, [location.search]);
 
   const [appSettings, setAppSettings] = useState<{ lockedSections?: { courses?: boolean; prompts?: boolean; assignments?: boolean } }>({});
   const [allMySubmissions, setAllMySubmissions] = useState<any[]>([]);
@@ -2080,9 +2080,15 @@ export default function StudentDashboard() {
   const [activeSkillFilter, setActiveSkillFilter] = useState<string>('all');
   const navigate = useNavigate();
 
-  const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments') => {
+  const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments', cId: string | null = null) => {
     setCurrentView(view);
-    navigate(`/dashboard?view=${view}`);
+    setSelectedCourseId(cId);
+    setIsMobileMenuOpen(false);
+    if (cId) {
+      navigate(`/dashboard?view=${view}&courseId=${cId}`);
+    } else {
+      navigate(`/dashboard?view=${view}`);
+    }
   };
 
   const handleSelectCourseId = (cId: string | null) => {
@@ -2141,16 +2147,17 @@ export default function StudentDashboard() {
       alert("No active course path assigned to submit an assignment for.");
       return;
     }
-    if (uploadedImages.length < 2 || uploadedImages.length > 3) {
-      alert("Please upload exactly 2 or 3 screenshot images of your workspace checkpoints to submit.");
+    const hasImages = uploadedImages.length > 0;
+    const hasLink = !!submitLink.trim();
+    const hasText = !!submitText.trim();
+
+    if (!hasImages && !hasLink && !hasText) {
+      alert("Please provide at least one submission option: paste a live link, write a description, or upload a screenshot image.");
       return;
     }
-    if (!submitLink.trim()) {
-      alert("Please paste your assignment live URL link.");
-      return;
-    }
-    if (!submitText.trim()) {
-      alert("Please enter the copied text or answers to complete the submission.");
+
+    if (uploadedImages.length > 3) {
+      alert("You may upload a maximum of 3 screenshot images.");
       return;
     }
 
@@ -2804,7 +2811,7 @@ export default function StudentDashboard() {
         <nav className="flex-1 px-4 space-y-1.5 mt-5 text-xs font-bold">
           <button 
             type="button"
-            onClick={() => { handleViewChange('courses'); handleSelectCourseId(null); setIsMobileMenuOpen(false); }}
+            onClick={() => handleViewChange('courses', null)}
             className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'courses' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
           >
             <div className="flex items-center gap-3">
@@ -2819,7 +2826,7 @@ export default function StudentDashboard() {
           {!isGuest && (
             <button 
               type="button"
-              onClick={() => { handleViewChange('assignments'); handleSelectCourseId(null); setIsMobileMenuOpen(false); }}
+              onClick={() => handleViewChange('assignments', null)}
               className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'assignments' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
             >
               <div className="flex items-center gap-3">
@@ -2834,7 +2841,7 @@ export default function StudentDashboard() {
 
           <button 
             type="button"
-            onClick={() => { handleViewChange('prompts'); handleSelectCourseId(null); setIsMobileMenuOpen(false); }}
+            onClick={() => handleViewChange('prompts', null)}
             className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'prompts' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
           >
             <div className="flex items-center gap-3">
@@ -2849,7 +2856,7 @@ export default function StudentDashboard() {
           {!isGuest && (
             <button 
               type="button"
-              onClick={() => { handleViewChange('notifications'); setIsMobileMenuOpen(false); }}
+              onClick={() => handleViewChange('notifications', null)}
               className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'notifications' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
             >
               <div className="flex items-center gap-3">
@@ -2866,7 +2873,7 @@ export default function StudentDashboard() {
           {!isGuest && (
             <button 
               type="button"
-              onClick={() => { handleViewChange('profile'); setIsMobileMenuOpen(false); }}
+              onClick={() => handleViewChange('profile', null)}
               className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'profile' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
             >
               <UserIcon className="w-4 h-4" />
@@ -3291,7 +3298,7 @@ export default function StudentDashboard() {
 
                           {/* Link to paste */}
                           <div className="space-y-1.5">
-                            <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Paste Assignment Link</label>
+                            <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Paste Assignment Link (Optional)</label>
                             <input
                               type="url"
                               value={submitLink}
@@ -3303,7 +3310,7 @@ export default function StudentDashboard() {
 
                           {/* Copied text */}
                           <div className="space-y-1.5">
-                            <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Copied Text / Workspace Summary</label>
+                            <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Copied Text / Workspace Summary (Optional)</label>
                             <textarea
                               value={submitText}
                               onChange={(e) => setSubmitText(e.target.value)}
@@ -3316,7 +3323,7 @@ export default function StudentDashboard() {
                           {/* 2 or 3 Image uploading area */}
                           <div className="space-y-2">
                             <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider block">
-                              Screenshot Uploads <span className="text-indigo-650 font-extrabold">(Exactly 2 or 3 screenshot images required)</span>
+                              Screenshot Uploads <span className="text-indigo-600 font-extrabold">(Optional, up to 3 screenshot images)</span>
                             </label>
 
                             <div 
@@ -3370,7 +3377,7 @@ export default function StudentDashboard() {
                               />
                               <span className="text-2xl block mb-2 select-none">📸</span>
                               <p className="text-xs font-bold text-slate-800">Drag & Drop images or click to browse</p>
-                              <p className="text-[10px] text-slate-400 mt-1">Upload exactly 2 or 3 screenshots confirming your active workspace outputs.</p>
+                              <p className="text-[10px] text-slate-400 mt-1">Upload up to 3 screenshots confirming your active workspace outputs, or leave blank if providing text/links.</p>
                             </div>
 
                             {uploadedImages.length > 0 && (
