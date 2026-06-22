@@ -14,6 +14,7 @@ interface Submission {
   submittedText: string;
   fileUrl?: string;
   fileName?: string;
+  images?: string[];
   status: 'Pending' | 'Approved' | 'Disapproved';
   adminReason?: string;
   gradedBy?: string;
@@ -27,6 +28,7 @@ export default function AssignmentsAdmin() {
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Disapproved'>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   
   const [reason, setReason] = useState('');
   const [submittingGrade, setSubmittingGrade] = useState(false);
@@ -335,7 +337,7 @@ export default function AssignmentsAdmin() {
                       <FileText className="w-5 h-5 text-indigo-600 shrink-0" />
                       <div className="text-xs min-w-0">
                         <p className="font-bold text-slate-900 truncate">{selectedSub.fileName || "uploaded_attachment"}</p>
-                        <p className="text-[10px] text-indigo-700/60 font-medium">Assignment Proof Document</p>
+                        <p className="text-[10px] text-indigo-700/60 font-medium font-bold select-none">Assignment Proof Link / Attachment</p>
                       </div>
                     </div>
                     
@@ -346,7 +348,7 @@ export default function AssignmentsAdmin() {
                       rel="noreferrer"
                       className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10px] uppercase tracking-wide px-3 py-2 rounded-xl shrink-0 cursor-pointer border-0"
                     >
-                      <Download className="w-3 h-3" /> View Proof
+                      <Download className="w-3 h-3" /> View Link / File
                     </a>
                   </div>
 
@@ -356,11 +358,42 @@ export default function AssignmentsAdmin() {
                       <img 
                         src={selectedSub.fileUrl} 
                         alt="Submitted proof assignment" 
-                        className="max-h-56 mx-auto rounded-lg object-contain shadow-sm bg-white"
+                        className="max-h-56 mx-auto rounded-lg object-contain shadow-sm bg-white cursor-zoom-in hover:opacity-90 transition-opacity"
                         referrerPolicy="no-referrer"
+                        onClick={() => setZoomedImage(selectedSub.fileUrl)}
                       />
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Multi-screenshot uploaded images rendering */}
+              {selectedSub.images && Array.isArray(selectedSub.images) && selectedSub.images.length > 0 && (
+                <div className="space-y-1.5 pt-2">
+                  <span className="text-[10px] uppercase font-extrabold text-slate-400 block">
+                    📸 Student Workspace Screenshots ({selectedSub.images.length})
+                  </span>
+                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+                    {selectedSub.images.map((imgSrc, idx) => (
+                      <div 
+                        key={idx} 
+                        onClick={() => setZoomedImage(imgSrc)}
+                        className="relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-white hover:border-indigo-400 cursor-zoom-in group transition-all"
+                      >
+                        <img 
+                          src={imgSrc} 
+                          alt={`Student workspace screenshot ${idx + 1}`} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-205"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <span className="text-[8px] font-black tracking-wider text-white uppercase bg-slate-950/80 px-1.5 py-0.5 rounded">
+                            Zoom 🔍
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -422,6 +455,33 @@ export default function AssignmentsAdmin() {
           )}
         </div>
       </div>
+
+      {/* Screenshot Lightbox Zoom Magnifier Modal */}
+      {zoomedImage && (
+        <div 
+          className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setZoomedImage(null)}
+        >
+          <div className="relative max-w-5xl w-full bg-slate-900 text-white rounded-3xl p-3 md:p-4 overflow-hidden shadow-2xl flex flex-col items-center border border-slate-700/60 transition-transform duration-200">
+            <button 
+              onClick={(e) => { e.stopPropagation(); setZoomedImage(null); }}
+              className="absolute top-4 right-4 bg-slate-800/80 hover:bg-slate-700 text-white font-bold p-2 px-4 rounded-full text-xs shadow hover:scale-105 transition-all border-0 cursor-pointer"
+            >
+              ✕ Close
+            </button>
+            <img 
+              src={zoomedImage} 
+              alt="Zoomed Student Screenshot Proof" 
+              className="max-w-full max-h-[80vh] rounded-2xl object-contain selection:bg-transparent"
+              onClick={(e) => e.stopPropagation()}
+              referrerPolicy="no-referrer"
+            />
+            <div className="text-center pt-2 text-slate-400 text-[10px] font-semibold tracking-wide uppercase">
+              Click anywhere outside or press the Close button to dismiss lightroom.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

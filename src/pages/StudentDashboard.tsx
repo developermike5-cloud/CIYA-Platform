@@ -1965,7 +1965,7 @@ export default function StudentDashboard() {
   }, [currentUser]);
 
   const handleDashboardAssignmentSubmit = async (dayIndex: number, data: any) => {
-    const activeCId = selectedAssignCourseId || courses[0]?.id;
+    const activeCId = selectedAssignCourseId || coursesToSee[0]?.id;
     if (!activeCId) return;
     try {
       const userRef = doc(db, 'users', currentUser.uid);
@@ -2580,11 +2580,31 @@ export default function StudentDashboard() {
     }
     
     const selection = (userProfile?.pathwaySelection || '').toLowerCase().trim();
+    const courseType = (userProfile?.courseType || '').toLowerCase().trim();
+    const recommended = (userProfile?.recommendedPath || '').toLowerCase().trim();
+    
     const title = (c.title || '').toLowerCase().trim();
     const category = (c.category || '').toLowerCase().trim();
-    const recommended = (userProfile?.recommendedPath || '').toLowerCase().trim();
+    const skill = (c.skill || '').toLowerCase().trim();
+
+    // Exact classification of learning pathways to avoid cross-course leaks
+    const isLandingUser = courseType.includes('landing') || selection.includes('landing') || recommended.includes('landing') || recommended.includes('funnel') || selection.includes('funnel') || selection.includes('flyer') || selection.includes('logo') || selection.includes('graphic') || selection.includes('mockup');
+    const isEcommerceUser = courseType.includes('e-commerce') || selection.includes('e-commerce') || recommended.includes('e-commerce') || selection.includes('store') || selection.includes('checkout') || selection.includes('catalog') || recommended.includes('store');
+
+    const isLandingCourse = title.includes('landing') || category.includes('landing') || skill.includes('landing') || title.includes('funnel') || category.includes('funnel');
+    const isEcommerceCourse = title.includes('e-commerce') || title.includes('ecommerce') || category.includes('e-commerce') || category.includes('ecommerce') || title.includes('store') || title.includes('checkout') || title.includes('catalog');
+
+    if (isLandingUser && isLandingCourse) {
+      return true;
+    }
+    if (isEcommerceUser && isEcommerceCourse) {
+      return true;
+    }
 
     if (selection && (title.includes(selection) || selection.includes(title))) {
+      return true;
+    }
+    if (courseType && (title.includes(courseType) || courseType.includes(title))) {
       return true;
     }
     if (recommended && (title.includes(recommended) || recommended.includes(title))) {
@@ -2597,8 +2617,8 @@ export default function StudentDashboard() {
     return false;
   });
 
-  // If unregistered list is empty for a registered/approved student, gracefully fall back to all standard published courses to avoid blank states
-  const coursesToSee = (isAdmin || registeredCoursesList.length > 0) ? registeredCoursesList : courses;
+  // Filter courses carefully: admins see everything, students see only their registered course list (no cross courses)
+  const coursesToSee = isAdmin ? courses : registeredCoursesList;
 
   // Apply Skill tags sorting filters & locking courses visibility logic (locked courses only visible to admins)
   const filteredCourses = coursesToSee.filter(c => {
@@ -2627,11 +2647,11 @@ export default function StudentDashboard() {
             </div>
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">Application Selected & Pending Review 📋</h2>
             
-            <div className="text-slate-600 text-sm leading-relaxed max-w-md mx-auto space-y-3 font-medium">
+            <div className="text-slate-900 text-sm leading-relaxed max-w-md mx-auto space-y-3 font-semibold">
               <p>
-                Hello <strong className="text-slate-800 font-bold">{userProfile.fullName || 'Student'}</strong>! Thank you for lodging your request. Your onboarding metrics are currently under verification.
+                Hello <strong className="text-slate-900 font-extrabold">{userProfile.fullName || 'Student'}</strong>! Thank you for lodging your request. Your onboarding metrics are currently under active verification.
               </p>
-              <p className="italic text-xs text-slate-500">
+              <p className="italic text-xs text-slate-700 bg-slate-50 border p-3 rounded-2xl leading-normal mt-2">
                 Keep eye contact with your personal inbox because once checked, notification pathways automatically transmit the link. Checking junk mail ensures zero latency!
               </p>
             </div>
@@ -3032,7 +3052,7 @@ export default function StudentDashboard() {
                     <div className="flex items-center gap-2 mb-4">
                       <span className="text-lg">📊</span>
                       <div>
-                        <h3 className="font-extrabold text-slate-850 text-xs tracking-tight uppercase tracking-wider text-indigo-700">Course Quizzes Score Sheet</h3>
+                        <h3 className="font-extrabold text-slate-805 text-xs tracking-tight uppercase tracking-wider text-indigo-700">Course Quizzes Score Sheet</h3>
                         <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
                           Your first-attempt scores are locked in your profile. Click 'Reset Progress' below to start fresh.
                         </p>
@@ -3254,7 +3274,7 @@ export default function StudentDashboard() {
                           )}
                           {matchedSubForSelectedDay.adminReason && (
                             <div className="mt-3 pt-2.5 border-t border-dashed border-slate-200">
-                              <strong className="text-slate-850 block mb-0.5">ℹ️ Feedback:</strong>
+                              <strong className="text-slate-800 font-black block mb-0.5">ℹ️ Feedback:</strong>
                               {matchedSubForSelectedDay.adminReason}
                             </div>
                           )}
@@ -3264,7 +3284,7 @@ export default function StudentDashboard() {
                       {(!matchedSubForSelectedDay || matchedSubForSelectedDay.status === 'Disapproved') ? (
                         <div className="space-y-5">
                           {matchedSubForSelectedDay?.status === 'Disapproved' && (
-                            <div className="bg-rose-55 border border-rose-200 p-4 rounded-2xl text-xs font-semibold text-rose-800 leading-relaxed">
+                            <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl text-xs font-semibold text-rose-800 leading-relaxed">
                               Your previous submission was disapproved. Please update the details and resubmit below.
                             </div>
                           )}
@@ -3277,7 +3297,7 @@ export default function StudentDashboard() {
                               value={submitLink}
                               onChange={(e) => setSubmitLink(e.target.value)}
                               placeholder="https://your-deployment-link.com or Google Drive url"
-                              className="w-full bg-slate-50 border border-slate-200 text-slate-850 rounded-2xl py-3 px-4 text-xs font-semibold focus:border-indigo-500 outline-none transition-all shadow-inner"
+                              className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-bold rounded-2xl py-3 px-4 text-xs focus:border-indigo-500 outline-none transition-all shadow-inner"
                             />
                           </div>
 
@@ -3289,7 +3309,7 @@ export default function StudentDashboard() {
                               onChange={(e) => setSubmitText(e.target.value)}
                               rows={4}
                               placeholder="Describe your workspace, findings, or paste your completed script copy answers here..."
-                              className="w-full bg-slate-50 border border-slate-200 text-slate-850 rounded-2xl py-3.5 px-4 text-xs font-semibold focus:border-indigo-500 outline-none transition-all shadow-inner resize-none"
+                              className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-bold rounded-2xl py-3.5 px-4 text-xs focus:border-indigo-500 outline-none transition-all shadow-inner resize-none"
                             />
                           </div>
 
@@ -3676,13 +3696,13 @@ export default function StudentDashboard() {
 
             <h3 className="text-lg font-black text-slate-800 tracking-tight">Assignment Submitted Successfully!</h3>
             
-            <div className="text-slate-600 text-xs md:text-sm leading-relaxed mt-3 space-y-3 font-semibold text-left">
+            <div className="text-slate-800 text-xs md:text-sm leading-relaxed mt-3 space-y-3 font-bold text-left">
               <p>
                 Your daily workspace checklist checkpoint has been successfully compiled and sent to our certified tech coaches and administrators for reviews.
               </p>
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-left font-bold text-slate-700 mt-2 space-y-1">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left font-bold text-slate-800 mt-2 space-y-1">
                 <span className="text-indigo-600 font-extrabold text-[11px] block uppercase tracking-wider">🗓️ Next steps:</span>
-                <p className="font-semibold text-slate-500 text-xs leading-normal">
+                <p className="font-bold text-slate-700 text-xs leading-normal">
                   Our administrators and instructors are actively reviewing your live workspace and screenshot proof. Keep an eye on your <strong className="text-indigo-600 font-extrabold">Notification Desk</strong> inbox for approval outcomes or personalized feedback.
                 </p>
               </div>
