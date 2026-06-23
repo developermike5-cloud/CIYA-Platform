@@ -12,12 +12,9 @@ import NotificationsAdmin from './pages/admin/NotificationsAdmin';
 import PortalLocksAdmin from './pages/admin/PortalLocksAdmin';
 import Onboarding from './pages/Onboarding';
 import GetStarted from './pages/GetStarted';
-import DatabaseQuotaBanner from './components/DatabaseQuotaBanner';
-
 export default function App() {
   return (
     <BrowserRouter>
-      <DatabaseQuotaBanner />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/onboarding" element={<Onboarding />} />

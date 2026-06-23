@@ -10,6 +10,7 @@ import { motion } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 import SecureYoutubePlayer from '../components/SecureYoutubePlayer';
 import PromptGenerator from '../components/PromptGenerator';
+import { safeStorage } from '../utils/safeStorage';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -1855,7 +1856,7 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   
   const [currentUser, setCurrentUser] = useState<any>(() => {
-    const cached = localStorage.getItem('ciya_cached_user');
+    const cached = safeStorage.getItem('ciya_cached_user');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
@@ -1868,7 +1869,7 @@ export default function StudentDashboard() {
   });
 
   const [userProfile, setUserProfile] = useState<any>(() => {
-    const cachedProfile = localStorage.getItem('ciya_cached_profile');
+    const cachedProfile = safeStorage.getItem('ciya_cached_profile');
     if (cachedProfile) {
       try {
         return JSON.parse(cachedProfile);
@@ -1878,7 +1879,7 @@ export default function StudentDashboard() {
   });
 
   const [authChecking, setAuthChecking] = useState(() => {
-    return !(localStorage.getItem('ciya_cached_user') && localStorage.getItem('ciya_cached_profile'));
+    return !(safeStorage.getItem('ciya_cached_user') && safeStorage.getItem('ciya_cached_profile'));
   });
 
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
@@ -2040,7 +2041,7 @@ export default function StudentDashboard() {
 
   const [timeLeft, setTimeLeft] = useState('');
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    const cached = localStorage.getItem('ciya_cached_user');
+    const cached = safeStorage.getItem('ciya_cached_user');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
@@ -2102,7 +2103,7 @@ export default function StudentDashboard() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [liveCheckComplete, setLiveCheckComplete] = useState(() => {
-    const cachedProfile = localStorage.getItem('ciya_cached_profile');
+    const cachedProfile = safeStorage.getItem('ciya_cached_profile');
     if (cachedProfile) {
       try {
         const parsed = JSON.parse(cachedProfile);
@@ -2310,8 +2311,8 @@ export default function StudentDashboard() {
           email: result.user.email,
           role: isUserAdmin ? 'admin' : 'student'
         };
-        localStorage.setItem('ciya_cached_user', JSON.stringify(userData));
-        localStorage.setItem('ciya_cached_profile', JSON.stringify(data));
+        safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
+        safeStorage.setItem('ciya_cached_profile', JSON.stringify(data));
         setLiveCheckComplete(true);
       } else {
         await signOut(auth);
@@ -2369,17 +2370,14 @@ export default function StudentDashboard() {
             const profileData = docSnap.data();
             setUserProfile(profileData);
             
-            // Sync to RTDB Leaderboard to save Firestore reads for other students is suspended for now!
-            // syncUserProfileToRTDB(user.uid, profileData);
-            
             // Cache to local storage
             const userData = {
               uid: user.uid,
               email: user.email,
               role: isUserAdmin ? 'admin' : 'student'
             };
-            localStorage.setItem('ciya_cached_user', JSON.stringify(userData));
-            localStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
+            safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
+            safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
             setAuthChecking(false);
             setLiveCheckComplete(true);
           } else if (user.email === 'developermike5@gmail.com') {
@@ -2402,13 +2400,13 @@ export default function StudentDashboard() {
               email: user.email,
               role: 'super_admin'
             };
-            localStorage.setItem('ciya_cached_user', JSON.stringify(userData));
-            localStorage.setItem('ciya_cached_profile', JSON.stringify(mockProfile));
+            safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
+            safeStorage.setItem('ciya_cached_profile', JSON.stringify(mockProfile));
             setAuthChecking(false);
             setLiveCheckComplete(true);
           } else {
-            localStorage.removeItem('ciya_cached_user');
-            localStorage.removeItem('ciya_cached_profile');
+            safeStorage.removeItem('ciya_cached_user');
+            safeStorage.removeItem('ciya_cached_profile');
             alert('No profile found. Please complete the registration process.');
             setLiveCheckComplete(false);
             navigate('/onboarding', { replace: true });
@@ -2434,7 +2432,7 @@ export default function StudentDashboard() {
             setLiveCheckComplete(true);
           } else {
             handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-            const cachedP = localStorage.getItem('ciya_cached_profile');
+            const cachedP = safeStorage.getItem('ciya_cached_profile');
             if (cachedP) {
               try {
                 setUserProfile(JSON.parse(cachedP));
@@ -2460,10 +2458,10 @@ export default function StudentDashboard() {
         });
 
       } else {
-        const cachedUser = localStorage.getItem('ciya_cached_user');
+        const cachedUser = safeStorage.getItem('ciya_cached_user');
         if (!cachedUser) {
-          localStorage.removeItem('ciya_cached_user');
-          localStorage.removeItem('ciya_cached_profile');
+          safeStorage.removeItem('ciya_cached_user');
+          safeStorage.removeItem('ciya_cached_profile');
           setLiveCheckComplete(false);
           if (unsubSnapshot) {
             unsubSnapshot();
@@ -2532,8 +2530,8 @@ export default function StudentDashboard() {
     async function loadCourses() {
       setLoading(true);
 
-      const cached = localStorage.getItem('ciya_cached_courses');
-      const cachedTime = localStorage.getItem('ciya_cached_courses_time');
+      const cached = safeStorage.getItem('ciya_cached_courses');
+      const cachedTime = safeStorage.getItem('ciya_cached_courses_time');
       const ONE_HOUR = 60 * 60 * 1000;
 
       if (cached && cachedTime) {
@@ -2596,13 +2594,13 @@ export default function StudentDashboard() {
         });
 
         setCourses(data);
-        localStorage.setItem('ciya_cached_courses', JSON.stringify(data));
-        localStorage.setItem('ciya_cached_courses_time', Date.now().toString());
+        safeStorage.setItem('ciya_cached_courses', JSON.stringify(data));
+        safeStorage.setItem('ciya_cached_courses_time', Date.now().toString());
       } catch (error) {
         console.error("Error fetching courses from custom cache-loader:", error);
         handleFirestoreError(error, OperationType.LIST, 'courses');
         
-        const backup = localStorage.getItem('ciya_cached_courses');
+        const backup = safeStorage.getItem('ciya_cached_courses');
         if (backup) {
           try {
             setCourses(JSON.parse(backup));
@@ -2682,8 +2680,8 @@ export default function StudentDashboard() {
   };
 
   const handleLogout = async () => {
-    localStorage.removeItem('ciya_cached_user');
-    localStorage.removeItem('ciya_cached_profile');
+    safeStorage.removeItem('ciya_cached_user');
+    safeStorage.removeItem('ciya_cached_profile');
     await signOut(auth);
     setCurrentUser(null);
     setUserProfile(null);

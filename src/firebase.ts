@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { getAuth, initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from 'firebase/auth';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore } from 'firebase/firestore';
 import { getDatabase, ref, set } from 'firebase/database';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -22,17 +22,45 @@ const activeFirebaseConfig = {
 };
 
 const app = initializeApp(activeFirebaseConfig);
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
-}, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth();
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    localCache: memoryLocalCache()
+  }, firebaseConfig.firestoreDatabaseId);
+} catch (error) {
+  console.warn("Firestore initializeFirestore with memoryLocalCache failed, falling back to default getFirestore:", error);
+  try {
+    firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  } catch (secondError) {
+    console.error("Firestore safe fallback also failed, initializing default getFirestore:", secondError);
+    firestoreDb = getFirestore(app);
+  }
+}
+export const db = firestoreDb;
+
+let authInstance;
+try {
+  // Use explicit persistence to bypass IDB issues in sandboxed frames
+  authInstance = initializeAuth(app, {
+    persistence: [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence]
+  });
+} catch (e) {
+  console.warn("initializeAuth failed (usually due to iframe constraints), trying inMemoryPersistence:", e);
+  try {
+    authInstance = initializeAuth(app, {
+      persistence: inMemoryPersistence
+    });
+  } catch (err2) {
+    console.error("Auth inMemoryPersistence fallback failed, using getAuth(app):", err2);
+    authInstance = getAuth(app);
+  }
+}
+
+export const auth = authInstance;
 
 // Initialize Realtime Database for zero-cost high-frequency real-time events,
-// such as Leaderboard live scoring synchronization and live settings locks,
-// which prevents wasting Firestore daily read/write quota rules!
+// such as live settings locks, which prevents wasting Firestore daily read/write quota rules!
 let rtdbInstance;
 try {
   // Safe regional construction supporting US/EU databases
@@ -108,61 +136,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
   if (shouldThrow) {
     throw new Error(JSON.stringify(errInfo));
-  }
-}
-
-// Function to synchronize a student's profile progress to Firebase Realtime Database.
-// This allows students to load the leaderboard without consuming any Firestore reads,
-// preventing quota exceeding blocks for the entire academy!
-export function syncUserProfileToRTDB(userId: string, profileData: any) {
-  if (!rtdb || !userId || !profileData) return;
-  if (profileData.email === 'developermike5@gmail.com') return; // Skip admin account
-
-  let totalScore = 0;
-  const dayScores: { [dayNum: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  let totalQuizzesTaken = 0;
-
-  if (profileData.progress) {
-    Object.keys(profileData.progress).forEach((courseId) => {
-      const courseProgress = profileData.progress[courseId];
-      if (courseProgress && courseProgress.quizScores) {
-        const quizScores = courseProgress.quizScores;
-        Object.entries(quizScores).forEach(([checkKey, record]: [string, any]) => {
-          // Key format: "activeDayIdx-activeVideoIdx" (e.g., "0-1")
-          const parts = checkKey.split('-');
-          const dayIdx = parseInt(parts[0], 10);
-          if (!isNaN(dayIdx)) {
-            const dayNum = dayIdx + 1; // 1-indexed (Day 1 to 5)
-            const score = typeof record.score === 'number' ? record.score : 0;
-
-            if (dayNum >= 1 && dayNum <= 5) {
-              dayScores[dayNum] = (dayScores[dayNum] || 0) + score;
-              totalScore += score;
-              totalQuizzesTaken += 1;
-            }
-          }
-        });
-      }
-    });
-  }
-
-  // Update Realtime Database leaderboard ref
-  try {
-    const userRef = ref(rtdb, `leaderboard/${userId}`);
-    set(userRef, {
-      id: userId,
-      fullName: profileData.fullName || 'Anonymous Student',
-      state: profileData.state || 'Global',
-      email: profileData.email || '',
-      totalScore,
-      dayScores,
-      totalQuizzesTaken,
-      lastUpdated: Date.now()
-    }).catch(e => {
-      console.warn("RTDB write promise rejected (possibly missing rules or auth not fully initialized):", e);
-    });
-  } catch (err) {
-    console.error("RTDB Leaderboard Sync Error: ", err);
   }
 }
 
