@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getDatabase, ref, set } from 'firebase/database';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -22,7 +22,12 @@ const activeFirebaseConfig = {
 };
 
 const app = initializeApp(activeFirebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+}, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth();
 
 // Initialize Realtime Database for zero-cost high-frequency real-time events,

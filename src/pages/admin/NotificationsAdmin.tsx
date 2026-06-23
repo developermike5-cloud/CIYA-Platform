@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, serverTimestamp, writeBatch, limit } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Mail, Settings, Plus, Trash2, Calendar, Send, Users, AlertCircle, RefreshCw, Layers } from 'lucide-react';
@@ -85,7 +85,7 @@ export default function NotificationsAdmin() {
         });
 
         // 2. Fetch Dispatched Notifications History
-        const qHistory = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
+        const qHistory = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50));
         unsubHistory = onSnapshot(qHistory, (snap) => {
           const list: DispatchedNotification[] = [];
           snap.forEach(d => list.push({ id: d.id, ...d.data() } as DispatchedNotification));
@@ -93,15 +93,37 @@ export default function NotificationsAdmin() {
           setLoading(false);
         });
 
-        // 3. Fetch User Students list once for manual picker dropdown
-        getDocs(collection(db, 'users')).then(snap => {
-          const list: UserStudent[] = [];
-          snap.forEach(d => {
-            const u = d.data();
-            list.push({ id: d.id, email: u.email, fullName: u.fullName });
-          });
-          setStudents(list);
-        }).catch(err => console.error("Error loading student select list:", err));
+        // 3. Fetch User Students list with cache for manual picker dropdown
+        const cachedUsersStr = localStorage.getItem('ciya_admin_cached_users_list');
+        const cachedUsersTimeStr = localStorage.getItem('ciya_admin_cached_users_time');
+        const CACHE_MINS = 10 * 60 * 1000; // 10 minutes cache
+        
+        if (cachedUsersStr && cachedUsersTimeStr && (Date.now() - parseInt(cachedUsersTimeStr, 10) < CACHE_MINS)) {
+          try {
+            const parsed = JSON.parse(cachedUsersStr);
+            const list: UserStudent[] = parsed.map((u: any) => ({
+              id: u.id,
+              email: u.email,
+              fullName: u.fullName
+            }));
+            setStudents(list);
+          } catch (e) {
+            console.warn("Could not parse cached user list for dropdown, reading from database:", e);
+          }
+        } else {
+          getDocs(collection(db, 'users')).then(snap => {
+            const list: UserStudent[] = [];
+            const rawList: any[] = [];
+            snap.forEach(d => {
+              const u = d.data();
+              rawList.push({ id: d.id, ...u });
+              list.push({ id: d.id, email: u.email, fullName: u.fullName });
+            });
+            setStudents(list);
+            localStorage.setItem('ciya_admin_cached_users_list', JSON.stringify(rawList));
+            localStorage.setItem('ciya_admin_cached_users_time', Date.now().toString());
+          }).catch(err => console.error("Error loading student select list:", err));
+        }
       } else {
         setTemplates([]);
         setHistory([]);

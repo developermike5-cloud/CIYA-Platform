@@ -1996,40 +1996,46 @@ export default function StudentDashboard() {
   };
 
   useEffect(() => {
-    if (!rtdb) {
-      const unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
+    let unsubFirestore: (() => void) | null = null;
+    let unsubRTDB: (() => void) | null = null;
+
+    const setupFirestoreFallback = () => {
+      if (unsubFirestore) return; // Already listening
+      unsubFirestore = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
         if (docSnap.exists()) {
           setAppSettings(docSnap.data() || {});
         }
       });
-      return () => unsubSettings();
+    };
+
+    if (!rtdb) {
+      setupFirestoreFallback();
+    } else {
+      const locksRef = dbRef(rtdb, 'settings/app');
+      unsubRTDB = onValue(locksRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const val = snapshot.val();
+          setAppSettings(val || {});
+          // If RTDB successfully returned valid data, we can safely disconnect Firestore
+          if (unsubFirestore) {
+            unsubFirestore();
+            unsubFirestore = null;
+          }
+        } else {
+          setupFirestoreFallback();
+        }
+      }, (error) => {
+        console.warn("RTDB locks load failed, falling back to Firestore:", error);
+        setupFirestoreFallback();
+      });
     }
 
-    const locksRef = dbRef(rtdb, 'settings/app');
-    const unsub = onValue(locksRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const val = snapshot.val();
-        setAppSettings(val || {});
-      } else {
-        // Fallback if RTDB path is unpopulated yet
-        const unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
-          if (docSnap.exists()) {
-            setAppSettings(docSnap.data() || {});
-          }
-        });
-        return () => unsubSettings();
+    return () => {
+      if (unsubRTDB) unsubRTDB();
+      if (unsubFirestore) {
+        unsubFirestore();
       }
-    }, (error) => {
-      console.warn("RTDB locks load failed, falling back to Firestore:", error);
-      const unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
-        if (docSnap.exists()) {
-          setAppSettings(docSnap.data() || {});
-        }
-      });
-      return () => unsubSettings();
-    });
-
-    return () => unsub();
+    };
   }, []);
 
   const [timeLeft, setTimeLeft] = useState('');

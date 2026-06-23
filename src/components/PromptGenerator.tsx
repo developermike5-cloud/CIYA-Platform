@@ -9,7 +9,8 @@ import {
   where, 
   serverTimestamp,
   doc,
-  getDocs
+  getDocs,
+  getDoc
 } from 'firebase/firestore';
 import { 
   Copy, 
@@ -454,17 +455,42 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
   } | null>(null);
   const [modCopySuccess, setModCopySuccess] = useState(false);
 
-  // 1. Fetch any Admin templates from Firestore Settings (for shuffler options)
+  // 1. Fetch any Admin templates from Firestore Settings with a 15-minute cache
   useEffect(() => {
     async function fetchAdminTemplates() {
+      // Check cache first
+      const cachedLp = localStorage.getItem('ciya_cached_lp_templates');
+      const cachedEc = localStorage.getItem('ciya_cached_ec_templates');
+      const cachedTime = localStorage.getItem('ciya_cached_templates_time');
+      const CACHE_LIMIT = 15 * 60 * 1000; // 15 mins
+
+      if (cachedLp && cachedEc && cachedTime) {
+        const diff = Date.now() - parseInt(cachedTime, 10);
+        if (diff < CACHE_LIMIT) {
+          try {
+            setCustomLpTemplates(JSON.parse(cachedLp));
+            setCustomEcTemplates(JSON.parse(cachedEc));
+            return; // Used cache successfully, 0 reads!
+          } catch (e) {
+            console.warn("Error parsing template cache:", e);
+          }
+        }
+      }
+
       try {
         const fullDocRef = doc(db, 'settings', 'full_prompts');
-        const fullSnap = await getDocs(collection(db, 'settings'));
-        const configDoc = fullSnap.docs.find(d => d.id === 'full_prompts');
-        if (configDoc && configDoc.exists()) {
+        const configDoc = await getDoc(fullDocRef);
+        if (configDoc.exists()) {
           const data = configDoc.data();
-          setCustomLpTemplates(data.landing || []);
-          setCustomEcTemplates(data.ecommerce || []);
+          const lpTemplates = data.landing || [];
+          const ecTemplates = data.ecommerce || [];
+          
+          setCustomLpTemplates(lpTemplates);
+          setCustomEcTemplates(ecTemplates);
+          
+          localStorage.setItem('ciya_cached_lp_templates', JSON.stringify(lpTemplates));
+          localStorage.setItem('ciya_cached_ec_templates', JSON.stringify(ecTemplates));
+          localStorage.setItem('ciya_cached_templates_time', Date.now().toString());
         }
       } catch (err) {
         console.error("Admin prompt retrieval skipped, falling back:", err);

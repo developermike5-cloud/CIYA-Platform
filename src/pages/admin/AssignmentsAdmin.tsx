@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { CheckCircle2, XCircle, Clock, Search, FileText, Download, Check, RefreshCw } from 'lucide-react';
@@ -50,7 +50,8 @@ export default function AssignmentsAdmin() {
       if (user) {
         const q = query(
           collection(db, 'assignments'),
-          orderBy('createdAt', 'desc')
+          orderBy('createdAt', 'desc'),
+          limit(100)
         );
 
         qUnsubscribe = onSnapshot(q, (snapshot) => {

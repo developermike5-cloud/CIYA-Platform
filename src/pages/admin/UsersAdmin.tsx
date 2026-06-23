@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
-import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw } from 'lucide-react';
+import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 
 function getFirestoreTime(timestamp: any): number {
@@ -366,31 +366,73 @@ export default function UsersAdmin() {
     }
   };
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
-        setUsers(data);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-        // Fetch admins
-        const adminSnapshot = await getDocs(collection(db, 'admins'));
-        const adminIds: string[] = [];
-        const adminMap: Record<string, { email: string, role?: string, permissions?: string[] }> = {};
-        adminSnapshot.docs.forEach(docSnap => {
-          adminIds.push(docSnap.id);
-          adminMap[docSnap.id] = (docSnap.data() || {}) as any;
-        });
-        setAdmins(adminIds);
-        setAdminsData(adminMap);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'users');
-      } finally {
-        setLoading(false);
+  const fetchUsers = async (forceRefresh = false) => {
+    if (forceRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    try {
+      if (!forceRefresh) {
+        // Try local storage cache
+        const cachedUsersStr = localStorage.getItem('ciya_admin_cached_users_list');
+        const cachedUsersTimeStr = localStorage.getItem('ciya_admin_cached_users_time');
+        const CACHE_MINS = 10 * 60 * 1000; // 10 minutes cache
+        
+        if (cachedUsersStr && cachedUsersTimeStr && (Date.now() - parseInt(cachedUsersTimeStr, 10) < CACHE_MINS)) {
+          try {
+            const parsedUsers = JSON.parse(cachedUsersStr);
+            setUsers(parsedUsers);
+            
+            // Also load cached admins info to keep UI snappy
+            const cachedAdminsStr = localStorage.getItem('ciya_admin_cached_admins_list');
+            const cachedAdminsDataStr = localStorage.getItem('ciya_admin_cached_admins_data');
+            if (cachedAdminsStr && cachedAdminsDataStr) {
+              setAdmins(JSON.parse(cachedAdminsStr));
+              setAdminsData(JSON.parse(cachedAdminsDataStr));
+              setLoading(false);
+              return; // Cache remains valid, 0 Firestore reads!
+            }
+          } catch (e) {
+            console.warn("Could not parse cached users, doing a fresh read:", e);
+          }
+        }
       }
-    };
-    fetchUsers();
+
+      // Fresh Firestore fetch (Only triggers on manual refresh or cache expiry!)
+      const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+      setUsers(data);
+
+      const adminSnapshot = await getDocs(collection(db, 'admins'));
+      const adminIds: string[] = [];
+      const adminMap: Record<string, { email: string, role?: string, permissions?: string[] }> = {};
+      adminSnapshot.docs.forEach(docSnap => {
+        adminIds.push(docSnap.id);
+        adminMap[docSnap.id] = (docSnap.data() || {}) as any;
+      });
+      setAdmins(adminIds);
+      setAdminsData(adminMap);
+
+      // Save to local cache
+      localStorage.setItem('ciya_admin_cached_users_list', JSON.stringify(data));
+      localStorage.setItem('ciya_admin_cached_users_time', Date.now().toString());
+      localStorage.setItem('ciya_admin_cached_admins_list', JSON.stringify(adminIds));
+      localStorage.setItem('ciya_admin_cached_admins_data', JSON.stringify(adminMap));
+
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'users');
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers(false);
   }, []);
 
   const uniqueStates = Array.from(new Set(users.map(u => u.state).filter(Boolean))).sort() as string[];
@@ -565,7 +607,18 @@ export default function UsersAdmin() {
 
       <div className="flex flex-col mb-6 gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <h1 className="text-2xl font-bold text-slate-800">Students & Onboarding Stats</h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold text-slate-800">Students & Onboarding Stats</h1>
+            <button
+              onClick={() => fetchUsers(true)}
+              disabled={isRefreshing}
+              className={`p-1.5 px-3 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 cursor-pointer shadow-sm transition-all flex items-center gap-1.5 text-xs font-bold ${isRefreshing ? 'opacity-60 cursor-not-allowed' : ''}`}
+              title="Force sync latest student data from Firestore"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-550' : ''}`} />
+              <span>{isRefreshing ? 'Syncing...' : 'Sync Live'}</span>
+            </button>
+          </div>
           
           <div className="relative w-full md:w-64">
             <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
