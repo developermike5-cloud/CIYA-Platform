@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
 import BrandingLogo from '../components/BrandingLogo';
+import Leaderboard from '../components/Leaderboard';
 import { 
   Lightbulb, Gift, Bot, Wallet, Check, Smartphone, Briefcase, Zap, TrendingUp, Globe, Film, Palette, Sparkles
 } from 'lucide-react';
@@ -233,6 +234,7 @@ function Navbar() {
       <div className="hidden md:flex items-center gap-10 text-sm font-medium text-teal-200">
         <a href="#mission" className="hover:text-amber-400 transition-colors">Mission</a>
         <a href="#courses" className="hover:text-amber-400 transition-colors">Courses</a>
+        <a href="#leaderboard" className="hover:text-amber-400 transition-colors">Leaderboard</a>
         <Link to="/dashboard?view=prompts" className="hover:text-amber-400 transition-colors flex items-center gap-1">
           <Sparkles className="w-3.5 h-3.5 text-amber-450" />
           <span>Prompt Generator</span>
@@ -881,6 +883,7 @@ export default function App() {
         <Hero />
         <Mission />
         <Courses />
+        <Leaderboard />
         <HowItWorks />
         <WhyCiya />
         <CTA />

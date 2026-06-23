@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../../firebase';
+import { db, auth, rtdb } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Lock, Unlock, ShieldAlert, Sparkles, CheckCircle, HelpCircle } from 'lucide-react';
 
 interface LockedSections {
@@ -34,13 +35,22 @@ export default function PortalLocksAdmin() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data && data.lockedSections) {
-          setLockedSections({
+          const locks = {
             courses: !!data.lockedSections.courses,
             prompts: !!data.lockedSections.prompts,
             profile: !!data.lockedSections.profile,
             notifications: !!data.lockedSections.notifications,
             assignments: !!data.lockedSections.assignments,
-          });
+          };
+          setLockedSections(locks);
+
+          // Keep RTDB in sync whenever settings are read/edited
+          if (rtdb) {
+            dbSet(dbRef(rtdb, 'settings/app'), {
+              lockedSections: locks,
+              updatedAt: Date.now()
+            }).catch(err => console.warn("Failed to sync app locks to RTDB:", err));
+          }
         }
       }
       setLoading(false);
@@ -69,6 +79,14 @@ export default function PortalLocksAdmin() {
         lockedSections: updatedLocks,
         updatedAt: serverTimestamp()
       }, { merge: true });
+
+      // Synchronize to RTDB for immediate cost-free retrieval by students!
+      if (rtdb) {
+        dbSet(dbRef(rtdb, 'settings/app'), {
+          lockedSections: updatedLocks,
+          updatedAt: Date.now()
+        }).catch(err => console.error("Error updating RTDB locks:", err));
+      }
     } catch (err) {
       console.error("Error setting portal lock:", err);
       alert("Failed to update lock permission state on the server. Verify your administrator authorization!");

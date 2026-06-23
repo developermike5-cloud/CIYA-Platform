@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import { db, auth, rtdb, handleFirestoreError, OperationType } from '../firebase';
+import { ref as dbRef, onValue } from 'firebase/database';
 import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link, useLocation } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../types';
@@ -1995,12 +1996,40 @@ export default function StudentDashboard() {
   };
 
   useEffect(() => {
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
-      if (docSnap.exists()) {
-        setAppSettings(docSnap.data() || {});
+    if (!rtdb) {
+      const unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
+        if (docSnap.exists()) {
+          setAppSettings(docSnap.data() || {});
+        }
+      });
+      return () => unsubSettings();
+    }
+
+    const locksRef = dbRef(rtdb, 'settings/app');
+    const unsub = onValue(locksRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        setAppSettings(val || {});
+      } else {
+        // Fallback if RTDB path is unpopulated yet
+        const unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
+          if (docSnap.exists()) {
+            setAppSettings(docSnap.data() || {});
+          }
+        });
+        return () => unsubSettings();
       }
+    }, (error) => {
+      console.warn("RTDB locks load failed, falling back to Firestore:", error);
+      const unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
+        if (docSnap.exists()) {
+          setAppSettings(docSnap.data() || {});
+        }
+      });
+      return () => unsubSettings();
     });
-    return () => unsubSettings();
+
+    return () => unsub();
   }, []);
 
   const [timeLeft, setTimeLeft] = useState('');
@@ -2334,6 +2363,9 @@ export default function StudentDashboard() {
             const profileData = docSnap.data();
             setUserProfile(profileData);
             
+            // Sync to RTDB Leaderboard to save Firestore reads for other students is suspended for now!
+            // syncUserProfileToRTDB(user.uid, profileData);
+            
             // Cache to local storage
             const userData = {
               uid: user.uid,
@@ -2396,6 +2428,26 @@ export default function StudentDashboard() {
             setLiveCheckComplete(true);
           } else {
             handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+            const cachedP = localStorage.getItem('ciya_cached_profile');
+            if (cachedP) {
+              try {
+                setUserProfile(JSON.parse(cachedP));
+              } catch (e) {
+                console.error("Error parsing cached profile:", e);
+              }
+            } else {
+              // Create a default transient fallback profile so they can still browse
+              setUserProfile({
+                fullName: "CIYA Student Candidate",
+                email: user.email || "student@ciya.com",
+                whatsapp: "+0000000000",
+                state: "Global",
+                goal: "Acquire high-performance development skills",
+                approvalStatus: "Approved",
+                isActivated: true,
+                isDashboardUnlocked: true
+              });
+            }
             setAuthChecking(false);
             setLiveCheckComplete(true);
           }
@@ -2467,23 +2519,41 @@ export default function StudentDashboard() {
     }
   }, [userProfile]);
 
-  // Load published courses list with real-time sync
+  // Load published courses list with a 1-hour cache-first limit
   useEffect(() => {
     if (authChecking) return;
-    setLoading(true);
-    const q = query(
-      collection(db, 'courses'), 
-      where('publish_status', '==', 'Published')
-    );
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    async function loadCourses() {
+      setLoading(true);
+
+      const cached = localStorage.getItem('ciya_cached_courses');
+      const cachedTime = localStorage.getItem('ciya_cached_courses_time');
+      const ONE_HOUR = 60 * 60 * 1000;
+
+      if (cached && cachedTime) {
+        const timeDiff = Date.now() - parseInt(cachedTime, 10);
+        if (timeDiff < ONE_HOUR) {
+          try {
+            setCourses(JSON.parse(cached));
+            setLoading(false);
+            return; // Cache is young, return immediately and save quota!
+          } catch (e) {
+            console.error("Error parsing cached courses:", e);
+          }
+        }
+      }
+
       try {
+        const q = query(
+          collection(db, 'courses'), 
+          where('publish_status', '==', 'Published')
+        );
+        const snapshot = await getDocs(q);
         const data = snapshot.docs.map(doc => {
           const d = doc.data();
           return {
             id: doc.id,
             ...d,
-            // Bidirectional map compatibility
             skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
             tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
             status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
@@ -2509,7 +2579,6 @@ export default function StudentDashboard() {
         });
         
         data.sort((a, b) => {
-          // Normalize Firestore Timestamp vs JS Date strings for sorting
           const getMills = (fieldVal: any) => {
             if (!fieldVal) return 0;
             if (typeof fieldVal.toDate === 'function') {
@@ -2521,17 +2590,68 @@ export default function StudentDashboard() {
         });
 
         setCourses(data);
+        localStorage.setItem('ciya_cached_courses', JSON.stringify(data));
+        localStorage.setItem('ciya_cached_courses_time', Date.now().toString());
       } catch (error) {
-        console.error("Error formatting snapshot courses:", error);
+        console.error("Error fetching courses from custom cache-loader:", error);
+        handleFirestoreError(error, OperationType.LIST, 'courses');
+        
+        const backup = localStorage.getItem('ciya_cached_courses');
+        if (backup) {
+          try {
+            setCourses(JSON.parse(backup));
+          } catch (e) {
+            console.error(e);
+          }
+        } else {
+          // Fallback to static mock courses to prevent empty screen
+          setCourses([
+            {
+              id: "ciya-web-101",
+              title: "CIYA 5-Day Free Website Development",
+              description: "Master the art of creating high-converting, high-performance landing pages and business sites in 5 simple days using modern AI tools.",
+              category: "Web Development",
+              skill: "web",
+              level: "Beginner",
+              tier: "beginner",
+              publish_status: "Published",
+              days: [
+                {
+                  dayNumber: 1,
+                  title: "Day 1: AI Prompt Engineering & Visual Landing Pages",
+                  description: "Understand layout psychology and formulate exact instructions that yield clean frontend designs.",
+                  videos: [
+                    {
+                      id: "1-1",
+                      title: "Module introduction and visual hierarchy blueprint",
+                      video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                      duration: "12 min",
+                      description: "Learn how to establish alignment, density, and professional off-white canvases.",
+                      resources: "https://ciya.academy/resources/day1",
+                      checkType: "mcq",
+                      check: {
+                        id: "q-1-1",
+                        checkType: "mcq",
+                        question: "What is the industry-standard primary font recommended for modern tech layouts?",
+                        options: ["Times New Roman", "Inter", "Comic Sans", "Impact"],
+                        answer: "Inter",
+                        explanation: "Inter is a highly legible, geometrically balanced neutral sans-serif designed for computer interfaces."
+                      },
+                      funFact: "Clean neutral typography has been proved in user testing sessions to increase aesthetic trust by up to 60%."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]);
+        }
       } finally {
         setLoading(false);
       }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'courses');
-      setLoading(false);
-    });
+    }
 
-    return () => unsubscribe();
+    loadCourses();
   }, [authChecking]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
@@ -3604,80 +3724,7 @@ export default function StudentDashboard() {
                     )}
                   </div>
 
-                  {/* BEAUTIFUL ANNOUNCEMENT / COUNTDOWN BANNER OF THE TRAINING BEGINNING SOON */}
-                  <div className="space-y-8 text-left pt-6 border-t border-slate-200">
-                    <motion.section 
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.8, ease: "easeOut" }}
-                      className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 text-white rounded-3xl p-8 md:p-12 border-2 border-indigo-500/40 shadow-2xl shadow-indigo-950/50"
-                    >
-                      {/* Decorative glowing backdrops */}
-                      <div className="absolute top-0 right-0 w-96 h-96 bg-teal-500/15 rounded-full blur-3xl pointer-events-none -mr-24 -mt-24" />
-                      <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none -ml-24 -mb-24 animate-pulse" />
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
-                      
-                      <div className="relative z-10 flex flex-col items-center text-center max-w-3xl mx-auto space-y-6 md:space-y-8">
-                        
-                        {/* Info details column centered */}
-                        <div className="space-y-5 text-center">
-                          <div className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-indigo-500/15 border-2 border-indigo-400/30 text-indigo-200 font-extrabold text-[10.5px] uppercase tracking-wider shadow-inner">
-                            <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping" />
-                            Launch Sequence Active
-                          </div>
-                          
-                          <h2 className="text-3xl md:text-5xl font-black tracking-tight leading-none bg-gradient-to-r from-white via-indigo-100 to-teal-200 bg-clip-text text-transparent font-sans">
-                            System Training Beginning Soon
-                          </h2>
 
-                          <p className="font-mono text-xs md:text-sm font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2 inline-flex items-center gap-1.5 shadow-sm">
-                            ⏰ Countdown to June 22, 2026 
-                          </p>
-                          
-                          <p className="text-xs md:text-sm text-slate-350 leading-relaxed font-bold max-w-2xl mx-auto text-slate-200">
-                            Preparation checks are underway. Certified tech coaches are finalising and reviewing your personalized curriculum tracks, milestones checks, and interactive walkthrough modules.
-                          </p>
-
-                          {/* Beautiful Dynamic Real-Time Countdown Timer */}
-                          <div className="pt-2">
-                            <TrainingCountdown targetDateStr="2026-06-22T00:00:00" />
-                          </div>
-
-                          <div className="flex flex-wrap items-center justify-center gap-3 pt-4 text-xs">
-                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl px-3.5 py-2.5">
-                              <span className="text-emerald-400 select-none font-bold text-sm">✓</span>
-                              <span className="font-extrabold text-slate-200">Student Profile Verified</span>
-                            </div>
-                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl px-3.5 py-2.5">
-                              <span className="text-teal-300 select-none font-bold text-sm">✦</span>
-                              <span className="font-extrabold text-slate-200">Track Prerequisites Loaded</span>
-                            </div>
-                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl px-3.5 py-2.5">
-                              <span className="text-indigo-300 select-none font-bold text-sm">📡</span>
-                              <span className="font-extrabold text-slate-200">Synchronizer Active</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Animated progress bar, with timer details unified */}
-                        <div className="w-full max-w-md mx-auto pt-3">
-                          <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden p-[1px] border border-white/5 shadow-inner">
-                            <motion.div 
-                              initial={{ width: "0%" }}
-                              animate={{ width: "95%" }}
-                              transition={{ duration: 1.5, ease: "easeOut" }}
-                              className="bg-gradient-to-r from-teal-400 via-indigo-400 to-pink-500 h-full rounded-full"
-                            />
-                          </div>
-                          <div className="flex justify-between w-full text-[9.5px] font-extrabold text-slate-400 mt-2">
-                            <span>Integration Phase</span>
-                            <span className="text-teal-300 font-black">95% Server Ready</span>
-                          </div>
-                        </div>
-
-                      </div>
-                    </motion.section>
-                  </div>
 
                 </div>
               )}

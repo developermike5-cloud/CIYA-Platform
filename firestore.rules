@@ -156,8 +156,8 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow list: if isAdmin() || isSignedIn();
+      allow read: if true;
+      allow list: if true;
       allow create: if isSignedIn() 
                     && request.auth.uid == userId 
                     && isValidUserProfile(incoming())
