@@ -816,6 +816,8 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
     const unsubscribe = onSnapshot(q, (snap) => {
       const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setDbSubmissions(list);
+    }, (error) => {
+      console.warn("Soft handling error loading specific course submissions:", error);
     });
     return () => unsubscribe();
   }, [currentUser, courseId]);
@@ -2006,6 +2008,8 @@ export default function StudentDashboard() {
         if (docSnap.exists()) {
           setAppSettings(docSnap.data() || {});
         }
+      }, (error) => {
+        console.warn("Soft handling error loading app settings fallback:", error);
       });
     };
 
@@ -2074,6 +2078,8 @@ export default function StudentDashboard() {
         return timeB - timeA;
       });
       setDbNotifications(list);
+    }, (error) => {
+      console.warn("Soft handling error loading db notifications:", error);
     });
     return () => unsubscribe();
   }, [currentUser, isAdmin]);

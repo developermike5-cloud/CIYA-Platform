@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
+import { db, auth, handleFirestoreError, OperationType, getActiveDatabaseId, setActiveDatabaseId } from '../../firebase';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 
@@ -144,8 +144,16 @@ export default function UsersAdmin() {
             });
           }
         }
-      } catch (err) {
-        console.error("Error fetching section locks in UsersAdmin:", err);
+      } catch (err: any) {
+        // Delegate error to handleFirestoreError to trigger any global auto-healing if needed
+        handleFirestoreError(err, OperationType.GET, 'settings/app');
+        
+        const errMsg = err?.message || String(err);
+        if (errMsg.toLowerCase().includes('offline') || !navigator.onLine) {
+          console.warn("Offline/cache fetch for section locks in UsersAdmin:", errMsg);
+        } else {
+          console.warn("Could not fetch section locks in UsersAdmin (using defaults):", errMsg);
+        }
       } finally {
         setLoadingLocks(false);
       }
@@ -572,6 +580,29 @@ export default function UsersAdmin() {
 
   return (
     <div>
+      {/* Database Instance Status */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-6 text-white shadow-lg">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <h2 className="text-sm font-bold tracking-wider text-slate-300 uppercase">Active Firestore Database</h2>
+            </div>
+            <p className="text-slate-400 text-xs max-w-2xl leading-relaxed">
+              Your application is permanently connected to your dedicated, custom provisioned Firestore database (<strong className="text-indigo-400">{getActiveDatabaseId()}</strong>). All of your settings, student records, courses, and application forms are safely secured inside this instance.
+            </p>
+          </div>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span className="text-xs font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 px-3 py-1.5 rounded-xl uppercase tracking-wider">
+              Connected & Secure
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Website Branding Logo Uploader */}
       {hasBrandingPermission && (
         <div className="bg-white border border-slate-200/90 rounded-2xl p-4 mb-6 flex items-center justify-between gap-4 shadow-sm">

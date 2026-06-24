@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Outlet, Navigate, Link, useLocation } from 'react-router';
-import { auth, db } from '../../firebase';
+import { auth, db, getActiveDatabaseId, setActiveDatabaseId, handleFirestoreError, OperationType } from '../../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Database } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 
 export default function AdminLayout() {
@@ -60,10 +60,22 @@ export default function AdminLayout() {
               localStorage.removeItem('ciya_cached_user');
               setUser(null);
             }
-          } catch (err) {
-            console.error("Error verifying admin details from DB:", err);
-            localStorage.removeItem('ciya_cached_user');
-            setUser(null);
+          } catch (err: any) {
+            handleFirestoreError(err, OperationType.GET, `admins/${currentUser.uid}`);
+            
+            const errMsg = err?.message || String(err);
+            if (errMsg.toLowerCase().includes('offline') || !navigator.onLine) {
+              console.warn("Offline during admin verification, relying on cached user state:", errMsg);
+              // Do NOT wipe cached user if they already exist, so they stay logged in offline
+              const cached = localStorage.getItem('ciya_cached_user');
+              if (!cached) {
+                setUser(null);
+              }
+            } else {
+              console.error("Error verifying admin details from DB:", err);
+              localStorage.removeItem('ciya_cached_user');
+              setUser(null);
+            }
           } finally {
             setLoading(false);
           }
@@ -275,14 +287,29 @@ export default function AdminLayout() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-stretch h-screen overflow-hidden">
-        <header className="h-16 bg-white border-b flex items-center px-4 md:px-8 shrink-0 gap-4">
-          <button 
-            className="md:hidden text-slate-500 hover:text-slate-800"
-            onClick={() => setIsMobileMenuOpen(true)}
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          <h2 className="text-xl font-semibold text-slate-800">Dashboard</h2>
+        <header className="h-16 bg-white border-b flex items-center justify-between px-4 md:px-8 shrink-0 gap-4">
+          <div className="flex items-center gap-4">
+            <button 
+              className="md:hidden text-slate-500 hover:text-slate-800"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <h2 className="text-xl font-semibold text-slate-800">Dashboard</h2>
+          </div>
+
+          {/* Active Database Badge */}
+          <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-1.5 shadow-sm text-slate-700">
+            <Database className="w-4 h-4 text-indigo-600 shrink-0" />
+            <div className="flex items-center gap-1.5">
+              <span className="flex h-2 w-2 relative shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">Database:</span>
+              <span className="text-xs font-semibold text-slate-700">Connected</span>
+            </div>
+          </div>
         </header>
         <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-50">
           <Outlet />

@@ -113,7 +113,7 @@ service cloud.firestore {
       return data.keys().hasAll(['userId', 'courseId', 'dayIndex', 'status', 'createdAt'])
         && data.userId is string
         && data.courseId is string
-        && data.dayIndex is number
+        && data.dayIndex is int
         && data.status in ['Pending', 'Approved', 'Disapproved']
         && (data.get('userName', '') is string)
         && (data.get('userEmail', '') is string)
@@ -231,8 +231,8 @@ service cloud.firestore {
     }
 
     match /saved_prompts/{promptId} {
-      allow read, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read, delete: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
       allow create: if isSignedIn()
                     && isValidId(promptId)
                     && isValidSavedPrompt(incoming())
@@ -248,19 +248,19 @@ service cloud.firestore {
     }
 
     match /assignments/{submissionId} {
-      allow read, list: if isSignedIn();
+      allow read, list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
       allow create: if isSignedIn()
                     && isValidId(submissionId)
                     && isValidAssignmentSubmission(incoming())
                     && incoming().userId == request.auth.uid
                     && incoming().createdAt == request.time;
       allow update: if isSignedIn()
-                    && (isAdmin() || (incoming().userId == request.auth.uid && existing().userId == request.auth.uid && existing().status == "Pending"));
+                    && (isAdmin() || (incoming().userId == request.auth.uid && existing().get('userId', '') == request.auth.uid && existing().status == "Pending"));
       allow delete: if isAdmin();
     }
 
     match /notifications/{notificationId} {
-      allow read, list: if isSignedIn();
+      allow read, list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
       allow create: if isSignedIn();
       allow update: if isSignedIn()
                     && (incoming().userId == request.auth.uid || isAdmin());
