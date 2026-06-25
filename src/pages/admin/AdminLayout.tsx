@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet, Navigate, Link, useLocation } from 'react-router';
+import { Outlet, Navigate, Link, useLocation, useNavigate } from 'react-router';
 import { auth, db, getActiveDatabaseId, setActiveDatabaseId, handleFirestoreError, OperationType } from '../../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -26,6 +26,7 @@ export default function AdminLayout() {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -298,16 +299,18 @@ export default function AdminLayout() {
             <h2 className="text-xl font-semibold text-slate-800">Dashboard</h2>
           </div>
 
-          {/* Active Database Badge */}
-          <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-1.5 shadow-sm text-slate-700">
-            <Database className="w-4 h-4 text-indigo-600 shrink-0" />
-            <div className="flex items-center gap-1.5">
-              <span className="flex h-2 w-2 relative shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">Database:</span>
-              <span className="text-xs font-semibold text-slate-700">Connected</span>
+          <div className="flex items-center gap-3">
+            {/* Active Database Badge */}
+            <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-1.5 shadow-sm text-slate-700">
+              <Database className="w-4 h-4 text-indigo-600 shrink-0" />
+              <div className="flex items-center gap-1.5">
+                <span className="flex h-2 w-2 relative shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">Database:</span>
+                <span className="text-xs font-semibold text-slate-700">Connected</span>
+              </div>
             </div>
           </div>
         </header>

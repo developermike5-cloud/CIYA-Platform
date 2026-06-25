@@ -532,27 +532,340 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
     return () => unsubscribe();
   }, []);
 
-  // Wildcard parsing
-  const extractDetail = (text: string, label: string, fallback: string) => {
-    if (!text) return fallback;
-    const lines = text.split(/[.\n]+/);
-    const matched = lines.find(line => line.toLowerCase().includes(label.toLowerCase()));
-    if (matched) {
-      const parts = matched.split(/[:\-]+/);
-      if (parts.length > 1) {
-        return parts[1].trim();
-      }
-      return matched.trim();
+  // Advanced KYCB parsing and compilation
+  const parseKycb = (text: string) => {
+    if (!text) {
+      return {
+        name: "My Custom Brand",
+        location: "Global Region",
+        theme: "Modern Minimalist and High-Conversion",
+        industry: "",
+        address: "",
+        vibe: "",
+        themeStyles: "",
+        colors: "",
+        usp: "",
+        uspNotes: "",
+        painPoints: "",
+        actionPlan: "",
+        categories: "",
+        campaigns: "",
+        payments: "",
+        deliveryFees: "",
+        features: "",
+        actionPaths: "",
+        actionGoals: "",
+        notes: ""
+      };
     }
-    return fallback;
+
+    const lines = text.split('\n');
+    const result: Record<string, string> = {};
+    
+    // Clean helper
+    const extractValue = (line: string, label: string) => {
+      const idx = line.toLowerCase().indexOf(label.toLowerCase());
+      if (idx !== -1) {
+        const afterLabel = line.substring(idx + label.length);
+        const separatorIdx = afterLabel.match(/[:\-]/);
+        if (separatorIdx && separatorIdx.index !== undefined) {
+          return afterLabel.substring(separatorIdx.index + 1).trim();
+        }
+        return afterLabel.trim();
+      }
+      return '';
+    };
+
+    // Scan for keys
+    for (const line of lines) {
+      const l = line.trim();
+      if (!l) continue;
+      
+      if (l.toLowerCase().includes('business name:')) {
+        result.businessName = extractValue(l, 'business name');
+      } else if (l.toLowerCase().includes('client name:')) {
+        result.clientName = extractValue(l, 'client name');
+      } else if (l.toLowerCase().includes('industry / niche:')) {
+        result.industry = extractValue(l, 'industry / niche');
+      } else if (l.toLowerCase().includes('industry:')) {
+        result.industry = extractValue(l, 'industry');
+      } else if (l.toLowerCase().includes('business address:')) {
+        result.address = extractValue(l, 'business address');
+      } else if (l.toLowerCase().includes('brand mood vibe:')) {
+        result.vibe = extractValue(l, 'brand mood vibe');
+      } else if (l.toLowerCase().includes('preference theme styles:')) {
+        result.themeStyles = extractValue(l, 'preference theme styles');
+      } else if (l.toLowerCase().includes('custom color codes:')) {
+        result.colors = extractValue(l, 'custom color codes');
+      } else if (l.toLowerCase().includes('brand differentiation vectors:')) {
+        result.usp = extractValue(l, 'brand differentiation vectors');
+      } else if (l.toLowerCase().includes('detailed usp notes:')) {
+        result.uspNotes = extractValue(l, 'detailed usp notes');
+      } else if (l.toLowerCase().includes('visitor action paths:')) {
+        result.actionPaths = extractValue(l, 'visitor action paths');
+      } else if (l.toLowerCase().includes('custom action goals:')) {
+        result.actionGoals = extractValue(l, 'custom action goals');
+      } else if (l.toLowerCase().includes('core age group:')) {
+        result.ageGroup = extractValue(l, 'core age group');
+      } else if (l.toLowerCase().includes('target gender focus:')) {
+        result.gender = extractValue(l, 'target gender focus');
+      } else if (l.toLowerCase().includes('target geographical locales:')) {
+        result.locales = extractValue(l, 'target geographical locales');
+      } else if (l.toLowerCase().includes('common pain points handled:')) {
+        result.painPoints = extractValue(l, 'common pain points handled');
+      } else if (l.toLowerCase().includes('action plan details:')) {
+        result.actionPlan = extractValue(l, 'action plan details');
+      } else if (l.toLowerCase().includes('defined categories / core lines:')) {
+        result.categories = extractValue(l, 'defined categories / core lines');
+      } else if (l.toLowerCase().includes('campaign detail guidelines:')) {
+        result.campaigns = extractValue(l, 'campaign detail guidelines');
+      } else if (l.toLowerCase().includes('payment options selected:')) {
+        result.payments = extractValue(l, 'payment options selected');
+      } else if (l.toLowerCase().includes('delivery fees plan:')) {
+        result.deliveryFees = extractValue(l, 'delivery fees plan');
+      } else if (l.toLowerCase().includes('features selected:')) {
+        result.features = extractValue(l, 'features selected');
+      } else if (l.toLowerCase().includes('consultative general notes:')) {
+        result.notes = extractValue(l, 'consultative general notes');
+      }
+    }
+    
+    // Derived aggregates
+    result.name = result.businessName || result.clientName || "My Custom Brand";
+    result.location = result.address || result.locales || "Global Region";
+    result.theme = result.vibe || result.themeStyles || "Modern Minimalist and High-Conversion";
+    
+    return result;
   };
 
   const currentParams = React.useMemo(() => {
-    const name = extractDetail(businessInfo, "name", "My Custom Brand");
-    const location = extractDetail(businessInfo, "based in", "Global Region");
-    const vibe = extractDetail(businessInfo, "vibe", "Modern Minimalist and High-Conversion");
-    return { name, location, vibe };
+    if (!businessInfo.trim()) {
+      return { name: "My Custom Brand", location: "Global Region", vibe: "Modern Minimalist and High-Conversion" };
+    }
+    const parsed = parseKycb(businessInfo);
+    return {
+      name: parsed.name,
+      location: parsed.location,
+      vibe: parsed.theme
+    };
   }, [businessInfo]);
+
+  // Reactive auto-detection for pasted KYCB text
+  useEffect(() => {
+    if (!businessInfo.trim()) return;
+    
+    const parsed = parseKycb(businessInfo);
+    if (parsed.industry && !fullIndustry) {
+      setFullIndustry(parsed.industry);
+    }
+    
+    // Auto-detect Website Category
+    const lowerText = businessInfo.toLowerCase();
+    if (
+      lowerText.includes('target profile: ecommerce') || 
+      lowerText.includes('target profile: e-commerce') || 
+      lowerText.includes('ecommerce website') || 
+      lowerText.includes('[section 2: ecommerce store business model]')
+    ) {
+      setWebsiteType('ecommerce');
+    } else if (
+      lowerText.includes('target profile: landing') || 
+      lowerText.includes('landing page')
+    ) {
+      setWebsiteType('landing');
+    }
+  }, [businessInfo]);
+
+  const generateTailoredSmartPrompt = (text: string, type: 'landing' | 'ecommerce') => {
+    const parsed = parseKycb(text);
+    
+    // Parse products
+    const lines = text.split('\n');
+    const products: Array<{name: string, price: string, desc: string, qty: string, variants: string}> = [];
+    let currentProduct: any = null;
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const productMatch = trimmed.match(/^\*?\s*Product\s*\d+:\s*(.+)$/i);
+      if (productMatch) {
+        if (currentProduct) {
+          products.push(currentProduct);
+        }
+        currentProduct = { name: productMatch[1].trim(), price: '', desc: '', qty: '', variants: '' };
+      } else if (currentProduct) {
+        if (trimmed.toLowerCase().startsWith('- price:') || trimmed.toLowerCase().startsWith('price:')) {
+          currentProduct.price = trimmed.split(/[:\-]/).slice(1).join(':').trim();
+        } else if (trimmed.toLowerCase().startsWith('- description:') || trimmed.toLowerCase().startsWith('description:')) {
+          currentProduct.desc = trimmed.split(/[:\-]/).slice(1).join(':').trim();
+        } else if (trimmed.toLowerCase().startsWith('- quantity:') || trimmed.toLowerCase().startsWith('quantity:')) {
+          currentProduct.qty = trimmed.split(/[:\-]/).slice(1).join(':').trim();
+        } else if (trimmed.toLowerCase().startsWith('- variants:') || trimmed.toLowerCase().startsWith('variants:')) {
+          currentProduct.variants = trimmed.split(/[:\-]/).slice(1).join(':').trim();
+        } else if (trimmed.startsWith('**') || trimmed.startsWith('[') || trimmed.match(/^\*\s*Product/)) {
+          products.push(currentProduct);
+          currentProduct = null;
+        }
+      }
+    }
+    if (currentProduct) {
+      products.push(currentProduct);
+    }
+
+    const bizName = parsed.name || currentParams.name || "My Custom Brand";
+    const bizLocation = parsed.location || currentParams.location || "Global Region";
+    const bizVibe = parsed.vibe || parsed.themeStyles || currentParams.vibe || "Modern Minimalist and High-Conversion";
+    const bizIndustry = parsed.industry || fullIndustry || "Professional Services";
+    
+    let baseTemplate = '';
+    if (type === 'landing') {
+      if (customLpTemplates.length > 0) {
+        baseTemplate = customLpTemplates[0].template;
+      } else {
+        baseTemplate = FALLBACK_LP_TEMPLATE;
+      }
+    } else {
+      if (customEcTemplates.length > 0) {
+        baseTemplate = customEcTemplates[0].template;
+      } else {
+        baseTemplate = FALLBACK_EC_TEMPLATE;
+      }
+    }
+
+    let body = ``;
+
+    if (type === 'landing') {
+      body = `System Instruction:
+You are an expert senior web designer, brand strategist, and front-end developer specializing in High-Converting modern Landing Pages. Your job is to draft a comprehensive, step-by-step production plan and compile the production-ready code for a stunning custom website based on the following business profile:
+
+=== CUSTOM BUSINESS PROFILE ===
+- Business Name / Anchor: ${bizName}
+- Industry / Niche: ${bizIndustry}
+- Operations Location: ${bizLocation}
+- Brand Mood & Vibe: ${bizVibe}
+
+=== HIGH-FIDELITY MERCHANT STRATEGY ===
+- Custom Color Palette: ${parsed.colors || 'A balanced professional scheme (e.g., slate grays and elegant primary accents)'}
+- Brand Differentiation (USP): ${parsed.usp || 'High-quality bespoke service and exceptional reliability'}
+- USP Supporting Context: ${parsed.uspNotes || 'Customer trust built on transparency and direct communication'}
+- Target Demographics: ${parsed.ageGroup ? `${parsed.ageGroup} age group` : 'All demographics'} ${parsed.gender ? `(${parsed.gender})` : ''} ${parsed.locales ? `located in ${parsed.locales}` : ''}
+- Customer Pain Points Addressed: ${parsed.painPoints || 'Difficulty finding highly qualified specialists and fast turnaround'}
+- Brand Action Plan: ${parsed.actionPlan || 'Highlight verified credentials, provide transparent communication, and offer direct quotes'}
+- Interactive Core Features: ${parsed.features || 'An interactive consultation calculator or quick evaluation form'}
+- Custom Conversion Goals: ${parsed.actionGoals || 'Increase visitor bookings or inquiry forms'}
+
+Objective: Design a custom single-page landing page featuring modern aesthetics, exceptional typography, and flawless responsiveness.
+
+Please structure your response into the following clear phases of work. Provide the precise HTML, React + Tailwind compilation, or custom copywriting copy guidelines for each:
+
+PHASE 1: BRAND STRATEGY, VISUAL PALETTE & VIBE (TAILORED FOR ${bizIndustry.toUpperCase()})
+- Establish a highly specific Color Palette matching: "${parsed.colors || 'brand specific professional colors'}".
+- Define a cohesive mood/vibe representing a "${bizVibe}" and styling style ("${parsed.themeStyles || 'modern, minimalist, clean'}"). Ensure generous negative spacing and an editorial visual appeal.
+- Select a clear, modern Font pairing (e.g., Space Grotesk/Outfit for Display Headings, Inter for legible copy, and Jetbrains Mono for metadata or code tags).
+
+PHASE 2: MASTER COPYWRITING & STRUCTURE (TAILORED FOR ${bizIndustry.toUpperCase()})
+- Write/format the exact text Copy for the page following the AIDA high-conversion framework:
+  1. Attention: A stunning hero header celebrating ${bizName} that clearly states the unique value proposition: "${parsed.usp || 'Bespoke high-quality solutions designed around you'}".
+  2. Interest: Engaging story hooks and benefit cards addressing these client pain points directly: "${parsed.painPoints || 'general industry pain points'}".
+  3. Desire: Rich social proof or testimonial snippets, custom metrics/stats, and trust tags like "${parsed.uspNotes || 'certified credentials and verified client reviews'}".
+  4. Action: Highly compelling Call-To-Action (CTA) message for visitors: "${parsed.actionPaths || 'Schedule your introductory session today'}".
+
+PHASE 3: HIGH-FIDELITY UI LAYOUT ARCHITECTURE (TAILORED FOR ${bizIndustry.toUpperCase()})
+Outline the precise HTML/React component sections to be implemented:
+1. Header & Navigation: A sticky, semi-transparent navigation bar with custom backdrop-blur, containing the business brand name/logo ("${bizName}") and responsive quick links.
+2. Hero Section: A highly engaging, visually deep introductory section with custom radial highlights, an elegant tagline, conversion buttons (with hover scaling transitions like "Get Started" or "${parsed.actionPaths || 'Book a Consultation'}"), and optional mock graphics.
+3. Feature / Grid Sections: A bento-grid, 3-column, or stagger-aligned layout detailing premium offerings or specialties: "${parsed.categories || 'Key practice areas and professional services'}" using modern cards.
+4. Testimonials & Social Proof: A section featuring high-quality client quotes, avatars, and trust badges reflecting their verified experiences.
+5. Interactive Elements: An interactive accordion-based FAQs and smooth fade-in motion effects on scroll.
+6. Custom Interactive Component: A fully working, mock interactive component for: "${parsed.features || 'interactive questionnaire or dynamic calculator'}".
+7. Lead Collection/Contact Form: A beautiful, modern inputs group with validation highlights, a message text-area, and success states targeting: "${parsed.actionGoals || 'Request a free estimate/consultation'}".
+8. Footer: Clean copyright text, contact indicators, and neat social media link icons from Lucide.
+
+PHASE 4: COMPLETE PRODUCTION CODE IMPLEMENTATION GUIDELINES
+- Provide direct programming commands to compile this landing page using beautiful standard React functional patterns. Use React hooks for states, standard Tailwind CSS classes directly, and lucide-react icons. Include micro-behavior interactions on buttons and cards using scaling and sliding classes (e.g., 'hover:-translate-y-1 hover:shadow-lg transition-all duration-300').`;
+    } else {
+      body = `System Instruction:
+You are an expert full-stack developer, product listing UI/UX architect, and brand strategist specializing in High-Converting eCommerce shopping portals. Your job is to draft a comprehensive production architecture and complete code guidelines for a custom sales-optimized online store based on the following business details:
+
+=== CUSTOM BUSINESS PROFILE ===
+- Store / Product Domain: ${bizName}
+- Industry / Niche: ${bizIndustry}
+- Sales Operations Based In: ${bizLocation}
+- Styling Theme Preference: ${bizVibe}
+
+=== HIGH-FIDELITY MERCHANT STRATEGY ===
+- Custom Color Palette: ${parsed.colors || 'A cohesive premium scheme matching the industry aesthetic'}
+- Brand Differentiation (USP): ${parsed.usp || 'Bespoke product sourcing, independent quality audits, and transparent shipping'}
+- USP Supporting Context: ${parsed.uspNotes || 'Direct customer trust built on certified lab results or verified material standards'}
+- Target Demographics: ${parsed.ageGroup ? `${parsed.ageGroup} age group` : 'All demographics'} ${parsed.gender ? `(${parsed.gender})` : ''} ${parsed.locales ? `located in ${parsed.locales}` : ''}
+- Customer Pain Points Addressed: ${parsed.painPoints || 'Difficulty finding verified clean ingredients and slow delivery'}
+- Brand Action Plan: ${parsed.actionPlan || 'Highlight certifications, lab testing, transparent supply chain, and offer standard 2-day delivery'}
+- Interactive Core Features: ${parsed.features || 'An interactive supplement finder or custom product quiz'}
+- Custom Conversion Goals: ${parsed.actionGoals || 'Increase average order value (AOV) via post-purchase upsells or newsletter signup'}
+
+Objective: Design a highly interactive, responsive eCommerce platform with clean item listing, fully detailed product cards, catalog filters, a persistent slide-out shopping cart, a secure mock checkout portal, and conversion states.
+
+Please structure your response into the following implementation phases. Provide the precise configuration details, layout elements, state managers, and component layouts:
+
+PHASE 1: STORE BRAND AESTHETIC, STYLING & THEME CONFIGURATION (TAILORED FOR ${bizIndustry.toUpperCase()})
+- Establish the specific look-and-feel of the store matching: "${bizVibe}".
+- Define the exact Typography Pairings and responsive padding standards. Use the custom color codes provided: ${parsed.colors || 'brand specific colors'} for a clean, editorial look.
+
+PHASE 2: PRODUCT CATALOG & DYNAMIC FILTERING ARCHITECTURE (TAILORED FOR ${bizIndustry.toUpperCase()})
+- Dynamic Catalog: You MUST pre-populate your React components state with EXACTLY the merchant's real-world product catalog detailed below:
+${products.length > 0 ? JSON.stringify(products, null, 2) : `[
+  {
+    "name": "${bizName} Flagship Product 1",
+    "price": "$29.99",
+    "desc": "Premium quality flagship offering matching ${bizIndustry}.",
+    "qty": "300 units",
+    "variants": "Standard, Premium"
+  },
+  {
+    "name": "${bizName} Essential Product 2",
+    "price": "$19.99",
+    "desc": "Everyday essential designed for durability and performance.",
+    "qty": "200 units",
+    "variants": "Single Pack, Double Pack"
+  }
+]`}
+- Categories & Search: Outline robust tags and filter pills matching: "${parsed.categories || 'All Products, Best Sellers, Featured'}" and an instant search filter system.
+
+PHASE 3: KEY UI/UX ECOMMERCE SECTIONS (TAILORED FOR ${bizIndustry.toUpperCase()})
+1. Navigation Bar with Cart Hub: Sticky top navigation displaying the brand logo ("${bizName}"), category shortcuts, a search bar, and a persistent shopping cart button showing a dynamic items counter badge.
+2. Promo Banner/Hero: A full-width promotional banner celebrating an introductory discount code: "${parsed.campaigns || 'WELCOME10'}".
+3. Catalog Grid Section: Highly polished grid layout containing product cards. Each card must feature: hover picture scaling, clear pricing, discount badges, and a prominent 'Add to Cart' button with click ripple animations.
+4. Persistent Slide-out Shopping Cart Drawer: A panel that slides in from the right edge, listing added products with item quantities (+ and - modifier controls), individual prices, dynamic subtotal calculations, and a direct checkout call to action.
+5. Custom Interactive Component: A fully working, mock interactive component for: "${parsed.features || 'interactive recommendation quiz or stock indicators'}".
+6. In-Context Checkout Modal: A gorgeous form that lets customers fill shipment details, email, payment card fields, and displays a summary order checklist. Include direct payment options for: ${parsed.payments || 'Credit Cards (Stripe), Apple Pay, Google Pay, PayPal'}.
+
+PHASE 4: CLIENT-SIDE STATE MANAGEMENT SPECIFICATION
+- Provide exact state variables (using standard React useState and useEffect hooks):
+  - 'products': Object array of active inventory.
+  - 'cart': Array of items with selected quantities.
+  - 'isCartOpen': Boolean state governing the drawer.
+  - 'activeCategory': Filter category state.
+- Set up logic commands for:
+  - 'addToCart(productId)': Safely increments or appends the item to the cart.
+  - 'removeFromCart(productId)' or 'updateQuantity(productId, newQty)': Updates subtotals and sizes.
+  - Coupon logic: Save 10% with coupon "${parsed.campaigns || 'WELCOME10'}".
+  - Shipping fees logic: "${parsed.deliveryFees || 'Free shipping over $50, flat-rate $4.99 otherwise'}".
+  - 'checkoutSubmit()': Mock confirmation sequence that empties the cart and unlocks a styled order-completed banner.
+
+PHASE 5: COMPLETE PRODUCTION CODE IMPLEMENTATION GUIDELINES
+- Provide direct programming commands to compile this eCommerce hub using beautiful standard React functional patterns. Use React hooks for states, standard Tailwind CSS classes directly, and lucide-react icons.`;
+    }
+
+    if (baseTemplate && baseTemplate !== FALLBACK_LP_TEMPLATE && baseTemplate !== FALLBACK_EC_TEMPLATE) {
+      body += `\n\n=== ADDITIONAL BRANDING SPECIFICATIONS (ADMIN TEMPLATE) ===\n`;
+      body += baseTemplate
+        .replace(/{name}/g, bizName)
+        .replace(/{location}/g, bizLocation)
+        .replace(/{vibe}/g, bizVibe)
+        .replace(/{details}/g, `(Tailored above based on parsed questionnaire)`);
+    }
+
+    return body;
+  };
 
   const handleApplyPreset = (preset: typeof PRESETS[0]) => {
     setWebsiteType(preset.type as 'landing' | 'ecommerce');
@@ -575,33 +888,9 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
     }
 
     setIsCompiling(true);
-    const { name: bizName, location: bizLocation, vibe: bizVibe } = currentParams;
 
     setTimeout(() => {
-      let selectedTemplateText = '';
-
-      if (websiteType === 'landing') {
-        if (customLpTemplates.length > 0) {
-          const randomIndex = Math.floor(Math.random() * customLpTemplates.length);
-          selectedTemplateText = customLpTemplates[randomIndex].template;
-        } else {
-          selectedTemplateText = FALLBACK_LP_TEMPLATE;
-        }
-      } else {
-        if (customEcTemplates.length > 0) {
-          const randomIndex = Math.floor(Math.random() * customEcTemplates.length);
-          selectedTemplateText = customEcTemplates[randomIndex].template;
-        } else {
-          selectedTemplateText = FALLBACK_EC_TEMPLATE;
-        }
-      }
-
-      const promptText = selectedTemplateText
-        .replace(/{name}/g, bizName)
-        .replace(/{location}/g, bizLocation)
-        .replace(/{vibe}/g, bizVibe)
-        .replace(/{details}/g, businessInfo);
-
+      const promptText = generateTailoredSmartPrompt(businessInfo, websiteType);
       setGeneratedPrompt(promptText);
       setIsCompiling(false);
     }, 600);
@@ -715,8 +1004,8 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-500/10 border-2 border-teal-500/20 text-sm font-black text-teal-400">
             <Sparkles className="w-4 h-4" /> Prompt Generator Lab
           </div>
-          <h2 className="text-2xl md:text-3.5xl font-black tracking-tight text-white">Dynamic AI Prompt Architect</h2>
-          <p className="text-base md:text-lg text-slate-350 leading-relaxed max-w-4xl font-semibold">
+          <h2 className="text-2xl md:text-3xl font-black tracking-tight text-white">Dynamic AI Prompt Architect</h2>
+          <p className="text-base md:text-lg text-slate-300 leading-relaxed max-w-4xl font-semibold">
             Convert raw commercial configurations and target details into exhaustive, developer prompts. Choose between comprehensive workspace prompts or load selective category & industry modular codes to redesign micro-components.
           </p>
         </div>
@@ -728,7 +1017,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
           <label htmlFor="prompt-mode" className="text-lg md:text-xl font-black tracking-wider uppercase text-slate-700 block">
             Select Prompt Workspace Mode
           </label>
-          <p className="text-base md:text-lg text-slate-505 font-bold">
+          <p className="text-base md:text-lg text-slate-500 font-bold">
             Choose complete full workspace prompt generation or select categorized modular refiners.
           </p>
         </div>
@@ -764,7 +1053,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
                     className={`py-4 px-5 rounded-2xl text-base font-black border-2 transition-all flex items-center justify-center gap-2 cursor-pointer outline-none ${
                       websiteType === 'landing'
                         ? 'bg-teal-50 text-teal-800 border-teal-600 shadow-sm font-black'
-                        : 'bg-transparent text-slate-500 border-slate-205 hover:bg-slate-50'
+                        : 'bg-transparent text-slate-500 border-slate-200 hover:bg-slate-50'
                     }`}
                   >
                     <Globe className="w-5 h-5" />
@@ -776,7 +1065,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
                     className={`py-4 px-5 rounded-2xl text-base font-black border-2 transition-all flex items-center justify-center gap-2 cursor-pointer outline-none ${
                       websiteType === 'ecommerce'
                         ? 'bg-teal-50 text-teal-800 border-teal-600 shadow-sm font-black'
-                        : 'bg-transparent text-slate-500 border-slate-205 hover:bg-slate-50'
+                        : 'bg-transparent text-slate-500 border-slate-200 hover:bg-slate-50'
                     }`}
                   >
                     <ShoppingBag className="w-5 h-5" />
@@ -818,7 +1107,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
                   value={fullIndustry}
                   onChange={(e) => setFullIndustry(e.target.value)}
                   placeholder="e.g. Floristry Boutique, High-End Fitness, Clean Tech..."
-                  className="w-full text-base md:text-lg bg-slate-50/50 hover:bg-slate-50/80 border-2 border-slate-205 rounded-2xl p-4 text-slate-850 font-bold placeholder:text-slate-400 outline-none focus:bg-white focus:border-teal-550 focus:ring-4 focus:ring-teal-100 transition-all font-sans"
+                  className="w-full text-base md:text-lg bg-slate-50/50 hover:bg-slate-50/80 border-2 border-slate-200 rounded-2xl p-4 text-slate-800 font-bold placeholder:text-slate-400 outline-none focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-100 transition-all font-sans"
                 />
               </div>
 
@@ -837,10 +1126,10 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
                     >
                       <div className="space-y-1 max-w-[80%]">
                         <span className="font-extrabold text-slate-900 text-base block">{p.name}</span>
-                        <span className="text-sm text-slate-550 truncate block">{p.desc}</span>
-                        <span className="text-xs font-bold text-teal-600 block">💼 {p.industry}</span>
+                        <span className="text-sm text-slate-500 truncate block">{p.desc}</span>
+                        <span className="text-xs font-bold text-teal-650 block">💼 {p.industry}</span>
                       </div>
-                      <span className="text-xs font-black bg-slate-100 text-slate-650 px-3 py-1 rounded-lg uppercase font-mono tracking-wider">
+                      <span className="text-xs font-black bg-slate-100 text-slate-600 px-3 py-1 rounded-lg uppercase font-mono tracking-wider">
                         {p.type === 'landing' ? 'Landing' : 'eCom'}
                       </span>
                     </button>
@@ -885,11 +1174,11 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
                     <button
                       type="button"
                       onClick={handleCopy}
-                      className="flex items-center gap-2 bg-slate-100 hover:bg-teal-50 text-slate-850 hover:text-teal-800 border-2 border-slate-200 px-4 py-2.5 rounded-xl transition-all cursor-pointer font-extrabold text-base"
+                      className="flex items-center gap-2 bg-slate-100 hover:bg-teal-50 text-slate-800 hover:text-teal-800 border-2 border-slate-200 px-4 py-2.5 rounded-xl transition-all cursor-pointer font-extrabold text-base"
                     >
                       {copySuccess ? (
                         <>
-                          <Check className="w-4 h-4 text-teal-650" />
+                          <Check className="w-4 h-4 text-teal-600" />
                           Copied!
                         </>
                       ) : (
@@ -952,7 +1241,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
                     </div>
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 select-none py-24 border-2 border-dashed border-slate-150 rounded-3xl">
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 select-none py-24 border-2 border-dashed border-slate-200 rounded-3xl">
                     <div className="w-16 h-16 rounded-full border-2 border-slate-200 flex items-center justify-center bg-slate-50 mb-4 animate-pulse">
                       <Code className="w-8 h-8 text-slate-300" />
                     </div>
@@ -970,7 +1259,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
           <div className="bg-slate-50 rounded-3xl p-7 md:p-10 border-2 border-slate-200 text-left space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b-2 border-slate-200 pb-5 gap-4">
               <div className="flex items-center gap-3">
-                <FolderHeart className="w-7 h-7 text-teal-650" />
+                <FolderHeart className="w-7 h-7 text-teal-600" />
                 <div>
                   <h3 className="font-black text-slate-900 text-lg md:text-2xl uppercase tracking-tight">Stored Workspace Prompts Vault</h3>
                   <p className="text-sm md:text-base text-slate-500 font-bold mt-1">
@@ -1055,7 +1344,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
         /* MODULAR PROMPT MODE VIEW */
         <div className="space-y-8">
           <div className="bg-white border-2 border-slate-200 rounded-3xl p-7 md:p-9 shadow-sm space-y-6">
-            <div className="flex items-center gap-3 border-b-2 border-slate-105 pb-4">
+            <div className="flex items-center gap-3 border-b-2 border-slate-200 pb-4">
               <Layers className="w-7 h-7 text-indigo-600" />
               <h3 className="font-black text-slate-900 text-xl md:text-2xl uppercase tracking-tight">
                 Configure Sectional Refiner Prompts
@@ -1070,14 +1359,14 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
               
               {/* Category Select Dropdown */}
               <div className="space-y-2">
-                <label htmlFor="modular-category-select" className="text-base md:text-lg font-black text-slate-705 uppercase tracking-widest block">
+                <label htmlFor="modular-category-select" className="text-base md:text-lg font-black text-slate-700 uppercase tracking-widest block">
                   1. Select Section Category
                 </label>
                 <select
                   id="modular-category-select"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full bg-slate-50 border-2 border-slate-350 text-slate-900 rounded-2xl px-5 py-4 text-base md:text-lg font-black transition-all outline-none focus:bg-white focus:border-indigo-550 focus:ring-4 focus:ring-indigo-150 cursor-pointer"
+                  className="w-full bg-slate-50 border-2 border-slate-300 text-slate-900 rounded-2xl px-5 py-4 text-base md:text-lg font-black transition-all outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 cursor-pointer"
                 >
                   <option value="">-- Choose Category --</option>
                   <option value="visuals">🎨 UI Layout & Visual Components</option>
@@ -1088,14 +1377,14 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
 
               {/* Industry Select Dropdown */}
               <div className="space-y-2">
-                <label htmlFor="modular-industry-select" className="text-base md:text-lg font-black text-slate-705 uppercase tracking-widest block">
+                <label htmlFor="modular-industry-select" className="text-base md:text-lg font-black text-slate-700 uppercase tracking-widest block">
                   2. Select Target Industry
                 </label>
                 <select
                   id="modular-industry-select"
                   value={selectedIndustry}
                   onChange={(e) => setSelectedIndustry(e.target.value)}
-                  className="w-full bg-slate-50 border-2 border-slate-350 text-slate-900 rounded-2xl px-5 py-4 text-base md:text-lg font-black transition-all outline-none focus:bg-white focus:border-indigo-550 focus:ring-4 focus:ring-indigo-150 cursor-pointer"
+                  className="w-full bg-slate-50 border-2 border-slate-300 text-slate-900 rounded-2xl px-5 py-4 text-base md:text-lg font-black transition-all outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 cursor-pointer"
                 >
                   <option value="">-- Choose Industry --</option>
                   <option value="healthcare">🏥 Healthcare & Medical Services</option>
@@ -1115,14 +1404,14 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
               <div className="w-18 h-18 rounded-full border-2 border-slate-200 flex items-center justify-center bg-slate-100/60 mx-auto animate-bounce duration-1000">
                 <Layers className="w-8 h-8 text-indigo-400" />
               </div>
-              <h4 className="text-lg md:text-xl font-black text-slate-750 uppercase tracking-wider">Awaiting Selection Parameters</h4>
-              <p className="text-base md:text-lg text-slate-450 leading-relaxed max-w-xl mx-auto font-bold">
+              <h4 className="text-lg md:text-xl font-black text-slate-700 uppercase tracking-wider">Awaiting Selection Parameters</h4>
+              <p className="text-base md:text-lg text-slate-500 leading-relaxed max-w-xl mx-auto font-bold">
                 You must select both a Section Category and a Target Industry from the dropdown lists above to generate and load custom modular developer sub-prompts.
               </p>
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="inline-flex items-center gap-2.5 px-4.5 py-2 rounded-full bg-indigo-50 border-2 border-indigo-255 text-base font-black text-indigo-800">
+              <div className="inline-flex items-center gap-2.5 px-4.5 py-2 rounded-full bg-indigo-50 border-2 border-indigo-200 text-base font-black text-indigo-800">
                 <BookOpen className="w-5 h-5 text-indigo-700" /> 
                 Ready &bull; Showing {MODULAR_PROMPTS_MATRIX[selectedCategory]?.[selectedIndustry]?.length || 0} Segment blueprints
               </div>
@@ -1144,7 +1433,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
                   >
                     <div className="space-y-4 text-left">
                       <div className="flex justify-between items-center">
-                        <span className="px-3 py-1 bg-indigo-50 text-indigo-805 rounded-lg text-xs md:text-sm font-black uppercase tracking-wider border border-indigo-150">
+                        <span className="px-3 py-1 bg-indigo-50 text-indigo-800 rounded-lg text-xs md:text-sm font-black uppercase tracking-wider border border-indigo-200">
                           Segment {idx + 1}
                         </span>
                         <span className="text-sm md:text-base text-indigo-600 font-extrabold group-hover:translate-x-1 transition-transform">
@@ -1153,7 +1442,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
                       </div>
                       
                       <div className="space-y-2">
-                        <h4 className="font-extrabold text-slate-850 text-lg md:text-xl group-hover:text-indigo-650 transition-colors leading-snug">
+                        <h4 className="font-extrabold text-slate-800 text-lg md:text-xl group-hover:text-indigo-600 transition-colors leading-snug">
                           {section.sectionName}
                         </h4>
                         <p className="text-base text-slate-500 font-semibold leading-relaxed">
@@ -1166,7 +1455,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
                       <span className="block text-xs font-black uppercase text-slate-400 tracking-wider mb-1">
                         Prompt Code Sample:
                       </span>
-                      <p className="text-sm md:text-base text-slate-450 font-mono truncate bg-slate-50 p-3 rounded-lg border">
+                      <p className="text-sm md:text-base text-slate-500 font-mono truncate bg-slate-50 p-3 rounded-lg border">
                         {section.prompt}
                       </p>
                     </div>
@@ -1180,7 +1469,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
 
       {/* POPUP MODAL FOR MODULAR BLUEPRINT COPY */}
       {activeModPopup && (
-        <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-200 rounded-3xl p-8 max-w-3xl w-full shadow-2xl relative animate-in fade-in zoom-in-95 duration-150 text-left">
             <button
               onClick={() => setActiveModPopup(null)}
@@ -1190,7 +1479,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
             </button>
             
             <div className="flex items-center gap-4 mb-6">
-              <div className="p-3 bg-indigo-50 border-2 border-indigo-100 text-indigo-650 rounded-2xl">
+              <div className="p-3 bg-indigo-50 border-2 border-indigo-100 text-indigo-600 rounded-2xl">
                 <Layers className="w-6 h-6" />
               </div>
               <div className="space-y-1">
@@ -1202,7 +1491,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
             </div>
 
             <div className="space-y-6">
-              <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-150 text-sm md:text-base font-bold text-indigo-850 leading-relaxed">
+              <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-200 text-sm md:text-base font-bold text-indigo-800 leading-relaxed">
                 💡 <span className="font-black">Implementation Strategy:</span> Copy and paste this focused chunk description into your development model workspace to instantly build, refine, or restyle this specific layout section.
               </div>
 
@@ -1227,7 +1516,7 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
               <button
                 type="button"
                 onClick={handleCopyModPrompt}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-750 text-white text-base font-black rounded-xl border-0 cursor-pointer flex items-center gap-2 shadow-sm"
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-base font-black rounded-xl border-0 cursor-pointer flex items-center gap-2 shadow-sm"
               >
                 {modCopySuccess ? (
                   <>

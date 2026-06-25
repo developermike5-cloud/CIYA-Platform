@@ -60,25 +60,43 @@ safeSetItem('ciya_active_database_id', firebaseConfig.firestoreDatabaseId);
 const app = getApps().length > 0 ? getApp() : initializeApp(activeFirebaseConfig);
 let firestoreDb;
 
-// 2. Resilient firestore initialization
-try {
-  // If it's already been initialized, we shouldn't re-initialize it
-  firestoreDb = getFirestore(app, chosenDatabaseId || undefined);
-} catch (getDbError) {
+// Determine if we should use memory cache (essential for sandboxed iframes where IndexedDB fails asynchronously)
+let useMemoryCache = false;
+if (typeof window !== 'undefined') {
+  const isIframe = window.self !== window.top;
+  let hasIndexedDB = false;
   try {
-    // Try to initialize with persistent local cache for high performance and disk-based offline support
+    hasIndexedDB = !!window.indexedDB;
+  } catch (e) {
+    hasIndexedDB = false;
+  }
+  if (isIframe || !hasIndexedDB) {
+    useMemoryCache = true;
+  }
+}
+
+// 2. Resilient firestore initialization
+if (useMemoryCache) {
+  try {
+    firestoreDb = initializeFirestore(app, {
+      localCache: memoryLocalCache()
+    }, chosenDatabaseId || undefined);
+  } catch (err) {
+    firestoreDb = getFirestore(app, chosenDatabaseId || undefined);
+  }
+} else {
+  try {
+    // Try to initialize with persistent local cache first for high performance and disk-based offline support
     firestoreDb = initializeFirestore(app, {
       localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager()
       })
     }, chosenDatabaseId || undefined);
-  } catch (error: any) {
-    if (error && error.code === 'failed-precondition') {
-      // Multiple tabs open, fallback to standard getFirestore
-      console.warn("Firestore persistentLocalCache failed-precondition (multiple tabs active):", error);
+  } catch (initError) {
+    try {
+      // If it's already initialized or fails, fall back to getFirestore
       firestoreDb = getFirestore(app, chosenDatabaseId || undefined);
-    } else {
-      console.warn("Firestore persistentLocalCache failed (usually due to iframe constraints), falling back to memoryLocalCache + long polling:", error);
+    } catch (getDbError) {
       try {
         // Fall back to memory cache with forced long polling if IndexedDB is blocked
         firestoreDb = initializeFirestore(app, {
@@ -86,12 +104,7 @@ try {
           localCache: memoryLocalCache()
         }, chosenDatabaseId || undefined);
       } catch (secondError: any) {
-        if (secondError && secondError.code === 'failed-precondition') {
-          firestoreDb = getFirestore(app, chosenDatabaseId || undefined);
-        } else {
-          console.error("Firestore memory cache fallback also failed, using default getFirestore:", secondError);
-          firestoreDb = getFirestore(app, chosenDatabaseId || undefined);
-        }
+        firestoreDb = getFirestore(app, chosenDatabaseId || undefined);
       }
     }
   }

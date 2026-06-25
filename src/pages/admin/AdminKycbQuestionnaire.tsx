@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
-import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
 import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download } from 'lucide-react';
 import LpQuestionnaireForm from '../../components/LpQuestionnaireForm';
 import EcQuestionnaireForm from '../../components/EcQuestionnaireForm';
@@ -13,9 +13,23 @@ interface SavedForm {
   businessName: string;
   createdAt: any;
   data: any;
+  userId?: string;
+  userEmail?: string;
 }
 
-export default function AdminKycbQuestionnaire() {
+interface AdminKycbQuestionnaireProps {
+  isAdminMode?: boolean;
+  userId?: string;
+  userEmail?: string;
+  defaultClientName?: string;
+}
+
+export default function AdminKycbQuestionnaire({
+  isAdminMode = true,
+  userId = '',
+  userEmail = '',
+  defaultClientName = ''
+}: AdminKycbQuestionnaireProps = {}) {
   const [activeTab, setActiveTab] = useState<'lp' | 'ec'>('lp');
 
   // Perspective helper function
@@ -28,7 +42,7 @@ export default function AdminKycbQuestionnaire() {
   const [saving, setSaving] = useState(false);
 
   // Form Metadata
-  const [clientName, setClientName] = useState('');
+  const [clientName, setClientName] = useState(defaultClientName || '');
   const [dateCompleted, setDateCompleted] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [industry, setIndustry] = useState('');
@@ -548,6 +562,12 @@ export default function AdminKycbQuestionnaire() {
   };
 
   useEffect(() => {
+    if (!clientName && defaultClientName) {
+      setClientName(defaultClientName);
+    }
+  }, [defaultClientName]);
+
+  useEffect(() => {
     fetchForms();
 
     // Load drafts from localStorage on first mount
@@ -575,7 +595,7 @@ export default function AdminKycbQuestionnaire() {
         console.error("Failed loading EC draft", e);
       }
     }
-  }, []);
+  }, [isAdminMode, userId]);
 
   // Autosave current draft whenever typing (with currentId === null)
   useEffect(() => {
@@ -608,10 +628,15 @@ export default function AdminKycbQuestionnaire() {
     setLoading(true);
     try {
       const qSnap = await getDocs(query(collection(db, 'kycb_questionnaires'), orderBy('createdAt', 'desc')));
-      const list = qSnap.docs.map(doc => ({
+      let list = qSnap.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as SavedForm[];
+      
+      if (!isAdminMode) {
+        list = list.filter(form => form.userId === userId || form.id === currentId);
+      }
+      
       setSavedForms(list);
     } catch (err) {
       handleFirestoreError(err, OperationType.LIST, 'kycb_questionnaires');
@@ -626,12 +651,14 @@ export default function AdminKycbQuestionnaire() {
       return;
     }
     setSaving(true);
-    const docData = {
+    const docData: any = {
       clientName,
       dateCompleted,
       type: activeTab,
       businessName,
       createdAt: serverTimestamp(),
+      userId: userId || null,
+      userEmail: userEmail || null,
       data: {
         industry, phone, email, address, hasSite, siteUrl, socialLinks,
         visitorActions, otherAction, idealAge, locations, occupation,

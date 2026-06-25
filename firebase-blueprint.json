@@ -82,7 +82,9 @@
         "type": { "type": "string", "enum": ["lp", "ec"] },
         "businessName": { "type": "string" },
         "createdAt": { "type": "string", "format": "timestamp" },
-        "data": { "type": "object" }
+        "data": { "type": "object" },
+        "userId": { "type": "string", "description": "The student user ID" },
+        "userEmail": { "type": "string", "description": "The student email" }
       },
       "required": ["clientName", "type", "businessName", "createdAt", "data"]
     },

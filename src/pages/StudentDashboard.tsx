@@ -10,6 +10,7 @@ import { motion } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 import SecureYoutubePlayer from '../components/SecureYoutubePlayer';
 import PromptGenerator from '../components/PromptGenerator';
+import AdminKycbQuestionnaire from './admin/AdminKycbQuestionnaire';
 import { safeStorage } from '../utils/safeStorage';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
@@ -1908,13 +1909,14 @@ export default function StudentDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments'>(() => {
+  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb'>(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
     if (view === 'prompts') return 'prompts';
     if (view === 'profile') return 'profile';
     if (view === 'notifications') return 'notifications';
     if (view === 'assignments') return 'assignments';
+    if (view === 'kycb') return 'kycb';
     return 'courses';
   });
 
@@ -1941,6 +1943,8 @@ export default function StudentDashboard() {
       setCurrentView('courses');
     } else if (view === 'assignments') {
       setCurrentView('assignments');
+    } else if (view === 'kycb') {
+      setCurrentView('kycb');
     } else {
       setCurrentView('courses');
     }
@@ -1949,7 +1953,14 @@ export default function StudentDashboard() {
     setSelectedCourseId(cId);
   }, [location.search]);
 
-  const [appSettings, setAppSettings] = useState<{ lockedSections?: { courses?: boolean; prompts?: boolean; assignments?: boolean } }>({});
+  const [appSettings, setAppSettings] = useState<{ lockedSections?: { courses?: boolean; prompts?: boolean; assignments?: boolean; profile?: boolean; notifications?: boolean } }>(() => {
+    try {
+      const cached = safeStorage.getItem('ciya_cached_app_settings');
+      return cached ? JSON.parse(cached) : {};
+    } catch (e) {
+      return {};
+    }
+  });
   const [allMySubmissions, setAllMySubmissions] = useState<any[]>([]);
   const [selectedAssignCourseId, setSelectedAssignCourseId] = useState<string | null>(null);
 
@@ -2006,10 +2017,20 @@ export default function StudentDashboard() {
       if (unsubFirestore) return; // Already listening
       unsubFirestore = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
         if (docSnap.exists()) {
-          setAppSettings(docSnap.data() || {});
+          const data = docSnap.data() || {};
+          setAppSettings(data);
+          try {
+            safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
+          } catch (e) {}
         }
       }, (error) => {
-        console.warn("Soft handling error loading app settings fallback:", error);
+        console.warn("Soft handling error loading app settings fallback, loading from cache:", error);
+        try {
+          const cached = safeStorage.getItem('ciya_cached_app_settings');
+          if (cached) {
+            setAppSettings(JSON.parse(cached));
+          }
+        } catch (e) {}
       });
     };
 
@@ -2019,8 +2040,11 @@ export default function StudentDashboard() {
       const locksRef = dbRef(rtdb, 'settings/app');
       unsubRTDB = onValue(locksRef, (snapshot) => {
         if (snapshot.exists()) {
-          const val = snapshot.val();
-          setAppSettings(val || {});
+          const val = snapshot.val() || {};
+          setAppSettings(val);
+          try {
+            safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(val));
+          } catch (e) {}
           // If RTDB successfully returned valid data, we can safely disconnect Firestore
           if (unsubFirestore) {
             unsubFirestore();
@@ -2030,8 +2054,14 @@ export default function StudentDashboard() {
           setupFirestoreFallback();
         }
       }, (error) => {
-        console.warn("RTDB locks load failed, falling back to Firestore:", error);
+        console.warn("RTDB locks load failed, falling back to Firestore/cache:", error);
         setupFirestoreFallback();
+        try {
+          const cached = safeStorage.getItem('ciya_cached_app_settings');
+          if (cached) {
+            setAppSettings(JSON.parse(cached));
+          }
+        } catch (e) {}
       });
     }
 
@@ -2122,7 +2152,7 @@ export default function StudentDashboard() {
   const [activeSkillFilter, setActiveSkillFilter] = useState<string>('all');
   const navigate = useNavigate();
 
-  const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments', cId: string | null = null) => {
+  const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb', cId: string | null = null) => {
     setCurrentView(view);
     setSelectedCourseId(cId);
     setIsMobileMenuOpen(false);
@@ -2986,6 +3016,22 @@ export default function StudentDashboard() {
           {!isGuest && (
             <button 
               type="button"
+              onClick={() => handleViewChange('kycb', null)}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'kycb' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+            >
+              <div className="flex items-center gap-3">
+                <BookOpen className="w-4 h-4 text-emerald-400" />
+                <span>KYCB Sheet & Data</span>
+              </div>
+              {!isAdmin && appSettings?.lockedSections?.kycb && (
+                <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              )}
+            </button>
+          )}
+
+          {!isGuest && (
+            <button 
+              type="button"
               onClick={() => handleViewChange('notifications', null)}
               className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'notifications' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
             >
@@ -2993,21 +3039,31 @@ export default function StudentDashboard() {
                 <Bell className="w-4 h-4 text-amber-400" />
                 <span>Notification Desk</span>
               </div>
-              {unreadNotificationsCount > 0 && (
-                <span className="bg-rose-550 text-white text-[9px] font-black px-2 py-0.5 rounded-full shrink-0">
-                  {unreadNotificationsCount}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {unreadNotificationsCount > 0 && (
+                  <span className="bg-rose-550 text-white text-[9px] font-black px-2 py-0.5 rounded-full shrink-0">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+                {!isAdmin && appSettings?.lockedSections?.notifications && (
+                  <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                )}
+              </div>
             </button>
           )}
           {!isGuest && (
             <button 
               type="button"
               onClick={() => handleViewChange('profile', null)}
-              className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'profile' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'profile' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
             >
-              <UserIcon className="w-4 h-4" />
-              My Profile Settings
+              <div className="flex items-center gap-3">
+                <UserIcon className="w-4 h-4 text-slate-400" />
+                <span>My Profile Settings</span>
+              </div>
+              {!isAdmin && appSettings?.lockedSections?.profile && (
+                <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              )}
             </button>
           )}
           {isAdmin && (
@@ -3067,7 +3123,9 @@ export default function StudentDashboard() {
                     ? 'Notification Desk'
                     : currentView === 'assignments'
                       ? 'My Assignments Workspace'
-                      : 'Prompt Generator Lab'}
+                      : currentView === 'kycb'
+                        ? 'KYCB Workspace (Know Your Client & Business)'
+                        : 'Prompt Generator Lab'}
             </h2>
           </div>
           <div className="flex items-center gap-4">
@@ -3110,10 +3168,31 @@ export default function StudentDashboard() {
         
         {/* Core content scroll container */}
         <div className="flex-1 overflow-auto p-6 md:p-8">
-          {currentView === 'prompts' ? (
+          {currentView === 'kycb' ? (
+            <AdminKycbQuestionnaire
+              isAdminMode={false}
+              userId={currentUser?.uid}
+              userEmail={currentUser?.email || userProfile?.email || ''}
+              defaultClientName={userProfile?.fullName || currentUser?.displayName || ''}
+            />
+          ) : currentView === 'prompts' ? (
             <PromptGenerator isLocked={!isAdmin && appSettings?.lockedSections?.prompts} />
           ) : currentView === 'profile' ? (
-            <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 md:p-8 max-w-2xl mx-auto shadow-sm">
+            (!isAdmin && appSettings?.lockedSections?.profile) ? (
+              <div className="bg-white border text-sm border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
+                <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Lock className="w-8 h-8 text-rose-500" />
+                </div>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight">Profile Settings Locked</h3>
+                <p className="text-slate-500 mt-3 text-sm leading-relaxed font-semibold">
+                  Student profile customization controls are temporarily locked by the administrators. Please contact your coordinator to modify your personal information!
+                </p>
+                <div className="mt-8 pt-6 border-t border-slate-100 flex justify-center items-center gap-2 text-xs text-slate-400 font-bold">
+                  <span>🛡️ CIYA Guarded Academy Portal</span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 md:p-8 max-w-2xl mx-auto shadow-sm">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-black text-slate-800">Profile Settings</h3>
                 {!editingProfile && (
@@ -3270,8 +3349,23 @@ export default function StudentDashboard() {
                 </div>
               )}
             </div>
+            )
           ) : currentView === 'notifications' ? (
-            <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 md:p-8 max-w-2xl mx-auto shadow-sm space-y-4 animate-fade-in">
+            (!isAdmin && appSettings?.lockedSections?.notifications) ? (
+              <div className="bg-white border text-sm border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
+                <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Lock className="w-8 h-8 text-rose-500" />
+                </div>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight">Notification Desk Locked</h3>
+                <p className="text-slate-500 mt-3 text-sm leading-relaxed font-semibold">
+                  The student broadcast notification desk is temporarily locked by administrators. Broadcasters will restore communications when live updates are issued.
+                </p>
+                <div className="mt-8 pt-6 border-t border-slate-100 flex justify-center items-center gap-2 text-xs text-slate-400 font-bold">
+                  <span>🛡️ CIYA Guarded Academy Portal</span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 md:p-8 max-w-2xl mx-auto shadow-sm space-y-4 animate-fade-in">
               <div className="flex items-center justify-between border-b pb-4 mb-2">
                 <div className="space-y-0.5 text-left">
                   <span className="text-[10px] uppercase tracking-wider text-teal-600 font-black block">Notification Desk</span>
@@ -3319,6 +3413,7 @@ export default function StudentDashboard() {
                 </div>
               )}
             </div>
+            )
           ) : currentView === 'assignments' ? (
             (!isAdmin && appSettings?.lockedSections?.assignments) ? (
               <div className="bg-white border text-sm border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">

@@ -75,21 +75,25 @@ export default function PortalLocksAdmin() {
     setLockedSections(updatedLocks);
 
     try {
-      await setDoc(doc(db, 'settings', 'app'), {
-        lockedSections: updatedLocks,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+      try {
+        await setDoc(doc(db, 'settings', 'app'), {
+          lockedSections: updatedLocks,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (firestoreErr) {
+        console.warn("Firestore setDoc failed (possibly quota limit). Attempting fallback to RTDB:", firestoreErr);
+      }
 
       // Synchronize to RTDB for immediate cost-free retrieval by students!
       if (rtdb) {
-        dbSet(dbRef(rtdb, 'settings/app'), {
+        await dbSet(dbRef(rtdb, 'settings/app'), {
           lockedSections: updatedLocks,
           updatedAt: Date.now()
-        }).catch(err => console.error("Error updating RTDB locks:", err));
+        });
       }
     } catch (err) {
-      console.error("Error setting portal lock:", err);
-      alert("Failed to update lock permission state on the server. Verify your administrator authorization!");
+      console.error("Error setting portal lock in RTDB:", err);
+      alert("Failed to update lock permission state. Verify your network connection!");
     } finally {
       setSaving(false);
     }

@@ -219,15 +219,19 @@ service cloud.firestore {
     }
 
     match /kycb_questionnaires/{questionnaireId} {
-      allow read: if isAdmin();
-      allow create: if isAdmin()
+      allow read: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
+      allow create: if isSignedIn()
+                    && (incoming().get('userId', '') == request.auth.uid || isAdmin())
                     && isValidId(questionnaireId)
                     && isValidKycbQuestionnaire(incoming())
                     && incoming().createdAt == request.time;
-      allow update: if isAdmin()
+      allow update: if isSignedIn()
+                    && (resource.data.get('userId', '') == request.auth.uid || isAdmin())
+                    && (incoming().get('userId', '') == request.auth.uid || isAdmin())
                     && isValidKycbQuestionnaire(incoming())
-                    && incoming().createdAt == request.time;
-      allow delete: if isAdmin();
+                    && (incoming().createdAt == request.time || incoming().createdAt == resource.data.createdAt);
+      allow delete: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
     }
 
     match /saved_prompts/{promptId} {

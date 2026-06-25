@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType, getActiveDatabaseId, setActiveDatabaseId } from '../../firebase';
-import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw } from 'lucide-react';
+import { db, auth, rtdb, handleFirestoreError, OperationType, getActiveDatabaseId, setActiveDatabaseId } from '../../firebase';
+import { ref as dbRef, set as dbSet } from 'firebase/database';
+import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 
 function getFirestoreTime(timestamp: any): number {
@@ -127,7 +128,19 @@ export default function UsersAdmin() {
   });
 
   // Section locking state
-  const [lockedSections, setLockedSections] = useState<{ courses: boolean; prompts: boolean }>({ courses: false, prompts: false });
+  const [lockedSections, setLockedSections] = useState<{
+    courses: boolean;
+    prompts: boolean;
+    profile: boolean;
+    notifications: boolean;
+    assignments: boolean;
+  }>({
+    courses: false,
+    prompts: false,
+    profile: false,
+    notifications: false,
+    assignments: false,
+  });
   const [loadingLocks, setLoadingLocks] = useState(false);
 
   useEffect(() => {
@@ -140,7 +153,10 @@ export default function UsersAdmin() {
           if (data && data.lockedSections) {
             setLockedSections({
               courses: !!data.lockedSections.courses,
-              prompts: !!data.lockedSections.prompts
+              prompts: !!data.lockedSections.prompts,
+              profile: !!data.lockedSections.profile,
+              notifications: !!data.lockedSections.notifications,
+              assignments: !!data.lockedSections.assignments,
             });
           }
         }
@@ -161,7 +177,7 @@ export default function UsersAdmin() {
     fetchSettings();
   }, []);
 
-  const handleToggleSectionLock = async (section: 'courses' | 'prompts') => {
+  const handleToggleSectionLock = async (section: 'courses' | 'prompts' | 'profile' | 'notifications' | 'assignments') => {
     if (!isSuperAdmin) {
       alert("Only the super admin can lock or unlock website sections.");
       return;
@@ -173,13 +189,25 @@ export default function UsersAdmin() {
     };
     setLockedSections(updatedLocked);
     try {
-      await setDoc(doc(db, 'settings', 'app'), {
-        lockedSections: updatedLocked,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+      try {
+        await setDoc(doc(db, 'settings', 'app'), {
+          lockedSections: updatedLocked,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (firestoreErr) {
+        console.warn("Firestore setDoc failed (possibly quota limit). Attempting fallback to RTDB:", firestoreErr);
+      }
+
+      // Synchronize to RTDB for immediate cost-free retrieval by students!
+      if (rtdb) {
+        await dbSet(dbRef(rtdb, 'settings/app'), {
+          lockedSections: updatedLocked,
+          updatedAt: Date.now()
+        });
+      }
     } catch (err) {
-      console.error("Error updating section lock status:", err);
-      alert("Failed to synchronize section lock with the database.");
+      console.error("Error updating section lock status in RTDB:", err);
+      alert("Failed to synchronize section lock. Check network connection!");
       // Roll back
       setLockedSections(prev => ({ ...prev, [section]: !newVal }));
     }
@@ -603,35 +631,126 @@ export default function UsersAdmin() {
         </div>
       </div>
 
-      {/* Website Branding Logo Uploader */}
+      {/* Website Branding & Portal Locks Settings */}
       {hasBrandingPermission && (
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 mb-6 flex items-center justify-between gap-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-900 p-2.5 rounded-2xl border border-slate-700 shadow-inner">
-              <BrandingLogo size="xs" />
-              {currentLogo && (
-                <button 
-                  onClick={handleResetLogo}
-                  title="Reset to default text logo"
-                  className="p-1.5 hover:bg-slate-800 text-rose-450 hover:text-rose-355 rounded-lg transition-colors bg-transparent border-0 cursor-pointer ml-1"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </button>
-              )}
+        <div className="space-y-4 mb-6 animate-fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Branding Logo Card */}
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm flex flex-col justify-between gap-4">
+              <div>
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">Branding Identity</h3>
+                <p className="text-xs text-slate-500 font-semibold mb-3">Configure custom banner display logo across the main student workspace interface.</p>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 bg-slate-900 p-2.5 rounded-2xl border border-slate-700 shadow-inner">
+                  <BrandingLogo size="xs" />
+                  {currentLogo && (
+                    <button 
+                      onClick={handleResetLogo}
+                      title="Reset to default text logo"
+                      className="p-1.5 hover:bg-slate-800 text-rose-450 hover:text-rose-355 rounded-lg transition-colors bg-transparent border-0 cursor-pointer ml-1"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-0.5 border-0">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{logoUploading ? "Uploading..." : "Upload Logo"}</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleLogoUpload} 
+                    className="hidden" 
+                    disabled={logoUploading}
+                  />
+                </label>
+              </div>
             </div>
-          </div>
-          <div className="shrink-0 flex items-center gap-3">
-            <label className="flex items-center gap-2 px-5 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-0.5">
-              <Upload className="w-4 h-4" />
-              {logoUploading ? "Uploading..." : "Upload Real Logo"}
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={handleLogoUpload} 
-                className="hidden" 
-                disabled={logoUploading}
-              />
-            </label>
+
+            {/* Quick Section Locks Card */}
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm flex flex-col justify-between gap-4">
+              <div>
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">Quick Portal Locks</h3>
+                <p className="text-xs text-slate-500 font-semibold mb-3">Enforce access controls for key student workspace features immediately.</p>
+              </div>
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-2.5">
+                {/* Courses Lock Button */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleSectionLock('courses')}
+                  disabled={loadingLocks}
+                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                    lockedSections.courses 
+                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/70' 
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/70'
+                  }`}
+                >
+                  <Lock className="w-3 h-3 shrink-0" />
+                  <span className="truncate">Courses: {lockedSections.courses ? "LOCK" : "OK"}</span>
+                </button>
+
+                {/* Assignments Lock Button */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleSectionLock('assignments')}
+                  disabled={loadingLocks}
+                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                    lockedSections.assignments 
+                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/70' 
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/70'
+                  }`}
+                >
+                  <Lock className="w-3 h-3 shrink-0" />
+                  <span className="truncate">Assigns: {lockedSections.assignments ? "LOCK" : "OK"}</span>
+                </button>
+
+                {/* Prompts Lock Button */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleSectionLock('prompts')}
+                  disabled={loadingLocks}
+                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                    lockedSections.prompts 
+                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/70' 
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/70'
+                  }`}
+                >
+                  <Lock className="w-3 h-3 shrink-0" />
+                  <span className="truncate">Prompts: {lockedSections.prompts ? "LOCK" : "OK"}</span>
+                </button>
+
+                {/* Notifications Lock Button */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleSectionLock('notifications')}
+                  disabled={loadingLocks}
+                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                    lockedSections.notifications 
+                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/70' 
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/70'
+                  }`}
+                >
+                  <Lock className="w-3 h-3 shrink-0" />
+                  <span className="truncate">Alerts: {lockedSections.notifications ? "LOCK" : "OK"}</span>
+                </button>
+
+                {/* Profile Lock Button */}
+                <button
+                  type="button"
+                  onClick={() => handleToggleSectionLock('profile')}
+                  disabled={loadingLocks}
+                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                    lockedSections.profile 
+                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/70' 
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/70'
+                  }`}
+                >
+                  <Lock className="w-3 h-3 shrink-0" />
+                  <span className="truncate">Profile: {lockedSections.profile ? "LOCK" : "OK"}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

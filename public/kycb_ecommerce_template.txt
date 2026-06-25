@@ -1,0 +1,111 @@
+========================================================================
+       CIYA - KNOW YOUR CLIENT & BUSINESS (KYCB) CONFIGURATION
+========================================================================
+
+[METADATA]
+- Client Name: Jane Doe (Example eCommerce Merchant)
+- Date Completed: 2026-06-25
+- Target Profile: ECOMMERCE WEBSITE
+- Business Name: Apex Wellness Goods
+- Industry / Niche: Health, Organic Supplements & Wellness Accessories
+- Phone Number: +1 (555) 019-2834
+- Email Address: hello@apexwellnessgoods.com
+- Business Address: 100 Innovation Way, Suite 400, Boston, MA 02110
+- Existing Website: None (Brand new setup)
+- Social Media links: instagram.com/apexwellness, facebook.com/apexwellnessgoods
+
+[SECTION 2: ECOMMERCE STORE BUSINESS MODEL]
+- E-commerce Sub-Type: B2C (Business-to-Consumer), Direct-to-Consumer (DTC)
+- On-hand Inventory Details: Yes, stored at: Principal Fulfillment Center, Boston MA
+
+[SECTION 3: CONVERSION ATTAINMENT GOALS]
+- Visitor Action Paths: Make Purchase, Sign up for Newsletter, Add to Cart, Create Account
+- Custom Action Goals: Track average order value (AOV) increases via post-purchase cross-sell upsells.
+
+[SECTION 4: CUSTOMER DEMOGRAPHICS]
+- Core Age Group: 25 - 45 Years Old
+- Target Gender focus: All Genders (with strong appeal to wellness-conscious demographics)
+- Target Income bracket: Mid to High Income ($60,000 - $150,000+ annual household income)
+- Demographics Interests: Organic eating, holistic health, active lifestyle, sustainability, yoga, mindfulness
+- Target Geographical Locales: United States (Nationwide), Canada, United Kingdom
+- Common Pain Points Handled: Difficulty finding verified clean-ingredient organic supplements; slow delivery of health goods; lack of transparency in brand sourcing.
+- Action Plan details: Highlight organic certifications and ingredient lab tests transparently on product detail pages; offer standard fast 2-day domestic shipping.
+
+[SECTION 5: PRODUCT INVENTORIES]
+- Defined Categories / Core Lines: Premium Supplements, Eco-Friendly Gym Gear, Organic Herbal Teas, Sleep Wellness Packs
+- Active Showcase Sample Cards details:
+  * Product 1: Apex Ultra Multi-Vitamin
+    - Price: $39.99
+    - Description: Whole-food multi-vitamin with organic adaptogens for sustained daily vitality.
+    - Quantity: 500 units
+    - Variants: 30-Day Supply, 90-Day Supply
+  * Product 2: Eco-Cork Yoga Block
+    - Price: $19.99
+    - Description: Biodegradable high-density cork block designed for robust balance and alignment support.
+    - Quantity: 200 units
+    - Variants: Single, Pair (Set of 2)
+  * Product 3: Sleep Harmony Tea blend
+    - Price: $14.50
+    - Description: Soothing chamomile, lavender, and valerian root herbal loose tea blend for sleep enhancement.
+    - Quantity: 400 units
+    - Variants: 100g Bag, 250g Jar
+
+[SECTION 6: DISCOUNTS & CAMPAIGNS]
+- Promotions Strategy Checked: Welcome Discount Code, Buy One Get One (BOGO) Specials, Subscription Discounts
+- Campaign Detail guidelines: Save 10% on first order with coupon "WELCOME10"; Save 15% on repeat monthly subscription deliveries.
+
+[SECTION 7: UNIQUE SELLING POINT (USP)]
+- Motivating Drivers: Clean Certified Ingredients, Earth-Safe Zero-Waste Packaging, Third-Party Lab Verified Quality
+- Brand Differentiation Vectors: Unlike standard wellness brands, 100% of our products undergo independent purity audits with visible QR codes linking to certified lab findings on every bottle.
+- Detailed USP Notes: Apex Wellness Goods aims to rebuild consumer trust in nutritional supplements through absolute transparency.
+
+[SECTION 8: BRAND GUIDELINES & PREFERRED STYLE]
+- Logo Status: Already exists (custom vector files ready in SVG format)
+- Custom Color Codes: Forest Green (#1B4332), Warm Sand (#F4F1DE), Soft Sage (#A3B19B), Crisp Charcoal (#2B2D42)
+- Preference Theme Styles: Clean, minimalist, natural, modern, editorial with generous spacing
+- Brand Mood Vibe: Warm, trustworthy, scientific but approachable, calm, premium
+
+[SECTION 9: MEDIA ASSETS STATUS]
+- Quality Product Images Provided: Yes, Client will provide (high-definition transparent white-background photos and lifestyle renders)
+- Descriptive Product Videos Provided: Yes, Client will provide (brief 15-second product demonstration loops for hero cards)
+- Customer Testimonial Reviews: Yes, Client will provide (3 introductory verified customer quotes with profile avatars)
+
+[SECTION 10: DESIGNATED STORE SPEC PAGES]
+- Pages Required: Homepage, Shop All (Catalog), Individual Product Detail Page, About Us / Sustainability Story, Contact Form & FAQ, Cart, Secure Checkout
+
+[SECTION 11: INTEGRATED PAYMENT OPTIONS]
+- Payment Options Selected: Credit/Debit Cards (Stripe), Apple Pay, Google Pay, PayPal
+
+[SECTION 12: SHIPPING & LOGISTICS SPECS]
+- Delivery Scope Focus: Domestic & International shipping
+- Specific States bounds: All USA states, Canadian provinces, UK mainland
+- Standard Shipping Options: USPS Ground Advantage (standard), FedEx 2-Day Air (express)
+- Delivery Fees Plan: Free Delivery on orders exceeding $50. Flat-rate $4.99 shipping on smaller orders.
+- Target logistics partner company: ShipBob Fulfillment Services
+
+[SECTION 13: NOTIFICATIONS & FULFILLMENT]
+- Notification Channels Checked: Automated Email confirmation, SMS Tracking Alerts
+- Automatic Order Confirmation Receipts: Yes, dynamic HTML templates styled with brand colors
+
+[SECTION 14: FUNCTIONAL STORE INTEGRATIONS]
+- Features Selected: Interactive Supplement Finder quiz, Live inventory stock-level indicators, Up-sell / Cross-sell suggestions widget on checkout.
+- Other Requirements: Compliance with accessibility guidelines (WCAG 2.1 AA).
+
+[SECTION 15: ADVERTISING & TRAFFIC CHANNELS]
+- Running Paid Campaigns: Yes, on channels: Meta Ads (Instagram/Facebook), Google Search PPC, Pinterest Shopping Ads
+- Other Traffic Channels Checked: Organic SEO, Influencer affiliate networks, Email newsletter flows
+- Needs helper setting up marketing campaigns: Yes, looking for expert conversion-rate optimization (CRO) setup.
+
+[SECTION 16: POLICIES & LEGAL PAGES]
+- Privacy Policy Status: Needs freelancer creation (fully GDPR and CCPA compliant template required)
+- Terms & Conditions Status: Needs freelancer creation (general sales agreements and service terms)
+- Refund & Return Rules Status: Already exists (30-day hassle-free refund policies)
+
+[SECTION 17: LAUNCH TIMELINE & FINANCE LIMITS]
+- Target Launch Deadline: August 15, 2026
+- Target Budget Limits: $4,500 - $6,500
+- Consultative General Notes: Store must be highly optimized for mobile devices, as over 80% of wellness product purchases are executed on mobile phones.
+
+========================================================================
+    END OF SPECIFICATION. USE THIS LOG AS A BASIS FOR THE PROMPT BUILDER.
+========================================================================
