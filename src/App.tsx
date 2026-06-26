@@ -29,6 +29,12 @@ function NavigationTracker() {
     // Mark as restored immediately so it never runs again during this session
     sessionStorage.setItem('ciya_initial_path_restored', 'true');
 
+    // ONLY restore if the user initially landed on the root page '/'
+    const isRootPath = window.location.pathname === '/' || window.location.pathname === '';
+    if (!isRootPath) {
+      return;
+    }
+
     const savedPath = localStorage.getItem('ciya_last_visited_path');
     const currentPath = window.location.pathname + window.location.search;
     
