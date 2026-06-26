@@ -160,6 +160,77 @@ async function startServer() {
     }
   });
 
+  app.post("/api/ai/compile-smart-prompt", async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(200).json({ 
+          error: "GEMINI_API_KEY environment variable is not configured." 
+        });
+      }
+
+      const { businessInfo, websiteType, referenceTemplate } = req.body;
+      if (!businessInfo) {
+        return res.status(400).json({ error: "businessInfo is required." });
+      }
+
+      // We will try gemini-3.5-flash first
+      const modelsToTry = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+      let generatedText = "";
+
+      const systemInstruction = `You are an expert Prompt Engineer, Senior Web Architect, and Brand Strategist.
+Your goal is to generate a comprehensive, professional, single-screen or multi-screen developer prompt for a student's business.
+You are trained on a provided reference template which shows the standard level of high-quality detail, design directions, typography, sections structure, and production code guidelines.
+
+Your output must be a single cohesive developer prompt that follows the high-quality structure, phrasing, and phases of the reference template, BUT adapted 100% to the student's actual business information.
+
+CRITICAL INSTRUCTIONS:
+1. STRICTLY EXCLUDE ANY DUMMY DATA FROM THE REFERENCE TEMPLATE. Do not include any business names (e.g., 'Urban Monarch Fashion House'), addresses (e.g., '22 Admiralty Way, Lekki Phase 1, Lagos'), phone numbers, social handles, or products (e.g., 'Royal Senator Set', 'Luxury Agbada', 'Executive Kaftan') from the reference template.
+2. EXTRACT AND USE ONLY the student's actual business info from the 'STUDENT DATA' provided. If the student has products, lists, colors, or vibes, use them exactly. If they lack some details, professionally elaborate them in the style and depth of the template.
+3. The prompt you output MUST start directly with: 'System Instruction: You are an expert...' and contain Phase 1, Phase 2, Phase 3, etc. with exact, tailored specifications for the student's business.
+4. DO NOT write any conversational introduction, footnotes, or wrappers. Simply output the generated developer prompt itself.`;
+
+      const contents = `=== REFERENCE TEMPLATE (STANDARD MODEL FOR TRAINING) ===
+${referenceTemplate || ''}
+
+=== STUDENT DATA (RAW KYCB ANSWERS) ===
+${businessInfo}
+
+=== TARGET WEBSITE TYPE ===
+${websiteType || 'landing'}
+
+Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity developer prompt based on the template structure and standard of quality, but strictly customized to the student's business details without any reference template dummy info:`;
+
+      for (const modelName of modelsToTry) {
+        try {
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: contents,
+            config: {
+              systemInstruction: systemInstruction,
+              temperature: 0.3,
+            }
+          });
+          if (response.text) {
+            generatedText = response.text;
+            break;
+          }
+        } catch (err: any) {
+          console.warn(`Model ${modelName} failed for compile-smart-prompt, trying fallback...`, err);
+        }
+      }
+
+      if (!generatedText) {
+        throw new Error("Failed to generate custom prompt using Gemini AI models.");
+      }
+
+      res.json({ prompt: generatedText });
+    } catch (err: any) {
+      console.error("Smart prompt compilation failed:", err);
+      res.status(500).json({ error: err.message || "Failed to compile tailored developer prompt." });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

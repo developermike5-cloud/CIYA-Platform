@@ -855,15 +855,6 @@ PHASE 5: COMPLETE PRODUCTION CODE IMPLEMENTATION GUIDELINES
 - Provide direct programming commands to compile this eCommerce hub using beautiful standard React functional patterns. Use React hooks for states, standard Tailwind CSS classes directly, and lucide-react icons.`;
     }
 
-    if (baseTemplate && baseTemplate !== FALLBACK_LP_TEMPLATE && baseTemplate !== FALLBACK_EC_TEMPLATE) {
-      body += `\n\n=== ADDITIONAL BRANDING SPECIFICATIONS (ADMIN TEMPLATE) ===\n`;
-      body += baseTemplate
-        .replace(/{name}/g, bizName)
-        .replace(/{location}/g, bizLocation)
-        .replace(/{vibe}/g, bizVibe)
-        .replace(/{details}/g, `(Tailored above based on parsed questionnaire)`);
-    }
-
     return body;
   };
 
@@ -880,8 +871,8 @@ PHASE 5: COMPLETE PRODUCTION CODE IMPLEMENTATION GUIDELINES
     setGeneratedPrompt('');
   };
 
-  // Full Prompt compiler
-  const handleCompilePrompt = () => {
+  // Full Prompt compiler using dynamic Gemini AI backend
+  const handleCompilePrompt = async () => {
     if (!businessInfo.trim()) {
       alert("Please paste some details about your business first!");
       return;
@@ -889,11 +880,56 @@ PHASE 5: COMPLETE PRODUCTION CODE IMPLEMENTATION GUIDELINES
 
     setIsCompiling(true);
 
-    setTimeout(() => {
-      const promptText = generateTailoredSmartPrompt(businessInfo, websiteType);
-      setGeneratedPrompt(promptText);
+    let baseTemplate = '';
+    if (websiteType === 'landing') {
+      if (customLpTemplates.length > 0) {
+        baseTemplate = customLpTemplates[0].template;
+      } else {
+        baseTemplate = FALLBACK_LP_TEMPLATE;
+      }
+    } else {
+      if (customEcTemplates.length > 0) {
+        baseTemplate = customEcTemplates[0].template;
+      } else {
+        baseTemplate = FALLBACK_EC_TEMPLATE;
+      }
+    }
+
+    try {
+      const response = await fetch('/api/ai/compile-smart-prompt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          businessInfo,
+          websiteType,
+          referenceTemplate: baseTemplate
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Server responded with an error status.");
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (data.prompt) {
+        setGeneratedPrompt(data.prompt);
+      } else {
+        throw new Error("No prompt was returned from the server.");
+      }
+    } catch (err) {
+      console.warn("Dynamic AI prompt generation failed, using optimized local fallback:", err);
+      // Local fallback that does NOT append the raw template directly
+      const fallbackPrompt = generateTailoredSmartPrompt(businessInfo, websiteType);
+      setGeneratedPrompt(fallbackPrompt);
+    } finally {
       setIsCompiling(false);
-    }, 600);
+    }
   };
 
   const handleCopy = () => {
