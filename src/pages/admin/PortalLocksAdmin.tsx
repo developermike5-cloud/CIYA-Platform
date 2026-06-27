@@ -11,6 +11,7 @@ interface LockedSections {
   profile: boolean;
   notifications: boolean;
   assignments: boolean;
+  kycb: boolean;
 }
 
 export default function PortalLocksAdmin() {
@@ -20,6 +21,7 @@ export default function PortalLocksAdmin() {
     profile: false,
     notifications: false,
     assignments: false,
+    kycb: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,16 +43,9 @@ export default function PortalLocksAdmin() {
             profile: !!data.lockedSections.profile,
             notifications: !!data.lockedSections.notifications,
             assignments: !!data.lockedSections.assignments,
+            kycb: !!data.lockedSections.kycb,
           };
           setLockedSections(locks);
-
-          // Keep RTDB in sync whenever settings are read/edited
-          if (rtdb) {
-            dbSet(dbRef(rtdb, 'settings/app'), {
-              lockedSections: locks,
-              updatedAt: Date.now()
-            }).catch(err => console.warn("Failed to sync app locks to RTDB:", err));
-          }
         }
       }
       setLoading(false);
@@ -65,38 +60,42 @@ export default function PortalLocksAdmin() {
     };
   }, []);
 
-  const handleToggleLock = async (section: keyof LockedSections) => {
-    setSaving(true);
-    const updatedLocks = {
-      ...lockedSections,
-      [section]: !lockedSections[section],
-    };
+  const handleToggleLock = (section: keyof LockedSections) => {
+    // Immediate optimistic update of the local state
+    let updatedLocks: LockedSections;
+    setLockedSections((prev) => {
+      updatedLocks = {
+        ...prev,
+        [section]: !prev[section],
+      };
 
-    setLockedSections(updatedLocks);
+      // Perform background saves so the UI remains interactive and fast!
+      setDoc(doc(db, 'settings', 'app'), {
+        lockedSections: updatedLocks,
+        updatedAt: serverTimestamp()
+      }, { merge: true }).catch(err => {
+        console.error("Firestore setDoc failed:", err);
+      });
 
-    try {
-      try {
-        await setDoc(doc(db, 'settings', 'app'), {
-          lockedSections: updatedLocks,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      } catch (firestoreErr) {
-        console.warn("Firestore setDoc failed (possibly quota limit). Attempting fallback to RTDB:", firestoreErr);
-      }
-
-      // Synchronize to RTDB for immediate cost-free retrieval by students!
+      // Synchronize to RTDB in the background (fire-and-forget, prevents hanging if RTDB is slow or blocked)
       if (rtdb) {
-        await dbSet(dbRef(rtdb, 'settings/app'), {
+        dbSet(dbRef(rtdb, 'settings/app'), {
           lockedSections: updatedLocks,
           updatedAt: Date.now()
+        }).catch(err => {
+          console.warn("RTDB sync failed:", err);
         });
       }
-    } catch (err) {
-      console.error("Error setting portal lock in RTDB:", err);
-      alert("Failed to update lock permission state. Verify your network connection!");
-    } finally {
+
+      return updatedLocks;
+    });
+
+    // Provide immediate transient save feedback without locking up buttons
+    setSaving(true);
+    const timer = setTimeout(() => {
       setSaving(false);
-    }
+    }, 600);
+    return () => clearTimeout(timer);
   };
 
   const sectionsInfo = [
@@ -129,6 +128,12 @@ export default function PortalLocksAdmin() {
       title: 'Student Profile Settings',
       description: 'Governs Student Profile review & customization tabs. Controls modification of names, emails, states of origin, and biography metadata.',
       badgeText: 'Student Bio Settings',
+    },
+    {
+      key: 'kycb' as keyof LockedSections,
+      title: 'KYCB Sheet & Questionnaire',
+      description: 'Governs student access to the KYCB (Know Your Client & Business) onboarding questions sheet.',
+      badgeText: 'Client & Business KYC',
     },
   ];
 
@@ -215,7 +220,6 @@ export default function PortalLocksAdmin() {
                 <button
                   type="button"
                   onClick={() => handleToggleLock(sec.key)}
-                  disabled={saving}
                   className={`px-4 py-2.5 rounded-xl font-extrabold text-[11px] uppercase tracking-wider cursor-pointer border-0 transition-all select-none shadow-sm ${
                     isLocked 
                       ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/10' 

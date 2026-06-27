@@ -1277,7 +1277,7 @@ export default function CourseEdit() {
                 className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold"
                 value={form.title || ""}
                 onChange={e => setField("title", e.target.value)}
-                placeholder="e.g., Build a Landing Page with AI in 5 Days"
+                placeholder="e.g., Build a Landing Page with AI in 3 Days"
               />
             </div>
             <div>
@@ -1416,7 +1416,7 @@ export default function CourseEdit() {
         </div>
       )}
 
-      {/* TAB 2: 5-DAY CURRICULUM & CHECKS BUILDER */}
+      {/* TAB 2: 3-DAY CURRICULUM & CHECKS BUILDER */}
       {activeSection === "curriculum" && (
         <div className="space-y-6">
           {/* Day Selector Accordion Buttons */}

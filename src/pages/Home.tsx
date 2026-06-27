@@ -327,7 +327,7 @@ function Mission() {
 
         <motion.div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-6 w-full" variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }}>
           {[
-            { icon: Lightbulb, title: "Learn by Doing", desc: "Practical, hands-on training that gets you results within 5 days." },
+            { icon: Lightbulb, title: "Learn by Doing", desc: "Practical, hands-on training that gets you results within 3 days." },
             { icon: Gift, title: "Free to Begin", desc: "Beginner courses are completely free — no barriers to entry." },
             { icon: Bot, title: "AI-Powered", desc: "Forget difficult coding. Let AI do the heavy lifting while you create." },
             { icon: Wallet, title: "Earn or Save", desc: "Use your skills to save money or charge clients for services." },
@@ -351,14 +351,14 @@ const COURSES_DATA = {
         title: "Landing Page Foundations",
         price: "100% Free",
         isFree: true,
-        desc: "Build your first landing page in 5 days using AI generators. No coding needed. Enough to launch your online presence right away.",
+        desc: "Build your first landing page in 3 days using AI generators. No coding needed. Enough to launch your online presence right away.",
         features: ["Landing page creation", "AI copywriting assistant", "Lead capture forms", "Publish & go live"]
       },
       {
         level: "Advanced",
         title: "Professional Conversion Page Builder",
         price: "₦15,000",
-        subPrice: "/ 5-day course",
+        subPrice: "/ 3-day course",
         featured: true,
         badge: "Most Popular",
         desc: "Offer professional landing page design services. Learn the full workflow to structure conversion heroes, perform speed audits, and deliver client projects confidently.",
@@ -368,7 +368,7 @@ const COURSES_DATA = {
         level: "Masterclass",
         title: "Conversion Funnel Agency",
         price: "₦30,000",
-        subPrice: "/ 5-day course",
+        subPrice: "/ 3-day course",
         desc: "Scale into a high-ticket landing page agency. Master multivariate layout testing, advanced copywriting frameworks, client acquisition, and team pricing.",
         features: ["Complex marketing systems", "Client acquisition strategy", "High-ticket pricing & packaging", "Agency team operations"]
       }
@@ -393,14 +393,14 @@ const COURSES_DATA = {
         title: "E-commerce Essentials",
         price: "100% Free",
         isFree: true,
-        desc: "Launch your personal online store in 5 days with AI. Hook up a basic catalog, add product cards, set up images, and integrate simple WhatsApp checkouts for instant sales.",
+        desc: "Launch your personal online store in 3 days with AI. Hook up a basic catalog, add product cards, set up images, and integrate simple WhatsApp checkouts for instant sales.",
         features: ["Product listing setups", "Interactive shop catalogs", "WhatsApp routing checkouts", "Inventory publishing"]
       },
       {
         level: "Advanced",
         title: "Professional Store Builder",
         price: "₦15,000",
-        subPrice: "/ 5-day course",
+        subPrice: "/ 3-day course",
         featured: true,
         badge: "Most Popular",
         desc: "Build highly robust commercial stores for retail brands and direct-to-consumer businesses. Include filters, order search, tax setups, and localized delivery configurations.",
@@ -410,7 +410,7 @@ const COURSES_DATA = {
         level: "Masterclass",
         title: "E-Commerce Agency Growth",
         price: "₦30,000",
-        subPrice: "/ 5-day course",
+        subPrice: "/ 3-day course",
         desc: "Create and scale a dedicated e-commerce agency. Gain high-value store blueprints, master wholesale setup strategies, and access lead lists of retail merchants ready to pay for dynamic stores.",
         features: ["Multi-vendor marketplaces", "Automated email notifications", "Merchant sales reporting", "Agency client acquisition"]
       }
@@ -655,7 +655,7 @@ function Courses() {
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.5 }}>
             <span className="text-xs md:text-sm font-semibold uppercase tracking-wider text-amber-400 mb-2 block">Our Courses</span>
             <h2 className="text-3xl md:text-5xl font-extrabold text-teal-50 mb-4 tracking-tight drop-shadow-md">AI Website Creation Tracks</h2>
-            <p className="text-teal-100 text-base md:text-lg max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow">Master premium layout builders & automated checkouts in just 5 days, from zero to your first host.</p>
+            <p className="text-teal-100 text-base md:text-lg max-w-2xl mx-auto mb-8 leading-relaxed drop-shadow">Master premium layout builders & automated checkouts in just 3 days, from zero to your first host.</p>
             
             <div className="flex flex-wrap gap-3 justify-center mb-10">
               {[
@@ -684,7 +684,7 @@ function Courses() {
 function HowItWorks() {
   const steps = [
     { title: "Pick Your Creator Track", desc: "Choose between AI Landing Pages and AI E-commerce Websites. Start with the free beginner course — no commitment needed." },
-    { title: "Join the 5-Day Training", desc: "Attend daily live/recorded sessions with practical exercises. Each day builds on the last — by day 5 you'll have a real website live to show." },
+    { title: "Join the 3-Day Training", desc: "Attend daily live/recorded sessions with practical exercises. Each day builds on the last — by day 3 you'll have a real website live to show." },
     { title: "Build Real Sites", desc: "Every class ends with a live project you build during training — a landing page or an e-commerce storefront — that you own and can use." },
     { title: "Apply or Advance", desc: "Use the beginner skills to save money or start-up. When ready, upgrade to advanced or masterclass to unlock professional-grade client contract potential." },
   ];
@@ -695,8 +695,8 @@ function HowItWorks() {
       <div className="max-w-6xl mx-auto relative z-10 w-full">
         <motion.div className="mb-14 text-center md:text-left" initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeUp}>
           <span className="text-sm font-semibold uppercase tracking-wider text-teal-400 mb-4 block">How It Works</span>
-          <h2 className="text-3xl md:text-5xl font-extrabold text-teal-50 mb-6 tracking-tight">From Zero to Skilled in 5 Days</h2>
-          <p className="text-teal-200 text-lg max-w-2xl md:mx-0 mx-auto leading-relaxed">Every CIYA course is structured as an intensive 5-day programme designed to get you skilled, confident, and ready to apply what you've learned immediately.</p>
+          <h2 className="text-3xl md:text-5xl font-extrabold text-teal-50 mb-6 tracking-tight">From Zero to Skilled in 3 Days</h2>
+          <p className="text-teal-200 text-lg max-w-2xl md:mx-0 mx-auto leading-relaxed">Every CIYA course is structured as an intensive 3-day programme designed to get you skilled, confident, and ready to apply what you've learned immediately.</p>
         </motion.div>
         
         <motion.div 
@@ -724,7 +724,7 @@ function WhyCiya() {
     { icon: Bot, title: "AI Makes it Easy", desc: "No need to learn complicated code. AI tools handle the technical complexity so you can focus on creating and delivering results." },
     { icon: Smartphone, title: "No More WhatsApp Hustle", desc: "Move your business beyond your contacts list. A proper website or branded content puts your business in front of the right audience." },
     { icon: Briefcase, title: "Create Your Own Job", desc: "Don't wait for employment. Build a freelance career or business around skills that companies and clients genuinely pay for." },
-    { icon: Zap, title: "5 Days. Real Results.", desc: "We don't waste your time. In 5 focused days, you'll complete a real project and have a skill you can use immediately." },
+    { icon: Zap, title: "3 Days. Real Results.", desc: "We don't waste your time. In 3 focused days, you'll complete a real project and have a skill you can use immediately." },
     { icon: TrendingUp, title: "Grow at Your Own Pace", desc: "Start free, advance when you're ready. CIYA grows with you from beginner to professional to masterclass agency-level." },
   ];
 

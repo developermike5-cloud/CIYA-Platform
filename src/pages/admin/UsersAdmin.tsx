@@ -127,92 +127,6 @@ export default function UsersAdmin() {
     return localStorage.getItem('ciya_brand_logo');
   });
 
-  // Section locking state
-  const [lockedSections, setLockedSections] = useState<{
-    courses: boolean;
-    prompts: boolean;
-    profile: boolean;
-    notifications: boolean;
-    assignments: boolean;
-  }>({
-    courses: false,
-    prompts: false,
-    profile: false,
-    notifications: false,
-    assignments: false,
-  });
-  const [loadingLocks, setLoadingLocks] = useState(false);
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      setLoadingLocks(true);
-      try {
-        const docSnap = await getDoc(doc(db, 'settings', 'app'));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data && data.lockedSections) {
-            setLockedSections({
-              courses: !!data.lockedSections.courses,
-              prompts: !!data.lockedSections.prompts,
-              profile: !!data.lockedSections.profile,
-              notifications: !!data.lockedSections.notifications,
-              assignments: !!data.lockedSections.assignments,
-            });
-          }
-        }
-      } catch (err: any) {
-        // Delegate error to handleFirestoreError to trigger any global auto-healing if needed
-        handleFirestoreError(err, OperationType.GET, 'settings/app');
-        
-        const errMsg = err?.message || String(err);
-        if (errMsg.toLowerCase().includes('offline') || !navigator.onLine) {
-          console.warn("Offline/cache fetch for section locks in UsersAdmin:", errMsg);
-        } else {
-          console.warn("Could not fetch section locks in UsersAdmin (using defaults):", errMsg);
-        }
-      } finally {
-        setLoadingLocks(false);
-      }
-    };
-    fetchSettings();
-  }, []);
-
-  const handleToggleSectionLock = async (section: 'courses' | 'prompts' | 'profile' | 'notifications' | 'assignments') => {
-    if (!isSuperAdmin) {
-      alert("Only the super admin can lock or unlock website sections.");
-      return;
-    }
-    const newVal = !lockedSections[section];
-    const updatedLocked = {
-      ...lockedSections,
-      [section]: newVal
-    };
-    setLockedSections(updatedLocked);
-    try {
-      try {
-        await setDoc(doc(db, 'settings', 'app'), {
-          lockedSections: updatedLocked,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      } catch (firestoreErr) {
-        console.warn("Firestore setDoc failed (possibly quota limit). Attempting fallback to RTDB:", firestoreErr);
-      }
-
-      // Synchronize to RTDB for immediate cost-free retrieval by students!
-      if (rtdb) {
-        await dbSet(dbRef(rtdb, 'settings/app'), {
-          lockedSections: updatedLocked,
-          updatedAt: Date.now()
-        });
-      }
-    } catch (err) {
-      console.error("Error updating section lock status in RTDB:", err);
-      alert("Failed to synchronize section lock. Check network connection!");
-      // Roll back
-      setLockedSections(prev => ({ ...prev, [section]: !newVal }));
-    }
-  };
-
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -632,125 +546,39 @@ export default function UsersAdmin() {
         </div>
       </div>
 
-      {/* Website Branding & Portal Locks Settings */}
+      {/* Website Branding Settings */}
       {hasBrandingPermission && (
         <div className="space-y-4 mb-6 animate-fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Branding Logo Card */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm flex flex-col justify-between gap-4">
-              <div>
-                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">Branding Identity</h3>
-                <p className="text-xs text-slate-500 font-semibold mb-3">Configure custom banner display logo across the main student workspace interface.</p>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2 bg-slate-900 p-2.5 rounded-2xl border border-slate-700 shadow-inner">
-                  <BrandingLogo size="xs" />
-                  {currentLogo && (
-                    <button 
-                      onClick={handleResetLogo}
-                      title="Reset to default text logo"
-                      className="p-1.5 hover:bg-slate-800 text-rose-450 hover:text-rose-355 rounded-lg transition-colors bg-transparent border-0 cursor-pointer ml-1"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                <label className="flex items-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-0.5 border-0">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>{logoUploading ? "Uploading..." : "Upload Logo"}</span>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleLogoUpload} 
-                    className="hidden" 
-                    disabled={logoUploading}
-                  />
-                </label>
-              </div>
+          {/* Branding Logo Card */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 max-w-2xl">
+            <div>
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">Branding Identity</h3>
+              <p className="text-xs text-slate-500 font-semibold">Configure custom banner display logo across the main student workspace interface.</p>
             </div>
-
-            {/* Quick Section Locks Card */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm flex flex-col justify-between gap-4">
-              <div>
-                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">Quick Portal Locks</h3>
-                <p className="text-xs text-slate-500 font-semibold mb-3">Enforce access controls for key student workspace features immediately.</p>
+            <div className="flex items-center justify-between gap-4 w-full sm:w-auto">
+              <div className="flex items-center gap-2 bg-slate-900 p-2.5 rounded-2xl border border-slate-700 shadow-inner shrink-0">
+                <BrandingLogo size="xs" />
+                {currentLogo && (
+                  <button 
+                    onClick={handleResetLogo}
+                    title="Reset to default text logo"
+                    className="p-1.5 hover:bg-slate-800 text-rose-450 hover:text-rose-355 rounded-lg transition-colors bg-transparent border-0 cursor-pointer ml-1 flex items-center justify-center"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-              <div className="grid grid-cols-2 xl:grid-cols-3 gap-2.5">
-                {/* Courses Lock Button */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleSectionLock('courses')}
-                  disabled={loadingLocks}
-                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                    lockedSections.courses 
-                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/70' 
-                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/70'
-                  }`}
-                >
-                  <Lock className="w-3 h-3 shrink-0" />
-                  <span className="truncate">Courses: {lockedSections.courses ? "LOCK" : "OK"}</span>
-                </button>
-
-                {/* Assignments Lock Button */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleSectionLock('assignments')}
-                  disabled={loadingLocks}
-                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                    lockedSections.assignments 
-                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/70' 
-                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/70'
-                  }`}
-                >
-                  <Lock className="w-3 h-3 shrink-0" />
-                  <span className="truncate">Assigns: {lockedSections.assignments ? "LOCK" : "OK"}</span>
-                </button>
-
-                {/* Prompts Lock Button */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleSectionLock('prompts')}
-                  disabled={loadingLocks}
-                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                    lockedSections.prompts 
-                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/70' 
-                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/70'
-                  }`}
-                >
-                  <Lock className="w-3 h-3 shrink-0" />
-                  <span className="truncate">Prompts: {lockedSections.prompts ? "LOCK" : "OK"}</span>
-                </button>
-
-                {/* Notifications Lock Button */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleSectionLock('notifications')}
-                  disabled={loadingLocks}
-                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                    lockedSections.notifications 
-                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/70' 
-                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/70'
-                  }`}
-                >
-                  <Lock className="w-3 h-3 shrink-0" />
-                  <span className="truncate">Alerts: {lockedSections.notifications ? "LOCK" : "OK"}</span>
-                </button>
-
-                {/* Profile Lock Button */}
-                <button
-                  type="button"
-                  onClick={() => handleToggleSectionLock('profile')}
-                  disabled={loadingLocks}
-                  className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                    lockedSections.profile 
-                      ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/70' 
-                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100/70'
-                  }`}
-                >
-                  <Lock className="w-3 h-3 shrink-0" />
-                  <span className="truncate">Profile: {lockedSections.profile ? "LOCK" : "OK"}</span>
-                </button>
-              </div>
+              <label className="flex items-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-md transition-all duration-200 cursor-pointer hover:-translate-y-0.5 border-0 shrink-0">
+                <Upload className="w-3.5 h-3.5" />
+                <span>{logoUploading ? "Uploading..." : "Upload Logo"}</span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleLogoUpload} 
+                  className="hidden" 
+                  disabled={logoUploading}
+                />
+              </label>
             </div>
           </div>
         </div>

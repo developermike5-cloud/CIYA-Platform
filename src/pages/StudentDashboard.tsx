@@ -2011,63 +2011,26 @@ export default function StudentDashboard() {
   };
 
   useEffect(() => {
-    let unsubFirestore: (() => void) | null = null;
-    let unsubRTDB: (() => void) | null = null;
-
-    const setupFirestoreFallback = () => {
-      if (unsubFirestore) return; // Already listening
-      unsubFirestore = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data() || {};
-          setAppSettings(data);
-          try {
-            safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
-          } catch (e) {}
-        }
-      }, (error) => {
-        console.warn("Soft handling error loading app settings fallback, loading from cache:", error);
+    // Listen directly and purely to Firestore settings/app document
+    const unsubFirestore = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() || {};
+        setAppSettings(data);
         try {
-          const cached = safeStorage.getItem('ciya_cached_app_settings');
-          if (cached) {
-            setAppSettings(JSON.parse(cached));
-          }
+          safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
         } catch (e) {}
-      });
-    };
-
-    if (!rtdb) {
-      setupFirestoreFallback();
-    } else {
-      const locksRef = dbRef(rtdb, 'settings/app');
-      unsubRTDB = onValue(locksRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const val = snapshot.val() || {};
-          setAppSettings(val);
-          try {
-            safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(val));
-          } catch (e) {}
-          // If RTDB successfully returned valid data, we can safely disconnect Firestore
-          if (unsubFirestore) {
-            unsubFirestore();
-            unsubFirestore = null;
-          }
-        } else {
-          setupFirestoreFallback();
+      }
+    }, (error) => {
+      console.warn("Soft handling error loading app settings, loading from cache:", error);
+      try {
+        const cached = safeStorage.getItem('ciya_cached_app_settings');
+        if (cached) {
+          setAppSettings(JSON.parse(cached));
         }
-      }, (error) => {
-        console.warn("RTDB locks load failed, falling back to Firestore/cache:", error);
-        setupFirestoreFallback();
-        try {
-          const cached = safeStorage.getItem('ciya_cached_app_settings');
-          if (cached) {
-            setAppSettings(JSON.parse(cached));
-          }
-        } catch (e) {}
-      });
-    }
+      } catch (e) {}
+    });
 
     return () => {
-      if (unsubRTDB) unsubRTDB();
       if (unsubFirestore) {
         unsubFirestore();
       }
@@ -2560,42 +2523,29 @@ export default function StudentDashboard() {
     }
   }, [userProfile]);
 
-  // Defined as a reusable function so that students can also trigger a manual refresh to see admin changes instantly
-  const loadCourses = async (forceSync = false) => {
-    // Admins and Super Admins bypass the cache completely to see their live updates instantly on the Student Dashboard preview
-    const bypassCache = isAdmin || forceSync;
-
-    if (!bypassCache) {
-      const cached = safeStorage.getItem('ciya_cached_courses');
-      const cachedTime = safeStorage.getItem('ciya_cached_courses_time');
-      const TWO_MINUTES = 2 * 60 * 1000; // Shorter cache limit (2 minutes) for standard students so admin edits sync dynamically without extreme quota usage
-
-      if (cached && cachedTime) {
-        const timeDiff = Date.now() - parseInt(cachedTime, 10);
-        if (timeDiff < TWO_MINUTES) {
-          try {
-            setCourses(JSON.parse(cached));
-            setLoading(false);
-            return;
-          } catch (e) {
-            console.error("Error parsing cached courses:", e);
-          }
-        }
+  // Set up real-time listener for published courses to ensure immediate synchronization with student dashboards
+  useEffect(() => {
+    if (authChecking) return;
+    
+    setLoading(true);
+    
+    // Stale-While-Revalidate: render cached courses instantly first so students never see a blank screen
+    const cached = safeStorage.getItem('ciya_cached_courses');
+    if (cached) {
+      try {
+        setCourses(JSON.parse(cached));
+        setLoading(false);
+      } catch (e) {
+        console.error("Error parsing cached courses:", e);
       }
     }
 
-    if (forceSync) {
-      setIsRefreshingCourses(true);
-    } else {
-      setLoading(true);
-    }
+    const q = query(
+      collection(db, 'courses'), 
+      where('publish_status', '==', 'Published')
+    );
 
-    try {
-      const q = query(
-        collection(db, 'courses'), 
-        where('publish_status', '==', 'Published')
-      );
-      const snapshot = await getDocs(q);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => {
         const d = doc.data();
         return {
@@ -2637,12 +2587,15 @@ export default function StudentDashboard() {
       });
 
       setCourses(data);
-      safeStorage.setItem('ciya_cached_courses', JSON.stringify(data));
-      safeStorage.setItem('ciya_cached_courses_time', Date.now().toString());
-    } catch (error) {
-      console.error("Error fetching courses from custom cache-loader:", error);
-      handleFirestoreError(error, OperationType.LIST, 'courses');
-      
+      setLoading(false);
+      setIsRefreshingCourses(false);
+      try {
+        safeStorage.setItem('ciya_cached_courses', JSON.stringify(data));
+        safeStorage.setItem('ciya_cached_courses_time', Date.now().toString());
+      } catch (e) {}
+    }, (error) => {
+      console.error("Error listening to real-time courses:", error);
+      // Fail gracefully: try to keep using local storage cached courses
       const backup = safeStorage.getItem('ciya_cached_courses');
       if (backup) {
         try {
@@ -2651,58 +2604,56 @@ export default function StudentDashboard() {
           console.error(e);
         }
       } else {
-          // Fallback to static mock courses to prevent empty screen
-          setCourses([
-            {
-              id: "ciya-web-101",
-              title: "CIYA 5-Day Free Website Development",
-              description: "Master the art of creating high-converting, high-performance landing pages and business sites in 5 simple days using modern AI tools.",
-              category: "Web Development",
-              skill: "web",
-              level: "Beginner",
-              tier: "beginner",
-              publish_status: "Published",
-              days: [
-                {
-                  dayNumber: 1,
-                  title: "Day 1: AI Prompt Engineering & Visual Landing Pages",
-                  description: "Understand layout psychology and formulate exact instructions that yield clean frontend designs.",
-                  videos: [
-                    {
-                      id: "1-1",
-                      title: "Module introduction and visual hierarchy blueprint",
-                      video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                      duration: "12 min",
-                      description: "Learn how to establish alignment, density, and professional off-white canvases.",
-                      resources: "https://ciya.academy/resources/day1",
+        // Mock fallback if nothing in cache
+        setCourses([
+          {
+            id: "ciya-web-101",
+            title: "CIYA 3-Day Free Website Development",
+            description: "Master the art of creating high-converting, high-performance landing pages and business sites in 3 simple days using modern AI tools.",
+            category: "Web Development",
+            skill: "web",
+            level: "Beginner",
+            tier: "beginner",
+            publish_status: "Published",
+            days: [
+              {
+                dayNumber: 1,
+                title: "Day 1: AI Prompt Engineering & Visual Landing Pages",
+                description: "Understand layout psychology and formulate exact instructions that yield clean frontend designs.",
+                videos: [
+                  {
+                    id: "1-1",
+                    title: "Module introduction and visual hierarchy blueprint",
+                    video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                    duration: "12 min",
+                    description: "Learn how to establish alignment, density, and professional off-white canvases.",
+                    resources: "https://ciya.academy/resources/day1",
+                    checkType: "mcq",
+                    check: {
+                      id: "q-1-1",
                       checkType: "mcq",
-                      check: {
-                        id: "q-1-1",
-                        checkType: "mcq",
-                        question: "What is the industry-standard primary font recommended for modern tech layouts?",
-                        options: ["Times New Roman", "Inter", "Comic Sans", "Impact"],
-                        answer: "Inter",
-                        explanation: "Inter is a highly legible, geometrically balanced neutral sans-serif designed for computer interfaces."
-                      },
-                      funFact: "Clean neutral typography has been proved in user testing sessions to increase aesthetic trust by up to 60%."
-                    }
-                  ]
-                }
-              ]
-            }
-          ]);
-        }
-      } finally {
-        setLoading(false);
-        setIsRefreshingCourses(false);
+                      question: "What is the industry-standard primary font recommended for modern tech layouts?",
+                      options: ["Times New Roman", "Inter", "Comic Sans", "Impact"],
+                      answer: "Inter",
+                      explanation: "Inter is a highly legible, geometrically balanced neutral sans-serif designed for computer interfaces."
+                    },
+                    funFact: "Clean neutral typography has been proved in user testing sessions to increase aesthetic trust by up to 60%."
+                  }
+                ]
+              }
+            ]
+          }
+        ]);
       }
-  };
+      setLoading(false);
+      setIsRefreshingCourses(false);
+    });
 
-  useEffect(() => {
-    if (authChecking) return;
-    loadCourses(false);
-  }, [authChecking, isAdmin]);
+    return () => {
+      unsubscribe();
+    };
+  }, [authChecking]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2854,7 +2805,7 @@ export default function StudentDashboard() {
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">Application Reviewed ❌</h2>
             
             <p className="text-slate-600 text-sm leading-relaxed max-w-sm mx-auto font-medium">
-              Hello <strong>{userProfile.fullName || 'Student'}</strong>! After reviewing your submitted metrics, we regret to notify that you were not chosen for this specific cohort. We received a massive scale of CIYA Five days Free Website Development Training requests. We wish you rapid career velocity!
+              Hello <strong>{userProfile.fullName || 'Student'}</strong>! After reviewing your submitted metrics, we regret to notify that you were not chosen for this specific cohort. We received a massive scale of CIYA Three days Free Website Development Training requests. We wish you rapid career velocity!
             </p>
 
             <div className="w-full">
@@ -2882,7 +2833,7 @@ export default function StudentDashboard() {
               </span>
               <h2 className="text-3xl font-black text-slate-900 tracking-tight">Enter Your Access Activation Code 🔑</h2>
               <p className="text-slate-950 text-base leading-relaxed max-w-md mx-auto font-black">
-                Congratulations, <strong className="text-teal-800 font-black decoration-teal-600/30 underline decoration-2">{userProfile.fullName || 'Scholar'}</strong>! Your spot for CIYA Five days Free Website Development Training has been approved by the administrators. 
+                Congratulations, <strong className="text-teal-800 font-black decoration-teal-600/30 underline decoration-2">{userProfile.fullName || 'Scholar'}</strong>! Your spot for CIYA Three days Free Website Development Training has been approved by the administrators. 
                 Please enter your unique <strong className="text-indigo-800 font-black decoration-indigo-600/30 underline decoration-2">activation code (e.g., CIYA-854473)</strong> below to unlock your course learning dashboard.
               </p>
             </div>
@@ -3179,12 +3130,27 @@ export default function StudentDashboard() {
         {/* Core content scroll container */}
         <div className="flex-1 overflow-auto p-6 md:p-8">
           {currentView === 'kycb' ? (
-            <AdminKycbQuestionnaire
-              isAdminMode={false}
-              userId={currentUser?.uid}
-              userEmail={currentUser?.email || userProfile?.email || ''}
-              defaultClientName={userProfile?.fullName || currentUser?.displayName || ''}
-            />
+            (!isAdmin && appSettings?.lockedSections?.kycb) ? (
+              <div className="bg-white border text-sm border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
+                <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Lock className="w-8 h-8 text-rose-500" />
+                </div>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight">KYCB Portal Locked</h3>
+                <p className="text-slate-500 mt-3 text-sm leading-relaxed font-semibold">
+                  The KYCB (Know Your Client & Business) onboarding questions sheet is temporarily locked by administrators. Please reach out to your certified coach or coordinator to unlock this questionnaire!
+                </p>
+                <div className="mt-8 pt-6 border-t border-slate-100 flex justify-center items-center gap-2 text-xs text-slate-400 font-bold">
+                  <span>🛡️ CIYA Guarded Academy Portal</span>
+                </div>
+              </div>
+            ) : (
+              <AdminKycbQuestionnaire
+                isAdminMode={false}
+                userId={currentUser?.uid}
+                userEmail={currentUser?.email || userProfile?.email || ''}
+                defaultClientName={userProfile?.fullName || currentUser?.displayName || ''}
+              />
+            )
           ) : currentView === 'prompts' ? (
             <PromptGenerator isLocked={!isAdmin && appSettings?.lockedSections?.prompts} />
           ) : currentView === 'profile' ? (
@@ -3805,17 +3771,16 @@ export default function StudentDashboard() {
                         ))}
                       </div>
 
-                      <button
-                        onClick={() => loadCourses(true)}
-                        disabled={isRefreshingCourses}
-                        className={`p-1.5 px-3 rounded-xl border border-slate-200 text-slate-600 hover:text-indigo-600 bg-white hover:bg-slate-50 cursor-pointer shadow-sm transition-all flex items-center justify-center gap-1.5 text-xs font-bold shrink-0 ${isRefreshingCourses ? 'opacity-60 cursor-not-allowed' : ''}`}
-                        title="Sync latest training curriculum and content updates from coaches"
+                      <div
+                        className="p-1.5 px-3 rounded-xl border border-teal-200/55 text-teal-700 bg-teal-50/60 shadow-sm transition-all flex items-center justify-center gap-2 text-xs font-bold shrink-0 select-none"
+                        title="Your training syllabus is automatically synchronized in real-time with your coaches"
                       >
-                        <svg className={`w-3.5 h-3.5 ${isRefreshingCourses ? 'animate-spin text-indigo-600' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 16H18.5" />
-                        </svg>
-                        <span>{isRefreshingCourses ? 'Syncing...' : 'Sync Curriculum'}</span>
-                      </button>
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+                        </span>
+                        <span>Auto Synced with Coaches</span>
+                      </div>
                     </div>
 
                     {loading ? (
@@ -3927,7 +3892,7 @@ export default function StudentDashboard() {
               </h2>
               
               <p className="text-slate-600 text-sm leading-relaxed">
-                Your admission profile and CIYA Five days Free Website Development Training benefits have been fully verified and activated. We are incredibly excited to welcome you into our intensive training cohort.
+                Your admission profile and CIYA Three days Free Website Development Training benefits have been fully verified and activated. We are incredibly excited to welcome you into our intensive training cohort.
               </p>
 
               <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-left mt-6">
