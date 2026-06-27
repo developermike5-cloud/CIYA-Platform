@@ -1857,6 +1857,7 @@ export default function StudentDashboard() {
   const location = useLocation();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshingCourses, setIsRefreshingCourses] = useState(false);
   
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const cached = safeStorage.getItem('ciya_cached_user');
@@ -2559,91 +2560,97 @@ export default function StudentDashboard() {
     }
   }, [userProfile]);
 
-  // Load published courses list with a 1-hour cache-first limit
-  useEffect(() => {
-    if (authChecking) return;
-    
-    async function loadCourses() {
-      setLoading(true);
+  // Defined as a reusable function so that students can also trigger a manual refresh to see admin changes instantly
+  const loadCourses = async (forceSync = false) => {
+    // Admins and Super Admins bypass the cache completely to see their live updates instantly on the Student Dashboard preview
+    const bypassCache = isAdmin || forceSync;
 
+    if (!bypassCache) {
       const cached = safeStorage.getItem('ciya_cached_courses');
       const cachedTime = safeStorage.getItem('ciya_cached_courses_time');
-      const ONE_HOUR = 60 * 60 * 1000;
+      const TWO_MINUTES = 2 * 60 * 1000; // Shorter cache limit (2 minutes) for standard students so admin edits sync dynamically without extreme quota usage
 
       if (cached && cachedTime) {
         const timeDiff = Date.now() - parseInt(cachedTime, 10);
-        if (timeDiff < ONE_HOUR) {
+        if (timeDiff < TWO_MINUTES) {
           try {
             setCourses(JSON.parse(cached));
             setLoading(false);
-            return; // Cache is young, return immediately and save quota!
+            return;
           } catch (e) {
             console.error("Error parsing cached courses:", e);
           }
         }
       }
+    }
 
-      try {
-        const q = query(
-          collection(db, 'courses'), 
-          where('publish_status', '==', 'Published')
-        );
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => {
-          const d = doc.data();
-          return {
-            id: doc.id,
-            ...d,
-            skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
-            tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
-            status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
-            days: (d.days || []).map((day: any, dIdx: number) => ({
-              dayNumber: dIdx + 1,
-              title: day.title || `Day ${dIdx + 1}: Study Module`,
-              description: day.description || '',
-              assignment: day.assignment || { prompt: '', dueNote: '' },
-              videos: (day.videos || []).map((v: any) => ({
-                id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
-                title: v.title || '',
-                video_url: v.video_url || v.url || '',
-                url: v.url || v.video_url || '',
-                duration: v.duration || '10 min',
-                description: v.description || '',
-                resources: v.resources || '',
-                checkType: v.checkType || 'none',
-                check: v.check || null,
-                funFact: v.funFact || null
-              }))
+    if (forceSync) {
+      setIsRefreshingCourses(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const q = query(
+        collection(db, 'courses'), 
+        where('publish_status', '==', 'Published')
+      );
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
+          tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
+          status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
+          days: (d.days || []).map((day: any, dIdx: number) => ({
+            dayNumber: dIdx + 1,
+            title: day.title || `Day ${dIdx + 1}: Study Module`,
+            description: day.description || '',
+            assignment: day.assignment || { prompt: '', dueNote: '' },
+            videos: (day.videos || []).map((v: any) => ({
+              id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
+              title: v.title || '',
+              video_url: v.video_url || v.url || '',
+              url: v.url || v.video_url || '',
+              duration: v.duration || '10 min',
+              description: v.description || '',
+              resources: v.resources || '',
+              checkType: v.checkType || 'none',
+              check: v.check || null,
+              funFact: v.funFact || null
             }))
-          } as Course;
-        });
-        
-        data.sort((a, b) => {
-          const getMills = (fieldVal: any) => {
-            if (!fieldVal) return 0;
-            if (typeof fieldVal.toDate === 'function') {
-              return fieldVal.toDate().getTime();
-            }
-            return new Date(fieldVal).getTime() || 0;
-          };
-          return getMills(b.createdAt) - getMills(a.createdAt);
-        });
-
-        setCourses(data);
-        safeStorage.setItem('ciya_cached_courses', JSON.stringify(data));
-        safeStorage.setItem('ciya_cached_courses_time', Date.now().toString());
-      } catch (error) {
-        console.error("Error fetching courses from custom cache-loader:", error);
-        handleFirestoreError(error, OperationType.LIST, 'courses');
-        
-        const backup = safeStorage.getItem('ciya_cached_courses');
-        if (backup) {
-          try {
-            setCourses(JSON.parse(backup));
-          } catch (e) {
-            console.error(e);
+          }))
+        } as Course;
+      });
+      
+      data.sort((a, b) => {
+        const getMills = (fieldVal: any) => {
+          if (!fieldVal) return 0;
+          if (typeof fieldVal.toDate === 'function') {
+            return fieldVal.toDate().getTime();
           }
-        } else {
+          return new Date(fieldVal).getTime() || 0;
+        };
+        return getMills(b.createdAt) - getMills(a.createdAt);
+      });
+
+      setCourses(data);
+      safeStorage.setItem('ciya_cached_courses', JSON.stringify(data));
+      safeStorage.setItem('ciya_cached_courses_time', Date.now().toString());
+    } catch (error) {
+      console.error("Error fetching courses from custom cache-loader:", error);
+      handleFirestoreError(error, OperationType.LIST, 'courses');
+      
+      const backup = safeStorage.getItem('ciya_cached_courses');
+      if (backup) {
+        try {
+          setCourses(JSON.parse(backup));
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
           // Fallback to static mock courses to prevent empty screen
           setCourses([
             {
@@ -2688,11 +2695,14 @@ export default function StudentDashboard() {
         }
       } finally {
         setLoading(false);
+        setIsRefreshingCourses(false);
       }
-    }
+  };
 
-    loadCourses();
-  }, [authChecking]);
+  useEffect(() => {
+    if (authChecking) return;
+    loadCourses(false);
+  }, [authChecking, isAdmin]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3768,30 +3778,44 @@ export default function StudentDashboard() {
                   )}
 
                   <div className="space-y-4 text-left">
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <button
-                        onClick={() => setActiveSkillFilter("all")}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                          activeSkillFilter === "all"
-                            ? "border-teal-600 bg-teal-50 text-teal-700 font-extrabold"
-                            : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-                        }`}
-                      >
-                        All Tracks in Catalog
-                      </button>
-                      {Object.entries(SKILLS).map(([k, v]) => (
+                    <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
+                      <div className="flex flex-wrap gap-2 items-center">
                         <button
-                          key={k}
-                          onClick={() => setActiveSkillFilter(k)}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                            activeSkillFilter === k
+                          onClick={() => setActiveSkillFilter("all")}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            activeSkillFilter === "all"
                               ? "border-teal-600 bg-teal-50 text-teal-700 font-extrabold"
                               : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
                           }`}
                         >
-                          {v.icon} {v.label}
+                          All Tracks in Catalog
                         </button>
-                      ))}
+                        {Object.entries(SKILLS).map(([k, v]) => (
+                          <button
+                            key={k}
+                            onClick={() => setActiveSkillFilter(k)}
+                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                              activeSkillFilter === k
+                                ? "border-teal-600 bg-teal-50 text-teal-700 font-extrabold"
+                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                            }`}
+                          >
+                            {v.icon} {v.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => loadCourses(true)}
+                        disabled={isRefreshingCourses}
+                        className={`p-1.5 px-3 rounded-xl border border-slate-200 text-slate-600 hover:text-indigo-600 bg-white hover:bg-slate-50 cursor-pointer shadow-sm transition-all flex items-center justify-center gap-1.5 text-xs font-bold shrink-0 ${isRefreshingCourses ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        title="Sync latest training curriculum and content updates from coaches"
+                      >
+                        <svg className={`w-3.5 h-3.5 ${isRefreshingCourses ? 'animate-spin text-indigo-600' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 16H18.5" />
+                        </svg>
+                        <span>{isRefreshingCourses ? 'Syncing...' : 'Sync Curriculum'}</span>
+                      </button>
                     </div>
 
                     {loading ? (

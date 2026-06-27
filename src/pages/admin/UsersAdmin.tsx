@@ -405,39 +405,36 @@ export default function UsersAdmin() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchUsers = async (forceRefresh = false) => {
+    let hasUsedCache = false;
+
     if (forceRefresh) {
       setIsRefreshing(true);
     } else {
-      setLoading(true);
-    }
-    try {
-      if (!forceRefresh) {
-        // Try local storage cache
-        const cachedUsersStr = localStorage.getItem('ciya_admin_cached_users_list');
-        const cachedUsersTimeStr = localStorage.getItem('ciya_admin_cached_users_time');
-        const CACHE_MINS = 10 * 60 * 1000; // 10 minutes cache
-        
-        if (cachedUsersStr && cachedUsersTimeStr && (Date.now() - parseInt(cachedUsersTimeStr, 10) < CACHE_MINS)) {
-          try {
-            const parsedUsers = JSON.parse(cachedUsersStr);
-            setUsers(parsedUsers);
-            
-            // Also load cached admins info to keep UI snappy
-            const cachedAdminsStr = localStorage.getItem('ciya_admin_cached_admins_list');
-            const cachedAdminsDataStr = localStorage.getItem('ciya_admin_cached_admins_data');
-            if (cachedAdminsStr && cachedAdminsDataStr) {
-              setAdmins(JSON.parse(cachedAdminsStr));
-              setAdminsData(JSON.parse(cachedAdminsDataStr));
-              setLoading(false);
-              return; // Cache remains valid, 0 Firestore reads!
-            }
-          } catch (e) {
-            console.warn("Could not parse cached users, doing a fresh read:", e);
-          }
+      // Stale-while-revalidate: Load from cache instantly, then fetch fresh in background
+      const cachedUsersStr = localStorage.getItem('ciya_admin_cached_users_list');
+      const cachedAdminsStr = localStorage.getItem('ciya_admin_cached_admins_list');
+      const cachedAdminsDataStr = localStorage.getItem('ciya_admin_cached_admins_data');
+
+      if (cachedUsersStr && cachedAdminsStr && cachedAdminsDataStr) {
+        try {
+          setUsers(JSON.parse(cachedUsersStr));
+          setAdmins(JSON.parse(cachedAdminsStr));
+          setAdminsData(JSON.parse(cachedAdminsDataStr));
+          setLoading(false);
+          hasUsedCache = true;
+          setIsRefreshing(true); // show subtle syncing indicator
+        } catch (e) {
+          console.warn("Could not parse cached users:", e);
         }
       }
 
-      // Fresh Firestore fetch (Only triggers on manual refresh or cache expiry!)
+      if (!hasUsedCache) {
+        setLoading(true);
+      }
+    }
+
+    try {
+      // Fresh Firestore fetch (Always executed to fetch newly registered students immediately)
       const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
@@ -460,7 +457,11 @@ export default function UsersAdmin() {
       localStorage.setItem('ciya_admin_cached_admins_data', JSON.stringify(adminMap));
 
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'users');
+      if (!hasUsedCache || forceRefresh) {
+        handleFirestoreError(error, OperationType.LIST, 'users');
+      } else {
+        console.warn("Quiet background sync failed (could be Firestore quota limit):", error);
+      }
     } finally {
       setLoading(false);
       setIsRefreshing(false);
