@@ -10,11 +10,14 @@ import { motion } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 import SecureYoutubePlayer from '../components/SecureYoutubePlayer';
 import PromptGenerator from '../components/PromptGenerator';
+import { StudentBlog } from '../components/StudentBlog';
 import AdminKycbQuestionnaire from './admin/AdminKycbQuestionnaire';
 import { safeStorage } from '../utils/safeStorage';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
+  frontend: { label: "Frontend Development", icon: "💻", color: "#0284c7", bg: "#e0f2fe" },
+  backend: { label: "Backend Development", icon: "⚙️", color: "#e11d48", bg: "#ffe4e6" },
   film: { label: "AI Film Studio", icon: "🎬", color: "#7c3aed", bg: "#ede9fe" },
   image: { label: "AI Image & Graphics", icon: "🎨", color: "#d97706", bg: "#fef3c7" },
 };
@@ -725,6 +728,7 @@ interface CourseViewerProps {
   showToast: (msg: string) => void;
   handleResetProgress: (cId: string) => Promise<void>;
   isAdmin?: boolean;
+  isEnrolled?: boolean;
 }
 
 function renderBulletList(text: string, icon: string, textClass: string = "text-sm text-slate-800") {
@@ -746,7 +750,7 @@ function renderBulletList(text: string, icon: string, textClass: string = "text-
   );
 }
 
-function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true }: CourseViewerProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -1085,7 +1089,13 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
 
           <div className="pt-4">
             <button
-              onClick={() => updateParams({ syllabus: 'false', assignment: 'false' })}
+              onClick={() => {
+                if (!isEnrolled) {
+                  alert("Please complete your current running course before enrolling for another.");
+                  return;
+                }
+                updateParams({ syllabus: 'false', assignment: 'false' });
+              }}
               className="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-sm uppercase rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer transform active:scale-[0.98] border-0"
             >
               📊 Enter Classroom & Begin Lessons →
@@ -1588,15 +1598,34 @@ function getYouTubeEmbedUrl(url: string): string {
   return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
 }
 
-function CourseCard({ course, isLocked, onSelect }: any) {
+function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled }: any) {
   const sk = SKILLS[course.skill || 'web'];
   const totalVideos = course.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
   const [expanded, setExpanded] = useState(false);
 
+  const progressStore = userProfile?.progress?.[course.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+  const completedKeys: string[] = progressStore.watched || [];
+  const totalWatchedCount = completedKeys.length;
+  const progressRatio = totalVideos > 0 ? Math.round((totalWatchedCount / totalVideos) * 100) : 0;
+  const isCompleted = progressRatio === 100 && totalVideos > 0;
+  const isFrontend = course.skill === 'frontend';
+
+  let cardBorderClass = "border-slate-200/90 hover:shadow-2xl hover:shadow-teal-950/10";
+  let cardBgClass = "bg-white";
+  if (isEnrolled && isFrontend) {
+    if (isCompleted) {
+      cardBorderClass = "border-emerald-500 shadow-xl shadow-emerald-500/10 hover:shadow-emerald-500/20";
+      cardBgClass = "bg-gradient-to-b from-emerald-50/20 to-white";
+    } else {
+      cardBorderClass = "border-amber-400 shadow-md shadow-amber-500/5 hover:shadow-amber-500/15";
+      cardBgClass = "bg-gradient-to-b from-amber-50/10 to-white";
+    }
+  }
+
   return (
     <div 
       onClick={onSelect}
-      className="group flex flex-col bg-white border-2 border-slate-200/90 rounded-3xl overflow-hidden hover:shadow-2xl hover:shadow-teal-950/10 hover:-translate-y-1.5 transition-all duration-350 cursor-pointer text-left font-sans w-full"
+      className={`group flex flex-col ${cardBgClass} border-2 ${cardBorderClass} rounded-3xl overflow-hidden hover:-translate-y-1.5 transition-all duration-350 cursor-pointer text-left font-sans w-full`}
     >
       <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden">
         {course.thumbnail ? (
@@ -1606,12 +1635,37 @@ function CourseCard({ course, isLocked, onSelect }: any) {
             {sk?.icon || "📕"}
           </div>
         )}
-        <div className="absolute top-4 right-4 flex flex-col gap-1 items-end">
+        <div className="absolute top-4 right-4 flex flex-col gap-1.5 items-end">
           <TierBadge tier={course.tier || 'beginner'} />
+          
+          {isEnrolled && isFrontend && (
+            isCompleted ? (
+              <motion.div 
+                animate={{ scale: [1, 1.06, 1], y: [0, -1, 0] }}
+                transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+                className="bg-emerald-600 text-white font-black uppercase text-[9px] tracking-widest px-2.5 py-1 rounded-full shadow-lg border border-emerald-400/40 flex items-center gap-1 select-none"
+              >
+                <span>⭐</span> COMPLETED ✓
+              </motion.div>
+            ) : (
+              <motion.div 
+                animate={{ opacity: [0.8, 1, 0.8] }}
+                transition={{ repeat: Infinity, duration: 1.8 }}
+                className="bg-amber-500 text-slate-950 font-black uppercase text-[9px] tracking-widest px-2.5 py-1 rounded-full shadow-md border border-amber-300 flex items-center gap-1 select-none"
+              >
+                <span>⏳</span> RUNNING ({progressRatio}%)
+              </motion.div>
+            )
+          )}
         </div>
         {isLocked && (
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center z-10 transition-all opacity-0 group-hover:opacity-100">
-            <Lock className="w-12 h-12 text-white drop-shadow-md" />
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[1px] flex flex-col items-center justify-center z-10 transition-all">
+            <div className="bg-white/10 p-3.5 rounded-full border border-white/20 shadow-lg backdrop-blur-md mb-2">
+              <Lock className="w-6 h-6 text-amber-400 drop-shadow-md" />
+            </div>
+            <span className="text-[9px] bg-amber-500 text-slate-950 font-black tracking-widest uppercase px-2.5 py-0.5 rounded-full shadow">
+              Locked Path
+            </span>
           </div>
         )}
       </div>
@@ -1910,7 +1964,7 @@ export default function StudentDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb'>(() => {
+  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog'>(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
     if (view === 'prompts') return 'prompts';
@@ -1918,6 +1972,7 @@ export default function StudentDashboard() {
     if (view === 'notifications') return 'notifications';
     if (view === 'assignments') return 'assignments';
     if (view === 'kycb') return 'kycb';
+    if (view === 'blog') return 'blog';
     return 'courses';
   });
 
@@ -1954,7 +2009,7 @@ export default function StudentDashboard() {
     setSelectedCourseId(cId);
   }, [location.search]);
 
-  const [appSettings, setAppSettings] = useState<{ lockedSections?: { courses?: boolean; prompts?: boolean; assignments?: boolean; profile?: boolean; notifications?: boolean } }>(() => {
+  const [appSettings, setAppSettings] = useState<{ lockedSections?: { courses?: boolean; prompts?: boolean; assignments?: boolean; profile?: boolean; notifications?: boolean; blog?: boolean; kycb?: boolean } }>(() => {
     try {
       const cached = safeStorage.getItem('ciya_cached_app_settings');
       return cached ? JSON.parse(cached) : {};
@@ -1981,7 +2036,7 @@ export default function StudentDashboard() {
   }, [currentUser]);
 
   const handleDashboardAssignmentSubmit = async (dayIndex: number, data: any) => {
-    const activeCId = selectedAssignCourseId || coursesToSee[0]?.id;
+    const activeCId = selectedAssignCourseId || registeredCoursesList[0]?.id;
     if (!activeCId) return;
     try {
       const userRef = doc(db, 'users', currentUser.uid);
@@ -2116,7 +2171,7 @@ export default function StudentDashboard() {
   const [activeSkillFilter, setActiveSkillFilter] = useState<string>('all');
   const navigate = useNavigate();
 
-  const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb', cId: string | null = null) => {
+  const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog', cId: string | null = null) => {
     setCurrentView(view);
     setSelectedCourseId(cId);
     setIsMobileMenuOpen(false);
@@ -2178,7 +2233,7 @@ export default function StudentDashboard() {
 
   const handleCustomAssignmentSubmit = async () => {
     if (!currentUser) return;
-    const registeredCourse = coursesToSee[0];
+    const registeredCourse = registeredCoursesList[0];
     if (!registeredCourse) {
       alert("No active course path assigned to submit an assignment for.");
       return;
@@ -2608,8 +2663,8 @@ export default function StudentDashboard() {
         setCourses([
           {
             id: "ciya-web-101",
-            title: "CIYA 3-Day Free Website Development",
-            description: "Master the art of creating high-converting, high-performance landing pages and business sites in 3 simple days using modern AI tools.",
+            title: "CIYA 5-Day Free Website Development",
+            description: "Master the art of creating high-converting, high-performance landing pages and business sites in 5 simple days using modern AI tools.",
             category: "Web Development",
             skill: "web",
             level: "Beginner",
@@ -2638,7 +2693,7 @@ export default function StudentDashboard() {
                       answer: "Inter",
                       explanation: "Inter is a highly legible, geometrically balanced neutral sans-serif designed for computer interfaces."
                     },
-                    funFact: "Clean neutral typography has been proved in user testing sessions to increase aesthetic trust by up to 60%."
+                    funFact: { headline: "Aesthetic Trust", body: "Clean neutral typography has been proved in user testing sessions to increase aesthetic trust by up to 60%." }
                   }
                 ]
               }
@@ -2746,17 +2801,27 @@ export default function StudentDashboard() {
   });
 
   // Filter courses carefully: admins see everything, students see only their registered course list (no cross courses)
-  const coursesToSee = isAdmin ? courses : registeredCoursesList;
+  const coursesToSee = courses;
 
-  // Apply Skill tags sorting filters & locking courses visibility logic (locked courses only visible to admins)
+  const enrolledCourses = isAdmin ? courses : registeredCoursesList;
+  const notEnrolledCourses = isAdmin ? [] : courses.filter(c => !registeredCoursesList.some(r => r.id === c.id));
+
+  // Apply Skill tags sorting filters (locked courses are visible and carry padlocks)
   const filteredCourses = coursesToSee.filter(c => {
     if (activeSkillFilter !== 'all' && c.skill !== activeSkillFilter) return false;
-    const isCourseLocked = c.isLocked || c.locked;
-    if (isCourseLocked && !isAdmin) {
-      return false;
-    }
     return true;
   });
+
+  const filteredRegisteredCourses = enrolledCourses.filter(c => {
+    if (activeSkillFilter !== 'all' && c.skill !== activeSkillFilter) return false;
+    return true;
+  });
+
+  const filteredOtherCourses = notEnrolledCourses.filter(c => {
+    if (activeSkillFilter !== 'all' && c.skill !== activeSkillFilter) return false;
+    return true;
+  });
+
   const selectedCourse = coursesToSee.find(c => c.id === selectedCourseId);
 
   // Master Full-Screen Gating Page for Unapproved or Locked Users (No dashboard UI visible)
@@ -2805,7 +2870,7 @@ export default function StudentDashboard() {
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">Application Reviewed ❌</h2>
             
             <p className="text-slate-600 text-sm leading-relaxed max-w-sm mx-auto font-medium">
-              Hello <strong>{userProfile.fullName || 'Student'}</strong>! After reviewing your submitted metrics, we regret to notify that you were not chosen for this specific cohort. We received a massive scale of CIYA Three days Free Website Development Training requests. We wish you rapid career velocity!
+              Hello <strong>{userProfile.fullName || 'Student'}</strong>! After reviewing your submitted metrics, we regret to notify that you were not chosen for this specific cohort. We received a massive scale of CIYA Five days Free Website Development Training requests. We wish you rapid career velocity!
             </p>
 
             <div className="w-full">
@@ -2833,7 +2898,7 @@ export default function StudentDashboard() {
               </span>
               <h2 className="text-3xl font-black text-slate-900 tracking-tight">Enter Your Access Activation Code 🔑</h2>
               <p className="text-slate-950 text-base leading-relaxed max-w-md mx-auto font-black">
-                Congratulations, <strong className="text-teal-800 font-black decoration-teal-600/30 underline decoration-2">{userProfile.fullName || 'Scholar'}</strong>! Your spot for CIYA Three days Free Website Development Training has been approved by the administrators. 
+                Congratulations, <strong className="text-teal-800 font-black decoration-teal-600/30 underline decoration-2">{userProfile.fullName || 'Scholar'}</strong>! Your spot for CIYA Five days Free Website Development Training has been approved by the administrators. 
                 Please enter your unique <strong className="text-indigo-800 font-black decoration-indigo-600/30 underline decoration-2">activation code (e.g., CIYA-854473)</strong> below to unlock your course learning dashboard.
               </p>
             </div>
@@ -2990,6 +3055,20 @@ export default function StudentDashboard() {
             </button>
           )}
 
+          <button 
+            type="button"
+            onClick={() => handleViewChange('blog', null)}
+            className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'blog' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-4 h-4 flex items-center justify-center text-rose-400 text-xs">📰</span>
+              <span>CIYA Official Blog</span>
+            </div>
+            {!isAdmin && appSettings?.lockedSections?.blog && (
+              <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            )}
+          </button>
+
           {!isGuest && (
             <button 
               type="button"
@@ -3086,7 +3165,9 @@ export default function StudentDashboard() {
                       ? 'My Assignments Workspace'
                       : currentView === 'kycb'
                         ? 'KYCB Workspace (Know Your Client & Business)'
-                        : 'Prompt Generator Lab'}
+                        : currentView === 'blog'
+                          ? 'CIYA News & Resource Desk'
+                          : 'Prompt Generator Lab'}
             </h2>
           </div>
           <div className="flex items-center gap-4">
@@ -3129,7 +3210,9 @@ export default function StudentDashboard() {
         
         {/* Core content scroll container */}
         <div className="flex-1 overflow-auto p-6 md:p-8">
-          {currentView === 'kycb' ? (
+          {currentView === 'blog' ? (
+            <StudentBlog isLocked={!isAdmin && appSettings?.lockedSections?.blog} />
+          ) : currentView === 'kycb' ? (
             (!isAdmin && appSettings?.lockedSections?.kycb) ? (
               <div className="bg-white border text-sm border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
                 <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -3251,9 +3334,9 @@ export default function StudentDashboard() {
                       </div>
                     </div>
 
-                    {coursesToSee.some(c => userProfile.progress?.[c.id || '']?.quizScores) ? (
+                    {registeredCoursesList.some(c => userProfile.progress?.[c.id || '']?.quizScores) ? (
                       <div className="space-y-4">
-                        {coursesToSee.map(course => {
+                        {registeredCoursesList.map(course => {
                           const courseId = course.id || '';
                           const cScores = userProfile.progress?.[courseId]?.quizScores || {};
                           if (Object.keys(cScores).length === 0) return null;
@@ -3420,7 +3503,7 @@ export default function StudentDashboard() {
                 {/* Main Form Fields */}
                 {(() => {
                   // Find registered course
-                  const registeredCourse = coursesToSee[0];
+                  const registeredCourse = registeredCoursesList[0];
                   if (!registeredCourse) {
                     return (
                       <div className="bg-white border text-center p-8 rounded-3xl text-xs font-black text-slate-400 uppercase">
@@ -3655,22 +3738,9 @@ export default function StudentDashboard() {
                 })()}
               </div>
             )
-          ) : !isAdmin && appSettings?.lockedSections?.courses ? (
-            <div className="bg-white border border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
-              <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Lock className="w-8 h-8 text-rose-500" />
-              </div>
-              <h3 className="text-xl font-black text-slate-800 tracking-tight">CIYA Learning Arena Locked</h3>
-              <p className="text-slate-500 mt-3 text-sm leading-relaxed font-semibold">
-                The main curriculum and learning arena are temporarily locked by the course administrators. Unlocks are periodically timed with training syllabus parameters and live cohorts schedules. Please reach out to your instructor for detail coordinates.
-              </p>
-              <div className="mt-8 pt-6 border-t border-slate-100 flex justify-center items-center gap-2 text-xs text-slate-400 font-bold">
-                <span>🛡️ CIYA Guarded Academy Portal</span>
-              </div>
-            </div>
           ) : (
             <>
-              {selectedCourseId && selectedCourse ? (
+              {(selectedCourseId && selectedCourse && (isAdmin || !appSettings?.lockedSections?.courses)) ? (
                 <CourseViewer 
                   course={selectedCourse}
                   userProfile={userProfile}
@@ -3679,6 +3749,7 @@ export default function StudentDashboard() {
                   showToast={showToast}
                   handleResetProgress={handleResetProgress}
                   isAdmin={isAdmin}
+                  isEnrolled={isAdmin || registeredCoursesList.some(r => r.id === selectedCourse.id)}
                 />
               ) : (
                 <div className="space-y-8">
@@ -3794,26 +3865,73 @@ export default function StudentDashboard() {
                         <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto font-semibold">Assigned active tracks to your student profile will reveal here shortly.</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                        {filteredCourses.map(course => (
-                          <CourseCard 
-                            key={course.id} 
-                            course={course} 
-                            isLocked={isAdmin ? false : (isGuest || course.isLocked || course.locked)} 
-                            onSelect={() => {
-                              if (isAdmin) {
-                                handleSelectCourseId(course.id || null);
-                              } else if (isGuest) {
-                                alert("This premium curriculum is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
-                                handleLogin();
-                              } else if (course.isLocked || course.locked) {
-                                alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
-                              } else {
-                                handleSelectCourseId(course.id || null);
-                              }
-                            }} 
-                          />
-                        ))}
+                      <div className="space-y-12">
+                        {/* SECTION 1: REGISTERED/ENROLLED COURSES */}
+                        <div className="space-y-4">
+                          <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2 border-b pb-2">
+                            <span>🎓</span> My Registered Course
+                          </h3>
+                          {filteredRegisteredCourses.length === 0 ? (
+                            <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                              No enrolled courses in this track.
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                              {filteredRegisteredCourses.map(course => (
+                                <CourseCard 
+                                  key={course.id} 
+                                  course={course} 
+                                  userProfile={userProfile}
+                                  isEnrolled={true}
+                                  isLocked={isAdmin ? false : (isGuest || appSettings?.lockedSections?.courses || course.isLocked)} 
+                                  onSelect={() => {
+                                    if (isAdmin) {
+                                      handleSelectCourseId(course.id || null);
+                                    } else if (isGuest) {
+                                      alert("This premium curriculum is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
+                                      handleLogin();
+                                    } else if (!isAdmin && appSettings?.lockedSections?.courses) {
+                                      alert("The main curriculum and learning arena are temporarily locked by the course administrators. Please contact your instructor to unlock access.");
+                                    } else if (course.isLocked) {
+                                      alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
+                                    } else {
+                                      handleSelectCourseId(course.id || null);
+                                    }
+                                  }} 
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* SECTION 2: OTHER AVAILABLE COURSES (NOT ENROLLED) */}
+                        {!isAdmin && (
+                          <div className="space-y-4">
+                            <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2 border-b pb-2">
+                              <span>🌐</span> Other Courses (Not Enrolled)
+                            </h3>
+                            {filteredOtherCourses.length === 0 ? (
+                              <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                                No other courses available in this track.
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                                {filteredOtherCourses.map(course => (
+                                  <CourseCard 
+                                    key={course.id} 
+                                    course={course} 
+                                    userProfile={userProfile}
+                                    isEnrolled={false}
+                                    isLocked={false} 
+                                    onSelect={() => {
+                                      handleSelectCourseId(course.id || null);
+                                    }} 
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -3892,7 +4010,7 @@ export default function StudentDashboard() {
               </h2>
               
               <p className="text-slate-600 text-sm leading-relaxed">
-                Your admission profile and CIYA Three days Free Website Development Training benefits have been fully verified and activated. We are incredibly excited to welcome you into our intensive training cohort.
+                Your admission profile and CIYA Five days Free Website Development Training benefits have been fully verified and activated. We are incredibly excited to welcome you into our intensive training cohort.
               </p>
 
               <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-left mt-6">

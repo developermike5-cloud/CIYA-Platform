@@ -143,6 +143,15 @@ service cloud.firestore {
         && data.eventType is string;
     }
 
+    // Entity Validation: BlogPost
+    function isValidBlogPost(data) {
+      return data.keys().hasAll(['title', 'content', 'createdAt', 'updatedAt'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.content is string && data.content.size() > 0 && data.content.size() <= 100000
+        && (data.get('imageUrl', '') is string && data.get('imageUrl', '').size() <= 2000)
+        && (data.get('author', '') is string && data.get('author', '').size() <= 200);
+    }
+
     // Collections Routes
     match /admins/{adminId} {
       // Only root admin can manage admins
@@ -274,6 +283,20 @@ service cloud.firestore {
     match /notification_templates/{templateId} {
       allow read, list: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    match /blog/{postId} {
+      allow read: if true;
+      allow create: if isAdmin()
+                    && isValidId(postId)
+                    && isValidBlogPost(incoming())
+                    && incoming().createdAt == request.time
+                    && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+                    && isValidBlogPost(incoming())
+                    && incoming().createdAt == existing().createdAt
+                    && incoming().updatedAt == request.time;
+      allow delete: if isAdmin();
     }
 
     match /settings/{settingsDoc} {

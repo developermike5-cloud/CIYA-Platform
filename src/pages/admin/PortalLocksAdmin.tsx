@@ -12,6 +12,7 @@ interface LockedSections {
   notifications: boolean;
   assignments: boolean;
   kycb: boolean;
+  blog: boolean;
 }
 
 export default function PortalLocksAdmin() {
@@ -22,6 +23,7 @@ export default function PortalLocksAdmin() {
     notifications: false,
     assignments: false,
     kycb: false,
+    blog: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,6 +46,7 @@ export default function PortalLocksAdmin() {
             notifications: !!data.lockedSections.notifications,
             assignments: !!data.lockedSections.assignments,
             kycb: !!data.lockedSections.kycb,
+            blog: !!data.lockedSections.blog,
           };
           setLockedSections(locks);
         }
@@ -134,6 +137,12 @@ export default function PortalLocksAdmin() {
       title: 'KYCB Sheet & Questionnaire',
       description: 'Governs student access to the KYCB (Know Your Client & Business) onboarding questions sheet.',
       badgeText: 'Client & Business KYC',
+    },
+    {
+      key: 'blog' as keyof LockedSections,
+      title: 'CIYA News & Article Blog',
+      description: 'Governs student access to published coaching articles, conversion scripts, and coaching newsletters.',
+      badgeText: 'News & Writing Desk',
     },
   ];
 

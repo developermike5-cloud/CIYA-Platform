@@ -5,39 +5,30 @@ import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { Course, CourseDay, CourseVideo } from '../../types';
 import { ArrowLeft, Save, Sparkles, AlertCircle, Plus, Trash2, HelpCircle } from 'lucide-react';
 
-const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string, subskills: { id: string, label: string }[] }> = {
+const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string, defaultSubskills: string[], defaultSkillPaths: string[] }> = {
   web: {
-    label: "AI Website Development",
+    label: "AI Website Class",
     icon: "🌐",
     color: "#0d9488",
     bg: "#ccfbf1",
-    subskills: [
-      { id: "landing", label: "Landing Page" },
-      { id: "ecommerce", label: "E-Commerce" },
-      { id: "portfolio", label: "Portfolio" }
-    ]
+    defaultSubskills: ["Frontend Development", "Backend Development", "Full-Stack Setup"],
+    defaultSkillPaths: ["Landing Page", "E-Commerce", "Portfolio Website"]
   },
   film: {
-    label: "AI Film Studio",
+    label: "AI Film Studio Class",
     icon: "🎬",
     color: "#7c3aed",
     bg: "#ede9fe",
-    subskills: [
-      { id: "short", label: "Short Video" },
-      { id: "commercial", label: "Commercial Video" },
-      { id: "cinematic", label: "Cinematic Video" }
-    ]
+    defaultSubskills: ["Cinematic Screenwriting", "Automated Editing", "AI Voiceover Sync"],
+    defaultSkillPaths: ["Short Video", "Commercial Video", "Cinematic Video"]
   },
   image: {
-    label: "AI Image & Graphics",
+    label: "AI Graphics & Image Class",
     icon: "🎨",
     color: "#d97706",
     bg: "#fef3c7",
-    subskills: [
-      { id: "mockup", label: "Mockup Image" },
-      { id: "graphic", label: "Graphic Design" },
-      { id: "imagemockup", label: "Image Mockup" }
-    ]
+    defaultSubskills: ["Marketing Banners", "Branding Design", "Mockup Rendering"],
+    defaultSkillPaths: ["Mockup Image", "Graphic Design", "Brand Identity"]
   },
 };
 
@@ -73,8 +64,10 @@ const defaultInitialForm = (): Course => ({
   description: "",
   overview: "",
   skill: "web",
-  subskill: "landing",
-  category: "AI Website development",
+  subskill: "Frontend Development",
+  skillPath: "Landing Page",
+  durationMode: "standard",
+  category: "AI Website Class",
   level: "Beginner",
   tier: "beginner",
   price: 0,
@@ -854,7 +847,7 @@ export default function CourseEdit() {
 
       const statusVal = form.status || 'draft';
       const normSkill = form.skill || 'web';
-      const normCategory = normSkill === 'web' ? 'AI Website development' : normSkill === 'film' ? 'AI Film Studio' : normSkill === 'image' ? 'AI Image & Graphics' : 'AI Website development';
+      const normCategory = normSkill === 'web' ? 'AI Website Class' : normSkill === 'film' ? 'AI Film Studio Class' : normSkill === 'image' ? 'AI Graphics & Image Class' : 'AI Website Class';
       const normTier = form.tier || 'beginner';
       const normLevel = normTier === 'beginner' ? 'Beginner' : normTier === 'advanced' ? 'Advanced' : normTier === 'masterclass' ? 'Masterclass' : 'Beginner';
       const normPublishStatus = statusVal === 'published' ? 'Published' : 'Draft';
@@ -888,6 +881,8 @@ export default function CourseEdit() {
         category: normCategory,
         skill: normSkill,
         subskill: form.subskill || '',
+        skillPath: form.skillPath || '',
+        durationMode: form.durationMode || 'standard',
         level: normLevel,
         tier: normTier,
         price: Number(form.price) || 0,
@@ -959,7 +954,9 @@ export default function CourseEdit() {
             overview: raw.overview || raw.description || '',
             skill: raw.skill || (raw.category?.toLowerCase().includes('web') ? 'web' : raw.category?.toLowerCase().includes('film') ? 'film' : raw.category?.toLowerCase().includes('image') ? 'image' : 'web'),
             subskill: raw.subskill || '',
-            category: raw.category || 'AI Website development',
+            skillPath: raw.skillPath || '',
+            durationMode: raw.durationMode || 'standard',
+            category: raw.category || 'AI Website Class',
             level: raw.level || 'Beginner',
             tier: raw.tier || (raw.level === 'Beginner' ? 'beginner' : raw.level === 'Advanced' ? 'advanced' : raw.level === 'Masterclass' ? 'masterclass' : 'beginner'),
             price: Number(raw.price) || 0,
@@ -1109,7 +1106,7 @@ export default function CourseEdit() {
 
     try {
       const normSkill = form.skill || 'web';
-      const normCategory = normSkill === 'web' ? 'AI Website development' : normSkill === 'film' ? 'AI Film Studio' : normSkill === 'image' ? 'AI Image & Graphics' : 'AI Website development';
+      const normCategory = normSkill === 'web' ? 'AI Website Class' : normSkill === 'film' ? 'AI Film Studio Class' : normSkill === 'image' ? 'AI Graphics & Image Class' : 'AI Website Class';
       const normTier = form.tier || 'beginner';
       const normLevel = normTier === 'beginner' ? 'Beginner' : normTier === 'advanced' ? 'Advanced' : normTier === 'masterclass' ? 'Masterclass' : 'Beginner';
       const normPublishStatus = statusVal === 'published' ? 'Published' : 'Draft';
@@ -1143,6 +1140,8 @@ export default function CourseEdit() {
         category: normCategory,
         skill: normSkill,
         subskill: form.subskill || '',
+        skillPath: form.skillPath || '',
+        durationMode: form.durationMode || 'standard',
         level: normLevel,
         tier: normTier,
         price: Number(form.price) || 0,
@@ -1277,7 +1276,7 @@ export default function CourseEdit() {
                 className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold"
                 value={form.title || ""}
                 onChange={e => setField("title", e.target.value)}
-                placeholder="e.g., Build a Landing Page with AI in 3 Days"
+                placeholder="e.g., Build a Landing Page with AI in 5 Days"
               />
             </div>
             <div>
@@ -1304,7 +1303,8 @@ export default function CourseEdit() {
                 onChange={e => {
                   const val = e.target.value;
                   setField("skill", val);
-                  setField("subskill", SKILLS[val]?.subskills[0]?.id || "");
+                  setField("subskill", SKILLS[val]?.defaultSubskills[0] || "");
+                  setField("skillPath", SKILLS[val]?.defaultSkillPaths[0] || "");
                 }}
               >
                 {Object.entries(SKILLS).map(([k, v]) => (
@@ -1314,14 +1314,80 @@ export default function CourseEdit() {
             </div>
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Sub-Skill *</label>
+              <div className="space-y-2">
+                <select
+                  className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold cursor-pointer"
+                  value={selectedSkillMeta?.defaultSubskills.includes(form.subskill || "") ? form.subskill : "custom"}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === "custom") {
+                      setField("subskill", "");
+                    } else {
+                      setField("subskill", val);
+                    }
+                  }}
+                >
+                  {selectedSkillMeta?.defaultSubskills.map(sub => (
+                    <option key={sub} value={sub}>{sub}</option>
+                  ))}
+                  <option value="custom">➕ Add Custom Subskill...</option>
+                </select>
+
+                {(!selectedSkillMeta?.defaultSubskills.includes(form.subskill || "") || form.subskill === "") && (
+                  <input
+                    type="text"
+                    className="w-full bg-indigo-50 text-slate-950 border border-indigo-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold"
+                    placeholder="Type custom subskill name..."
+                    value={form.subskill || ""}
+                    onChange={e => setField("subskill", e.target.value)}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Skill Path *</label>
+              <div className="space-y-2">
+                <select
+                  className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold cursor-pointer"
+                  value={selectedSkillMeta?.defaultSkillPaths.includes(form.skillPath || "") ? form.skillPath : "custom"}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === "custom") {
+                      setField("skillPath", "");
+                    } else {
+                      setField("skillPath", val);
+                    }
+                  }}
+                >
+                  {selectedSkillMeta?.defaultSkillPaths.map(path => (
+                    <option key={path} value={path}>{path}</option>
+                  ))}
+                  <option value="custom">➕ Add Custom Skill Path...</option>
+                </select>
+
+                {(!selectedSkillMeta?.defaultSkillPaths.includes(form.skillPath || "") || form.skillPath === "") && (
+                  <input
+                    type="text"
+                    className="w-full bg-indigo-50 text-slate-950 border border-indigo-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold"
+                    placeholder="Type custom skill path name..."
+                    value={form.skillPath || ""}
+                    onChange={e => setField("skillPath", e.target.value)}
+                  />
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Course Duration Mode *</label>
               <select
                 className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold cursor-pointer"
-                value={form.subskill || ""}
-                onChange={e => setField("subskill", e.target.value)}
+                value={form.durationMode || "standard"}
+                onChange={e => setField("durationMode", e.target.value)}
               >
-                {selectedSkillMeta?.subskills.map(s => (
-                  <option key={s.id} value={s.id}>{s.label}</option>
-                ))}
+                <option value="standard">Standard (5-Day Structured pacing)</option>
+                <option value="express">Express (Self-paced, immediate access)</option>
               </select>
             </div>
           </div>
@@ -1416,7 +1482,7 @@ export default function CourseEdit() {
         </div>
       )}
 
-      {/* TAB 2: 3-DAY CURRICULUM & CHECKS BUILDER */}
+      {/* TAB 2: 5-DAY CURRICULUM & CHECKS BUILDER */}
       {activeSection === "curriculum" && (
         <div className="space-y-6">
           {/* Day Selector Accordion Buttons */}

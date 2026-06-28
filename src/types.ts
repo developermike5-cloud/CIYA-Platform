@@ -10,6 +10,8 @@ export interface Course {
   category?: string;
   skill?: string;       // "web" | "film" | "image"
   subskill?: string;
+  skillPath?: string;   // "landing" | "ecommerce" | "portfolio" etc.
+  durationMode?: 'standard' | 'express'; // "standard" | "express"
   youtube_link?: string;
   level?: 'Beginner' | 'Advanced' | 'Masterclass';
   tier?: 'beginner' | 'advanced' | 'masterclass';  // guide property

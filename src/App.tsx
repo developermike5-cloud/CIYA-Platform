@@ -11,9 +11,11 @@ import PromptsAdmin from './pages/admin/PromptsAdmin';
 import AssignmentsAdmin from './pages/admin/AssignmentsAdmin';
 import NotificationsAdmin from './pages/admin/NotificationsAdmin';
 import PortalLocksAdmin from './pages/admin/PortalLocksAdmin';
+import BlogAdmin from './pages/admin/BlogAdmin';
 import Onboarding from './pages/Onboarding';
 import WaitingOnboarding from './pages/WaitingOnboarding';
 import GetStarted from './pages/GetStarted';
+import { BrandedAlertContainer } from './components/BrandedAlert';
 
 function NavigationTracker() {
   const location = useLocation();
@@ -84,6 +86,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <NavigationTracker />
+      <BrandedAlertContainer />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/onboarding" element={<Onboarding />} />
@@ -98,6 +101,7 @@ export default function App() {
           <Route path="assignments" element={<AssignmentsAdmin />} />
           <Route path="notifications" element={<NotificationsAdmin />} />
           <Route path="locks" element={<PortalLocksAdmin />} />
+          <Route path="blog" element={<BlogAdmin />} />
           <Route path="courses/new" element={<CourseEdit />} />
           <Route path="courses/:courseId" element={<CourseEdit />} />
         </Route>

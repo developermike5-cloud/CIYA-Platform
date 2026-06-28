@@ -164,6 +164,20 @@
         "templates": { "type": "array" },
         "updatedAt": { "type": "string" }
       }
+    },
+    "BlogPost": {
+      "title": "Blog Post",
+      "description": "An article published by admins for students to read",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the blog post" },
+        "content": { "type": "string", "description": "Body content of the blog post" },
+        "imageUrl": { "type": "string", "description": "Optional image link" },
+        "author": { "type": "string", "description": "Author name" },
+        "createdAt": { "type": "string", "format": "timestamp" },
+        "updatedAt": { "type": "string", "format": "timestamp" }
+      },
+      "required": ["title", "content", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -202,6 +216,10 @@
     "/notification_templates/{templateId}": {
       "schema": { "$ref": "#/entities/NotificationTemplate" },
       "description": "Custom templates for manual and automatic notifications."
+    },
+    "/blog/{postId}": {
+      "schema": { "$ref": "#/entities/BlogPost" },
+      "description": "Blog posts and articles published by administrators."
     }
   }
 }

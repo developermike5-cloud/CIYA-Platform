@@ -586,7 +586,7 @@ _Action: Please review and approve this student profile!_`;
                   </div>
 
                   <p className="text-sm md:text-base text-rose-50 leading-relaxed font-bold max-w-lg mx-auto">
-                    To expedite your CIYA Three days Free Website Development Training evaluation, you must click the WhatsApp button below to forward your exact registration details directly to the admissions team for immediate verification and approval.
+                    To expedite your CIYA Five days Free Website Development Training evaluation, you must click the WhatsApp button below to forward your exact registration details directly to the admissions team for immediate verification and approval.
                   </p>
                 </div>
 
@@ -619,7 +619,7 @@ _Action: Please review and approve this student profile!_`;
 • *Referral Code Entered:* ${data.referralCode || 'None'}
 • *Student's Referral Code:* ${data.myReferralCode || ''}
 
-_Action: Please review and approve my student profile for CIYA Three days Free Website Development Training activation. Thank you!_`;
+_Action: Please review and approve my student profile for CIYA Five days Free Website Development Training activation. Thank you!_`;
                       return `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
                     };
 

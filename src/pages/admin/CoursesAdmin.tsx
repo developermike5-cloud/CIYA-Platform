@@ -7,9 +7,9 @@ import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle } from 'lucide-react';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
-  web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
-  film: { label: "AI Film Studio", icon: "🎬", color: "#7c3aed", bg: "#ede9fe" },
-  image: { label: "AI Image & Graphics", icon: "🎨", color: "#d97706", bg: "#fef3c7" },
+  web: { label: "AI Website Class", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
+  film: { label: "AI Film Studio Class", icon: "🎬", color: "#7c3aed", bg: "#ede9fe" },
+  image: { label: "AI Graphics & Image Class", icon: "🎨", color: "#d97706", bg: "#fef3c7" },
 };
 
 function formatFirestoreDate(timestamp: any): string {
@@ -55,6 +55,7 @@ export default function CoursesAdmin() {
   // Filters state
   const [filterSkill, setFilterSkill] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterDuration, setFilterDuration] = useState<string>('all');
   const navigate = useNavigate();
 
   // Load courses in real-time
@@ -158,7 +159,8 @@ export default function CoursesAdmin() {
     const matchesStatus = filterStatus === 'all' || 
                          (filterStatus === 'published' && (c.status === 'published' || c.publish_status === 'Published')) ||
                          (filterStatus === 'draft' && (c.status === 'draft' || c.publish_status === 'Draft'));
-    return matchesSkill && matchesStatus;
+    const matchesDuration = filterDuration === 'all' || c.durationMode === filterDuration;
+    return matchesSkill && matchesStatus && matchesDuration;
   });
 
   return (
@@ -209,6 +211,18 @@ export default function CoursesAdmin() {
               <option value="all">All Statuses</option>
               <option value="published">Published</option>
               <option value="draft">Draft Only</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Filter by Duration</label>
+            <select
+              value={filterDuration}
+              onChange={e => setFilterDuration(e.target.value)}
+              className="bg-white border-2 border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 cursor-pointer transition-all"
+            >
+              <option value="all">All Durations</option>
+              <option value="standard">Standard</option>
+              <option value="express">Express</option>
             </select>
           </div>
         </div>
@@ -284,6 +298,13 @@ export default function CoursesAdmin() {
                           {c.isLocked && (
                             <span className="px-2 py-0.5 rounded text-[10px] items-center font-bold bg-amber-50 border border-amber-200 text-amber-800">
                               🔒 Locked
+                            </span>
+                          )}
+                          {c.durationMode && (
+                            <span className={`px-2 py-0.5 rounded text-[10px] items-center font-bold ${
+                              c.durationMode === 'express' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-sky-100 text-sky-800 border border-sky-200'
+                            }`}>
+                              ⏱️ {c.durationMode === 'express' ? 'Express' : 'Standard'}
                             </span>
                           )}
                         </div>

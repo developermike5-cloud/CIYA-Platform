@@ -239,6 +239,14 @@ export default function AdminLayout() {
           </Link>
 
           <Link 
+            to="/admin/blog" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/blog') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+          >
+            📰 CIYA Blog Desk
+          </Link>
+
+          <Link 
             to="/admin/kycb" 
             onClick={() => setIsMobileMenuOpen(false)}
             className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/kycb') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
