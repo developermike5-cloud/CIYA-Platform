@@ -468,14 +468,22 @@ export default function BlogAdmin() {
                             }
                             return <p className="whitespace-pre-wrap leading-relaxed mb-3 text-slate-700 font-medium" {...props}>{children}</p>;
                           },
-                          a: ({node, ...props}) => (
-                            <a 
-                              className="text-teal-600 hover:text-teal-800 underline font-extrabold transition-colors cursor-pointer decoration-2 decoration-teal-300 hover:decoration-teal-600" 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              {...props} 
-                            />
-                          ),
+                          a: ({node, href, ...props}) => {
+                            const absoluteHref = href ? (
+                              (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('/') || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) 
+                                ? href 
+                                : `https://${href}`
+                            ) : '';
+                            return (
+                              <a 
+                                className="text-teal-600 hover:text-teal-800 underline font-extrabold transition-colors cursor-pointer decoration-2 decoration-teal-300 hover:decoration-teal-600" 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                {...props} 
+                                href={absoluteHref}
+                              />
+                            );
+                          },
                           ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-3 space-y-1 text-slate-700 font-medium" {...props} />,
                           ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-3 space-y-1 text-slate-700 font-medium" {...props} />,
                           li: ({node, ...props}) => <li className="mb-0.5" {...props} />,

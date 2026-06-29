@@ -37,6 +37,23 @@ export const preprocessMarkdown = (text: string): string => {
     return `[${plainUrl}](${plainUrl})`;
   });
 
+  // Step 3: Convert custom [text | url] syntax to [text](url) and ensure the url is absolute
+  processed = processed.replace(/\[\s*([^\]|]+?)\s*\|\s*([^\]|]+?)\s*\]/g, (match, textPart, urlPart) => {
+    const trimmedUrl = urlPart.trim();
+    const hasProtocol = /^(https?:\/\/|\/|#|mailto:|tel:)/i.test(trimmedUrl);
+    const absoluteUrl = hasProtocol ? trimmedUrl : `https://${trimmedUrl}`;
+    return `[${textPart.trim()}](${absoluteUrl})`;
+  });
+
+  // Step 4: Ensure all standard markdown links [text](url) have a protocol if needed
+  processed = processed.replace(/\[\s*([^\]]+?)\s*\]\(\s*([^)]+?)\s*\)/g, (match, textPart, urlPart) => {
+    const trimmedUrl = urlPart.trim();
+    // If it's already an absolute URL or begins with /, #, mailto:, or tel:, keep it
+    const hasProtocol = /^(https?:\/\/|\/|#|mailto:|tel:)/i.test(trimmedUrl);
+    const absoluteUrl = hasProtocol ? trimmedUrl : `https://${trimmedUrl}`;
+    return `[${textPart.trim()}](${absoluteUrl})`;
+  });
+
   return processed;
 };
 

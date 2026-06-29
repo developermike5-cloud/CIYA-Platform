@@ -16,8 +16,6 @@ import { safeStorage } from '../utils/safeStorage';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
-  frontend: { label: "Frontend Development", icon: "💻", color: "#0284c7", bg: "#e0f2fe" },
-  backend: { label: "Backend Development", icon: "⚙️", color: "#e11d48", bg: "#ffe4e6" },
   film: { label: "AI Film Studio", icon: "🎬", color: "#7c3aed", bg: "#ede9fe" },
   image: { label: "AI Image & Graphics", icon: "🎨", color: "#d97706", bg: "#fef3c7" },
 };
@@ -729,6 +727,7 @@ interface CourseViewerProps {
   handleResetProgress: (cId: string) => Promise<void>;
   isAdmin?: boolean;
   isEnrolled?: boolean;
+  onLogin?: () => void;
 }
 
 function renderBulletList(text: string, icon: string, textClass: string = "text-sm text-slate-800") {
@@ -750,7 +749,7 @@ function renderBulletList(text: string, icon: string, textClass: string = "text-
   );
 }
 
-function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin }: CourseViewerProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -1005,7 +1004,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
               }
             }}
             className="p-2.5 px-4 border border-slate-200 hover:bg-slate-50 text-slate-800 font-black text-xs rounded-xl transition-all cursor-pointer bg-white flex items-center justify-center shrink-0"
-            title="Back to curriculum"
+            title="Back to courses"
           >
             ← Back
           </button>
@@ -1090,6 +1089,13 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
           <div className="pt-4">
             <button
               onClick={() => {
+                if (!currentUser) {
+                  alert("This premium classroom is locked. Please sign in to enter the classroom and begin your lessons.");
+                  if (onLogin) {
+                    onLogin();
+                  }
+                  return;
+                }
                 if (!isEnrolled) {
                   alert("Please complete your current running course before enrolling for another.");
                   return;
@@ -1608,11 +1614,9 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled }: any
   const totalWatchedCount = completedKeys.length;
   const progressRatio = totalVideos > 0 ? Math.round((totalWatchedCount / totalVideos) * 100) : 0;
   const isCompleted = progressRatio === 100 && totalVideos > 0;
-  const isFrontend = course.skill === 'frontend';
-
   let cardBorderClass = "border-slate-200/90 hover:shadow-2xl hover:shadow-teal-950/10";
   let cardBgClass = "bg-white";
-  if (isEnrolled && isFrontend) {
+  if (isEnrolled) {
     if (isCompleted) {
       cardBorderClass = "border-emerald-500 shadow-xl shadow-emerald-500/10 hover:shadow-emerald-500/20";
       cardBgClass = "bg-gradient-to-b from-emerald-50/20 to-white";
@@ -1638,7 +1642,7 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled }: any
         <div className="absolute top-4 right-4 flex flex-col gap-1.5 items-end">
           <TierBadge tier={course.tier || 'beginner'} />
           
-          {isEnrolled && isFrontend && (
+          {isEnrolled && (
             isCompleted ? (
               <motion.div 
                 animate={{ scale: [1, 1.06, 1], y: [0, -1, 0] }}
@@ -1671,6 +1675,20 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled }: any
       </div>
       
       <div className="p-6 md:p-7 flex-1 flex flex-col">
+        {/* SKILL & SUBSKILL BADGES */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {sk && (
+            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-lg" style={{ backgroundColor: sk.bg, color: sk.color }}>
+              <span>{sk.icon}</span> <span>{sk.label}</span>
+            </span>
+          )}
+          {course.subskill && (
+            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200/50">
+              <span>🏷️</span> <span>{course.subskill}</span>
+            </span>
+          )}
+        </div>
+
         <h4 className="font-extrabold text-base md:text-lg lg:text-xl text-slate-900 mb-2 line-clamp-2 leading-snug group-hover:text-teal-700 transition-colors">
           {course.title}
         </h4>
@@ -2001,6 +2019,10 @@ export default function StudentDashboard() {
       setCurrentView('assignments');
     } else if (view === 'kycb') {
       setCurrentView('kycb');
+    } else if (view === 'blog') {
+      setCurrentView('blog');
+    } else if (view === 'notifications') {
+      setCurrentView('notifications');
     } else {
       setCurrentView('courses');
     }
@@ -2349,13 +2371,14 @@ export default function StudentDashboard() {
         navigate('/admin');
         return;
       }
-      const adminSnap = await getDoc(doc(db, 'admins', result.user.uid));
-      const isUserAdmin = adminSnap.exists();
-      if (isUserAdmin) {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
+      let isUserAdmin = false;
+      try {
+        const adminSnap = await getDoc(doc(db, 'admins', result.user.uid));
+        isUserAdmin = adminSnap.exists();
+      } catch (err) {
+        console.warn("User does not have permission to read admin documents, treating as regular student:", err);
       }
+      setIsAdmin(isUserAdmin);
       const docSnap = await getDoc(doc(db, 'users', result.user.uid));
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -2370,8 +2393,7 @@ export default function StudentDashboard() {
         safeStorage.setItem('ciya_cached_profile', JSON.stringify(data));
         setLiveCheckComplete(true);
       } else {
-        await signOut(auth);
-        alert("Your account is not registered. If you are an invited student, please complete the registration using the private onboarding link sent by your administrator.");
+        navigate('/waitingonboarding', { replace: true });
       }
     } catch (e: any) {
       if (e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user') {
@@ -2462,9 +2484,8 @@ export default function StudentDashboard() {
           } else {
             safeStorage.removeItem('ciya_cached_user');
             safeStorage.removeItem('ciya_cached_profile');
-            alert('No profile found. Please complete the registration process.');
             setLiveCheckComplete(false);
-            navigate('/onboarding', { replace: true });
+            navigate('/waitingonboarding', { replace: true });
             setAuthChecking(false);
           }
         }, (error: any) => {
@@ -3002,7 +3023,7 @@ export default function StudentDashboard() {
           >
             <div className="flex items-center gap-3">
               <Compass className="w-4 h-4" />
-              <span>Explore Curriculum</span>
+              <span>Explore Courses</span>
             </div>
             {!isAdmin && appSettings?.lockedSections?.courses && (
               <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -3749,7 +3770,15 @@ export default function StudentDashboard() {
                   showToast={showToast}
                   handleResetProgress={handleResetProgress}
                   isAdmin={isAdmin}
-                  isEnrolled={isAdmin || registeredCoursesList.some(r => r.id === selectedCourse.id)}
+                  isEnrolled={isAdmin || registeredCoursesList.some(r => r.id === selectedCourse.id) || (registeredCoursesList.length > 0 && registeredCoursesList.every(r => {
+                    const progressStore = userProfile?.progress?.[r.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+                    const completedKeys: string[] = progressStore.watched || [];
+                    const totalVideos = r.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
+                    const progressRatio = totalVideos > 0 ? Math.round((completedKeys.length / totalVideos) * 100) : 0;
+                    const isCompleted = (progressRatio === 100 && totalVideos > 0) || userProfile?.completedCoursesOverride?.includes(r.id || '');
+                    return isCompleted;
+                  }))}
+                  onLogin={handleLogin}
                 />
               ) : (
                 <div className="space-y-8">
@@ -3772,7 +3801,7 @@ export default function StudentDashboard() {
                             Explore Nigeria's Premium AI Training Catalog
                           </h1>
                           <p className="text-xs text-teal-100 opacity-90 leading-relaxed max-w-2xl font-medium">
-                            You are currently exploring CIYA's training curriculum as a guest. General information is visible below, but training materials (quizzes, videos, submission options) are inaccessible until you are signed in.
+                            You are currently exploring CIYA's training courses as a guest. General information is visible below, but training materials (quizzes, videos, submission options) are inaccessible until you are signed in.
                           </p>
                         </div>
                         
@@ -3807,7 +3836,7 @@ export default function StudentDashboard() {
                             Congratulations on your selection, {userProfile?.fullName || 'Scholar'}!
                           </h1>
                           <p className="text-xs text-teal-50 opacity-90 leading-relaxed max-w-2xl font-medium">
-                            You have unrestricted, free premium access to all active CIYA Academy daily curriculums below. Embark on systematic lessons, evaluate code, clear checkpoints, and hand in assignments directly to certified coaches!
+                            You have unrestricted, free premium access to all active CIYA Academy daily courses below. Embark on systematic lessons, evaluate code, clear checkpoints, and hand in assignments directly to certified coaches!
                           </p>
                         </div>
                       </div>
@@ -3861,48 +3890,50 @@ export default function StudentDashboard() {
                     ) : filteredCourses.length === 0 ? (
                       <div className="text-center py-16 bg-slate-50 border border-slate-200/60 rounded-3xl">
                         <span className="text-3xl block mb-2 select-none">🎓</span>
-                        <h4 className="text-sm font-black text-slate-800">No Premium Curriculum Paths Assigned Yet</h4>
-                        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto font-semibold">Assigned active tracks to your student profile will reveal here shortly.</p>
+                        <h4 className="text-sm font-black text-slate-800">No Premium Course Paths Assigned Yet</h4>
+                        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto font-semibold">Assigned active course tracks to your student profile will reveal here shortly.</p>
                       </div>
                     ) : (
                       <div className="space-y-12">
                         {/* SECTION 1: REGISTERED/ENROLLED COURSES */}
-                        <div className="space-y-4">
-                          <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2 border-b pb-2">
-                            <span>🎓</span> My Registered Course
-                          </h3>
-                          {filteredRegisteredCourses.length === 0 ? (
-                            <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
-                              No enrolled courses in this track.
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                              {filteredRegisteredCourses.map(course => (
-                                <CourseCard 
-                                  key={course.id} 
-                                  course={course} 
-                                  userProfile={userProfile}
-                                  isEnrolled={true}
-                                  isLocked={isAdmin ? false : (isGuest || appSettings?.lockedSections?.courses || course.isLocked)} 
-                                  onSelect={() => {
-                                    if (isAdmin) {
-                                      handleSelectCourseId(course.id || null);
-                                    } else if (isGuest) {
-                                      alert("This premium curriculum is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
-                                      handleLogin();
-                                    } else if (!isAdmin && appSettings?.lockedSections?.courses) {
-                                      alert("The main curriculum and learning arena are temporarily locked by the course administrators. Please contact your instructor to unlock access.");
-                                    } else if (course.isLocked) {
-                                      alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
-                                    } else {
-                                      handleSelectCourseId(course.id || null);
-                                    }
-                                  }} 
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        {!isGuest && (
+                          <div className="space-y-4">
+                            <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2 border-b pb-2">
+                              <span>🎓</span> My Registered Course
+                            </h3>
+                            {filteredRegisteredCourses.length === 0 ? (
+                              <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                                No enrolled courses in this track.
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                                {filteredRegisteredCourses.map(course => (
+                                  <CourseCard 
+                                    key={course.id} 
+                                    course={course} 
+                                    userProfile={userProfile}
+                                    isEnrolled={true}
+                                    isLocked={isAdmin ? false : (isGuest || appSettings?.lockedSections?.courses || course.isLocked)} 
+                                    onSelect={() => {
+                                      if (isAdmin) {
+                                        handleSelectCourseId(course.id || null);
+                                      } else if (isGuest) {
+                                        alert("This premium course is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
+                                        handleLogin();
+                                      } else if (!isAdmin && appSettings?.lockedSections?.courses) {
+                                        alert("The main courses and learning arena are temporarily locked by the course administrators. Please contact your instructor to unlock access.");
+                                      } else if (course.isLocked) {
+                                        alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
+                                      } else {
+                                        handleSelectCourseId(course.id || null);
+                                      }
+                                    }} 
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* SECTION 2: OTHER AVAILABLE COURSES (NOT ENROLLED) */}
                         {!isAdmin && (
@@ -4014,12 +4045,12 @@ export default function StudentDashboard() {
               </p>
 
               <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-left mt-6">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Your Enrolled Curriculum Pathway:</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Your Enrolled Course Pathway:</span>
                 <p className="font-extrabold text-slate-800 text-base md:text-lg mt-1 flex items-center gap-2">
                   📚 {userProfile?.recommendedPath || userProfile?.courseType || "Custom Tech Track"}
                 </p>
                 <p className="text-xs text-slate-500 mt-1 italic">
-                  Course access has been fully unlocked. Your curriculum tracks, daily milestones, and training assets are ready in your portal.
+                  Course access has been fully unlocked. Your course tracks, daily milestones, and training assets are ready in your portal.
                 </p>
               </div>
             </div>

@@ -19,9 +19,9 @@ service cloud.firestore {
     function isAdmin() { 
       // Bootstrap admin using email, or check if they are in the admins collection
       return isSignedIn() && (
-        request.auth.token.email == 'developermike5@gmail.com' ||
-        request.auth.token.get('email', '').lower() == 'developermike5@gmail.com' ||
-        (request.auth.token.get('email_verified', false) == true && exists(/databases/$(database)/documents/admins/$(request.auth.uid)))
+        ('email' in request.auth.token && request.auth.token.email == 'developermike5@gmail.com') ||
+        ('email' in request.auth.token && request.auth.token.email.lower() == 'developermike5@gmail.com') ||
+        ('email_verified' in request.auth.token && request.auth.token.email_verified == true && exists(/databases/$(database)/documents/admins/$(request.auth.uid)))
       );
     }
     
@@ -43,6 +43,8 @@ service cloud.firestore {
         && (data.get('category', '') is string && data.get('category', '').size() <= 200)
         && (data.get('skill', '') is string && data.get('skill', '').size() <= 100)
         && (data.get('subskill', '') is string && data.get('subskill', '').size() <= 200)
+        && (data.get('skillPath', '') is string && data.get('skillPath', '').size() <= 200)
+        && (data.get('durationMode', '') is string && data.get('durationMode', '').size() <= 200)
         && (data.get('youtube_link', '') is string && data.get('youtube_link', '').size() <= 1000)
         && (data.get('level', '') is string && data.get('level', '').size() <= 100)
         && (data.get('tier', '') is string && data.get('tier', '').size() <= 100)
@@ -69,6 +71,7 @@ service cloud.firestore {
         && data.email is string && data.email.size() <= 200
         && (data.get('intent', '') is string && data.get('intent', '').size() <= 5000)
         && (data.get('experience', '') is string && data.get('experience', '').size() <= 5000)
+        && (data.get('courseType', '') is string && data.get('courseType', '').size() <= 500)
         && (data.get('pathwaySelection', '') is string && data.get('pathwaySelection', '').size() <= 5000)
         && (data.get('pathwayReason', '') is string && data.get('pathwayReason', '').size() <= 5000)
         && (data.get('pathwayExperience', '') is string && data.get('pathwayExperience', '').size() <= 5000)
@@ -76,6 +79,10 @@ service cloud.firestore {
         && (data.get('goal', '') is string && data.get('goal', '').size() <= 5000)
         && (data.get('availability', '') is string && data.get('availability', '').size() <= 5000)
         && (data.get('fullName', '') is string && data.get('fullName', '').size() <= 1000)
+        && (data.get('gender', '') is string && data.get('gender', '').size() <= 200)
+        && (data.get('ageRange', '') is string && data.get('ageRange', '').size() <= 200)
+        && (data.get('learningTool', '') is string && data.get('learningTool', '').size() <= 500)
+        && (data.get('educationLevel', '') is string && data.get('educationLevel', '').size() <= 500)
         && (data.get('whatsapp', '') is string && data.get('whatsapp', '').size() <= 500)
         && (data.get('state', '') is string && data.get('state', '').size() <= 500)
         && (data.get('referralCode', '') is string && data.get('referralCode', '').size() <= 500)
@@ -95,6 +102,8 @@ service cloud.firestore {
         && data.type in ['lp', 'ec']
         && data.businessName is string && data.businessName.size() > 0 && data.businessName.size() <= 200
         && (data.get('dateCompleted', '') is string && data.get('dateCompleted', '').size() <= 100)
+        && (data.get('userId', '') is string && data.get('userId', '').size() <= 128)
+        && (data.get('userEmail', '') is string && data.get('userEmail', '').size() <= 200)
         && data.data is map;
     }
 
@@ -183,7 +192,7 @@ service cloud.firestore {
                        && incoming().createdAt == existing().createdAt
                        && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt)
                        && incoming().diff(existing()).affectedKeys().hasOnly([
-                         'intent', 'experience', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'whatsapp', 'state', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'isDashboardUnlocked', 'adminCode', 'progress', 'updatedAt'
+                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'isDashboardUnlocked', 'adminCode', 'progress', 'updatedAt'
                        ])
                       )
                       ||
@@ -219,7 +228,7 @@ service cloud.firestore {
                     && (incoming().updatedAt == request.time || !incoming().keys().hasAll(['updatedAt']))
                     && incoming().diff(existing()).affectedKeys().hasOnly([
                       'title', 'subtitle', 'tagline', 'slug', 'thumbnail', 'description', 
-                      'overview', 'category', 'skill', 'subskill', 'youtube_link', 
+                      'overview', 'category', 'skill', 'subskill', 'skillPath', 'durationMode', 'youtube_link', 
                       'level', 'tier', 'price', 'instructor', 'outcomes', 
                       'requirements', 'publish_status', 'status', 'isLocked', 'days', 'updatedAt', 'createdAt'
                     ]);

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Course } from '../../types';
-import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy } from 'lucide-react';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Class", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -144,6 +144,34 @@ export default function CoursesAdmin() {
     } catch (e) {
       console.error(e);
       alert('Failed to delete course.');
+    }
+  };
+
+  const handleCloneCourse = async (sourceCourse: Course) => {
+    const confirmName = window.prompt(
+      `Enter a title for the cloned course:`, 
+      `${sourceCourse.title} (Clone)`
+    );
+    if (confirmName === null) return; // Cancelled
+    const clonedTitle = confirmName.trim() || `${sourceCourse.title} (Clone)`;
+
+    try {
+      const clonedCourseData = {
+        ...sourceCourse,
+        title: clonedTitle,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        status: 'draft',
+        publish_status: 'Draft'
+      };
+      
+      delete (clonedCourseData as any).id;
+
+      await addDoc(collection(db, 'courses'), clonedCourseData);
+      alert(`Course "${sourceCourse.title}" cloned successfully! Saved as Draft: "${clonedTitle}".`);
+    } catch (err: any) {
+      console.error("Error cloning course:", err);
+      alert("Failed to clone course. Error: " + err.message);
     }
   };
 
@@ -347,6 +375,15 @@ export default function CoursesAdmin() {
                           }`}
                         >
                           {isPublished ? 'Unpublish' : 'Publish'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCloneCourse(c)}
+                          className="px-3 py-1.5 bg-indigo-50 border-2 border-indigo-200 rounded-lg text-indigo-700 font-extrabold hover:bg-indigo-100 transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                          title="Clone/duplicate this course"
+                        >
+                          <Copy className="w-3.5 h-3.5 shrink-0" />
+                          Clone
                         </button>
                         <Link
                           to={`/admin/courses/${c.id}`}

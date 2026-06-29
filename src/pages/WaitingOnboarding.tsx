@@ -27,6 +27,9 @@ export default function WaitingOnboarding() {
     recommendedPath: '',
     goal: '',
     availability: '',
+    learningTool: '',
+    educationLevel: '',
+    ageRange: '',
     fullName: '',
     gender: '',
     whatsapp: '',
@@ -74,7 +77,8 @@ export default function WaitingOnboarding() {
 
   const pathwaysOpt = [
     { val: 'A' as Pathway, label: 'AI Landing Page Creation', icon: <Globe className="w-6 h-6 text-blue-500" /> },
-    { val: 'B' as Pathway, label: 'AI E-commerce Website Creation', icon: <ShoppingBag className="w-6 h-6 text-emerald-500" /> }
+    { val: 'B' as Pathway, label: 'AI E-commerce Website Creation', icon: <ShoppingBag className="w-6 h-6 text-emerald-500" /> },
+    { val: 'C' as Pathway, label: 'AI Portfolio Website Creation', icon: <Briefcase className="w-6 h-6 text-purple-500" /> }
   ];
 
   const experiences = [
@@ -85,7 +89,7 @@ export default function WaitingOnboarding() {
   ];
 
   const validateForm = () => {
-    if (!data.fullName || !data.gender || !data.whatsapp || !data.state) {
+    if (!data.fullName || !data.gender || !data.ageRange || !data.whatsapp || !data.state || !data.learningTool || !data.educationLevel) {
       setFormError('Please fill in all required fields.');
       return false;
     }
@@ -109,6 +113,14 @@ export default function WaitingOnboarding() {
           recommendedPath = 'Conversion Funnel Agency Masterclass';
         } else {
           recommendedPath = 'Landing Page Foundations';
+        }
+      } else if (pathway === 'C') {
+        if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
+          recommendedPath = 'Professional Portfolio Builder';
+        } else if (data.experience.includes('expert')) {
+          recommendedPath = 'Portfolio Agency Masterclass';
+        } else {
+          recommendedPath = 'Portfolio Website Foundations';
         }
       } else {
         if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
@@ -141,7 +153,7 @@ export default function WaitingOnboarding() {
   };
 
   useEffect(() => {
-    if (step === 9 && creationTime) {
+    if (step === 11 && creationTime) {
       const targetTime = creationTime + 24 * 60 * 60 * 1000;
       const interval = setInterval(() => {
         const now = new Date().getTime();
@@ -171,6 +183,7 @@ export default function WaitingOnboarding() {
 • *Name:* ${data.fullName || ''}
 • *WhatsApp:* ${data.whatsapp || ''}
 • *Gender:* ${data.gender || ''}
+• *Age Range:* ${data.ageRange || 'N/A'}
 • *State:* ${data.state || ''}
 
 *📚 ACADEMIC PROFILE:*
@@ -178,6 +191,8 @@ export default function WaitingOnboarding() {
 • *Pathway Selection:* ${data.courseType || ''} ${data.pathwaySelection ? `(${data.pathwaySelection})` : ''}
 • *Reason:* ${data.pathwayReason || 'N/A'}
 • *Experience:* ${data.pathwayExperience || data.experience || 'None'}
+• *Education Level:* ${data.educationLevel || 'N/A'}
+• *Learning Tool:* ${data.learningTool || 'N/A'}
 
 *🎯 COMMITMENT & GOALS:*
 • *Target Goal:* ${data.goal || 'N/A'}
@@ -192,23 +207,23 @@ _Action: Please review my CIY Academy application. Thank you!_`;
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col items-center">
       <div className="w-full max-w-3xl p-6 flex items-center justify-between z-10">
         <div className="w-24">
-          {step > 1 && step < 9 && (
+          {step > 1 && step < 11 && (
             <button onClick={prevStep} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-semibold">
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
           )}
         </div>
         <div className="flex-1 flex justify-center">
-          {step > 1 && step < 9 && (
+          {step > 1 && step < 11 && (
             <div className="flex gap-2">
-              {[2, 3, 4, 5, 6, 7, 8].map(s => (
-                <div key={s} className={`h-1.5 w-6 rounded-full transition-colors ${step >= s ? 'bg-amber-500' : 'bg-slate-200'}`} />
+              {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(s => (
+                <div key={s} className={`h-1.5 w-5 rounded-full transition-colors ${step >= s ? 'bg-amber-500' : 'bg-slate-200'}`} />
               ))}
             </div>
           )}
         </div>
         <div className="w-24 flex justify-end">
-          {step > 1 && step < 8 && (
+          {step > 1 && step < 10 && (
             <button onClick={nextStep} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-semibold">
               Next <ArrowRight className="w-4 h-4" />
             </button>
@@ -335,7 +350,46 @@ _Action: Please review my CIY Academy application. Thank you!_`;
           )}
 
           {step === 8 && (
-            <motion.div key="8" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-md w-full">
+            <motion.div key="8" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-xl w-full">
+              <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">What tool will you be using for this training?</h2>
+              <div className="space-y-4">
+                {[
+                  { label: 'Mobile Phone', desc: 'I will learn and practice using my smartphone' },
+                  { label: 'Laptop', desc: 'I will learn and practice using my personal computer/laptop' }
+                ].map((opt, i) => (
+                  <button key={i} onClick={() => { selectData('learningTool', opt.label); nextStep(); }} className={`w-full p-5 rounded-2xl border-2 text-left flex items-center justify-between transition-all font-semibold text-lg ${data.learningTool === opt.label ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-md' : 'border-slate-200 hover:border-amber-450 bg-white text-slate-700 hover:bg-amber-50/20'}`}>
+                    <div>
+                      <div className="font-bold text-slate-800">{opt.label}</div>
+                      <div className="text-xs font-medium text-slate-500 mt-1">{opt.desc}</div>
+                    </div>
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${data.learningTool === opt.label ? 'border-amber-500 bg-amber-500 text-white' : 'border-slate-300'}`}>
+                      {data.learningTool === opt.label && <Check className="w-4 h-4 text-slate-900" />}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {step === 9 && (
+            <motion.div key="9" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-xl w-full">
+              <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">What is your current level of education?</h2>
+              <div className="space-y-4">
+                {[
+                  'SSCE',
+                  'Undergraduate',
+                  'Graduate'
+                ].map((opt, i) => (
+                  <button key={i} onClick={() => { selectData('educationLevel', opt); nextStep(); }} className={`w-full p-5 rounded-2xl border-2 text-center transition-all font-semibold text-lg ${data.educationLevel === opt ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-md' : 'border-slate-200 hover:border-amber-500 hover:bg-amber-50/20 bg-white text-slate-700'}`}>
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {step === 10 && (
+            <motion.div key="10" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-md w-full">
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-extrabold text-slate-800 mb-2">Join CIY Academy</h2>
                 <p className="text-slate-600">Please provide your details below. Your details will be sent directly via WhatsApp to complete your registration.</p>
@@ -360,6 +414,19 @@ _Action: Please review my CIY Academy application. Thank you!_`;
                       <option value="" disabled>Select Gender</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Age Range *</label>
+                  <div className="relative">
+                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+                    <select value={data.ageRange} onChange={e => selectData('ageRange', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-800">
+                      <option value="" disabled>Select Age Range</option>
+                      <option value="Below 18">Below 18</option>
+                      <option value="Between 18-25">Between 18-25</option>
+                      <option value="Between 25-36">Between 25-36</option>
+                      <option value="Above 36">Above 36</option>
                     </select>
                   </div>
                 </div>
@@ -397,8 +464,8 @@ _Action: Please review my CIY Academy application. Thank you!_`;
             </motion.div>
           )}
 
-          {step === 9 && (
-            <motion.div key="9" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl w-full">
+          {step === 11 && (
+            <motion.div key="11" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl w-full">
               <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-slate-100 text-center relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500"></div>
                 
@@ -474,6 +541,18 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
           <div>
             <span className="text-slate-600 block text-[10px] uppercase font-bold">Gender</span>
             <span className="text-slate-800 font-semibold">{data.gender || '-'}</span>
+          </div>
+          <div>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Age Range</span>
+            <span className="text-slate-800 font-semibold">{data.ageRange || '-'}</span>
+          </div>
+          <div>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Education Level</span>
+            <span className="text-slate-800 font-semibold">{data.educationLevel || '-'}</span>
+          </div>
+          <div>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Learning Tool</span>
+            <span className="text-slate-800 font-semibold">{data.learningTool || '-'}</span>
           </div>
           <div>
             <span className="text-slate-600 block text-[10px] uppercase font-bold">WhatsApp Number</span>
@@ -573,22 +652,20 @@ function PathwayB({ data, setData, onNext }: { data: any, setData: any, onNext: 
 function PathwayC({ data, setData, onNext }: { data: any, setData: any, onNext: () => void }) {
   const [subStep, setSubStep] = useState(1);
   const q1 = [
-    { title: 'Flyers & ads', meaning: 'Single-page promotional graphics for events, sales, or campaigns.', uses: 'Digital marketing, printed promotions, event awareness.', businesses: 'Event organizers, restaurants, retail stores, local businesses.', src: 'https://res.cloudinary.com/di4dlnd5x/image/upload/v1779199753/Clothing_Ad_Flyer_Design_d7wwr7.jpg' },
-    { title: 'Logos & branding', meaning: 'The foundational visual identity and marks that represent a company.', uses: 'Establishing brand recognition, trust, and professional appearance.', businesses: 'Startups, rebranding companies, freelancers, agencies.', src: 'https://res.cloudinary.com/di4dlnd5x/image/upload/v1779199775/Brand_Identity_-_Marketing_Agency_q3fhwf.jpg' },
-    { title: 'Social media graphics', meaning: 'Visual content like carousels, posts, and banners tailored for social platforms.', uses: 'Audience engagement, sharing tips, announcements, community building.', businesses: 'Coaches, influencers, B2B companies, non-profits.', src: 'https://res.cloudinary.com/di4dlnd5x/image/upload/v1779199790/New_Month_Flyer_November_iypfck.jpg' },
-    { title: 'Product mockups', meaning: 'The user interface design outlining how digital products look and feel.', uses: 'Prototyping apps, redesigning websites, improving user experience.', businesses: 'Tech startups, software companies, digital agencies, entrepreneurs.', src: 'https://res.cloudinary.com/di4dlnd5x/image/upload/v1779199740/Clear_Ledger_jvkytv.jpg' }
+    { title: 'Personal Developer Portfolio', meaning: 'Clean, professional portfolios designed to showcase developer projects, coding skills, and tech stacks.', uses: 'Tech job applications, engineering networking, code repository links.', businesses: 'Software engineers, frontend developers, tech job seekers.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp' },
+    { title: 'Creative & Freelancer Portfolio', meaning: 'Visually striking, media-rich websites designed to display creative projects, design case studies, and client reviews.', uses: 'Showcasing designer projects, copywriting samples, freelance client acquisition.', businesses: 'UI/UX designers, photographers, writers, consultants, agency freelancers.', src: 'https://res.cloudinary.com/di4dlnd5x/video/upload/v1779113179/704f7970e09360476c34e5b8dd6a1239_720w_hkdauz.webm' }
   ];
-  const q2 = ['Personal branding', 'Business promotion', 'Freelancing', 'Social media growth', 'To stop outsourcing designs'];
-  const q3 = ['Complete beginner', 'Canva user', 'Photoshop user', 'Professional designer'];
+  const q2 = ['To showcase my skills to land a tech role', 'To find high-paying freelance clients', 'To establish a strong professional brand online'];
+  const q3 = ['Never', 'Only with Canva/Wix', 'I tried coding before', 'I already build websites manually'];
 
   const clickQ1 = (val: string) => { setData((p:any) => ({...p, pathwaySelection: val})); setSubStep(2); };
   const clickQ2 = (val: string) => { setData((p:any) => ({...p, pathwayReason: val})); setSubStep(3); };
   const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext(); };
 
-  return <PathwayFlow step={subStep} mediaType="image"
-    title1="What type of designs interest you most?" opts1={q1} click1={clickQ1}
-    title2="Why do you want to learn design?" opts2={q2} click2={clickQ2}
-    title3="What’s your current design experience?" opts3={q3} click3={clickQ3}
+  return <PathwayFlow step={subStep} mediaType="video"
+    title1="What type of portfolio website would you love to create?" opts1={q1} click1={clickQ1}
+    title2="Why do you want to learn portfolio creation?" opts2={q2} click2={clickQ2}
+    title3="Have you ever built a website or portfolio before?" opts3={q3} click3={clickQ3}
   />;
 }
 

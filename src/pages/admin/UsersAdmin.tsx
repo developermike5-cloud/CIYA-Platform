@@ -4,6 +4,7 @@ import { db, auth, rtdb, handleFirestoreError, OperationType, getActiveDatabaseI
 import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
+import { Course } from '../../types';
 
 function getFirestoreTime(timestamp: any): number {
   if (!timestamp) return 0;
@@ -67,10 +68,16 @@ interface UserProfile {
   adminCode?: string;
   isDashboardUnlocked?: boolean;
   createdAt: any;
+  ageRange?: string;
+  educationLevel?: string;
+  learningTool?: string;
+  cohort?: string;
+  completedCoursesOverride?: string[];
 }
 
 export default function UsersAdmin() {
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -93,6 +100,62 @@ export default function UsersAdmin() {
   const [sortDate, setSortDate] = useState('desc');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterCohort, setFilterCohort] = useState('All');
+  const [filterAgeRange, setFilterAgeRange] = useState('');
+  const [filterEducationLevel, setFilterEducationLevel] = useState('');
+  const [filterLearningTool, setFilterLearningTool] = useState('');
+
+  // Cohorts State
+  const [cohortsConfig, setCohortsConfig] = useState<{ activeCohort: string; cohortsList: string[] }>({
+    activeCohort: 'Cohort 1',
+    cohortsList: ['Cohort 1']
+  });
+  const [newCohortName, setNewCohortName] = useState('');
+  const [isCreatingCohort, setIsCreatingCohort] = useState(false);
+
+  const handleCreateCohort = async () => {
+    if (!newCohortName.trim()) {
+      alert("Please enter a valid cohort name.");
+      return;
+    }
+    const sanitized = newCohortName.trim();
+    if (cohortsConfig.cohortsList.includes(sanitized)) {
+      alert("This cohort already exists!");
+      return;
+    }
+    setIsCreatingCohort(true);
+    try {
+      const updatedList = [...cohortsConfig.cohortsList, sanitized];
+      const newActive = sanitized;
+      
+      await setDoc(doc(db, 'settings', 'cohorts'), {
+        activeCohort: newActive,
+        cohortsList: updatedList
+      });
+      setCohortsConfig({ activeCohort: newActive, cohortsList: updatedList });
+      setNewCohortName('');
+      alert(`Cohort "${sanitized}" created successfully! It is now the ACTIVE cohort for new registrations.`);
+    } catch (err) {
+      console.error("Error creating cohort:", err);
+      alert("Failed to create cohort. Check administrative database permissions.");
+    } finally {
+      setIsCreatingCohort(false);
+    }
+  };
+
+  const handleChangeActiveCohort = async (newActive: string) => {
+    try {
+      await setDoc(doc(db, 'settings', 'cohorts'), {
+        activeCohort: newActive,
+        cohortsList: cohortsConfig.cohortsList
+      });
+      setCohortsConfig(prev => ({ ...prev, activeCohort: newActive }));
+      alert(`Active cohort updated to: ${newActive}`);
+    } catch (err) {
+      console.error("Error updating active cohort:", err);
+      alert("Failed to update active cohort.");
+    }
+  };
 
   // Actions Toggle & States
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
@@ -354,6 +417,10 @@ export default function UsersAdmin() {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
       setUsers(data);
 
+      const coursesSnapshot = await getDocs(collection(db, 'courses'));
+      const coursesData = coursesSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Course));
+      setAllCourses(coursesData);
+
       const adminSnapshot = await getDocs(collection(db, 'admins'));
       const adminIds: string[] = [];
       const adminMap: Record<string, { email: string, role?: string, permissions?: string[] }> = {};
@@ -363,6 +430,27 @@ export default function UsersAdmin() {
       });
       setAdmins(adminIds);
       setAdminsData(adminMap);
+
+      // Fetch Cohorts configuration from settings
+      let activeCohort = 'Cohort 1';
+      let cohortsList = ['Cohort 1'];
+      try {
+        const cohortsSnap = await getDoc(doc(db, 'settings', 'cohorts'));
+        if (cohortsSnap.exists()) {
+          const cData = cohortsSnap.data();
+          activeCohort = cData.activeCohort || 'Cohort 1';
+          cohortsList = cData.cohortsList || ['Cohort 1'];
+        } else {
+          // Initialize cohorts setting
+          await setDoc(doc(db, 'settings', 'cohorts'), {
+            activeCohort: 'Cohort 1',
+            cohortsList: ['Cohort 1']
+          });
+        }
+      } catch (cohortErr) {
+        console.warn("Could not fetch settings/cohorts document:", cohortErr);
+      }
+      setCohortsConfig({ activeCohort, cohortsList });
 
       // Save to local cache
       localStorage.setItem('ciya_admin_cached_users_list', JSON.stringify(data));
@@ -463,8 +551,15 @@ export default function UsersAdmin() {
     }
   };
 
+  const cohortFilteredUsers = useMemo(() => {
+    return users.filter(u => {
+      const uCohort = u.cohort || 'Cohort 1';
+      return filterCohort === 'All' ? true : uCohort === filterCohort;
+    });
+  }, [users, filterCohort]);
+
   const filteredUsers = useMemo(() => {
-    let result = users.filter(u => {
+    let result = cohortFilteredUsers.filter(u => {
       const term = searchTerm.toLowerCase();
       const matchesSearch = (
         (u.fullName?.toLowerCase() || '').includes(term) ||
@@ -472,7 +567,13 @@ export default function UsersAdmin() {
         (u.whatsapp?.toLowerCase() || '').includes(term) ||
         (u.state?.toLowerCase() || '').includes(term) ||
         (u.recommendedPath?.toLowerCase() || '').includes(term) ||
-        (u.courseType?.toLowerCase() || '').includes(term)
+        (u.courseType?.toLowerCase() || '').includes(term) ||
+        (u.ageRange?.toLowerCase() || '').includes(term) ||
+        (u.educationLevel?.toLowerCase() || '').includes(term) ||
+        (u.learningTool?.toLowerCase() || '').includes(term) ||
+        (u.pathwaySelection?.toLowerCase() || '').includes(term) ||
+        (u.pathwayReason?.toLowerCase() || '').includes(term) ||
+        (u.pathwayExperience?.toLowerCase() || '').includes(term)
       );
 
       const matchesState = filterState ? u.state === filterState : true;
@@ -480,6 +581,10 @@ export default function UsersAdmin() {
       const matchesStatus = filterStatus === 'activated' ? u.isActivated : filterStatus === 'pending' ? !u.isActivated : true;
       const matchesGender = filterGender ? (u.gender?.toLowerCase() === filterGender.toLowerCase()) : true;
       
+      const matchesAgeRange = filterAgeRange ? u.ageRange === filterAgeRange : true;
+      const matchesEducationLevel = filterEducationLevel ? u.educationLevel === filterEducationLevel : true;
+      const matchesLearningTool = filterLearningTool ? u.learningTool === filterLearningTool : true;
+
       const appStatus = u.approvalStatus || 'Pending';
       const matchesApproval = filterApproval ? (
         filterApproval === 'pending' ? appStatus === 'Pending' :
@@ -509,7 +614,7 @@ export default function UsersAdmin() {
         }
       }
 
-      return matchesSearch && matchesState && matchesCourse && matchesStatus && matchesApproval && matchesGender && matchesDateRange;
+      return matchesSearch && matchesState && matchesCourse && matchesStatus && matchesApproval && matchesGender && matchesDateRange && matchesAgeRange && matchesEducationLevel && matchesLearningTool;
     });
 
     result.sort((a, b) => {
@@ -519,7 +624,7 @@ export default function UsersAdmin() {
     });
 
     return result;
-  }, [users, searchTerm, filterState, filterCourse, filterStatus, filterApproval, filterGender, sortDate, filterStartDate, filterEndDate]);
+  }, [cohortFilteredUsers, searchTerm, filterState, filterCourse, filterStatus, filterApproval, filterGender, sortDate, filterStartDate, filterEndDate, filterAgeRange, filterEducationLevel, filterLearningTool]);
 
   return (
     <div>
@@ -584,6 +689,54 @@ export default function UsersAdmin() {
         </div>
       )}
 
+      {/* Cohort Management Dashboard */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-1 md:max-w-md">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span>📦</span> Cohort Management
+            </h3>
+            <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+              Create student cohorts to group registrations and manage onboarding periods. New registrants are automatically assigned to the designated <strong className="text-indigo-600">Active Cohort</strong>.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
+            {/* Create cohort input */}
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="New Cohort (e.g. Cohort 2)"
+                value={newCohortName}
+                onChange={(e) => setNewCohortName(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-xs text-slate-800 font-semibold w-full sm:w-48 bg-white"
+              />
+              <button
+                onClick={handleCreateCohort}
+                disabled={isCreatingCohort}
+                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-750 text-white font-extrabold text-xs uppercase tracking-wide rounded-xl shadow transition-all duration-150 disabled:opacity-50 shrink-0 border-0 cursor-pointer"
+              >
+                {isCreatingCohort ? "Creating..." : "Create"}
+              </button>
+            </div>
+
+            {/* Change Active Cohort */}
+            <div className="flex items-center gap-2 border-t sm:border-t-0 sm:border-l border-slate-200 pt-3 sm:pt-0 sm:pl-4">
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Active Cohort:</span>
+              <select
+                value={cohortsConfig.activeCohort}
+                onChange={(e) => handleChangeActiveCohort(e.target.value)}
+                className="text-xs font-bold border border-slate-300 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-700 bg-white"
+              >
+                {cohortsConfig.cohortsList.map(cohort => (
+                  <option key={cohort} value={cohort}>{cohort}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col mb-6 gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3 flex-wrap">
@@ -616,6 +769,20 @@ export default function UsersAdmin() {
             <Filter className="w-4 h-4" /> Filters:
           </div>
           
+          {/* Cohort filter */}
+          <select 
+            value={filterCohort} 
+            onChange={(e) => setFilterCohort(e.target.value)}
+            className="text-sm border border-indigo-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-700 font-bold bg-white"
+          >
+            <option value="All" className="text-slate-800">All Cohorts (Aggregated)</option>
+            {cohortsConfig.cohortsList.map(cohort => (
+              <option key={cohort} value={cohort} className="text-slate-800">
+                {cohort} {cohortsConfig.activeCohort === cohort ? "(Active)" : ""}
+              </option>
+            ))}
+          </select>
+
           <select 
             value={sortDate} 
             onChange={(e) => setSortDate(e.target.value)}
@@ -636,7 +803,7 @@ export default function UsersAdmin() {
             <option value="disapproved" className="text-slate-800">Disapproved Applications</option>
           </select>
 
-           <select 
+          <select 
             value={filterGender} 
             onChange={(e) => setFilterGender(e.target.value)}
             className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
@@ -644,6 +811,42 @@ export default function UsersAdmin() {
             <option value="" className="text-slate-800">All Genders</option>
             <option value="male" className="text-slate-800">Male</option>
             <option value="female" className="text-slate-800">Female</option>
+          </select>
+
+          {/* Age range filter */}
+          <select 
+            value={filterAgeRange} 
+            onChange={(e) => setFilterAgeRange(e.target.value)}
+            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
+          >
+            <option value="" className="text-slate-800">All Age Ranges</option>
+            {['15-20', '21-25', '26-30', '31-35', '36+'].map(age => (
+              <option key={age} value={age} className="text-slate-800">{age} years</option>
+            ))}
+          </select>
+
+          {/* Education level filter */}
+          <select 
+            value={filterEducationLevel} 
+            onChange={(e) => setFilterEducationLevel(e.target.value)}
+            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
+          >
+            <option value="" className="text-slate-800">All Education Levels</option>
+            {['SSCE', 'Undergraduate', 'Graduate'].map(edu => (
+              <option key={edu} value={edu} className="text-slate-800">{edu}</option>
+            ))}
+          </select>
+
+          {/* Learning tool filter */}
+          <select 
+            value={filterLearningTool} 
+            onChange={(e) => setFilterLearningTool(e.target.value)}
+            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
+          >
+            <option value="" className="text-slate-800">All Learning Tools</option>
+            {['Mobile Phone', 'Laptop'].map(tool => (
+              <option key={tool} value={tool} className="text-slate-800">{tool}</option>
+            ))}
           </select>
 
           <select 
@@ -687,7 +890,7 @@ export default function UsersAdmin() {
             />
           </div>
           
-          {(filterState || filterCourse || filterStatus || filterApproval || filterGender || sortDate !== 'desc' || filterStartDate || filterEndDate) && (
+          {(filterState || filterCourse || filterStatus || filterApproval || filterGender || sortDate !== 'desc' || filterStartDate || filterEndDate || filterCohort !== 'All' || filterAgeRange || filterEducationLevel || filterLearningTool) && (
             <button 
               onClick={() => {
                 setFilterState('');
@@ -698,6 +901,10 @@ export default function UsersAdmin() {
                 setSortDate('desc');
                 setFilterStartDate('');
                 setFilterEndDate('');
+                setFilterCohort('All');
+                setFilterAgeRange('');
+                setFilterEducationLevel('');
+                setFilterLearningTool('');
               }}
               className="text-sm text-indigo-600 hover:text-indigo-800 font-medium ml-2 cursor-pointer border-0 bg-transparent outline-none"
             >
@@ -710,27 +917,27 @@ export default function UsersAdmin() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-lg shadow p-5 border-t-4 border-indigo-500">
           <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Applicants</h3>
-          <p className="text-3xl font-bold text-indigo-600 mt-1">{users.length}</p>
+          <p className="text-3xl font-bold text-indigo-600 mt-1">{cohortFilteredUsers.length}</p>
         </div>
         
         <div className="bg-white rounded-lg shadow p-5 border-t-4 border-amber-500">
           <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Pending Review</h3>
           <p className="text-3xl font-bold text-amber-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('pending')}>
-            {users.filter(u => !u.approvalStatus || u.approvalStatus === 'Pending').length}
+            {cohortFilteredUsers.filter(u => !u.approvalStatus || u.approvalStatus === 'Pending').length}
           </p>
         </div>
 
         <div className="bg-white rounded-lg shadow p-5 border-t-4 border-emerald-500">
           <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Approved Applicants</h3>
           <p className="text-3xl font-bold text-emerald-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('approved')}>
-            {users.filter(u => u.approvalStatus === 'Approved').length}
+            {cohortFilteredUsers.filter(u => u.approvalStatus === 'Approved').length}
           </p>
         </div>
         
         <div className="bg-white rounded-lg shadow p-5 border-t-4 border-rose-500">
           <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Disapproved</h3>
           <p className="text-3xl font-bold text-rose-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('disapproved')}>
-            {users.filter(u => u.approvalStatus === 'Disapproved').length}
+            {cohortFilteredUsers.filter(u => u.approvalStatus === 'Disapproved').length}
           </p>
         </div>
       </div>
@@ -741,6 +948,21 @@ export default function UsersAdmin() {
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="px-5 py-4 bg-slate-50 border-b border-slate-150 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-slate-800">Showing {filteredUsers.length} of {cohortFilteredUsers.length} total students</span>
+              {filterCohort !== 'All' && (
+                <span className="text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">
+                  Cohort: {filterCohort}
+                </span>
+              )}
+            </div>
+            {searchTerm && (
+              <span className="text-xs text-slate-500 italic">
+                Filtered by search: "{searchTerm}"
+              </span>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50">
@@ -927,6 +1149,80 @@ export default function UsersAdmin() {
                                       System suggested: <strong className="text-slate-900">{u.recommendedPath || '-'}</strong> <br/>
                                       Choice selections: <strong className="text-slate-900">{u.courseType || ''} {u.pathwaySelection ? `(${u.pathwaySelection})` : ''}</strong>
                                     </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400 block font-bold text-[9px] uppercase">Cohort Placement</span>
+                                    <select
+                                      value={u.cohort || 'Cohort 1'}
+                                      onChange={async (e) => {
+                                        const targetCohort = e.target.value;
+                                        try {
+                                          await updateDoc(doc(db, 'users', u.id), {
+                                            cohort: targetCohort,
+                                            updatedAt: serverTimestamp()
+                                          });
+                                          setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, cohort: targetCohort } : usr));
+                                          alert(`Moved student to ${targetCohort} successfully!`);
+                                        } catch (err) {
+                                          console.error("Error moving student cohort:", err);
+                                          alert("Failed to update cohort. Please try again.");
+                                        }
+                                      }}
+                                      className="mt-1 bg-slate-50 border border-slate-300 rounded px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500 w-full outline-none"
+                                    >
+                                      {cohortsConfig.cohortsList.map(cohort => (
+                                        <option key={cohort} value={cohort}>{cohort}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div className="col-span-full pt-3 border-t border-slate-100 mt-2">
+                                    <span className="text-slate-500 block font-bold text-[9px] uppercase tracking-wider mb-2">🎓 Special Override: Course Completion</span>
+                                    {allCourses.length === 0 ? (
+                                      <p className="text-slate-400 text-xs italic">No courses in the system yet.</p>
+                                    ) : (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                        {allCourses.map(course => {
+                                          const isCompleted = u.completedCoursesOverride?.includes(course.id || '') || false;
+                                          return (
+                                            <div key={course.id} className="flex items-center justify-between bg-slate-50/50 p-2 rounded-xl border border-slate-200 text-xs">
+                                              <span className="font-extrabold text-slate-800 truncate pr-2" title={course.title}>
+                                                {course.title}
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={async () => {
+                                                  try {
+                                                    const currentCompleted = u.completedCoursesOverride || [];
+                                                    let nextCompleted: string[];
+                                                    if (isCompleted) {
+                                                      nextCompleted = currentCompleted.filter(id => id !== course.id);
+                                                    } else {
+                                                      nextCompleted = [...currentCompleted, course.id || ''];
+                                                    }
+                                                    await updateDoc(doc(db, 'users', u.id), {
+                                                      completedCoursesOverride: nextCompleted,
+                                                      updatedAt: serverTimestamp()
+                                                    });
+                                                    setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, completedCoursesOverride: nextCompleted } : usr));
+                                                  } catch (err) {
+                                                    console.error("Error overriding course complete:", err);
+                                                    alert("Failed to update course override complete. Please try again.");
+                                                  }
+                                                }}
+                                                className={`shrink-0 px-2 py-1 rounded text-[9px] font-black uppercase transition-all border-0 cursor-pointer ${
+                                                  isCompleted 
+                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                                    : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                                                }`}
+                                              >
+                                                {isCompleted ? "✓ Completed" : "Mark Completed"}
+                                              </button>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
                                   </div>
 
                                   <div className="pt-2.5 border-t border-slate-100 mt-2.5 space-y-2">

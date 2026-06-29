@@ -79,6 +79,7 @@ if (typeof window !== 'undefined') {
 if (useMemoryCache) {
   try {
     firestoreDb = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
       localCache: memoryLocalCache()
     }, chosenDatabaseId || undefined);
   } catch (err) {
@@ -88,6 +89,7 @@ if (useMemoryCache) {
   try {
     // Try to initialize with persistent local cache first for high performance and disk-based offline support
     firestoreDb = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
       localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager()
       })

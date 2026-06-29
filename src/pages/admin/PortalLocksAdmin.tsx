@@ -104,7 +104,7 @@ export default function PortalLocksAdmin() {
   const sectionsInfo = [
     {
       key: 'courses' as keyof LockedSections,
-      title: 'Explore Curriculum Arena',
+      title: 'Explore Courses Arena',
       description: 'Governs access to system daily courses catalog, training sessions, mini-videos, study guides, and comprehension checks.',
       badgeText: 'Syllabus & Coursework',
     },

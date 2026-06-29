@@ -144,8 +144,7 @@ const useLogin = () => {
           if (docSnap.exists()) {
             navigate('/dashboard');
           } else {
-            await signOut(auth);
-            alert("Your account is not registered. If you are an invited student, please complete the registration using the private onboarding link sent by your administrator.");
+            navigate('/waitingonboarding');
           }
         }
         return;
@@ -161,8 +160,7 @@ const useLogin = () => {
         if (docSnap.exists()) {
           navigate('/dashboard');
         } else {
-          await signOut(auth);
-          alert("Your account is not registered. If you are an invited student, please complete the registration using the private onboarding link sent by your administrator.");
+          navigate('/waitingonboarding');
         }
       }
     } catch (e: any) {
