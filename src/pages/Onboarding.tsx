@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag } from 'lucide-react';
 import { auth, db } from '../firebase';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 
 type Pathway = 'A' | 'B' | 'C' | null;
@@ -14,6 +14,20 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [pathway, setPathway] = useState<Pathway>(null);
+  const [showCareWarningModal, setShowCareWarningModal] = useState(() => {
+    try {
+      return localStorage.getItem('ciya_onboarding_warning_acknowledged') !== 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [hasAcknowledged, setHasAcknowledged] = useState(() => {
+    try {
+      return localStorage.getItem('ciya_onboarding_warning_acknowledged') === 'true';
+    } catch {
+      return false;
+    }
+  });
   
   const NIGERIAN_STATES = [
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
@@ -49,6 +63,23 @@ export default function Onboarding() {
   const [timeLeft, setTimeLeft] = useState('');
   const [creationTime, setCreationTime] = useState<number | null>(null);
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
+
+  // Auto-redirect if already registered
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const docSnap = await getDoc(doc(db, 'users', user.uid));
+          if (docSnap.exists()) {
+            navigate('/dashboard', { replace: true });
+          }
+        } catch (err) {
+          console.warn("Auto-redirect check failed:", err);
+        }
+      }
+    });
+    return () => unsub();
+  }, [navigate]);
 
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => Math.max(1, s - 1));
@@ -128,9 +159,9 @@ export default function Onboarding() {
   ];
 
   const pathwaysOpt = [
-    { val: 'A' as Pathway, label: 'AI Landing Page Creation', icon: <Globe className="w-6 h-6 text-blue-500" /> },
-    { val: 'B' as Pathway, label: 'AI E-commerce Website Creation', icon: <ShoppingBag className="w-6 h-6 text-emerald-500" /> },
-    { val: 'C' as Pathway, label: 'AI Portfolio Website Creation', icon: <Briefcase className="w-6 h-6 text-purple-500" /> }
+    { val: 'A' as Pathway, label: 'AI Landing Page Creation', icon: <Globe className="w-6 h-6 text-teal-400" /> },
+    { val: 'B' as Pathway, label: 'AI E-commerce Website Creation', icon: <ShoppingBag className="w-6 h-6 text-emerald-400" /> },
+    { val: 'C' as Pathway, label: 'AI Portfolio Website Creation', icon: <Briefcase className="w-6 h-6 text-indigo-400" /> }
   ];
 
   const experiences = [
@@ -141,11 +172,12 @@ export default function Onboarding() {
   ];
 
   const validateForm = () => {
-    if (!data.fullName || !data.gender || !data.ageRange || !data.whatsapp || !data.state || !data.learningTool || !data.educationLevel) {
-      setFormError('Please fill in all required fields.');
-      return false;
-    }
     setFormError('');
+    if (!data.fullName.trim()) { setFormError('Full Name is required.'); return false; }
+    if (!data.gender) { setFormError('Gender is required.'); return false; }
+    if (!data.ageRange) { setFormError('Age Range is required.'); return false; }
+    if (!data.whatsapp.trim()) { setFormError('WhatsApp Number is required.'); return false; }
+    if (!data.state) { setFormError('State is required.'); return false; }
     return true;
   };
 
@@ -170,11 +202,10 @@ export default function Onboarding() {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-           navigate('/dashboard', { replace: true });
-           return;
+            navigate('/dashboard', { replace: true });
+            return;
         }
 
-        // Generate unique code if not has one
         const userCode = data.myReferralCode || user.uid.slice(0, 6).toUpperCase();
         
         let recommendedPath = '';
@@ -205,7 +236,6 @@ export default function Onboarding() {
         }
 
         let isActivated = false;
-
         let activeCohort = 'Cohort 1';
         try {
           const cohortsSnap = await getDoc(doc(db, 'settings', 'cohorts'));
@@ -249,7 +279,6 @@ export default function Onboarding() {
         
         setData(d => ({ ...d, recommendedPath, myReferralCode: userCode, isActivated }));
 
-        // Handle referral activation for the referrer if entered
         if (data.referralCode) {
           try {
             const referrersRef = collection(db, 'users');
@@ -265,41 +294,6 @@ export default function Onboarding() {
               });
             }
           } catch(e) { console.error('Error activating referral:', e); }
-        }
-
-        // Send registration details formatted for WhatsApp straight to the Admin's Chat
-        try {
-          const adminWhatsapp = "2349042544355";
-          const messageText = `*🆕 NEW CIYA STUDENT REGISTRATION*
-
-*👤 PERSONAL DETAILS:*
-• *Name:* ${data.fullName}
-• *Email:* ${user.email || 'N/A'}
-• *WhatsApp:* ${data.whatsapp}
-• *Gender:* ${data.gender}
-• *Age Range:* ${data.ageRange || 'N/A'}
-• *State:* ${data.state}
-
-*📚 ACADEMIC PROFILE:*
-• *Recommended:* ${recommendedPath}
-• *Pathway Selection:* ${data.courseType || ''} ${data.pathwaySelection ? `(${data.pathwaySelection})` : ''}
-• *Reason:* ${data.pathwayReason || 'N/A'}
-• *Experience:* ${data.pathwayExperience || data.experience || 'None'}
-• *Education Level:* ${data.educationLevel || 'N/A'}
-• *Learning Tool:* ${data.learningTool || 'N/A'}
-
-*🎯 COMMITMENT & GOALS:*
-• *Target Goal:* ${data.goal || 'N/A'}
-• *Commitment:* ${data.availability || 'N/A'}
-• *Referral Code Entered:* ${data.referralCode || 'None'}
-• *Student's Referral Code:* ${userCode}
-
-_Action: Please review and approve this student profile!_`;
-
-          const whatsappUrl = `https://api.whatsapp.com/send?phone=${adminWhatsapp}&text=${encodeURIComponent(messageText)}`;
-          window.open(whatsappUrl, '_blank');
-        } catch (wsErr) {
-          console.error("Error launching WhatsApp portal:", wsErr);
         }
 
         nextStep(); 
@@ -331,7 +325,7 @@ _Action: Please review and approve this student profile!_`;
   };
 
   useEffect(() => {
-    if (step === 9 && !data.isActivated && creationTime) {
+    if (step === 11 && !data.isActivated && creationTime) {
       const targetTime = creationTime + 24 * 60 * 60 * 1000;
       const interval = setInterval(() => {
         const now = new Date().getTime();
@@ -352,14 +346,72 @@ _Action: Please review and approve this student profile!_`;
       
       return () => clearInterval(interval);
     }
-  }, [step, data.isActivated]);
+  }, [step, data.isActivated, creationTime]);
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col items-center">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col items-center relative overflow-x-hidden selection:bg-teal-500/30 selection:text-teal-200">
+      
+      {/* Dynamic Cosmic Background Orbs */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_25%,rgba(99,102,241,0.12),transparent_40%),radial-gradient(circle_at_70%_75%,rgba(20,184,166,0.12),transparent_40%)] pointer-events-none z-0" />
+
+      {/* WARNING POPUP ADVISORY MODAL */}
+      <AnimatePresence>
+        {showCareWarningModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-900 border border-slate-850 rounded-3xl p-6 md:p-8 max-w-lg w-full text-center space-y-6 shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-teal-400 via-indigo-500 to-purple-600"></div>
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-400">
+                <Sparkles className="w-8 h-8 animate-pulse" />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400 tracking-tight uppercase">CRITICAL ADVISORY ⚠️</h3>
+                <p className="text-slate-300 font-semibold leading-relaxed text-sm">
+                  Please complete this onboarding questionnaire with extreme care.
+                </p>
+              </div>
+              <div className="bg-slate-950/90 border border-slate-800/80 rounded-2xl p-5 text-left space-y-3.5 text-xs text-slate-300 leading-relaxed font-semibold">
+                <div className="flex gap-3">
+                  <div className="w-5 h-5 rounded-full bg-slate-800 text-teal-400 flex items-center justify-center shrink-0 font-black text-[10px]">1</div>
+                  <p>This is the <strong>ONLY form</strong> that configures your student profile and grants you access to your learning dashboard.</p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-5 h-5 rounded-full bg-slate-800 text-teal-400 flex items-center justify-center shrink-0 font-black text-[10px]">2</div>
+                  <p>Your details are <strong>final</strong> and <strong>CANNOT</strong> be changed once submitted.</p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-5 h-5 rounded-full bg-slate-800 text-teal-400 flex items-center justify-center shrink-0 font-black text-[10px]">3</div>
+                  <p>Your dashboard will be unlocked <strong>directly upon administrator approval</strong>. No access codes or external activation steps required!</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { 
+                  try {
+                    localStorage.setItem('ciya_onboarding_warning_acknowledged', 'true');
+                  } catch (e) {
+                    console.error("Failed to save onboarding warning acknowledgement:", e);
+                  }
+                  setShowCareWarningModal(false); 
+                  setHasAcknowledged(true); 
+                  setStep(2);
+                }}
+                className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black rounded-full text-sm shadow-lg hover:shadow-teal-500/20 transition-all cursor-pointer border-0 uppercase tracking-wider"
+              >
+                I understand, let's begin 🚀
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="w-full max-w-3xl p-6 flex items-center justify-between z-10">
         <div className="w-24">
           {step > 1 && step < 11 && (
-            <button onClick={prevStep} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-semibold">
+            <button onClick={prevStep} className="flex items-center gap-2 text-slate-400 hover:text-slate-100 transition-colors text-sm font-semibold bg-transparent border-0 cursor-pointer">
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
           )}
@@ -368,58 +420,90 @@ _Action: Please review and approve this student profile!_`;
           {step > 1 && step < 11 && (
             <div className="flex gap-2">
               {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(s => (
-                <div key={s} className={`h-1.5 w-5 rounded-full transition-colors ${step >= s ? 'bg-amber-500' : 'bg-slate-200'}`} />
+                <div key={s} className={`h-1.5 w-5 rounded-full transition-all ${step >= s ? 'bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.5)]' : 'bg-slate-800'}`} />
               ))}
             </div>
           )}
         </div>
         <div className="w-24 flex justify-end">
           {step > 1 && step < 10 && (
-            <button onClick={nextStep} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-semibold">
+            <button onClick={nextStep} className="flex items-center gap-2 text-slate-400 hover:text-slate-100 transition-colors text-sm font-semibold bg-transparent border-0 cursor-pointer">
               Next <ArrowRight className="w-4 h-4" />
             </button>
           )}
         </div>
       </div>
 
-      <div className="flex-1 w-full flex items-center justify-center p-6 pb-20 relative">
+      {/* TOP warning banner for persistent warning notice */}
+      {step > 1 && step < 11 && (
+        <div className="w-full max-w-2xl px-4 z-10">
+          <div className="w-full py-2.5 px-4 bg-slate-900/60 border border-teal-500/20 rounded-2xl flex items-center gap-3 shadow-md backdrop-blur-sm">
+            <div className="w-2 h-2 rounded-full bg-teal-400 animate-ping shrink-0" />
+            <p className="text-[11px] md:text-xs font-semibold text-slate-300 leading-normal">
+              <strong className="text-teal-400 font-bold uppercase mr-1">CARE REQUIRED:</strong> Answers are final & cannot be changed later. This form sets up your direct dashboard access!
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 w-full flex items-center justify-center p-6 pb-20 relative z-10">
         <AnimatePresence mode="wait">
           
           {step === 1 && (
             <motion.div key="1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-2xl text-center space-y-8">
-              <div className="w-20 h-20 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-2xl shadow-lg shadow-orange-500/20 mx-auto flex items-center justify-center mb-8">
-                <span className="text-white font-black tracking-tight text-3xl uppercase">Ciya</span>
+              <div className="w-20 h-20 bg-gradient-to-tr from-teal-500 via-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/20 mx-auto flex items-center justify-center mb-8">
+                <span className="text-slate-950 font-black tracking-tight text-3xl uppercase">Ciya</span>
               </div>
-              <h1 className="text-4xl md:text-6xl font-extrabold text-slate-800 leading-tight tracking-tight">
+              <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-indigo-400 to-purple-400 leading-tight tracking-tight">
                 Empowering 10,000 African Youths With AI & Digital Skills
               </h1>
-              <p className="text-lg md:text-xl text-slate-600 leading-relaxed font-medium max-w-xl mx-auto">
+              <p className="text-lg md:text-xl text-slate-300 leading-relaxed font-semibold max-w-xl mx-auto">
                 Learn practical AI-powered skills that help you:
               </p>
-              <ul className="text-left bg-white p-6 rounded-2xl shadow-sm border border-slate-100 max-w-md mx-auto space-y-4 font-medium text-slate-700">
-                <li className="flex items-center gap-3"><Check className="text-green-500 w-5 h-5 flex-shrink-0" /> Build for yourself</li>
-                <li className="flex items-center gap-3"><Check className="text-green-500 w-5 h-5 flex-shrink-0" /> Grow your business</li>
-                <li className="flex items-center gap-3"><Check className="text-green-500 w-5 h-5 flex-shrink-0" /> Earn income online</li>
-                <li className="flex items-center gap-3"><Check className="text-green-500 w-5 h-5 flex-shrink-0" /> Stop depending on expensive outsourcing</li>
+              <ul className="text-left bg-slate-900/60 border border-slate-800 backdrop-blur-md p-6 rounded-2xl shadow-lg max-w-md mx-auto space-y-4 font-semibold text-slate-300">
+                <li className="flex items-center gap-3"><Check className="text-teal-400 w-5 h-5 flex-shrink-0" /> Build for yourself</li>
+                <li className="flex items-center gap-3"><Check className="text-teal-400 w-5 h-5 flex-shrink-0" /> Grow your business</li>
+                <li className="flex items-center gap-3"><Check className="text-teal-400 w-5 h-5 flex-shrink-0" /> Earn income online</li>
+                <li className="flex items-center gap-3"><Check className="text-teal-400 w-5 h-5 flex-shrink-0" /> Stop depending on expensive outsourcing</li>
               </ul>
-              <div className="flex justify-center pt-4">
-                <button onClick={nextStep} className="px-8 py-4 bg-amber-500 text-amber-950 font-bold rounded-full shadow-lg hover:-translate-y-1 hover:shadow-amber-500/30 transition-all text-lg flex items-center justify-center gap-2 mx-auto">
+              <div className="flex flex-col gap-4 justify-center items-center pt-4">
+                <button 
+                  onClick={() => { 
+                    try {
+                      if (localStorage.getItem('ciya_onboarding_warning_acknowledged') === 'true') {
+                        setStep(2);
+                      } else {
+                        setShowCareWarningModal(true);
+                      }
+                    } catch {
+                      setShowCareWarningModal(true);
+                    }
+                  }} 
+                  className="px-8 py-4 bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-black rounded-full shadow-lg hover:-translate-y-1 hover:shadow-teal-500/20 transition-all text-lg flex items-center justify-center gap-2 mx-auto cursor-pointer border-0 uppercase tracking-wide"
+                >
                   Start My Journey <ArrowRight className="w-5 h-5" />
+                </button>
+                <button onClick={handleDirectLogin} className="text-slate-400 hover:text-teal-400 transition-colors text-xs font-bold underline bg-transparent border-0 cursor-pointer">
+                  Already registered? Login directly here
                 </button>
               </div>
             </motion.div>
           )}
 
           {step === 2 && (
-            <motion.div key="2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-2xl w-full">
-              <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">What do you want to achieve with AI skills?</h2>
+            <motion.div key="2" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="max-w-2xl w-full">
+              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-8 text-center">What do you want to achieve with AI skills?</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {intents.map((opt, i) => (
-                  <button key={i} onClick={() => handleIntent(opt.label)} className={`p-5 rounded-2xl border-2 text-left flex items-center gap-4 transition-all ${data.intent === opt.label ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-amber-300 bg-white shadow-sm hover:shadow'}`}>
-                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                  <button 
+                    key={i} 
+                    onClick={() => handleIntent(opt.label)} 
+                    className={`p-5 rounded-2xl border-2 text-left flex items-center gap-4 transition-all cursor-pointer ${data.intent === opt.label ? 'border-teal-400 bg-teal-950/20 text-teal-300 shadow-[0_0_15px_rgba(20,184,166,0.15)]' : 'border-slate-800 hover:border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-900/90'}`}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-teal-400 shrink-0">
                       {opt.icon}
                     </div>
-                    <span className="font-semibold text-slate-800 text-lg">{opt.label}</span>
+                    <span className="font-bold text-lg leading-snug">{opt.label}</span>
                   </button>
                 ))}
               </div>
@@ -427,16 +511,20 @@ _Action: Please review and approve this student profile!_`;
           )}
 
           {step === 3 && (
-            <motion.div key="3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-2xl w-full">
-              <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">Which of these AI pathways excites you the most?</h2>
+            <motion.div key="3" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="max-w-2xl w-full">
+              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-8 text-center">Which of these AI pathways excites you the most?</h2>
               <div className="flex flex-col gap-4">
                 {pathwaysOpt.map((opt, i) => (
-                  <button key={i} onClick={() => handlePathwaySelect(opt.val, opt.label)} className="p-6 rounded-2xl border-2 text-left flex items-center gap-6 transition-all border-slate-200 hover:border-amber-500 bg-white shadow-sm hover:shadow-md hover:bg-amber-50">
-                    <div className="w-14 h-14 rounded-full bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
+                  <button 
+                    key={i} 
+                    onClick={() => handlePathwaySelect(opt.val, opt.label)} 
+                    className="p-6 rounded-2xl border-2 text-left flex items-center gap-6 transition-all border-slate-800 hover:border-teal-500/40 bg-slate-900/60 hover:bg-slate-900/90 shadow-lg cursor-pointer text-slate-200"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-slate-850 flex items-center justify-center shrink-0 border border-slate-800">
                       {opt.icon}
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-xl">{opt.label}</h3>
+                      <h3 className="font-black text-slate-100 text-xl">{opt.label}</h3>
                     </div>
                   </button>
                 ))}
@@ -445,11 +533,15 @@ _Action: Please review and approve this student profile!_`;
           )}
 
           {step === 4 && (
-            <motion.div key="4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-xl w-full">
-              <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">What best describes your current level?</h2>
+            <motion.div key="4" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="max-w-xl w-full">
+              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-8 text-center">What best describes your current level?</h2>
               <div className="space-y-4">
                 {experiences.map((opt, i) => (
-                  <button key={i} onClick={() => handleExperience(opt)} className={`w-full p-5 rounded-2xl border-2 text-center transition-all font-semibold text-lg ${data.experience === opt ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-md' : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700 shadow-sm hover:shadow'}`}>
+                  <button 
+                    key={i} 
+                    onClick={() => handleExperience(opt)} 
+                    className={`w-full p-5 rounded-2xl border-2 text-center transition-all font-black text-lg cursor-pointer ${data.experience === opt ? 'border-teal-400 bg-teal-950/20 text-teal-300 shadow-[0_0_15px_rgba(20,184,166,0.15)]' : 'border-slate-800 hover:border-slate-700 bg-slate-900/60 text-slate-300'}`}
+                  >
                     {opt}
                   </button>
                 ))}
@@ -462,15 +554,19 @@ _Action: Please review and approve this student profile!_`;
           {step === 5 && pathway === 'C' && <PathwayC data={data} setData={setData} onNext={nextStep} />}
 
           {step === 6 && (
-            <motion.div key="6" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-xl w-full">
-              <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">What outcome would make this training successful for you?</h2>
+            <motion.div key="6" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="max-w-xl w-full">
+              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-8 text-center">What outcome would make this training successful for you?</h2>
               <div className="space-y-4">
                 {[
                   'Start earning online',
                   'Build my own business tools',
                   'Learn a profitable skill',
                 ].map((opt, i) => (
-                  <button key={i} onClick={() => { selectData('goal', opt); nextStep(); }} className="w-full p-5 rounded-2xl border-2 border-slate-200 hover:border-amber-500 hover:bg-amber-50 bg-white text-slate-700 hover:text-amber-900 transition-all font-semibold text-lg shadow-sm">
+                  <button 
+                    key={i} 
+                    onClick={() => { selectData('goal', opt); nextStep(); }} 
+                    className="w-full p-5 rounded-2xl border-2 border-slate-800 hover:border-teal-400 hover:bg-teal-950/20 bg-slate-900/60 text-slate-300 hover:text-teal-200 transition-all font-black text-lg cursor-pointer"
+                  >
                     {opt}
                   </button>
                 ))}
@@ -479,8 +575,8 @@ _Action: Please review and approve this student profile!_`;
           )}
 
           {step === 7 && (
-            <motion.div key="7" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-xl w-full">
-              <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">Can you commit to 5 consecutive days of learning?</h2>
+            <motion.div key="7" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="max-w-xl w-full">
+              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-8 text-center">Can you commit to 5 consecutive days of learning?</h2>
               <div className="space-y-4">
                 {[
                   'Yes, fully committed',
@@ -488,7 +584,11 @@ _Action: Please review and approve this student profile!_`;
                   'I’ll need recordings',
                   'Not sure yet'
                 ].map((opt, i) => (
-                  <button key={i} onClick={() => { selectData('availability', opt); nextStep(); }} className="w-full p-5 rounded-2xl border-2 border-slate-200 hover:border-amber-500 hover:bg-amber-50 bg-white text-slate-700 hover:text-amber-900 transition-all font-semibold text-lg shadow-sm">
+                  <button 
+                    key={i} 
+                    onClick={() => { selectData('availability', opt); nextStep(); }} 
+                    className="w-full p-5 rounded-2xl border-2 border-slate-800 hover:border-teal-400 hover:bg-teal-950/20 bg-slate-900/60 text-slate-300 hover:text-teal-200 transition-all font-black text-lg cursor-pointer"
+                  >
                     {opt}
                   </button>
                 ))}
@@ -497,20 +597,24 @@ _Action: Please review and approve this student profile!_`;
           )}
 
           {step === 8 && (
-            <motion.div key="8" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-xl w-full">
-              <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">What tool will you be using for this training?</h2>
+            <motion.div key="8" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="max-w-xl w-full">
+              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-8 text-center">What tool will you be using for this training?</h2>
               <div className="space-y-4">
                 {[
                   { label: 'Mobile Phone', desc: 'I will learn and practice using my smartphone' },
                   { label: 'Laptop', desc: 'I will learn and practice using my personal computer/laptop' }
                 ].map((opt, i) => (
-                  <button key={i} onClick={() => { selectData('learningTool', opt.label); nextStep(); }} className={`w-full p-5 rounded-2xl border-2 text-left flex items-center justify-between transition-all font-semibold text-lg ${data.learningTool === opt.label ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-md' : 'border-slate-200 hover:border-amber-450 bg-white text-slate-700 hover:bg-amber-50/20'}`}>
+                  <button 
+                    key={i} 
+                    onClick={() => { selectData('learningTool', opt.label); nextStep(); }} 
+                    className={`w-full p-5 rounded-2xl border-2 text-left flex items-center justify-between transition-all font-black text-lg cursor-pointer ${data.learningTool === opt.label ? 'border-teal-400 bg-teal-950/20 text-teal-300' : 'border-slate-800 hover:border-teal-400 bg-slate-900/60 text-slate-300'}`}
+                  >
                     <div>
-                      <div className="font-bold text-slate-800">{opt.label}</div>
-                      <div className="text-xs font-medium text-slate-500 mt-1">{opt.desc}</div>
+                      <div className="font-black text-slate-100">{opt.label}</div>
+                      <div className="text-xs font-semibold text-slate-400 mt-1">{opt.desc}</div>
                     </div>
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${data.learningTool === opt.label ? 'border-amber-500 bg-amber-500 text-white' : 'border-slate-300'}`}>
-                      {data.learningTool === opt.label && <Check className="w-4 h-4 text-slate-900" />}
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${data.learningTool === opt.label ? 'border-teal-400 bg-teal-400 text-slate-950' : 'border-slate-800'}`}>
+                      {data.learningTool === opt.label && <Check className="w-4 h-4 text-slate-950" />}
                     </div>
                   </button>
                 ))}
@@ -519,15 +623,19 @@ _Action: Please review and approve this student profile!_`;
           )}
 
           {step === 9 && (
-            <motion.div key="9" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-xl w-full">
-              <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">What is your current level of education?</h2>
+            <motion.div key="9" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="max-w-xl w-full">
+              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-8 text-center">What is your current level of education?</h2>
               <div className="space-y-4">
                 {[
                   'SSCE',
                   'Undergraduate',
                   'Graduate'
                 ].map((opt, i) => (
-                  <button key={i} onClick={() => { selectData('educationLevel', opt); nextStep(); }} className={`w-full p-5 rounded-2xl border-2 text-center transition-all font-semibold text-lg ${data.educationLevel === opt ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-md' : 'border-slate-200 hover:border-amber-500 hover:bg-amber-50/20 bg-white text-slate-700'}`}>
+                  <button 
+                    key={i} 
+                    onClick={() => { selectData('educationLevel', opt); nextStep(); }} 
+                    className={`w-full p-5 rounded-2xl border-2 text-center transition-all font-black text-lg cursor-pointer ${data.educationLevel === opt ? 'border-teal-400 bg-teal-950/20 text-teal-300' : 'border-slate-800 hover:border-teal-400 bg-slate-900/60 text-slate-300'}`}
+                  >
                     {opt}
                   </button>
                 ))}
@@ -536,28 +644,28 @@ _Action: Please review and approve this student profile!_`;
           )}
 
           {step === 10 && (
-            <motion.div key="10" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="max-w-md w-full">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-extrabold text-slate-800 mb-2">Final Step</h2>
-                <p className="text-slate-600">Please provide your details below to save your profile.</p>
+            <motion.div key="10" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} className="max-w-md w-full">
+              <div className="text-center mb-6">
+                <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-2">Final Step</h2>
+                <p className="text-slate-400 font-semibold text-sm">Please verify details below to lock your application.</p>
               </div>
 
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+              <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
                 {formError && (
-                  <div className="p-3 bg-red-50 text-red-700 text-sm font-medium rounded-lg">{formError}</div>
+                  <div className="p-3 bg-red-950/50 border border-red-800/40 text-red-200 text-sm font-semibold rounded-xl">{formError}</div>
                 )}
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Full Name *</label>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Full Name *</label>
                   <div className="relative">
-                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="text" value={data.fullName} onChange={e => selectData('fullName', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-900 focus:bg-slate-900 hover:bg-slate-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all text-slate-50 placeholder:text-slate-500" placeholder="John Doe" />
+                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input type="text" value={data.fullName} onChange={e => selectData('fullName', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold" placeholder="John Doe" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Gender *</label>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Gender *</label>
                   <div className="relative">
-                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                    <select value={data.gender} onChange={e => selectData('gender', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-900 focus:bg-slate-900 hover:bg-slate-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-50">
+                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 z-10" />
+                    <select value={data.gender} onChange={e => selectData('gender', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all appearance-none text-slate-100 font-bold cursor-pointer">
                       <option value="" disabled>Select Gender</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
@@ -565,10 +673,10 @@ _Action: Please review and approve this student profile!_`;
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Age Range *</label>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Age Range *</label>
                   <div className="relative">
-                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                    <select value={data.ageRange} onChange={e => selectData('ageRange', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-900 focus:bg-slate-900 hover:bg-slate-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-50">
+                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 z-10" />
+                    <select value={data.ageRange} onChange={e => selectData('ageRange', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all appearance-none text-slate-100 font-bold cursor-pointer">
                       <option value="" disabled>Select Age Range</option>
                       <option value="Below 18">Below 18</option>
                       <option value="Between 18-25">Between 18-25</option>
@@ -578,17 +686,17 @@ _Action: Please review and approve this student profile!_`;
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">WhatsApp Number *</label>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">WhatsApp Number *</label>
                   <div className="relative">
-                    <MessageCircle className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="tel" value={data.whatsapp} onChange={e => selectData('whatsapp', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-900 focus:bg-slate-900 hover:bg-slate-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all text-slate-50 placeholder:text-slate-500" placeholder="+234..." />
+                    <MessageCircle className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input type="tel" value={data.whatsapp} onChange={e => selectData('whatsapp', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold" placeholder="+234..." />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">State *</label>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">State *</label>
                   <div className="relative">
-                    <MapPin className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                    <select value={data.state} onChange={e => selectData('state', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-900 focus:bg-slate-900 hover:bg-slate-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-50">
+                    <MapPin className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 z-10" />
+                    <select value={data.state} onChange={e => selectData('state', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all appearance-none text-slate-100 font-bold cursor-pointer">
                       <option value="" disabled>Select State</option>
                       {NIGERIAN_STATES.map(s => (
                         <option key={s} value={s}>{s}</option>
@@ -598,24 +706,21 @@ _Action: Please review and approve this student profile!_`;
                 </div>
               </div>
 
-              <div className="mt-8">
+              <div className="mt-6">
                 <button 
                   onClick={doAuthAndSave} 
                   disabled={loading} 
-                  className={`w-full py-4 text-slate-900 bg-amber-400 hover:bg-amber-500 rounded-full font-black text-lg shadow-lg flex items-center justify-center gap-3 disabled:opacity-85 transition-all relative overflow-hidden active:scale-[0.98] ${loading ? 'cursor-not-allowed animate-pulse shadow-md shadow-amber-400/20' : 'cursor-pointer'}`}
+                  className={`w-full py-4 text-slate-950 bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 rounded-full font-black text-lg shadow-lg flex items-center justify-center gap-3 disabled:opacity-85 transition-all relative overflow-hidden active:scale-[0.98] ${loading ? 'cursor-not-allowed animate-pulse shadow-md shadow-teal-400/20' : 'cursor-pointer'}`}
                 >
                   {loading ? (
                     <div className="flex items-center justify-center py-0.5">
-                      <svg className="animate-spin h-6 w-6 text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-6 w-6 text-slate-950" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                     </div>
                   ) : (
                     <>
-                      <svg className="w-5 h-5 text-slate-900" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a5.95 5.95 0 1 1 0-11.9 5.869 5.869 0 0 1 4.12 1.594l2.846-2.845A9.689 9.689 0 0 0 12.545 2.1c-5.466 0-9.897 4.431-9.897 9.897s4.431 9.897 9.897 9.897c5.444 0 9.896-4.524 9.896-9.897 0-.649-.074-1.282-.196-1.897h-9.7z"/>
-                      </svg>
                       Sign Up
                     </>
                   )}
@@ -626,101 +731,30 @@ _Action: Please review and approve this student profile!_`;
 
           {step === 11 && (
             <motion.div key="11" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-2xl w-full">
-              <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-slate-100 text-center relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500"></div>
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 md:p-12 shadow-2xl text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-teal-400 via-indigo-500 to-purple-600"></div>
                 
-                {/* Enhanced Top Icon */}
-                <div className="w-24 h-24 bg-gradient-to-tr from-amber-50 to-orange-50 rounded-full mx-auto flex items-center justify-center mb-8 ring-8 ring-amber-400/10 border border-amber-200/60 shadow-inner relative animate-pulse">
-                  <div className="absolute inset-0 rounded-full bg-amber-400/5 animate-ping opacity-75" />
-                  <Sparkles className="w-12 h-12 text-amber-600 relative z-10" />
+                <div className="w-24 h-24 bg-gradient-to-tr from-teal-950 to-indigo-950 rounded-full mx-auto flex items-center justify-center mb-8 ring-8 ring-teal-500/10 border border-teal-500/20 shadow-inner relative animate-pulse">
+                  <div className="absolute inset-0 rounded-full bg-teal-500/5 animate-ping opacity-75" />
+                  <Sparkles className="w-12 h-12 text-teal-400 relative z-10" />
                 </div>
 
-                <h2 className="text-4xl md:text-5xl font-black text-slate-800 mb-6 tracking-tight">Application Received! 🎉</h2>
+                <h2 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-indigo-400 to-purple-400 mb-6 tracking-tight">Onboarding Complete! 🎉</h2>
                 
-                <div className="text-slate-700 text-lg md:text-xl font-medium mb-8 leading-relaxed max-w-xl mx-auto">
+                <div className="text-slate-300 text-lg md:text-xl font-semibold mb-8 leading-relaxed max-w-xl mx-auto">
                   <p>
-                    Thank you for applying, <strong className="text-slate-900 font-extrabold">{data.fullName ? data.fullName.split(' ')[0] : 'Student'}</strong>! Your application details have been received and are currently undergoing intensive evaluation and processing review.
+                    Congratulations, <strong className="text-teal-400 font-extrabold">{data.fullName ? data.fullName.split(' ')[0] : 'Student'}</strong>! Your student profile has been successfully registered.
+                  </p>
+                  <p className="text-base text-slate-400 mt-4 font-normal">
+                    You can now proceed to your student dashboard to view your profile status and access learning modules.
                   </p>
                 </div>
 
-                {/* Highly Visible Countdown Box */}
-                <div className="bg-rose-600 text-white rounded-3xl p-6 md:p-8 mb-8 text-center space-y-4 shadow-xl border border-rose-500 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-300 to-rose-400"></div>
-                  <div className="flex items-center justify-center gap-2.5">
-                    <span className="flex h-3.5 w-3.5 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-200 opacity-80"></span>
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-white"></span>
-                    </span>
-                    <h3 className="font-black text-white text-base md:text-lg uppercase tracking-widest">
-                      ACTION REQUIRED WITHIN 24 HOURS!
-                    </h3>
-                  </div>
-                  
-                  <div className="bg-rose-950/40 backdrop-blur rounded-2xl p-4 border border-white/10 flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-                    <span className="text-xs font-bold text-rose-200 tracking-wider uppercase">Time Remaining to Secure Approval:</span>
-                    <span className="font-mono font-black text-amber-350 text-2xl md:text-3xl select-none tracking-widest drop-shadow">
-                      {timeLeft || "24h 00m 00s"}
-                    </span>
-                  </div>
-
-                  <p className="text-sm md:text-base text-rose-50 leading-relaxed font-bold max-w-lg mx-auto">
-                    To expedite your CIYA Five days Free Website Development Training evaluation, you must click the WhatsApp button below to forward your exact registration details directly to the admissions team for immediate verification and approval.
-                  </p>
+                <div className="mt-8">
+                  <button onClick={() => navigate('/dashboard')} className="px-6 py-4.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black rounded-full text-base transition-all shadow-lg hover:shadow-teal-500/20 w-full cursor-pointer border-0 uppercase tracking-wider">
+                    Go to My Dashboard 🚀
+                  </button>
                 </div>
-
-                <div className="w-full mb-8 max-h-[250px] overflow-y-auto rounded-2xl border border-slate-100">
-                  <OnboardingSubmissionDetails data={data} />
-                </div>
-
-                {/* WhatsApp Manual Forwarding Options (Primary admin only) */}
-                <div className="mb-8">
-                  {(() => {
-                    const getWhatsAppLink = (phone: string) => {
-                      const msg = `*🆕 NEW CIYA STUDENT REGISTRATION*
-
-*👤 PERSONAL DETAILS:*
-• *Name:* ${data.fullName || ''}
-• *Email:* ${auth.currentUser?.email || 'N/A'}
-• *WhatsApp:* ${data.whatsapp || ''}
-• *Gender:* ${data.gender || ''}
-• *State:* ${data.state || ''}
-
-*📚 ACADEMIC PROFILE:*
-• *Recommended:* ${data.recommendedPath || ''}
-• *Pathway Selection:* ${data.courseType || ''} ${data.pathwaySelection ? `(${data.pathwaySelection})` : ''}
-• *Reason:* ${data.pathwayReason || 'N/A'}
-• *Experience:* ${data.pathwayExperience || data.experience || 'None'}
-
-*🎯 COMMITMENT & GOALS:*
-• *Target Goal:* ${data.goal || 'N/A'}
-• *Commitment:* ${data.availability || 'N/A'}
-• *Referral Code Entered:* ${data.referralCode || 'None'}
-• *Student's Referral Code:* ${data.myReferralCode || ''}
-
-_Action: Please review and approve my student profile for CIYA Five days Free Website Development Training activation. Thank you!_`;
-                      return `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(msg)}`;
-                    };
-
-                    return (
-                      <a 
-                        href={getWhatsAppLink("2349042544355")}
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="flex items-center justify-center gap-3 px-6 py-4.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-base md:text-lg transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-emerald-600/30 w-full cursor-pointer border-0"
-                      >
-                        <svg className="w-6 h-6 md:w-7 md:h-7 fill-white" viewBox="0 0 24 24">
-                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.729-1.458L0 24zm6.59-4.846c1.6.95 3.1 1.45 4.8 1.45 5.5 0 10-4.5 10-10s-4.5-10-10-10C6.9 1 2.3 5.5 2.3 11c0 1.9.5 3.7 1.5 5.3l-.98 3.56 3.65-.96zm12.33-7.53c-.34-.17-2.03-1-2.34-1.1-.3-.1-.53-.17-.76.17-.23.34-.88 1.1-.1.82a.85.85 0 0 0-.25-.6c-.2-.17-.8-.42-1.5-.7-2.65-1.15-4.42-3.8-4.55-4-.14-.17-1.18-1.57-1.18-3a3 3 0 0 1 1-2.2c.23-.23.5-.3.67-.3H10c.17 0 .42.06.64.3c.25.26 1 2.37 1.1 2.55.1.18.1.36-.02.6-.1.2-.24.44-.36.58l-.4.43c-.15.15-.3.32-.1.66.2.34.88 1.44 1.88 2.33.63.56 1.16.8 1.5.94.33.14.53.1.72-.1l1.1-1.3c.25-.3.5-.25.85-.12s2.2 1 2.6 1.2c.38.18.63.26.7.38.1.18.1 1-.25 2.1z"/>
-                        </svg>
-                        <span>Submit For Verification</span>
-                      </a>
-                    );
-                  })()}
-                </div>
-
-                <p className="text-xs text-slate-400">
-                  Please keep this window open while forwarding your details. Once evaluated, your admissions team will issue your study credentials.
-                </p>
-
               </div>
             </motion.div>
           )}
@@ -731,48 +765,35 @@ _Action: Please review and approve my student profile for CIYA Five days Free We
       {/* POPUP BLOCKED ALERT MODAL */}
       {showPopupBlocked && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-500">
               <Sparkles className="w-8 h-8 fill-amber-500" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black text-slate-800 tracking-tight">Login Popup Blocked</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Because this virtual Academy program is running inside an AI Studio preview frame, modern web browsers block standard login popups by default to protect your privacy.
+              <h3 className="text-xl font-black text-slate-100 tracking-tight">Login Popup Blocked</h3>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Admissions program requires a popup flow. Modern browsers block popup flows by default to protect privacy.
               </p>
             </div>
             
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-left space-y-3.5 text-xs text-slate-600">
+            <div className="bg-slate-950/90 border border-slate-850 rounded-2xl p-4 text-left space-y-3.5 text-xs text-slate-300">
               <div className="flex gap-3">
-                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 font-extrabold text-[10px]">1</span>
+                <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center shrink-0 font-extrabold text-[10px]">1</span>
                 <p className="leading-relaxed">
                   Look for a <strong>Popups Blocked</strong> icon in your browser's address bar, click it, and select <strong>"Always allow popups"</strong>.
                 </p>
               </div>
               <div className="flex gap-3">
-                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 font-extrabold text-[10px]">2</span>
+                <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center shrink-0 font-extrabold text-[10px]">2</span>
                 <p className="leading-relaxed">
                   Or, click the <strong>"Open App"</strong> / <strong>"Open in New Tab"</strong> button in the top-right corner of AI Studio to run the app directly, where log-in popups are never blocked!
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button
-                onClick={() => setShowPopupBlocked(false)}
-                className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-sm font-bold transition-all cursor-pointer"
-              >
-                Close Window
-              </button>
-              <button
-                onClick={() => {
-                  setShowPopupBlocked(false);
-                }}
-                className="flex-1 py-3 px-4 bg-amber-500 hover:bg-amber-400 text-teal-950 rounded-2xl text-sm font-bold transition-all shadow-lg shadow-amber-500/20 cursor-pointer"
-              >
-                Retry Sign In
-              </button>
-            </div>
+            <button onClick={() => setShowPopupBlocked(false)} className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl transition-colors">
+              Close
+            </button>
           </div>
         </div>
       )}
@@ -782,80 +803,80 @@ _Action: Please review and approve my student profile for CIYA Five days Free We
 
 function OnboardingSubmissionDetails({ data }: { data: any }) {
   return (
-    <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left max-w-xl mx-auto my-6 text-sm">
-      <h3 className="font-extrabold text-slate-800 mb-4 text-xs tracking-tight border-b border-slate-200 pb-2 uppercase text-[11px] tracking-wider text-indigo-700 flex items-center gap-2">
+    <div className="w-full bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 text-left max-w-xl mx-auto my-6 text-sm text-slate-200">
+      <h3 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-4 text-xs tracking-tight border-b border-slate-800/60 pb-2 uppercase text-[11px] tracking-wider flex items-center gap-2">
         <span>📋</span> Submitted Application Details
       </h3>
       <div className="space-y-4 text-xs md:text-sm">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Full Name</span>
-            <span className="text-slate-800 font-semibold">{data.fullName || '-'}</span>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">Full Name</span>
+            <span className="text-slate-100 font-semibold">{data.fullName || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Gender</span>
-            <span className="text-slate-800 font-semibold">{data.gender || '-'}</span>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">Gender</span>
+            <span className="text-slate-100 font-semibold">{data.gender || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Age Range</span>
-            <span className="text-slate-800 font-semibold">{data.ageRange || '-'}</span>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">Age Range</span>
+            <span className="text-slate-100 font-semibold">{data.ageRange || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Education Level</span>
-            <span className="text-slate-800 font-semibold">{data.educationLevel || '-'}</span>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">Education Level</span>
+            <span className="text-slate-100 font-semibold">{data.educationLevel || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Learning Tool</span>
-            <span className="text-slate-800 font-semibold">{data.learningTool || '-'}</span>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">Learning Tool</span>
+            <span className="text-slate-100 font-semibold">{data.learningTool || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">WhatsApp Number</span>
-            <span className="text-slate-800 font-mono font-semibold">{data.whatsapp || '-'}</span>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">WhatsApp Number</span>
+            <span className="text-slate-100 font-mono font-semibold">{data.whatsapp || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">State of Residence</span>
-            <span className="text-slate-800 font-semibold">{data.state || '-'}</span>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">State of Residence</span>
+            <span className="text-slate-100 font-semibold">{data.state || '-'}</span>
           </div>
         </div>
 
-        <div className="border-t border-slate-200 pt-3 space-y-3">
+        <div className="border-t border-slate-800/60 pt-3 space-y-3">
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Recommended Study Program</span>
-            <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded text-xs inline-block mt-0.5">
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">Recommended Study Program</span>
+            <span className="text-teal-300 font-bold bg-teal-950/40 border border-teal-850/40 px-2.5 py-1 rounded-xl text-xs inline-block mt-0.5">
               {data.recommendedPath || '-'}
             </span>
           </div>
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Path Selections</span>
-            <span className="text-slate-800 font-bold text-xs">
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">Path Selections</span>
+            <span className="text-slate-200 font-bold text-xs">
               {data.courseType || ''} {data.pathwaySelection ? `(${data.pathwaySelection})` : ''}
             </span>
           </div>
           {data.pathwayReason && (
             <div>
-              <span className="text-slate-600 block text-[10px] uppercase font-bold">Reason for Selection</span>
-              <p className="text-slate-600 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-200 rounded">{data.pathwayReason}</p>
+              <span className="text-slate-450 block text-[10px] uppercase font-bold">Reason for Selection</span>
+              <p className="text-slate-300 italic mt-0.5 leading-relaxed bg-slate-950/60 p-3 border border-slate-800/60 rounded-xl">{data.pathwayReason}</p>
             </div>
           )}
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Prior Experience in Course</span>
-            <span className="text-slate-800 font-semibold">{data.pathwayExperience || data.experience || 'None'}</span>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">Prior Experience in Course</span>
+            <span className="text-slate-200 font-semibold">{data.pathwayExperience || data.experience || 'None'}</span>
           </div>
           {data.intent && (
             <div>
-              <span className="text-slate-600 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
-              <p className="text-slate-600 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-200 rounded">{data.intent}</p>
+              <span className="text-slate-450 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
+              <p className="text-slate-300 italic mt-0.5 leading-relaxed bg-slate-950/60 p-3 border border-slate-800/60 rounded-xl">{data.intent}</p>
             </div>
           )}
           {data.goal && (
             <div>
-              <span className="text-slate-600 block text-[10px] uppercase font-bold">Target Learning Goal</span>
-              <p className="text-slate-600 italic mt-0.5 leading-relaxed bg-white p-2 border border-slate-200 rounded">{data.goal}</p>
+              <span className="text-slate-450 block text-[10px] uppercase font-bold">Target Learning Goal</span>
+              <p className="text-slate-300 italic mt-0.5 leading-relaxed bg-slate-950/60 p-3 border border-slate-800/60 rounded-xl">{data.goal}</p>
             </div>
           )}
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Commitment Level</span>
-            <span className="text-slate-800 font-bold">{data.availability || '-'}</span>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">Commitment Level</span>
+            <span className="text-slate-200 font-bold">{data.availability || '-'}</span>
           </div>
         </div>
       </div>
@@ -929,31 +950,31 @@ function PathwayFlow({ step, mediaType, title1, opts1, click1, title2, opts2, cl
   return (
     <div className="max-w-2xl w-full">
       {step === 1 && (
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full">
-           <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">{title1}</h2>
+        <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} className="w-full">
+           <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-8 text-center">{title1}</h2>
            <div className="flex flex-col gap-4">
              {opts1.map((opt: any, i: number) => {
                 const isExpanded = expandedIndex === i;
                 return (
-                  <div key={i} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm transition-all hover:shadow">
+                  <div key={i} className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden shadow-lg transition-all">
                     <button 
                       onClick={() => setExpandedIndex(isExpanded ? null : i)} 
-                      className="w-full p-6 text-left flex items-center justify-between focus:outline-none"
+                      className="w-full p-6 text-left flex items-center justify-between focus:outline-none bg-transparent border-0 cursor-pointer"
                     >
-                      <span className="font-bold text-slate-800 text-lg">{opt.title}</span>
-                      <div className={`p-2 rounded-full border border-slate-200 text-slate-500 transition-transform ${isExpanded ? 'rotate-180 bg-slate-50' : ''}`}>
+                      <span className="font-black text-slate-100 text-lg">{opt.title}</span>
+                      <div className={`p-2 rounded-full border border-slate-800 text-slate-400 transition-transform ${isExpanded ? 'rotate-180 bg-slate-850' : ''}`}>
                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                       </div>
                     </button>
                     {isExpanded && (
-                      <div className="px-6 pb-6 pt-2 border-t border-slate-100 bg-slate-50">
+                      <div className="px-6 pb-6 pt-2 border-t border-slate-800/60 bg-slate-950/40">
                         <div className="flex flex-col md:flex-row gap-6 mb-6">
                            <div className="flex-1 space-y-4">
-                             <div><span className="text-xs font-bold uppercase tracking-wider text-slate-400">Meaning</span><p className="text-slate-700 font-medium text-sm mt-1">{opt.meaning}</p></div>
-                             <div><span className="text-xs font-bold uppercase tracking-wider text-slate-400">Uses</span><p className="text-slate-700 font-medium text-sm mt-1">{opt.uses}</p></div>
-                             <div><span className="text-xs font-bold uppercase tracking-wider text-slate-400">Businesses that need it</span><p className="text-slate-700 font-medium text-sm mt-1">{opt.businesses}</p></div>
+                             <div><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Meaning</span><p className="text-slate-300 font-semibold text-sm mt-1">{opt.meaning}</p></div>
+                             <div><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Uses</span><p className="text-slate-300 font-semibold text-sm mt-1">{opt.uses}</p></div>
+                             <div><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Businesses that need it</span><p className="text-slate-300 font-semibold text-sm mt-1">{opt.businesses}</p></div>
                            </div>
-                           <div className="w-full md:w-72 h-72 md:h-64 bg-slate-200 rounded-xl flex items-center justify-center shrink-0 border border-slate-300 relative overflow-hidden">
+                           <div className="w-full md:w-72 h-72 md:h-64 bg-slate-950 rounded-xl flex items-center justify-center shrink-0 border border-slate-800 relative overflow-hidden">
                              {opt.src ? (
                                mediaType === 'video' ? (
                                  opt.src.includes('player.cloudinary.com/embed') ? (
@@ -964,22 +985,22 @@ function PathwayFlow({ step, mediaType, title1, opts1, click1, title2, opts2, cl
                                    </video>
                                  )
                                ) : (
-                                 <img src={opt.src} alt={opt.title} className="w-full h-full object-cover" />
+                                 <img src={opt.src} alt={opt.title} className="w-full h-full object-cover animate-pulse" referrerPolicy="no-referrer" />
                                )
                              ) : mediaType === 'video' ? (
-                               <div className="flex flex-col items-center text-slate-400">
+                               <div className="flex flex-col items-center text-slate-600">
                                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
                                  <span className="text-xs font-bold mt-2">Video Example</span>
                                </div>
                              ) : (
-                               <div className="flex flex-col items-center text-slate-400">
+                               <div className="flex flex-col items-center text-slate-600">
                                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                                  <span className="text-xs font-bold mt-2">Design Example</span>
                                </div>
                              )}
                            </div>
                         </div>
-                        <button onClick={() => click1(opt.title)} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-amber-950 font-bold rounded-xl transition-colors">
+                        <button onClick={() => click1(opt.title)} className="w-full py-3 bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-slate-950 font-black rounded-xl cursor-pointer border-0">
                           Select this path
                         </button>
                       </div>
@@ -991,11 +1012,11 @@ function PathwayFlow({ step, mediaType, title1, opts1, click1, title2, opts2, cl
         </motion.div>
       )}
       {step === 2 && (
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-xl mx-auto">
-           <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">{title2}</h2>
+        <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-xl mx-auto">
+           <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-8 text-center">{title2}</h2>
            <div className="space-y-3">
              {opts2.map((opt: string, i: number) => (
-               <button key={i} onClick={() => click2(opt)} className="w-full p-5 text-left rounded-2xl border-2 border-slate-200 hover:border-amber-400 bg-white hover:bg-amber-50 text-slate-700 font-semibold transition-all">
+               <button key={i} onClick={() => click2(opt)} className="w-full p-5 text-left rounded-2xl border-2 border-slate-800 hover:border-teal-400 bg-slate-900/60 hover:bg-slate-900/90 text-slate-200 font-bold transition-all cursor-pointer">
                  {opt}
                </button>
              ))}
@@ -1003,11 +1024,11 @@ function PathwayFlow({ step, mediaType, title1, opts1, click1, title2, opts2, cl
         </motion.div>
       )}
       {step === 3 && (
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-xl mx-auto">
-           <h2 className="text-3xl font-extrabold text-slate-800 mb-8 text-center">{title3}</h2>
+        <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-xl mx-auto">
+           <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-indigo-400 mb-8 text-center">{title3}</h2>
            <div className="space-y-3">
              {opts3.map((opt: string, i: number) => (
-               <button key={i} onClick={() => click3(opt)} className="w-full p-5 text-left rounded-2xl border-2 border-slate-200 hover:border-amber-400 bg-white hover:bg-amber-50 text-slate-700 font-semibold transition-all">
+               <button key={i} onClick={() => click3(opt)} className="w-full p-5 text-left rounded-2xl border-2 border-slate-800 hover:border-teal-400 bg-slate-900/60 hover:bg-slate-900/90 text-slate-200 font-bold transition-all cursor-pointer">
                  {opt}
                </button>
              ))}

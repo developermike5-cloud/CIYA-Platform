@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { getDatabase, ref, set } from 'firebase/database';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -299,4 +299,30 @@ if (typeof window !== 'undefined') {
     handleDatabaseError(msg);
   });
 }
+
+export async function triggerSystemSignal(field: 'courses' | 'settings' | 'blog' | 'assignments' | 'notifications' | 'user_signals', subField?: string) {
+  try {
+    const signalDocRef = doc(firestoreDb, 'settings', 'system_signals');
+    if (field === 'user_signals' && subField) {
+      await updateDoc(signalDocRef, {
+        [`user_signals.${subField}`]: Date.now()
+      });
+    } else {
+      await updateDoc(signalDocRef, {
+        [field]: Date.now()
+      });
+    }
+  } catch (err) {
+    console.warn("Failed to update system_signals in Firestore. Initiating create/merge if document is missing.", err);
+    try {
+      await setDoc(doc(firestoreDb, 'settings', 'system_signals'), {
+        [field]: Date.now(),
+        ...(field === 'user_signals' && subField ? { user_signals: { [subField]: Date.now() } } : {})
+      }, { merge: true });
+    } catch (e) {
+      console.error("Critical error updating system_signals document:", e);
+    }
+  }
+}
+
 

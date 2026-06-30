@@ -278,6 +278,30 @@ function PostVideoCheck({ check, checkType, checkKey, onPass }: PostVideoCheckPr
   return null;
 }
 
+// Helper to parse URLs in text and render them as clickable anchor tags
+function renderClickableLinks(text: string) {
+  if (!text) return null;
+  const urlRegex = /((?:https?:\/\/|www\.)[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, i) => {
+    if (part.match(urlRegex)) {
+      const href = part.startsWith('http') ? part : `https://${part}`;
+      return (
+        <a 
+          key={i} 
+          href={href} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-teal-600 hover:text-teal-800 underline break-all font-bold"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
 // Assignment submission Form Card
 interface AssignmentProps {
   assignment?: { prompt: string; dueNote: string };
@@ -286,78 +310,36 @@ interface AssignmentProps {
   onSubmit: (key: string, data: { text: string; link: string; submittedAt: string }) => void;
 }
 
-function AssignmentPanel({ assignment, dayIndex, submissions, onSubmit }: AssignmentProps) {
-  const [text, setText] = useState("");
-  const [link, setLink] = useState("");
-  
-  const currentSubmission = submissions[`day-${dayIndex}`];
-
-  if (currentSubmission) {
-    return (
-      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center space-y-3 shadow-inner">
-        <div className="text-3xl">✅</div>
-        <h4 className="font-extrabold text-sm text-emerald-800 uppercase tracking-wide">Assignment Handed In!</h4>
-        <p className="text-xs text-emerald-900 font-medium">Your submission for Day {dayIndex+1} study block has been securely logged with the coach.</p>
-        
-        {currentSubmission.link && (
-          <div className="text-xs font-bold font-mono py-1.5 px-3 bg-white border inline-block rounded-lg mt-2 shadow-sm text-teal-700">
-            🔗 Link: <a href={currentSubmission.link} target="_blank" rel="noreferrer" className="underline hover:text-teal-900">{currentSubmission.link}</a>
-          </div>
-        )}
-      </div>
-    );
-  }
-
+function AssignmentPanel({ assignment, dayIndex }: AssignmentProps) {
   return (
-    <div className="bg-white border-2 border-dashed border-teal-600 rounded-3xl p-6 space-y-4">
+    <div className="bg-white border-2 border-dashed border-teal-600 rounded-3xl p-6 space-y-4 shadow-sm">
       <div className="flex items-center gap-2.5">
         <span className="text-2xl">📋</span>
         <div>
-          <h4 className="font-black text-slate-800 text-sm">Day {dayIndex + 1} End-of-Day Assignment</h4>
+          <h4 className="font-black text-slate-800 text-sm">Day {dayIndex + 1} End-of-Day Assignment Question</h4>
           {assignment?.dueNote && <p className="text-[10px] uppercase font-bold text-amber-600 mt-0.5">{assignment.dueNote}</p>}
         </div>
       </div>
 
-      <div className="text-xs text-slate-600 bg-slate-50 border p-3 rounded-xl leading-relaxed">
-        {assignment?.prompt || "Execute today's syllabus lessons on your system and log your drafted link below."}
+      <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 p-4 rounded-xl leading-relaxed font-semibold whitespace-pre-wrap">
+        {renderClickableLinks(assignment?.prompt || "Execute today's syllabus lessons on your system and log your drafted link below.")}
       </div>
 
-      <div className="space-y-3 text-xs">
-        <div>
-          <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Response Description (Optional)</label>
-          <textarea
-            rows={3}
-            value={text}
-            onChange={e => setText(e.target.value)}
-            className="w-full bg-white border border-slate-300 shadow-sm outline-none p-3 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl transition-all"
-            placeholder="Describe what you built today, what obstacles you overcame, or outline your next study milestone..."
-          />
+      {/* Guidance box on how to submit assignment */}
+      <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 space-y-2.5 text-xs text-indigo-950">
+        <div className="flex items-center gap-2">
+          <span className="text-base">🚀</span>
+          <span className="font-extrabold text-indigo-900 uppercase tracking-wider">How to submit your response:</span>
         </div>
-        <div>
-          <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Live Demo / Resource URL Link (Optional)</label>
-          <input
-            type="text"
-            value={link}
-            onChange={e => setLink(e.target.value)}
-            className="w-full bg-white border border-slate-300 shadow-sm outline-none p-2.5 text-xs text-slate-800 font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl transition-all"
-            placeholder="https://your-live-deployment.web.app"
-          />
-        </div>
-
-        <button
-          onClick={() => {
-            if (!text.trim() && !link.trim()) return;
-            onSubmit(`day-${dayIndex}`, {
-              text,
-              link,
-              submittedAt: new Date().toLocaleString()
-            });
-          }}
-          disabled={!text.trim() && !link.trim()}
-          className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-xl transition-all shadow-md cursor-pointer text-xs uppercase disabled:opacity-40 border-0"
-        >
-          Submit Live Assignment →
-        </button>
+        <p className="font-semibold leading-relaxed">
+          Please note that assignment submission is no longer done here. To submit your answer, follow these simple steps:
+        </p>
+        <ol className="list-decimal list-inside space-y-1 font-semibold pl-1">
+          <li>Look at the sidebar navigation on the left (on desktop) or the menu navigation (on mobile).</li>
+          <li>Click on the <strong className="text-teal-800 underline">"My Assignments"</strong> menu option.</li>
+          <li>Select <strong className="text-indigo-900">Day {dayIndex + 1} Assignment</strong> from the dropdown in the Assignment Workspace.</li>
+          <li>Paste your live site link/answers and click <strong className="text-indigo-900">"Submit Assignment Proof"</strong>!</li>
+        </ol>
       </div>
     </div>
   );
@@ -2291,31 +2273,142 @@ export default function StudentDashboard() {
   };
 
   useEffect(() => {
-    // Listen directly and purely to Firestore settings/app document
-    const unsubFirestore = onSnapshot(doc(db, 'settings', 'app'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() || {};
-        setAppSettings(data);
-        try {
-          safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
-        } catch (e) {}
+    // Read from cache instantly on mount
+    try {
+      const cached = safeStorage.getItem('ciya_cached_app_settings');
+      if (cached) {
+        setAppSettings(JSON.parse(cached));
       }
-    }, (error) => {
-      console.warn("Soft handling error loading app settings, loading from cache:", error);
+    } catch (e) {
+      console.warn("Error parsing cached app settings on mount", e);
+    }
+  }, []);
+
+  // Custom Light-Ping Synchronization Guard Listener
+  useEffect(() => {
+    // We can run this whenever a user session is active (or if cached user exists)
+    const activeUid = currentUser?.uid || (() => {
       try {
-        const cached = safeStorage.getItem('ciya_cached_app_settings');
-        if (cached) {
-          setAppSettings(JSON.parse(cached));
-        }
+        const cached = safeStorage.getItem('ciya_cached_user');
+        if (cached) return JSON.parse(cached).uid;
       } catch (e) {}
+      return null;
+    })();
+
+    if (!activeUid) return;
+
+    // Set up a single, light tracking document listener in Firestore
+    const unsubSignals = onSnapshot(doc(db, 'settings', 'system_signals'), async (snapshot) => {
+      if (!snapshot.exists()) return;
+      const signalData = snapshot.data() || {};
+
+      // 1. Sync App Settings (Portal Locks, etc.)
+      const cachedSettingsTime = safeStorage.getItem('ciya_cached_settings_time') || '0';
+      const serverSettingsTime = String(signalData.settings || '0');
+      const hasCachedSettings = !!safeStorage.getItem('ciya_cached_app_settings');
+      if (serverSettingsTime !== cachedSettingsTime || !hasCachedSettings) {
+        try {
+          const snap = await getDoc(doc(db, 'settings', 'app'));
+          if (snap.exists()) {
+            const data = snap.data();
+            setAppSettings(data);
+            safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
+            safeStorage.setItem('ciya_cached_settings_time', serverSettingsTime);
+          }
+        } catch (err) {
+          console.warn("Error synchronizing settings in light-ping:", err);
+        }
+      }
+
+      // 2. Sync Course Catalogue
+      const cachedCoursesTime = safeStorage.getItem('ciya_cached_courses_time') || '0';
+      const serverCoursesTime = String(signalData.courses || '0');
+      const hasCachedCourses = !!safeStorage.getItem('ciya_cached_courses');
+      if (serverCoursesTime !== cachedCoursesTime || !hasCachedCourses) {
+        try {
+          const q = query(
+            collection(db, 'courses'), 
+            where('publish_status', '==', 'Published')
+          );
+          const courseSnapshot = await getDocs(q);
+          const data = courseSnapshot.docs.map(doc => {
+            const d = doc.data();
+            return {
+              id: doc.id,
+              ...d,
+              skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
+              tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
+              status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
+              days: (d.days || []).map((day: any, dIdx: number) => ({
+                dayNumber: dIdx + 1,
+                title: day.title || `Day ${dIdx + 1}: Study Module`,
+                description: day.description || '',
+                assignment: day.assignment || { prompt: '', dueNote: '' },
+                videos: (day.videos || []).map((v: any) => ({
+                  id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
+                  title: v.title || '',
+                  video_url: v.video_url || v.url || '',
+                  url: v.url || v.video_url || '',
+                  duration: v.duration || '10 min',
+                  description: v.description || '',
+                  resources: v.resources || '',
+                  checkType: v.checkType || 'none',
+                  check: v.check || null,
+                  funFact: v.funFact || null
+                }))
+              }))
+            } as Course;
+          });
+          
+          data.sort((a, b) => {
+            const getMills = (fieldVal: any) => {
+              if (!fieldVal) return 0;
+              if (typeof fieldVal.toDate === 'function') {
+                return fieldVal.toDate().getTime();
+              }
+              return new Date(fieldVal).getTime() || 0;
+            };
+            return getMills(b.createdAt) - getMills(a.createdAt);
+          });
+
+          setCourses(data);
+          setLoading(false);
+          safeStorage.setItem('ciya_cached_courses', JSON.stringify(data));
+          safeStorage.setItem('ciya_cached_courses_time', serverCoursesTime);
+        } catch (err) {
+          console.warn("Error synchronizing courses catalogue in light-ping:", err);
+        }
+      }
+
+      // 3. Sync User Profile & Status changes
+      const cachedProfileTime = safeStorage.getItem('ciya_cached_profile_time') || '0';
+      const serverProfileTime = String(signalData.user_signals?.[activeUid] || '0');
+      const hasCachedProfile = !!safeStorage.getItem('ciya_cached_profile');
+      if (serverProfileTime !== cachedProfileTime || !hasCachedProfile) {
+        try {
+          const snap = await getDoc(doc(db, 'users', activeUid));
+          if (snap.exists()) {
+            const profileData = snap.data();
+            setUserProfile(profileData);
+            if (!cleanupPerformedRef.current) {
+              cleanupPerformedRef.current = true;
+              cleanUpOldSubmissionsLocal(activeUid, profileData.progress);
+              cleanUpOldGlobalSubmissions(activeUid);
+            }
+            safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
+            safeStorage.setItem('ciya_cached_profile_time', serverProfileTime);
+          }
+        } catch (err) {
+          console.warn("Error synchronizing profile in light-ping:", err);
+        }
+      }
+
+    }, (error) => {
+      console.warn("Soft handling global light-ping system signals observer:", error);
     });
 
-    return () => {
-      if (unsubFirestore) {
-        unsubFirestore();
-      }
-    };
-  }, []);
+    return () => unsubSignals();
+  }, [currentUser]);
 
   const [timeLeft, setTimeLeft] = useState('');
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
@@ -2596,7 +2689,7 @@ export default function StudentDashboard() {
         safeStorage.setItem('ciya_cached_profile', JSON.stringify(data));
         setLiveCheckComplete(true);
       } else {
-        navigate('/waitingonboarding', { replace: true });
+        navigate('/onboarding', { replace: true });
       }
     } catch (e: any) {
       if (e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user') {
@@ -2643,109 +2736,128 @@ export default function StudentDashboard() {
 
         setCurrentUser(user);
         
-        // Listen to Firestore real-time profile changes
+        // Cache-first offline profile loader
         const docRef = doc(db, 'users', user.uid);
-        unsubSnapshot = onSnapshot(docRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const profileData = docSnap.data();
-            setUserProfile(profileData);
-            
-            if (!cleanupPerformedRef.current) {
-              cleanupPerformedRef.current = true;
-              cleanUpOldSubmissionsLocal(user.uid, profileData.progress);
-              cleanUpOldGlobalSubmissions(user.uid);
-            }
-            
-            // Cache to local storage
-            const userData = {
-              uid: user.uid,
-              email: user.email,
-              role: isUserAdmin ? 'admin' : 'student'
-            };
-            safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
-            safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
-            setAuthChecking(false);
-            setLiveCheckComplete(true);
-          } else if (user.email === 'developermike5@gmail.com') {
-            // Mock profile for super admin preview
-            const mockProfile = {
-              fullName: "Admissions Administrator (Super Admin)",
-              email: user.email,
-              whatsapp: "+00000000000",
-              state: "Admin State",
-              goal: "Previewing Student Dashboard",
-              approvalStatus: "Approved",
-              isActivated: true,
-              isDashboardUnlocked: true,
-              role: "super_admin",
-              createdAt: serverTimestamp()
-            };
-            setUserProfile(mockProfile);
-            const userData = {
-              uid: user.uid,
-              email: user.email,
-              role: 'super_admin'
-            };
-            safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
-            safeStorage.setItem('ciya_cached_profile', JSON.stringify(mockProfile));
-            setAuthChecking(false);
-            setLiveCheckComplete(true);
-          } else {
-            // Only navigate if we are still authenticated and didn't just sign out!
-            if (auth.currentUser) {
-              safeStorage.removeItem('ciya_cached_user');
-              safeStorage.removeItem('ciya_cached_profile');
-              setLiveCheckComplete(false);
-              navigate('/waitingonboarding', { replace: true });
+        const loadInitialProfile = async () => {
+          // 1. Immediately render cached profile if exists (Stale-While-Revalidate)
+          const cachedProfile = safeStorage.getItem('ciya_cached_profile');
+          if (cachedProfile) {
+            try {
+              const profileData = JSON.parse(cachedProfile);
+              setUserProfile(profileData);
+              if (!cleanupPerformedRef.current) {
+                cleanupPerformedRef.current = true;
+                cleanUpOldSubmissionsLocal(user.uid, profileData.progress);
+                cleanUpOldGlobalSubmissions(user.uid);
+              }
               setAuthChecking(false);
-            } else {
-              console.log("No user doc found but user is signed out or signing out. Ignoring redirect.");
+              setLiveCheckComplete(true);
+            } catch (e) {
+              console.error("Error parsing cached profile on auth change:", e);
             }
           }
-        }, (error: any) => {
-          console.error("Profile listen error:", error);
-          if (user.email === 'developermike5@gmail.com') {
-            const mockProfile = {
-              fullName: "Admissions Administrator (Super Admin)",
-              email: user.email,
-              whatsapp: "+00000000000",
-              state: "Admin State",
-              goal: "Previewing Student Dashboard",
-              approvalStatus: "Approved",
-              isActivated: true,
-              isDashboardUnlocked: true,
-              role: "super_admin",
-              createdAt: serverTimestamp()
-            };
-            setUserProfile(mockProfile);
-            setAuthChecking(false);
-            setLiveCheckComplete(true);
-          } else {
-            handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-            const cachedP = safeStorage.getItem('ciya_cached_profile');
-            if (cachedP) {
-              try {
-                setUserProfile(JSON.parse(cachedP));
-              } catch (e) {
-                console.error("Error parsing cached profile:", e);
+
+          // 2. Perform a single light GET query to fetch fresh baseline data and populate cache
+          try {
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              const profileData = docSnap.data();
+              setUserProfile(profileData);
+              if (!cleanupPerformedRef.current) {
+                cleanupPerformedRef.current = true;
+                cleanUpOldSubmissionsLocal(user.uid, profileData.progress);
+                cleanUpOldGlobalSubmissions(user.uid);
               }
-            } else {
-              // Create a default transient fallback profile so they can still browse
-              setUserProfile({
-                fullName: "CIYA Student Candidate",
-                email: user.email || "student@ciya.com",
-                whatsapp: "+0000000000",
-                state: "Global",
-                goal: "Acquire high-performance development skills",
+              const userData = {
+                uid: user.uid,
+                email: user.email,
+                role: isUserAdmin ? 'admin' : 'student'
+              };
+              safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
+              safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
+              // Save the synchronized baseline profile timestamp if available, else standard fallback
+              if (!safeStorage.getItem('ciya_cached_profile_time')) {
+                safeStorage.setItem('ciya_cached_profile_time', Date.now().toString());
+              }
+              setAuthChecking(false);
+              setLiveCheckComplete(true);
+            } else if (user.email === 'developermike5@gmail.com') {
+              const mockProfile = {
+                fullName: "Admissions Administrator (Super Admin)",
+                email: user.email,
+                whatsapp: "+00000000000",
+                state: "Admin State",
+                goal: "Previewing Student Dashboard",
                 approvalStatus: "Approved",
                 isActivated: true,
-                isDashboardUnlocked: true
-              });
+                isDashboardUnlocked: true,
+                role: "super_admin",
+                createdAt: serverTimestamp()
+              };
+              setUserProfile(mockProfile);
+              const userData = {
+                uid: user.uid,
+                email: user.email,
+                role: 'super_admin'
+              };
+              safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
+              safeStorage.setItem('ciya_cached_profile', JSON.stringify(mockProfile));
+              setAuthChecking(false);
+              setLiveCheckComplete(true);
+            } else {
+              if (auth.currentUser) {
+                safeStorage.removeItem('ciya_cached_user');
+                safeStorage.removeItem('ciya_cached_profile');
+                setLiveCheckComplete(false);
+                navigate('/onboarding', { replace: true });
+                setAuthChecking(false);
+              }
             }
-            setAuthChecking(false);
-            setLiveCheckComplete(true);
+          } catch (error: any) {
+            console.error("Initial profile load error:", error);
+            if (user.email === 'developermike5@gmail.com') {
+              const mockProfile = {
+                fullName: "Admissions Administrator (Super Admin)",
+                email: user.email,
+                whatsapp: "+00000000000",
+                state: "Admin State",
+                goal: "Previewing Student Dashboard",
+                approvalStatus: "Approved",
+                isActivated: true,
+                isDashboardUnlocked: true,
+                role: "super_admin",
+                createdAt: serverTimestamp()
+              };
+              setUserProfile(mockProfile);
+              setAuthChecking(false);
+              setLiveCheckComplete(true);
+            } else {
+              handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+              const cachedP = safeStorage.getItem('ciya_cached_profile');
+              if (cachedP) {
+                try {
+                  setUserProfile(JSON.parse(cachedP));
+                } catch (e) {
+                  console.error("Error parsing backup profile:", e);
+                }
+              } else {
+                setUserProfile({
+                  fullName: "CIYA Student Candidate",
+                  email: user.email || "student@ciya.com",
+                  whatsapp: "+0000000000",
+                  state: "Global",
+                  goal: "Acquire high-performance development skills",
+                  approvalStatus: "Approved",
+                  isActivated: true,
+                  isDashboardUnlocked: true
+                });
+              }
+              setAuthChecking(false);
+              setLiveCheckComplete(true);
+            }
           }
-        });
+        };
+        loadInitialProfile();
 
       } else {
         const cachedUser = safeStorage.getItem('ciya_cached_user');
@@ -2773,6 +2885,27 @@ export default function StudentDashboard() {
       }
     };
   }, [navigate]);
+
+  // Immediate unlock real-time sync for unapproved / locked users
+  useEffect(() => {
+    if (!currentUser || userProfile?.isDashboardUnlocked === true) return;
+
+    const unsubProfile = onSnapshot(doc(db, 'users', currentUser.uid), (snapshot) => {
+      if (snapshot.exists()) {
+        const freshProfile = snapshot.data();
+        if (freshProfile?.isDashboardUnlocked === true || freshProfile?.approvalStatus === 'Approved') {
+          setUserProfile(freshProfile);
+          safeStorage.setItem('ciya_cached_profile', JSON.stringify(freshProfile));
+        }
+      }
+    }, (error) => {
+      console.warn("Real-time profile sync listener error:", error);
+    });
+
+    return () => {
+      unsubProfile();
+    };
+  }, [currentUser, userProfile?.isDashboardUnlocked]);
 
   useEffect(() => {
     if (userProfile && !userProfile.isActivated) {
@@ -2817,9 +2950,7 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (authChecking) return;
     
-    setLoading(true);
-    
-    // Stale-While-Revalidate: render cached courses instantly first so students never see a blank screen
+    // Load courses instantly from cache
     const cached = safeStorage.getItem('ciya_cached_courses');
     if (cached) {
       try {
@@ -2828,121 +2959,9 @@ export default function StudentDashboard() {
       } catch (e) {
         console.error("Error parsing cached courses:", e);
       }
+    } else {
+      setLoading(true);
     }
-
-    const q = query(
-      collection(db, 'courses'), 
-      where('publish_status', '==', 'Published')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          ...d,
-          skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
-          tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
-          status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
-          days: (d.days || []).map((day: any, dIdx: number) => ({
-            dayNumber: dIdx + 1,
-            title: day.title || `Day ${dIdx + 1}: Study Module`,
-            description: day.description || '',
-            assignment: day.assignment || { prompt: '', dueNote: '' },
-            videos: (day.videos || []).map((v: any) => ({
-              id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
-              title: v.title || '',
-              video_url: v.video_url || v.url || '',
-              url: v.url || v.video_url || '',
-              duration: v.duration || '10 min',
-              description: v.description || '',
-              resources: v.resources || '',
-              checkType: v.checkType || 'none',
-              check: v.check || null,
-              funFact: v.funFact || null
-            }))
-          }))
-        } as Course;
-      });
-      
-      data.sort((a, b) => {
-        const getMills = (fieldVal: any) => {
-          if (!fieldVal) return 0;
-          if (typeof fieldVal.toDate === 'function') {
-            return fieldVal.toDate().getTime();
-          }
-          return new Date(fieldVal).getTime() || 0;
-        };
-        return getMills(b.createdAt) - getMills(a.createdAt);
-      });
-
-      setCourses(data);
-      setLoading(false);
-      setIsRefreshingCourses(false);
-      try {
-        safeStorage.setItem('ciya_cached_courses', JSON.stringify(data));
-        safeStorage.setItem('ciya_cached_courses_time', Date.now().toString());
-      } catch (e) {}
-    }, (error) => {
-      console.error("Error listening to real-time courses:", error);
-      // Fail gracefully: try to keep using local storage cached courses
-      const backup = safeStorage.getItem('ciya_cached_courses');
-      if (backup) {
-        try {
-          setCourses(JSON.parse(backup));
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
-        // Mock fallback if nothing in cache
-        setCourses([
-          {
-            id: "ciya-web-101",
-            title: "CIYA 5-Day Free Website Development",
-            description: "Master the art of creating high-converting, high-performance landing pages and business sites in 5 simple days using modern AI tools.",
-            category: "Web Development",
-            skill: "web",
-            level: "Beginner",
-            tier: "beginner",
-            publish_status: "Published",
-            days: [
-              {
-                dayNumber: 1,
-                title: "Day 1: AI Prompt Engineering & Visual Landing Pages",
-                description: "Understand layout psychology and formulate exact instructions that yield clean frontend designs.",
-                videos: [
-                  {
-                    id: "1-1",
-                    title: "Module introduction and visual hierarchy blueprint",
-                    video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                    duration: "12 min",
-                    description: "Learn how to establish alignment, density, and professional off-white canvases.",
-                    resources: "https://ciya.academy/resources/day1",
-                    checkType: "mcq",
-                    check: {
-                      id: "q-1-1",
-                      checkType: "mcq",
-                      question: "What is the industry-standard primary font recommended for modern tech layouts?",
-                      options: ["Times New Roman", "Inter", "Comic Sans", "Impact"],
-                      answer: "Inter",
-                      explanation: "Inter is a highly legible, geometrically balanced neutral sans-serif designed for computer interfaces."
-                    },
-                    funFact: { headline: "Aesthetic Trust", body: "Clean neutral typography has been proved in user testing sessions to increase aesthetic trust by up to 60%." }
-                  }
-                ]
-              }
-            ]
-          }
-        ]);
-      }
-      setLoading(false);
-      setIsRefreshingCourses(false);
-    });
-
-    return () => {
-      unsubscribe();
-    };
   }, [authChecking]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
@@ -2957,6 +2976,8 @@ export default function StudentDashboard() {
         goal: userProfile.goal,
         updatedAt: serverTimestamp()
       });
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(userProfile));
+      safeStorage.setItem('ciya_cached_profile_time', Date.now().toString());
       setEditingProfile(false);
       alert('Profile updated successfully!');
     } catch (error) {
@@ -2995,6 +3016,11 @@ export default function StudentDashboard() {
     // Check progressed course keys
     if (userProfile?.progress && userProfile.progress[c.id]) {
       return true;
+    }
+
+    // Exclude cloned courses unless they have progress (meaning they are registered for them)
+    if (c.isCloned) {
+      return false;
     }
     
     const selection = (userProfile?.pathwaySelection || '').toLowerCase().trim();
@@ -3084,6 +3110,36 @@ export default function StudentDashboard() {
               </p>
             </div>
 
+            {/* Urgent WhatsApp Activation Banner */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-left space-y-3 relative overflow-hidden">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Direct Admission Approval Link</span>
+              </div>
+              <h3 className="text-base font-black text-slate-950 leading-snug">⚠️ Get Approved Immediately</h3>
+              <p className="text-slate-700 text-xs leading-relaxed font-semibold">
+                Your student onboarding has been submitted. Contact our admissions officer on WhatsApp now to get your profile reviewed and activated instantly!
+              </p>
+              {(() => {
+                const reqMsg = `Hello Admissions! I have successfully completed my onboarding profile on the CIYA Digital Academy. Could you please verify and unlock my student dashboard access? My name is ${userProfile?.fullName || 'Student'} (${userProfile?.email || currentUser?.email || ''}). Thank you!`;
+                const whatsappUrl = `https://api.whatsapp.com/send?phone=2349042544355&text=${encodeURIComponent(reqMsg)}`;
+                return (
+                  <a 
+                    href={whatsappUrl}
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs transition-all duration-200 hover:-translate-y-0.5 shadow-md shadow-emerald-600/10 w-full cursor-pointer border-0 text-center no-underline uppercase tracking-wider"
+                  >
+                    <MessageCircle className="w-4 h-4 fill-white" />
+                    <span>Contact Admin for Approval 🚀</span>
+                  </a>
+                );
+              })()}
+            </div>
+
             <div className="w-full">
               <SubmissionDetailsCard profile={userProfile} />
             </div>
@@ -3123,68 +3179,49 @@ export default function StudentDashboard() {
           </div>
         ) : (
           <div className="max-w-xl w-full bg-white rounded-3xl p-8 md:p-12 shadow-2xl border border-slate-100 text-center space-y-6 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-amber-400 via-emerald-500 to-indigo-600"></div>
+            <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-teal-400 via-emerald-500 to-indigo-600"></div>
             <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center border border-amber-100 mx-auto">
               <Lock className="w-8 h-8 text-amber-500 animate-bounce" />
             </div>
             <div className="space-y-4">
-              <span className="inline-block bg-emerald-100 text-emerald-800 text-xs font-black uppercase px-3 py-1 rounded-full">
-                Training Verification Approved! 🎉
+              <span className="inline-block bg-amber-100 text-amber-800 text-xs font-black uppercase px-3 py-1 rounded-full">
+                Dashboard Locked 🔒
               </span>
-              <h2 className="text-3xl font-black text-slate-900 tracking-tight">Enter Your Access Activation Code 🔑</h2>
-              <p className="text-slate-950 text-base leading-relaxed max-w-md mx-auto font-black">
-                Congratulations, <strong className="text-teal-800 font-black decoration-teal-600/30 underline decoration-2">{userProfile.fullName || 'Scholar'}</strong>! Your spot for CIYA Five days Free Website Development Training has been approved by the administrators. 
-                Please enter your unique <strong className="text-indigo-800 font-black decoration-indigo-600/30 underline decoration-2">activation code (e.g., CIYA-854473)</strong> below to unlock your course learning dashboard.
+              <h2 className="text-3xl font-black text-slate-900 tracking-tight">Access Verification Required</h2>
+              <p className="text-slate-700 text-base leading-relaxed max-w-md mx-auto font-semibold">
+                Congratulations, <strong className="text-teal-800 font-bold">{userProfile.fullName || 'Scholar'}</strong>! Your student onboarding profile has been registered successfully.
+              </p>
+              <p className="text-slate-600 text-sm leading-relaxed max-w-md mx-auto">
+                Your learning dashboard is currently locked. To activate your full learning access, please contact the administrator via WhatsApp below to verify and unlock your account.
               </p>
             </div>
 
             <div className="max-w-sm mx-auto space-y-4">
-              <input 
-                type="text"
-                placeholder="CIYA-XXXXXX"
-                value={activationCode}
-                onChange={(e) => {
-                  setActivationError('');
-                  setActivationCode(e.target.value.toUpperCase());
-                }}
-                className="w-full text-center tracking-widest font-mono font-black text-lg border-2 border-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 bg-white placeholder:text-slate-400 text-slate-950 rounded-2xl py-3.5 px-4 outline-none transition-all shadow-md"
-              />
+              {(() => {
+                const reqMsg = `Hello Admissions! I have successfully completed my onboarding profile on the CIYA Digital Academy. Could you please verify and unlock my student dashboard access? My name is ${userProfile.fullName || ''} (${userProfile.email || currentUser?.email || ''}). Thank you!`;
+                const whatsappUrl = `https://api.whatsapp.com/send?phone=2349042544355&text=${encodeURIComponent(reqMsg)}`;
+                return (
+                  <a 
+                    href={whatsappUrl}
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center justify-center gap-3 px-6 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-base transition-all duration-200 hover:-translate-y-0.5 shadow-lg shadow-emerald-600/30 w-full cursor-pointer border-0 text-center no-underline"
+                  >
+                    <MessageCircle className="w-5 h-5 fill-white" />
+                    <span>Contact Admin to Unlock 🚀</span>
+                  </a>
+                );
+              })()}
+            </div>
 
-              {activationError && (
-                <p className="text-rose-600 text-xs font-semibold leading-relaxed">{activationError}</p>
-              )}
-
-              <button 
-                onClick={handleVerifyCode}
-                disabled={unlocking}
-                className="w-full py-4 px-4 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-2xl text-sm font-black shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer border-0"
-              >
-                {unlocking ? 'Verifying...' : 'Unlock Dashboard 🚀'}
-              </button>
+            <div className="w-full">
+              <SubmissionDetailsCard profile={userProfile} />
             </div>
 
             <div className="border-t border-slate-100 pt-5 text-center">
-              <p className="text-slate-800 text-sm leading-relaxed font-semibold">
-                <strong>Need help finding your code?</strong><br/>
-                Once approved, your admissions administrator will issue your unique training code. Click below to request it directly on WhatsApp.
+              <p className="text-slate-500 text-xs leading-relaxed">
+                Once approved by the administrators, your dashboard will automatically unlock and grant you full access. You do not need any activation codes.
               </p>
-              <div className="mt-3">
-                {(() => {
-                  const reqMsg = `Hello Admission Team! My CIYA Free Website Development Training profile has been approved. Could you please send me my custom Dashboard Activation Code for my studies? My name is ${userProfile.fullName || ''} (${userProfile.email || currentUser?.email || ''}).`;
-                  const whatsappUrl = `https://api.whatsapp.com/send?phone=2349042544355&text=${encodeURIComponent(reqMsg)}`;
-                  return (
-                    <a 
-                      href={whatsappUrl}
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="inline-flex px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs shadow-md transition-all gap-2 items-center cursor-pointer border-0"
-                    >
-                      <MessageCircle className="w-4 h-4 fill-white stroke-[3px] text-emerald-600" />
-                      <span>Request Code on WhatsApp</span>
-                    </a>
-                  );
-                })()}
-              </div>
               <div className="mt-4 pt-2 text-center">
                 <button 
                   onClick={handleLogout} 
@@ -3770,6 +3807,19 @@ export default function StudentDashboard() {
                           ))}
                         </select>
                       </div>
+
+                      {/* Display Assignment Prompt/Question here if available */}
+                      {daysList[submitDayIndex]?.assignment?.prompt && (
+                        <div className="bg-teal-50/50 border border-teal-100 rounded-2xl p-4 space-y-2 text-xs text-slate-850">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm">📋</span>
+                            <span className="font-black text-teal-900 uppercase tracking-wider">Day {submitDayIndex + 1} Assignment Question:</span>
+                          </div>
+                          <div className="font-semibold text-slate-700 leading-relaxed whitespace-pre-wrap">
+                            {renderClickableLinks(daysList[submitDayIndex].assignment.prompt)}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Day status indicator */}
                       {matchedSubForSelectedDay && (

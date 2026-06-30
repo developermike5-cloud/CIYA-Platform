@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
-import { db, auth } from '../../firebase';
+import { db, auth, triggerSystemSignal } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { CheckCircle2, XCircle, Clock, Search, FileText, Download, Check, RefreshCw } from 'lucide-react';
 
@@ -131,6 +131,8 @@ export default function AssignmentsAdmin() {
       } catch (templateErr) {
         console.warn("Skip automatic cascade triggers", templateErr);
       }
+
+      await triggerSystemSignal('user_signals', sub.userId);
 
       showToastMsg(`Assignment labeled as ${newStatus} successfully!`, 'success');
       setSelectedSub(prev => prev ? { ...prev, status: newStatus, adminReason: reason } : null);

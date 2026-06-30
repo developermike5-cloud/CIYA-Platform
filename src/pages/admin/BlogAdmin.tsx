@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
+import { db, handleFirestoreError, OperationType, triggerSystemSignal } from '../../firebase';
 import { BookOpen, Plus, Trash2, Edit2, Link as LinkIcon, Image as ImageIcon, Send, RefreshCw, X, Eye, FileText, Bold, Italic, Heading1, Heading2, Heading3, List, ListOrdered, Highlighter, Pilcrow } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { preprocessMarkdown, stripMarkdown } from '../../utils/markdownUtils';
@@ -127,6 +127,7 @@ export default function BlogAdmin() {
       if (isEditing && editingId) {
         const docRef = doc(db, 'blog', editingId);
         await updateDoc(docRef, payload);
+        await triggerSystemSignal('blog');
         showToast('success', 'Article successfully updated!');
       } else {
         const blogRef = collection(db, 'blog');
@@ -134,6 +135,7 @@ export default function BlogAdmin() {
           ...payload,
           createdAt: serverTimestamp(),
         });
+        await triggerSystemSignal('blog');
         showToast('success', 'New article successfully published to the blog!');
       }
 
@@ -175,6 +177,7 @@ export default function BlogAdmin() {
     try {
       const docRef = doc(db, 'blog', postId);
       await deleteDoc(docRef);
+      await triggerSystemSignal('blog');
       showToast('success', 'Article has been deleted successfully.');
     } catch (err: any) {
       handleFirestoreError(err, OperationType.DELETE, 'blog');

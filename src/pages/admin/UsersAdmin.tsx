@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth, rtdb, handleFirestoreError, OperationType, getActiveDatabaseId, setActiveDatabaseId } from '../../firebase';
+import { db, auth, rtdb, handleFirestoreError, OperationType, getActiveDatabaseId, setActiveDatabaseId, triggerSystemSignal } from '../../firebase';
 import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
@@ -485,9 +485,11 @@ export default function UsersAdmin() {
       const generatedCode = userDoc?.adminCode || `CIYA-${Math.floor(100000 + Math.random() * 900000)}`;
       await updateDoc(doc(db, 'users', userId), { 
         approvalStatus: 'Approved',
-        adminCode: generatedCode
+        adminCode: generatedCode,
+        isDashboardUnlocked: true
       });
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Approved', adminCode: generatedCode } : u));
+      await triggerSystemSignal('user_signals', userId);
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Approved', adminCode: generatedCode, isDashboardUnlocked: true } : u));
     } catch (error) {
       console.error("Error approving user application:", error);
     } finally {
@@ -498,8 +500,12 @@ export default function UsersAdmin() {
   const handleDisapprove = async (userId: string) => {
     setActionLoading(prev => ({ ...prev, [userId]: 'disapprove' }));
     try {
-      await updateDoc(doc(db, 'users', userId), { approvalStatus: 'Disapproved' });
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Disapproved' } : u));
+      await updateDoc(doc(db, 'users', userId), { 
+        approvalStatus: 'Disapproved',
+        isDashboardUnlocked: false
+      });
+      await triggerSystemSignal('user_signals', userId);
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Disapproved', isDashboardUnlocked: false } : u));
     } catch (error) {
       console.error("Error disapproving user application:", error);
     } finally {
@@ -512,6 +518,7 @@ export default function UsersAdmin() {
       const codeToSet = newCode.trim().toUpperCase();
       if (!codeToSet) return;
       await updateDoc(doc(db, 'users', userId), { adminCode: codeToSet });
+      await triggerSystemSignal('user_signals', userId);
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, adminCode: codeToSet } : u));
       setCodeSuccessId(userId);
       setTimeout(() => setCodeSuccessId(null), 2000);
@@ -524,6 +531,7 @@ export default function UsersAdmin() {
     try {
       const newStatus = !currentUnlocked;
       await updateDoc(doc(db, 'users', userId), { isDashboardUnlocked: newStatus });
+      await triggerSystemSignal('user_signals', userId);
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, isDashboardUnlocked: newStatus } : u));
     } catch (error) {
       console.error("Error toggling dashboard lock state:", error);
@@ -1161,6 +1169,7 @@ export default function UsersAdmin() {
                                             cohort: targetCohort,
                                             updatedAt: serverTimestamp()
                                           });
+                                          await triggerSystemSignal('user_signals', u.id);
                                           setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, cohort: targetCohort } : usr));
                                           alert(`Moved student to ${targetCohort} successfully!`);
                                         } catch (err) {
@@ -1204,6 +1213,7 @@ export default function UsersAdmin() {
                                                       completedCoursesOverride: nextCompleted,
                                                       updatedAt: serverTimestamp()
                                                     });
+                                                    await triggerSystemSignal('user_signals', u.id);
                                                     setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, completedCoursesOverride: nextCompleted } : usr));
                                                   } catch (err) {
                                                     console.error("Error overriding course complete:", err);

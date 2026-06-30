@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
+import { db, handleFirestoreError, OperationType, triggerSystemSignal } from '../../firebase';
 import { Course, CourseDay, CourseVideo } from '../../types';
 import { ArrowLeft, Save, Sparkles, AlertCircle, Plus, Trash2, HelpCircle } from 'lucide-react';
 
@@ -911,10 +911,12 @@ export default function CourseEdit() {
       if (isNew) {
         cleanedPayload.createdAt = serverTimestamp();
         await setDoc(docRef, cleanedPayload);
+        await triggerSystemSignal('courses');
         setForm(prev => ({ ...prev, id }));
         navigate(`/admin/courses/${id}`, { replace: true });
       } else {
         await updateDoc(docRef, cleanedPayload);
+        await triggerSystemSignal('courses');
       }
 
       setLessonSavedId(vidId);
@@ -1169,8 +1171,10 @@ export default function CourseEdit() {
       if (isNew) {
         cleanedPayload.createdAt = serverTimestamp();
         await setDoc(docRef, cleanedPayload);
+        await triggerSystemSignal('courses');
       } else {
         await updateDoc(docRef, cleanedPayload);
+        await triggerSystemSignal('courses');
       }
 
       navigate('/admin');

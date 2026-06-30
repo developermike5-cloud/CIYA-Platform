@@ -144,7 +144,7 @@ const useLogin = () => {
           if (docSnap.exists()) {
             navigate('/dashboard');
           } else {
-            navigate('/waitingonboarding');
+            navigate('/onboarding');
           }
         }
         return;
@@ -160,7 +160,7 @@ const useLogin = () => {
         if (docSnap.exists()) {
           navigate('/dashboard');
         } else {
-          navigate('/waitingonboarding');
+          navigate('/onboarding');
         }
       }
     } catch (e: any) {

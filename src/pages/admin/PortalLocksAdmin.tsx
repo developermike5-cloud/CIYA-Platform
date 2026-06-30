@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { db, auth, rtdb } from '../../firebase';
+import { db, auth, rtdb, triggerSystemSignal } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Lock, Unlock, ShieldAlert, Sparkles, CheckCircle, HelpCircle } from 'lucide-react';
@@ -76,7 +76,9 @@ export default function PortalLocksAdmin() {
       setDoc(doc(db, 'settings', 'app'), {
         lockedSections: updatedLocks,
         updatedAt: serverTimestamp()
-      }, { merge: true }).catch(err => {
+      }, { merge: true }).then(() => {
+        triggerSystemSignal('settings');
+      }).catch(err => {
         console.error("Firestore setDoc failed:", err);
       });
 

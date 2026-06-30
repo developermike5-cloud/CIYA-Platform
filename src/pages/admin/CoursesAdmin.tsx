@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, addDoc } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
+import { db, auth, handleFirestoreError, OperationType, triggerSystemSignal } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy } from 'lucide-react';
@@ -114,6 +114,7 @@ export default function CoursesAdmin() {
         publish_status: nextStatus === 'published' ? 'Published' : 'Draft',
         updatedAt: serverTimestamp()
       });
+      await triggerSystemSignal('courses');
     } catch (e) {
       console.error(e);
       alert('Error updating course status.');
@@ -128,6 +129,7 @@ export default function CoursesAdmin() {
         isLocked: nextLocked,
         updatedAt: serverTimestamp()
       });
+      await triggerSystemSignal('courses');
     } catch (e) {
       console.error(e);
       alert('Error updating course lock status.');
@@ -141,6 +143,7 @@ export default function CoursesAdmin() {
     try {
       const docRef = doc(db, 'courses', courseId);
       await deleteDoc(docRef);
+      await triggerSystemSignal('courses');
     } catch (e) {
       console.error(e);
       alert('Failed to delete course.');
@@ -177,6 +180,7 @@ export default function CoursesAdmin() {
       delete (clonedCourseData as any).id;
 
       await addDoc(collection(db, 'courses'), clonedCourseData);
+      await triggerSystemSignal('courses');
       alert(`Course "${sourceCourse.title}" cloned successfully! Saved as Draft: "${clonedTitle}".`);
     } catch (err: any) {
       console.error("Error cloning course:", err);

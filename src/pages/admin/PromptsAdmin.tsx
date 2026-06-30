@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
+import { db, handleFirestoreError, OperationType, triggerSystemSignal } from '../../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Plus, Trash, Edit, Save, Globe, ShoppingBag, Sparkles, AlertCircle, Check, Info, FileText, ChevronRight, X, RefreshCw } from 'lucide-react';
 
@@ -236,6 +236,7 @@ export default function PromptsAdmin() {
         ecommerce: ec,
         updatedAt: new Date().toISOString()
       }, { merge: true });
+      await triggerSystemSignal('settings');
       showToast("Full prompt templates saved successfully!");
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
@@ -253,6 +254,7 @@ export default function PromptsAdmin() {
         templates: mods,
         updatedAt: new Date().toISOString()
       }, { merge: true });
+      await triggerSystemSignal('settings');
       showToast("Modular prompt templates saved successfully!");
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
