@@ -21,6 +21,7 @@ export interface Course {
   requirements?: string;
   publish_status: 'Draft' | 'Published' | 'Archived';
   status?: 'draft' | 'published'; // guide property
+  isCloned?: boolean;
   isLocked?: boolean; // locking system
   createdAt?: any;
   updatedAt?: any;

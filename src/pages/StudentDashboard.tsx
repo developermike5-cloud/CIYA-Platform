@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType } from '../firebase';
 import { ref as dbRef, onValue } from 'firebase/database';
@@ -408,12 +408,13 @@ function isLessonUnlockedUnified(
   completedKeys: string[], 
   checkPassedKeys: string[],
   dbSubmissions: any[] = [],
-  isAdmin: boolean = false
+  isAdmin: boolean = false,
+  isCloned: boolean = false
 ) {
   if (isAdmin) return true;
 
   // Day-level lock check: For Day di (di > 0), preceding Day's (di-1) assignment must be Approved
-  if (di > 0) {
+  if (di > 0 && !isCloned) {
     const prevDayIdx = di - 1;
     const prevDaySubmission = dbSubmissions.find(sub => sub.dayIndex === prevDayIdx);
     if (!prevDaySubmission || prevDaySubmission.status !== 'Approved') {
@@ -728,6 +729,7 @@ interface CourseViewerProps {
   isAdmin?: boolean;
   isEnrolled?: boolean;
   onLogin?: () => void;
+  courses: Course[];
 }
 
 function renderBulletList(text: string, icon: string, textClass: string = "text-sm text-slate-800") {
@@ -749,7 +751,7 @@ function renderBulletList(text: string, icon: string, textClass: string = "text-
   );
 }
 
-function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses }: CourseViewerProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -758,6 +760,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [showAssignment, setShowAssignment] = useState(false);
   const [viewingSyllabus, setViewingSyllabus] = useState(true);
+  const [showTrackSelectionModal, setShowTrackSelectionModal] = useState(false);
 
   // Sync from URL params on search changes:
   useEffect(() => {
@@ -805,6 +808,24 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
     navigate(`/dashboard?${params.toString()}`);
   };
 
+  const handleEnroll = async (courseId: string, track: 'standard' | 'express') => {
+    try {
+      if (!currentUser) return;
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, {
+        [`progress.${courseId}.durationMode`]: track,
+        [`progress.${courseId}.createdAt`]: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      showToast(`Successfully enrolled in ${track === 'express' ? 'Express Track (3 Days)' : 'Standard Track (5 Days)'}! 🚀`);
+      setShowTrackSelectionModal(false);
+      updateParams({ syllabus: 'false', assignment: 'false' });
+    } catch (e) {
+      console.error("Error enrolling course:", e);
+      alert("Failed to enroll in course. Please try again.");
+    }
+  };
+
   const courseId = course.id || 'general';
   const progressStore = userProfile.progress?.[courseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
   
@@ -830,7 +851,10 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   const checkPassedKeys: string[] = progressStore.checkPassed || [];
   const submissions: Record<string, any> = progressStore.submissions || {};
 
-  const days: CourseDay[] = course.days || [];
+  const selectedDurationMode = progressStore.durationMode || course.durationMode || 'standard';
+  const days: CourseDay[] = selectedDurationMode === 'express' 
+    ? (course.days || []).slice(0, 3) 
+    : (course.days || []);
   const activeDay: any = days[activeDayIdx] || { dayNumber: activeDayIdx + 1, title: 'Study Module', videos: [], assignment: { prompt: '', dueNote: '' } };
   const videos: CourseVideo[] = activeDay.videos || [];
   const currentVideo = videos[activeVideoIdx] || null;
@@ -933,7 +957,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   };
 
   const handleGoNext = () => {
-    const isUnlocked = isAdmin || isLessonUnlockedUnified(activeDayIdx, activeVideoIdx, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin);
+    const isUnlocked = isAdmin || isLessonUnlockedUnified(activeDayIdx, activeVideoIdx, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
     if (!isUnlocked) {
       alert("Lesson check is locked! Clear comprehension quiz of this lesson first.");
       return;
@@ -943,7 +967,16 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
       setActiveVideoIdx(prev => prev + 1);
       setShowQuizModal(false);
     } else {
-      setShowAssignment(true);
+      if (course.isCloned) {
+        if (activeDayIdx < days.length - 1) {
+          handleGoToVideo(activeDayIdx + 1, 0);
+          showToast(`Moving to Day ${activeDayIdx + 2}! 🚀`);
+        } else {
+          showToast("Congratulations! You've completed all lessons for this cloned course path! 🎓");
+        }
+      } else {
+        setShowAssignment(true);
+      }
     }
   };
 
@@ -1100,6 +1133,31 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                   alert("Please complete your current running course before enrolling for another.");
                   return;
                 }
+
+                // Check if they already have an enrollment record in progress
+                const alreadyStarted = !!userProfile?.progress?.[course.id || ''];
+                if (!alreadyStarted) {
+                  // Count completed courses to check if they completed their first ever course
+                  const completedCoursesCount = Object.keys(userProfile?.progress || {}).filter(cId => {
+                    const p = userProfile?.progress?.[cId];
+                    if (!p) return false;
+                    const matchingCourse = courses.find(item => item.id === cId);
+                    if (!matchingCourse) return false;
+                    const totalVids = matchingCourse.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
+                    const isCompleted = (totalVids > 0 && (p.watched || []).length >= totalVids) || userProfile?.completedCoursesOverride?.includes(cId);
+                    return isCompleted;
+                  }).length;
+
+                  if (completedCoursesCount >= 1) {
+                    setShowTrackSelectionModal(true);
+                    return;
+                  } else {
+                    // Automatically enroll in standard track for their first ever course
+                    handleEnroll(course.id || '', 'standard');
+                    return;
+                  }
+                }
+
                 updateParams({ syllabus: 'false', assignment: 'false' });
               }}
               className="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-sm uppercase rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer transform active:scale-[0.98] border-0"
@@ -1153,7 +1211,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
             {/* 1. Selected Day card at the top */}
             {days.map((d, di) => {
               if (activeDayIdx !== di) return null;
-              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin);
+              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
               if (!isDayCoveredOrUnlocked) return null;
 
               return (
@@ -1177,11 +1235,11 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
 
                   <div className="space-y-2 text-left">
                     {(d.videos || []).map((vid, vi) => {
-                      const currentKey = `${di}-${vi}`;
-                      const isVidCurrent = activeDayIdx === di && activeVideoIdx === vi && !showAssignment;
-                      const isVidWatched = completedKeys.includes(currentKey);
-                      const isKeyCheckPassed = checkPassedKeys.includes(currentKey);
-                      const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin);
+                       const currentKey = `${di}-${vi}`;
+                       const isVidCurrent = activeDayIdx === di && activeVideoIdx === vi && !showAssignment;
+                       const isVidWatched = completedKeys.includes(currentKey);
+                       const isKeyCheckPassed = checkPassedKeys.includes(currentKey);
+                       const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
 
                       return (
                         <div key={vid.id || vi} className="space-y-3 bg-slate-50/40 p-1.5 rounded-2xl border border-slate-100 shadow-sm">
@@ -1405,7 +1463,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                 <div className="grid grid-cols-1 gap-4">
                   {days.map((d, di) => {
                     if (activeDayIdx === di) return null;
-                    const isDayUnlocked = di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin);
+                    const isDayUnlocked = di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
 
                     return (
                       <div
@@ -1514,6 +1572,86 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
               className="mt-1.5 px-3 py-1 bg-amber-700 hover:bg-amber-800 text-white font-extrabold text-[8px] tracking-wider uppercase rounded-full transition-all shadow-md cursor-pointer border-0 shrink-0"
             >
               Got it
+            </button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Track Selection Modal */}
+      {showTrackSelectionModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            className="bg-white rounded-[32px] max-w-2xl w-full p-6 md:p-10 shadow-2xl border border-slate-100 relative overflow-hidden text-center"
+          >
+            {/* Top decorative badge */}
+            <div className="mx-auto mb-6 w-16 h-16 bg-gradient-to-tr from-indigo-500 to-teal-500 rounded-2xl flex items-center justify-center text-3xl shadow-lg text-white">
+              ⚡
+            </div>
+
+            <h3 className="font-extrabold text-2xl md:text-3xl text-slate-900 tracking-tight leading-none mb-3">
+              Choose Your Learning Pace
+            </h3>
+            
+            <p className="text-slate-600 text-sm md:text-base font-semibold max-w-md mx-auto mb-8 leading-relaxed">
+              Congratulations on completing your previous course! Please select the learning track that best fits your schedule and goals:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8 text-left">
+              {/* Standard option */}
+              <button
+                type="button"
+                onClick={() => handleEnroll(course.id || '', 'standard')}
+                className="group relative bg-white border-2 border-slate-200 hover:border-indigo-600 p-6 rounded-3xl transition-all shadow-sm hover:shadow-md flex flex-col justify-between text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
+                      Standard Track
+                    </span>
+                    <span className="text-xl">📚</span>
+                  </div>
+                  <h4 className="font-extrabold text-slate-900 text-lg mb-2">5 Days Path</h4>
+                  <p className="text-slate-500 text-xs leading-relaxed font-semibold">
+                    Complete, standard curriculum. Covers all daily concepts, interactive quizzes, and full step-by-step guidance over 5 scheduled days.
+                  </p>
+                </div>
+                <div className="w-full mt-6 py-2.5 px-4 bg-slate-50 group-hover:bg-indigo-600 group-hover:text-white text-slate-700 text-xs font-black uppercase tracking-wide rounded-xl text-center transition-all">
+                  Select 5 Days →
+                </div>
+              </button>
+
+              {/* Express option */}
+              <button
+                type="button"
+                onClick={() => handleEnroll(course.id || '', 'express')}
+                className="group relative bg-white border-2 border-slate-200 hover:border-teal-600 p-6 rounded-3xl transition-all shadow-sm hover:shadow-md flex flex-col justify-between text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-black uppercase tracking-wider text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100">
+                      Express Track
+                    </span>
+                    <span className="text-xl">⚡</span>
+                  </div>
+                  <h4 className="font-extrabold text-slate-900 text-lg mb-2">3 Days Path</h4>
+                  <p className="text-slate-500 text-xs leading-relaxed font-semibold">
+                    Accelerated curriculum. Skip extra assignment sections and move through the core instructional lessons in just 3 days!
+                  </p>
+                </div>
+                <div className="w-full mt-6 py-2.5 px-4 bg-slate-50 group-hover:bg-teal-600 group-hover:text-white text-slate-700 text-xs font-black uppercase tracking-wide rounded-xl text-center transition-all">
+                  Select 3 Days →
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowTrackSelectionModal(false)}
+              className="text-slate-400 hover:text-slate-600 text-xs font-bold transition-all underline cursor-pointer border-0 bg-transparent animate-fade-in"
+            >
+              Cancel
             </button>
           </motion.div>
         </div>
@@ -1959,6 +2097,71 @@ export default function StudentDashboard() {
   });
 
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  const cleanupPerformedRef = useRef(false);
+
+  // Automatically clean up screenshot images older than 3 days to keep Firestore lightweight and prevent hitting limits
+  const cleanUpOldSubmissionsLocal = async (uid: string, progress: any) => {
+    try {
+      if (!progress) return;
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+      let updated = false;
+      const updatedProgress = { ...progress };
+
+      Object.entries(updatedProgress).forEach(([cId, pVal]: [string, any]) => {
+        if (pVal?.submissions) {
+          Object.entries(pVal.submissions).forEach(([dayKey, subVal]: [string, any]) => {
+            if (subVal?.images && subVal.images.length > 0 && subVal.submittedAt) {
+              const subDate = new Date(subVal.submittedAt);
+              if (subDate < threeDaysAgo) {
+                updatedProgress[cId].submissions[dayKey].images = []; // delete heavy base64 images
+                updated = true;
+              }
+            }
+          });
+        }
+      });
+
+      if (updated) {
+        const userRef = doc(db, 'users', uid);
+        await updateDoc(userRef, {
+          progress: updatedProgress,
+          updatedAt: serverTimestamp()
+        });
+      }
+    } catch (e) {
+      console.warn("Soft clean up old local submissions error:", e);
+    }
+  };
+
+  const cleanUpOldGlobalSubmissions = async (uid: string) => {
+    try {
+      const q = query(
+        collection(db, 'assignments'),
+        where('userId', '==', uid)
+      );
+      const snap = await getDocs(q);
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+      snap.forEach(async (dDoc) => {
+        const data = dDoc.data();
+        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : null);
+        if (createdAt && createdAt < threeDaysAgo && data.images && data.images.length > 0) {
+          const docRef = doc(db, 'assignments', dDoc.id);
+          await updateDoc(docRef, {
+            images: [], // strip heavy base64 images
+            imagesCleared: true,
+            updatedAt: serverTimestamp()
+          });
+        }
+      });
+    } catch (e) {
+      console.warn("Soft clean up old global submissions error:", e);
+    }
+  };
 
   useEffect(() => {
     const calculateCountdown = () => {
@@ -2447,6 +2650,12 @@ export default function StudentDashboard() {
             const profileData = docSnap.data();
             setUserProfile(profileData);
             
+            if (!cleanupPerformedRef.current) {
+              cleanupPerformedRef.current = true;
+              cleanUpOldSubmissionsLocal(user.uid, profileData.progress);
+              cleanUpOldGlobalSubmissions(user.uid);
+            }
+            
             // Cache to local storage
             const userData = {
               uid: user.uid,
@@ -2482,11 +2691,16 @@ export default function StudentDashboard() {
             setAuthChecking(false);
             setLiveCheckComplete(true);
           } else {
-            safeStorage.removeItem('ciya_cached_user');
-            safeStorage.removeItem('ciya_cached_profile');
-            setLiveCheckComplete(false);
-            navigate('/waitingonboarding', { replace: true });
-            setAuthChecking(false);
+            // Only navigate if we are still authenticated and didn't just sign out!
+            if (auth.currentUser) {
+              safeStorage.removeItem('ciya_cached_user');
+              safeStorage.removeItem('ciya_cached_profile');
+              setLiveCheckComplete(false);
+              navigate('/waitingonboarding', { replace: true });
+              setAuthChecking(false);
+            } else {
+              console.log("No user doc found but user is signed out or signing out. Ignoring redirect.");
+            }
           }
         }, (error: any) => {
           console.error("Profile listen error:", error);
@@ -2825,7 +3039,7 @@ export default function StudentDashboard() {
   const coursesToSee = courses;
 
   const enrolledCourses = isAdmin ? courses : registeredCoursesList;
-  const notEnrolledCourses = isAdmin ? [] : courses.filter(c => !registeredCoursesList.some(r => r.id === c.id));
+  const notEnrolledCourses = isAdmin ? [] : courses.filter(c => !registeredCoursesList.some(r => r.id === c.id) && !c.isCloned);
 
   // Apply Skill tags sorting filters (locked courses are visible and carry padlocks)
   const filteredCourses = coursesToSee.filter(c => {
@@ -3779,6 +3993,7 @@ export default function StudentDashboard() {
                     return isCompleted;
                   }))}
                   onLogin={handleLogin}
+                  courses={courses}
                 />
               ) : (
                 <div className="space-y-8">

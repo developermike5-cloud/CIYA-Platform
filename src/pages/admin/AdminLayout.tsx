@@ -115,7 +115,7 @@ export default function AdminLayout() {
   }
 
   if (!user) {
-    return <Navigate to="/" />;
+    return <Navigate to="/dashboard" />;
   }
 
   const isSuperAdmin = user?.email === 'developermike5@gmail.com' || user?.role === 'super_admin';

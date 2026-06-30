@@ -156,9 +156,18 @@ export default function CoursesAdmin() {
     const clonedTitle = confirmName.trim() || `${sourceCourse.title} (Clone)`;
 
     try {
+      const clonedDays = sourceCourse.days 
+        ? sourceCourse.days.map(day => {
+            const { assignment, ...rest } = day;
+            return rest;
+          })
+        : [];
+
       const clonedCourseData = {
         ...sourceCourse,
         title: clonedTitle,
+        isCloned: true,
+        days: clonedDays,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         status: 'draft',
