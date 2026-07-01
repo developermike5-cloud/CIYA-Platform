@@ -3203,7 +3203,7 @@ export default function StudentDashboard() {
   const isPending = approvalStatus === 'Pending';
   const isDisapproved = approvalStatus === 'Disapproved';
 
-  // Filter courses by registration
+  // Filter courses by registration (Lifted pathway restrictions so everyone can see their enrolled and registered courses without restriction)
   const registeredCoursesList = courses.filter(c => {
     if (isAdmin) return true;
     
@@ -3217,42 +3217,8 @@ export default function StudentDashboard() {
       return false;
     }
     
-    const selection = (userProfile?.pathwaySelection || '').toLowerCase().trim();
-    const courseType = (userProfile?.courseType || '').toLowerCase().trim();
-    const recommended = (userProfile?.recommendedPath || '').toLowerCase().trim();
-    
-    const title = (c.title || '').toLowerCase().trim();
-    const category = (c.category || '').toLowerCase().trim();
-    const skill = (c.skill || '').toLowerCase().trim();
-
-    // Exact classification of learning pathways to avoid cross-course leaks
-    const isLandingUser = courseType.includes('landing') || selection.includes('landing') || recommended.includes('landing') || recommended.includes('funnel') || selection.includes('funnel') || selection.includes('flyer') || selection.includes('logo') || selection.includes('graphic') || selection.includes('mockup');
-    const isEcommerceUser = courseType.includes('e-commerce') || selection.includes('e-commerce') || recommended.includes('e-commerce') || selection.includes('store') || selection.includes('checkout') || selection.includes('catalog') || recommended.includes('store');
-
-    const isLandingCourse = title.includes('landing') || category.includes('landing') || skill.includes('landing') || title.includes('funnel') || category.includes('funnel');
-    const isEcommerceCourse = title.includes('e-commerce') || title.includes('ecommerce') || category.includes('e-commerce') || category.includes('ecommerce') || title.includes('store') || title.includes('checkout') || title.includes('catalog');
-
-    if (isLandingUser && isLandingCourse) {
-      return true;
-    }
-    if (isEcommerceUser && isEcommerceCourse) {
-      return true;
-    }
-
-    if (selection && (title.includes(selection) || selection.includes(title))) {
-      return true;
-    }
-    if (courseType && (title.includes(courseType) || courseType.includes(title))) {
-      return true;
-    }
-    if (recommended && (title.includes(recommended) || recommended.includes(title))) {
-      return true;
-    }
-    if (selection && (category.includes(selection) || selection.includes(category))) {
-      return true;
-    }
-    
-    return false;
+    // All regular (non-cloned) courses are available as enrolled/registered courses without restriction
+    return true;
   });
 
   // Filter courses carefully: admins see everything, students see only their registered course list (no cross courses)
