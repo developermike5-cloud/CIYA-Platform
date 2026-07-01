@@ -744,6 +744,24 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   const [viewingSyllabus, setViewingSyllabus] = useState(true);
   const [showTrackSelectionModal, setShowTrackSelectionModal] = useState(false);
 
+  // Auto scroll window to top when day or course changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeDayIdx, course]);
+
+  // Smoothly scroll the active lesson details container into view when a lesson is opened
+  useEffect(() => {
+    if (activeVideoIdx !== undefined) {
+      const timer = setTimeout(() => {
+        const activeElem = document.getElementById('active-lesson-container');
+        if (activeElem) {
+          activeElem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activeVideoIdx, activeDayIdx]);
+
   // Sync from URL params on search changes:
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -843,6 +861,58 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
 
   const [showFunFactPopup, setShowFunFactPopup] = useState(false);
   const [currentFunFact, setCurrentFunFact] = useState<{ headline: string; body: string } | null>(null);
+  const [showAllWalkthroughLines, setShowAllWalkthroughLines] = useState(false);
+  const funFactScrollRef = useRef<HTMLDivElement>(null);
+  const [isFunFactInteracted, setIsFunFactInteracted] = useState(false);
+
+  // Reset walkthrough collapse state when active lesson changes
+  useEffect(() => {
+    setShowAllWalkthroughLines(false);
+  }, [activeVideoIdx, activeDayIdx]);
+
+  // Reset fun fact interactions when it is shown
+  useEffect(() => {
+    if (showFunFactPopup) {
+      setIsFunFactInteracted(false);
+      if (funFactScrollRef.current) {
+        funFactScrollRef.current.scrollTop = 0;
+      }
+    }
+  }, [showFunFactPopup, currentFunFact]);
+
+  // Auto-scroll logic for fun fact popup description when content overflows
+  useEffect(() => {
+    if (!showFunFactPopup || !currentFunFact || isFunFactInteracted) return;
+    const container = funFactScrollRef.current;
+    if (!container) return;
+
+    let intervalId: any;
+    
+    const checkAndScroll = () => {
+      if (container.scrollHeight > container.clientHeight) {
+        intervalId = setInterval(() => {
+          if (container.scrollTop + container.clientHeight >= container.scrollHeight - 1) {
+            clearInterval(intervalId);
+            setTimeout(() => {
+              if (showFunFactPopup && !isFunFactInteracted && container) {
+                container.scrollTo({ top: 0, behavior: 'smooth' });
+                setTimeout(checkAndScroll, 2000);
+              }
+            }, 3000);
+          } else {
+            container.scrollTop += 1;
+          }
+        }, 60);
+      }
+    };
+
+    const startDelayId = setTimeout(checkAndScroll, 2500);
+
+    return () => {
+      clearTimeout(startDelayId);
+      clearInterval(intervalId);
+    };
+  }, [showFunFactPopup, currentFunFact, isFunFactInteracted]);
 
   useEffect(() => {
     if (!currentVideo) return;
@@ -1008,8 +1078,8 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   return (
     <div className="max-w-4xl mx-auto space-y-8 font-sans pb-16">
       {/* 1. CLASSROOM TOP PORTAL SPECS CARD */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 w-full">
-        <div className="flex gap-3 items-center text-left min-w-0">
+      <div className="bg-gradient-to-b from-white to-slate-50 border border-slate-200 rounded-3xl p-6 md:p-8 shadow-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6 w-full">
+        <div className="flex gap-4 items-center text-left min-w-0 flex-1">
           <button
             onClick={() => {
               if (!viewingSyllabus) {
@@ -1018,22 +1088,43 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                 onBack();
               }
             }}
-            className="p-2.5 px-4 border border-slate-200 hover:bg-slate-50 text-slate-800 font-black text-xs rounded-xl transition-all cursor-pointer bg-white flex items-center justify-center shrink-0"
+            className="p-3 px-5 border border-slate-200 hover:bg-slate-50 text-slate-800 font-black text-xs rounded-xl transition-all cursor-pointer bg-white flex items-center justify-center shrink-0 shadow-sm"
             title="Back to courses"
           >
             ← Back
           </button>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-extrabold text-sm text-slate-900 leading-tight truncate sm:whitespace-normal sm:line-clamp-2">{course.title}</h3>
-            <p className="text-[10.5px] text-slate-600 font-extrabold truncate mt-0.5">{course.tagline || course.subtitle}</p>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <span className="text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-100">
+              CLASSROOM HUB
+            </span>
+            <h2 className="font-extrabold text-lg md:text-2xl lg:text-3xl text-slate-900 leading-tight tracking-tight sm:whitespace-normal">
+              {course.title}
+            </h2>
+            <p className="text-xs md:text-sm text-slate-600 font-extrabold leading-relaxed">
+              {course.tagline || course.subtitle}
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t border-slate-100 sm:border-0">
-          <div className="text-left sm:text-right">
-            <div className="text-[10px] font-black uppercase text-teal-700 tracking-wider">
-              {progressRatio}% COMPLETE · {totalWatchedCount}/{totalVideos} CLIPS
-            </div>
+        {/* Lesson Completion Rate Timeline Bar with Colored Animation */}
+        <div className="flex flex-col gap-2 w-full md:w-64 shrink-0 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-black">
+            <span className="text-indigo-800 uppercase tracking-wider text-[10px]">Course Progress</span>
+            <span className="text-teal-700 font-extrabold text-[11px]">{progressRatio}% Complete</span>
+          </div>
+          
+          <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden relative border border-slate-200/50">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${progressRatio}%` }}
+              transition={{ duration: 1.5, ease: "easeOut" }}
+              className="h-full bg-gradient-to-r from-teal-500 via-indigo-500 to-indigo-600 rounded-full"
+            />
+          </div>
+          
+          <div className="flex justify-between text-[10px] text-slate-500 font-bold font-mono">
+            <span>0% Start</span>
+            <span>{totalWatchedCount} of {totalVideos} Clips</span>
           </div>
         </div>
       </div>
@@ -1224,7 +1315,11 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                        const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
 
                       return (
-                        <div key={vid.id || vi} className="space-y-3 bg-slate-50/40 p-1.5 rounded-2xl border border-slate-100 shadow-sm">
+                        <div 
+                          key={vid.id || vi} 
+                          id={isVidCurrent ? 'active-lesson-container' : `lesson-card-${vi}`}
+                          className="space-y-3 bg-slate-50/40 p-2 rounded-2xl border border-slate-100 shadow-sm"
+                        >
                           <button
                             type="button"
                             onClick={() => {
@@ -1235,7 +1330,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                               }
                             }}
                             disabled={!isUnlocked}
-                            className={`w-full rounded-xl p-3 md:p-4 flex items-center justify-between text-xs md:text-sm transition-all pointer-events-auto cursor-pointer border ${
+                            className={`w-full rounded-xl p-4 md:p-5 flex items-center justify-between text-xs md:text-sm transition-all pointer-events-auto cursor-pointer border ${
                               isVidCurrent
                                 ? 'bg-indigo-600 text-white border-indigo-600 font-extrabold shadow-md'
                                 : isUnlocked
@@ -1243,21 +1338,25 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                                   : 'bg-slate-200 text-slate-600 border-slate-300 font-extrabold opacity-75 cursor-not-allowed'
                             }`}
                           >
-                            <div className="flex items-center gap-3 pr-2 text-inherit min-w-0">
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center font-black shrink-0 text-xs ${
+                            <div className="flex items-center gap-4 text-inherit min-w-0 flex-1">
+                              <span className={`w-8 h-8 rounded-full flex items-center justify-center font-black shrink-0 text-xs md:text-sm ${
                                 isVidCurrent ? 'bg-white text-indigo-950 shadow-sm' : 'bg-slate-200 text-slate-800'
                               }`}>
                                 {vi + 1}
                               </span>
-                              <span className="truncate font-black text-left text-xs md:text-sm">{vid.title || `Lesson ${vi+1}`}</span>
-                              {vid.duration && (
-                                <span className={`text-[10px] px-2 py-0.5 rounded-md font-mono shrink-0 font-bold ${isVidCurrent ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}>
-                                  ⏱ {vid.duration}
+                              <div className="flex-1 min-w-0 flex flex-col gap-1 text-left">
+                                <span className="font-extrabold text-sm md:text-base leading-snug whitespace-normal break-words">
+                                  {vid.title || `Lesson ${vi+1}`}
                                 </span>
-                              )}
+                                {vid.duration && (
+                                  <span className={`text-[10px] md:text-xs px-2.5 py-0.5 rounded-md font-mono shrink-0 font-bold w-max ${isVidCurrent ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}>
+                                    ⏱ {vid.duration}
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0 select-none">
+                            <div className="flex items-center gap-2 shrink-0 select-none pl-2">
                               {!isUnlocked ? (
                                 <Lock className="w-4 h-4 text-slate-400" />
                               ) : (
@@ -1295,11 +1394,54 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                               <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm space-y-4 text-left text-slate-900">
                                 <div>
                                   <h4 className="font-extrabold text-slate-900 text-sm md:text-base uppercase tracking-wider">📖 Walkthrough Outline</h4>
-                                  {vid.description ? (
-                                    <div className="pt-2 text-xs md:text-sm text-slate-800 leading-relaxed font-semibold">
-                                      {formatWalkthroughDescription(vid.description)}
-                                    </div>
-                                  ) : (
+                                  {vid.description ? (() => {
+                                    const allDescriptionLines = vid.description.split('\n').map(l => l.trim()).filter(Boolean);
+                                    const showMoreButton = allDescriptionLines.length > 2;
+                                    const displayedLines = showAllWalkthroughLines ? allDescriptionLines : allDescriptionLines.slice(0, 2);
+                                    return (
+                                      <div className="pt-2">
+                                        <div className="space-y-4 text-sm md:text-base font-semibold text-slate-800 leading-relaxed text-left">
+                                          {displayedLines.map((line, idx) => {
+                                            const timestampRegex = /^(\[?\d{1,2}:\d{2}\]?|Day\s+\d+\s+-\s+\d{1,2}:\d{2})\s*(?:-)?\s*(.*)$/i;
+                                            const match = line.match(timestampRegex);
+                                            if (match) {
+                                              const stamp = match[1];
+                                              const rest = match[2];
+                                              return (
+                                                <div key={idx} className="flex gap-3 items-start pt-1">
+                                                  <span className="font-mono text-xs font-black text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg mt-0.5 shrink-0 select-none">
+                                                    ⏱ {stamp}
+                                                  </span>
+                                                  <p className="text-slate-900 font-extrabold leading-normal m-0">{rest}</p>
+                                                </div>
+                                              );
+                                            }
+                                            return (
+                                              <p key={idx} className="leading-relaxed m-0 text-slate-900 font-extrabold">
+                                                {line}
+                                              </p>
+                                            );
+                                          })}
+                                        </div>
+                                        {showMoreButton && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setShowAllWalkthroughLines(!showAllWalkthroughLines);
+                                            }}
+                                            className="mt-3 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-extrabold rounded-lg flex items-center gap-1.5 cursor-pointer border border-indigo-200 transition-all shadow-sm shrink-0"
+                                          >
+                                            {showAllWalkthroughLines ? (
+                                              <>Show Less ▲</>
+                                            ) : (
+                                              <>Show More Outline ({allDescriptionLines.length - 2} remaining) ▼</>
+                                            )}
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })() : (
                                     <p className="text-xs text-slate-500 italic pt-1">No separate walkthrough text provided.</p>
                                   )}
                                 </div>
@@ -1367,30 +1509,6 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                                     </button>
                                   </div>
                                 )}
-
-                                {/* Inline Day Progression Controls inside active block for perfect pagination */}
-                                <div className="flex justify-between items-center border-t border-slate-100 pt-4 mt-5">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleGoPrev();
-                                    }}
-                                    className="px-4 py-2 border border-slate-205 hover:bg-slate-50 text-slate-650 text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer bg-white"
-                                  >
-                                    ← Previous Module
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleGoNext();
-                                    }}
-                                    className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer border-0"
-                                  >
-                                    {vi === (d.videos || []).length - 1 ? "End-of-Day Assignment →" : "Onward (Next) →"}
-                                  </button>
-                                </div>
                               </div>
                             </motion.div>
                           )}
@@ -1513,45 +1631,56 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
         />
       )}
 
-      {/* CIRCULAR FUN FACT POPUP CARD (Restricted strictly to the lesson number the user is on) */}
+      {/* SQUARE FUN FACT POPUP CARD (With increased font, auto scroll, and touch detection) */}
       {showFunFactPopup && currentFunFact && (
-        <div className="fixed bottom-4 right-4 z-[9999] p-1 select-none">
+        <div id="fun-fact-popup-container" className="fixed bottom-4 right-4 z-[9999] p-1 select-none">
           <motion.div 
+            id="fun-fact-card"
             initial={{ y: 30, scale: 0.9, opacity: 0 }}
             animate={{ y: 0, scale: 1, opacity: 1 }}
-            className="w-44 h-44 md:w-48 md:h-48 rounded-full bg-amber-50 border-2 border-amber-300 p-4 shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden text-amber-950"
+            className="w-64 h-64 md:w-72 md:h-72 rounded-3xl bg-amber-50 border-2 border-amber-300 p-5 shadow-2xl flex flex-col items-center justify-between text-center relative overflow-hidden text-amber-950"
           >
             {/* Top orange gradient accent bar */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
             
-            {/* Close button in top-right area of circle */}
+            {/* Close button in top-right area */}
             <button
+              id="fun-fact-close-btn"
               onClick={() => setShowFunFactPopup(false)}
-              className="absolute top-2.5 right-2.5 w-4.5 h-4.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-950 border-0 flex items-center justify-center cursor-pointer font-black text-[9px] transition-all focus:outline-none"
+              className="absolute top-3 right-3 w-6 h-6 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-950 border-0 flex items-center justify-center cursor-pointer font-black text-xs transition-all focus:outline-none"
             >
               ✕
             </button>
 
-            <span className="text-lg mb-0.5 select-none animate-bounce">💡</span>
+            <span className="text-2xl mt-1 select-none animate-bounce">💡</span>
             
-            <div className="space-y-0.5">
-              <span className="inline-block text-[8px] font-black uppercase text-amber-950 tracking-wider bg-amber-200 px-1.5 py-0.25 rounded-full border border-amber-300">
+            <div className="space-y-1 w-full px-1">
+              <span className="inline-block text-[10px] font-black uppercase text-amber-950 tracking-wider bg-amber-200 px-2.5 py-0.5 rounded-full border border-amber-300">
                 Lesson {activeVideoIdx + 1} Fact
               </span>
-              <h3 className="text-[10px] md:text-[11px] font-black text-amber-950 tracking-tight leading-tight max-w-[100px] md:max-w-[115px] mx-auto truncate">
+              <h3 className="text-sm md:text-base font-black text-amber-950 tracking-tight leading-tight max-w-[180px] md:max-w-[210px] mx-auto truncate">
                 {currentFunFact?.headline || "Did you know?"}
               </h3>
             </div>
 
-            <div className="max-h-[35px] md:max-h-[45px] overflow-y-auto px-1 mt-1 scrollbar-none text-left">
-              <p className="text-amber-950 text-[8px] md:text-[9px] leading-relaxed font-bold text-center">
+            {/* Scrollable body with increased font size and auto-scroll ability */}
+            <div 
+              id="fun-fact-scroll-body"
+              ref={funFactScrollRef}
+              onTouchStart={() => setIsFunFactInteracted(true)}
+              onMouseDown={() => setIsFunFactInteracted(true)}
+              onWheel={() => setIsFunFactInteracted(true)}
+              className="max-h-[100px] md:max-h-[115px] overflow-y-auto px-2 mt-2 text-left w-full scrollbar-thin scrollbar-thumb-amber-200"
+            >
+              <p className="text-amber-950 text-xs md:text-sm leading-relaxed font-bold text-center">
                 {currentFunFact?.body}
               </p>
             </div>
 
             <button
+              id="fun-fact-ack-btn"
               onClick={() => setShowFunFactPopup(false)}
-              className="mt-1.5 px-3 py-1 bg-amber-700 hover:bg-amber-800 text-white font-extrabold text-[8px] tracking-wider uppercase rounded-full transition-all shadow-md cursor-pointer border-0 shrink-0"
+              className="mt-2.5 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white font-extrabold text-[10px] md:text-xs tracking-wider uppercase rounded-xl transition-all shadow-md cursor-pointer border-0 shrink-0 w-full"
             >
               Got it
             </button>
@@ -1734,15 +1863,15 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled }: any
   const totalWatchedCount = completedKeys.length;
   const progressRatio = totalVideos > 0 ? Math.round((totalWatchedCount / totalVideos) * 100) : 0;
   const isCompleted = progressRatio === 100 && totalVideos > 0;
-  let cardBorderClass = "border-slate-200/90 hover:shadow-2xl hover:shadow-teal-950/10";
-  let cardBgClass = "bg-white";
+  let cardBorderClass = "border-slate-200 hover:border-slate-350 hover:shadow-lg";
+  let cardBgClass = "bg-slate-50/70";
   if (isEnrolled) {
     if (isCompleted) {
-      cardBorderClass = "border-emerald-500 shadow-xl shadow-emerald-500/10 hover:shadow-emerald-500/20";
-      cardBgClass = "bg-gradient-to-b from-emerald-50/20 to-white";
+      cardBorderClass = "border-emerald-500 ring-4 ring-emerald-500/15 shadow-xl hover:shadow-2xl shadow-emerald-500/10 hover:shadow-emerald-500/20";
+      cardBgClass = "bg-gradient-to-br from-emerald-50 via-emerald-100/10 to-white";
     } else {
-      cardBorderClass = "border-amber-400 shadow-md shadow-amber-500/5 hover:shadow-amber-500/15";
-      cardBgClass = "bg-gradient-to-b from-amber-50/10 to-white";
+      cardBorderClass = "border-indigo-500 ring-4 ring-indigo-500/15 shadow-xl hover:shadow-2xl shadow-indigo-100/40 hover:shadow-indigo-100/60";
+      cardBgClass = "bg-gradient-to-br from-indigo-50/70 via-indigo-100/10 to-white";
     }
   }
 
@@ -1759,6 +1888,16 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled }: any
             {sk?.icon || "📕"}
           </div>
         )}
+        
+        {/* Top-left Registered Track Highlight */}
+        {isEnrolled && (
+          <div className="absolute top-4 left-4 z-10">
+            <span className="bg-indigo-600 text-white font-extrabold uppercase text-[9px] tracking-wider px-3 py-1 rounded-full shadow-lg border border-indigo-400/30 flex items-center gap-1 select-none">
+              🎓 Registered Path
+            </span>
+          </div>
+        )}
+
         <div className="absolute top-4 right-4 flex flex-col gap-1.5 items-end">
           <TierBadge tier={course.tier || 'beginner'} />
           
@@ -2184,6 +2323,11 @@ export default function StudentDashboard() {
     return params.get('courseId') || null;
   });
 
+  // Auto scroll window to top when selected course or view changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [selectedCourseId, currentView]);
+
   const [submitDayIndex, setSubmitDayIndex] = useState<number>(0);
   const [submitLink, setSubmitLink] = useState('');
   const [submitText, setSubmitText] = useState('');
@@ -2284,7 +2428,7 @@ export default function StudentDashboard() {
     }
   }, []);
 
-  // Custom Light-Ping Synchronization Guard Listener
+  // Custom Robust Data Synchronization and Loader
   useEffect(() => {
     // We can run this whenever a user session is active (or if cached user exists)
     const activeUid = currentUser?.uid || (() => {
@@ -2295,119 +2439,169 @@ export default function StudentDashboard() {
       return null;
     })();
 
-    if (!activeUid) return;
+    if (!activeUid) {
+      setLoading(false);
+      return;
+    }
+
+    let isSubscribed = true;
+
+    // Reusable direct fetchers
+    const fetchAppSettings = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'app'));
+        if (snap.exists() && isSubscribed) {
+          const data = snap.data();
+          setAppSettings(data);
+          safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
+        }
+      } catch (err) {
+        console.warn("Error loading app settings:", err);
+      }
+    };
+
+    const fetchCourses = async (serverCoursesTime = '0') => {
+      try {
+        const q = query(
+          collection(db, 'courses'), 
+          where('publish_status', '==', 'Published')
+        );
+        const courseSnapshot = await getDocs(q);
+        const data = courseSnapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            ...d,
+            skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
+            tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
+            status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
+            days: (d.days || []).map((day: any, dIdx: number) => ({
+              dayNumber: dIdx + 1,
+              title: day.title || `Day ${dIdx + 1}: Study Module`,
+              description: day.description || '',
+              assignment: day.assignment || { prompt: '', dueNote: '' },
+              videos: (day.videos || []).map((v: any) => ({
+                id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
+                title: v.title || '',
+                video_url: v.video_url || v.url || '',
+                url: v.url || v.video_url || '',
+                duration: v.duration || '10 min',
+                description: v.description || '',
+                resources: v.resources || '',
+                checkType: v.checkType || 'none',
+                check: v.check || null,
+                funFact: v.funFact || null
+              }))
+            }))
+          } as Course;
+        });
+        
+        data.sort((a, b) => {
+          const getMills = (fieldVal: any) => {
+            if (!fieldVal) return 0;
+            if (typeof fieldVal.toDate === 'function') {
+              return fieldVal.toDate().getTime();
+            }
+            return new Date(fieldVal).getTime() || 0;
+          };
+          return getMills(b.createdAt) - getMills(a.createdAt);
+        });
+
+        if (isSubscribed) {
+          setCourses(data);
+          safeStorage.setItem('ciya_cached_courses', JSON.stringify(data));
+          safeStorage.setItem('ciya_cached_courses_time', serverCoursesTime);
+        }
+      } catch (err) {
+        console.warn("Error loading courses catalogue:", err);
+      } finally {
+        if (isSubscribed) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const fetchUserProfile = async (serverProfileTime = '0') => {
+      try {
+        const snap = await getDoc(doc(db, 'users', activeUid));
+        if (snap.exists() && isSubscribed) {
+          const profileData = snap.data();
+          setUserProfile(profileData);
+          if (!cleanupPerformedRef.current) {
+            cleanupPerformedRef.current = true;
+            cleanUpOldSubmissionsLocal(activeUid, profileData.progress);
+            cleanUpOldGlobalSubmissions(activeUid);
+          }
+          safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
+          safeStorage.setItem('ciya_cached_profile_time', serverProfileTime);
+        }
+      } catch (err) {
+        console.warn("Error loading profile:", err);
+      }
+    };
+
+    // First load from cache if available, or fetch directly if cache is missing
+    const hasCachedAppSettings = !!safeStorage.getItem('ciya_cached_app_settings');
+    const hasCachedCourses = !!safeStorage.getItem('ciya_cached_courses');
+    const hasCachedProfile = !!safeStorage.getItem('ciya_cached_profile');
+
+    if (!hasCachedAppSettings) fetchAppSettings();
+    if (!hasCachedCourses) {
+      fetchCourses();
+    } else {
+      setLoading(false);
+    }
+    if (!hasCachedProfile) fetchUserProfile();
 
     // Set up a single, light tracking document listener in Firestore
     const unsubSignals = onSnapshot(doc(db, 'settings', 'system_signals'), async (snapshot) => {
-      if (!snapshot.exists()) return;
+      if (!isSubscribed) return;
+
+      if (!snapshot.exists()) {
+        // Fallback: If signals document does not exist, always ensure initial fetch and set loading to false
+        if (!hasCachedCourses) await fetchCourses();
+        if (!hasCachedProfile) await fetchUserProfile();
+        if (!hasCachedAppSettings) await fetchAppSettings();
+        setLoading(false);
+        return;
+      }
+
       const signalData = snapshot.data() || {};
 
       // 1. Sync App Settings (Portal Locks, etc.)
       const cachedSettingsTime = safeStorage.getItem('ciya_cached_settings_time') || '0';
       const serverSettingsTime = String(signalData.settings || '0');
-      const hasCachedSettings = !!safeStorage.getItem('ciya_cached_app_settings');
-      if (serverSettingsTime !== cachedSettingsTime || !hasCachedSettings) {
-        try {
-          const snap = await getDoc(doc(db, 'settings', 'app'));
-          if (snap.exists()) {
-            const data = snap.data();
-            setAppSettings(data);
-            safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
-            safeStorage.setItem('ciya_cached_settings_time', serverSettingsTime);
-          }
-        } catch (err) {
-          console.warn("Error synchronizing settings in light-ping:", err);
-        }
+      if (serverSettingsTime !== cachedSettingsTime || !hasCachedAppSettings) {
+        await fetchAppSettings();
+        safeStorage.setItem('ciya_cached_settings_time', serverSettingsTime);
       }
 
       // 2. Sync Course Catalogue
       const cachedCoursesTime = safeStorage.getItem('ciya_cached_courses_time') || '0';
       const serverCoursesTime = String(signalData.courses || '0');
-      const hasCachedCourses = !!safeStorage.getItem('ciya_cached_courses');
       if (serverCoursesTime !== cachedCoursesTime || !hasCachedCourses) {
-        try {
-          const q = query(
-            collection(db, 'courses'), 
-            where('publish_status', '==', 'Published')
-          );
-          const courseSnapshot = await getDocs(q);
-          const data = courseSnapshot.docs.map(doc => {
-            const d = doc.data();
-            return {
-              id: doc.id,
-              ...d,
-              skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
-              tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
-              status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
-              days: (d.days || []).map((day: any, dIdx: number) => ({
-                dayNumber: dIdx + 1,
-                title: day.title || `Day ${dIdx + 1}: Study Module`,
-                description: day.description || '',
-                assignment: day.assignment || { prompt: '', dueNote: '' },
-                videos: (day.videos || []).map((v: any) => ({
-                  id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
-                  title: v.title || '',
-                  video_url: v.video_url || v.url || '',
-                  url: v.url || v.video_url || '',
-                  duration: v.duration || '10 min',
-                  description: v.description || '',
-                  resources: v.resources || '',
-                  checkType: v.checkType || 'none',
-                  check: v.check || null,
-                  funFact: v.funFact || null
-                }))
-              }))
-            } as Course;
-          });
-          
-          data.sort((a, b) => {
-            const getMills = (fieldVal: any) => {
-              if (!fieldVal) return 0;
-              if (typeof fieldVal.toDate === 'function') {
-                return fieldVal.toDate().getTime();
-              }
-              return new Date(fieldVal).getTime() || 0;
-            };
-            return getMills(b.createdAt) - getMills(a.createdAt);
-          });
-
-          setCourses(data);
-          setLoading(false);
-          safeStorage.setItem('ciya_cached_courses', JSON.stringify(data));
-          safeStorage.setItem('ciya_cached_courses_time', serverCoursesTime);
-        } catch (err) {
-          console.warn("Error synchronizing courses catalogue in light-ping:", err);
-        }
+        await fetchCourses(serverCoursesTime);
       }
 
       // 3. Sync User Profile & Status changes
       const cachedProfileTime = safeStorage.getItem('ciya_cached_profile_time') || '0';
       const serverProfileTime = String(signalData.user_signals?.[activeUid] || '0');
-      const hasCachedProfile = !!safeStorage.getItem('ciya_cached_profile');
       if (serverProfileTime !== cachedProfileTime || !hasCachedProfile) {
-        try {
-          const snap = await getDoc(doc(db, 'users', activeUid));
-          if (snap.exists()) {
-            const profileData = snap.data();
-            setUserProfile(profileData);
-            if (!cleanupPerformedRef.current) {
-              cleanupPerformedRef.current = true;
-              cleanUpOldSubmissionsLocal(activeUid, profileData.progress);
-              cleanUpOldGlobalSubmissions(activeUid);
-            }
-            safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
-            safeStorage.setItem('ciya_cached_profile_time', serverProfileTime);
-          }
-        } catch (err) {
-          console.warn("Error synchronizing profile in light-ping:", err);
-        }
+        await fetchUserProfile(serverProfileTime);
       }
 
-    }, (error) => {
+    }, async (error) => {
       console.warn("Soft handling global light-ping system signals observer:", error);
+      // Fail gracefully: fetch directly and stop loading
+      if (!hasCachedCourses) await fetchCourses();
+      if (!hasCachedProfile) await fetchUserProfile();
+      setLoading(false);
     });
 
-    return () => unsubSignals();
+    return () => {
+      isSubscribed = false;
+      unsubSignals();
+    };
   }, [currentUser]);
 
   const [timeLeft, setTimeLeft] = useState('');

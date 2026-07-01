@@ -478,7 +478,7 @@ export default function NotificationsAdmin() {
                 value={manualTitle}
                 onChange={e => setManualTitle(e.target.value)}
                 required
-                className="w-full bg-slate-50 border outline-none p-2.5 rounded-xl text-slate-805 font-extrabold focus:border-indigo-500 focus:bg-white"
+                className="w-full bg-slate-50 border outline-none p-2.5 rounded-xl text-slate-800 font-extrabold focus:border-indigo-500 focus:bg-white"
               />
             </div>
 
@@ -544,11 +544,11 @@ export default function NotificationsAdmin() {
                       </span>
                       <span className="text-[9px] text-slate-400 font-bold">Sender: {hist.triggeredBy || 'System'}</span>
                     </div>
-                    <strong className="text-slate-905 font-extrabold text-sm block">{hist.title}</strong>
-                    <p className="text-slate-650 leading-relaxed font-semibold font-sans select-all bg-white p-2.5 rounded-xl border border-slate-100 whitespace-pre-wrap">{hist.message}</p>
+                    <strong className="text-slate-900 font-extrabold text-sm block">{hist.title}</strong>
+                    <p className="text-slate-600 leading-relaxed font-semibold font-sans select-all bg-white p-2.5 rounded-xl border border-slate-100 whitespace-pre-wrap">{hist.message}</p>
                   </div>
 
-                  <div className="shrink-0 text-slate-450 uppercase text-[9px] font-black flex sm:flex-col justify-between items-end gap-1 font-mono">
+                  <div className="shrink-0 text-slate-500 uppercase text-[9px] font-black flex sm:flex-col justify-between items-end gap-1 font-mono">
                     <span>{hist.triggerType}</span>
                     <span>
                       {hist.createdAt?.toDate ? hist.createdAt.toDate().toLocaleString() : 'Logging...'}

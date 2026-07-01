@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp, where } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, getActiveDatabaseId, setActiveDatabaseId, triggerSystemSignal } from '../../firebase';
 import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
@@ -381,14 +381,15 @@ export default function UsersAdmin() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const fetchUsers = async (forceRefresh = false) => {
+  const fetchUsers = async (targetCohort: string, forceRefresh = false) => {
     let hasUsedCache = false;
 
     if (forceRefresh) {
       setIsRefreshing(true);
     } else {
-      // Stale-while-revalidate: Load from cache instantly, then fetch fresh in background
-      const cachedUsersStr = localStorage.getItem('ciya_admin_cached_users_list');
+      // Stale-while-revalidate: Load from cache instantly, namespaced by cohort, then fetch fresh in background
+      const cacheKey = `ciya_admin_cached_users_list_${targetCohort}`;
+      const cachedUsersStr = localStorage.getItem(cacheKey);
       const cachedAdminsStr = localStorage.getItem('ciya_admin_cached_admins_list');
       const cachedAdminsDataStr = localStorage.getItem('ciya_admin_cached_admins_data');
 
@@ -411,10 +412,24 @@ export default function UsersAdmin() {
     }
 
     try {
-      // Fresh Firestore fetch (Always executed to fetch newly registered students immediately)
-      const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+      // Fresh Firestore fetch (Restricted by targetCohort to streamline reads!)
+      const q = (targetCohort && targetCohort !== 'All')
+        ? query(collection(db, 'users'), where('cohort', '==', targetCohort))
+        : query(collection(db, 'users'));
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile));
+      
+      // Sort in memory by createdAt descending to avoid requiring composite indexes on Firestore
+      data.sort((a, b) => {
+        const getMills = (fieldVal: any) => {
+          if (!fieldVal) return 0;
+          if (typeof fieldVal.toDate === 'function') {
+            return fieldVal.toDate().getTime();
+          }
+          return new Date(fieldVal).getTime() || 0;
+        };
+        return getMills(b.createdAt) - getMills(a.createdAt);
+      });
       setUsers(data);
 
       const coursesSnapshot = await getDocs(collection(db, 'courses'));
@@ -431,29 +446,9 @@ export default function UsersAdmin() {
       setAdmins(adminIds);
       setAdminsData(adminMap);
 
-      // Fetch Cohorts configuration from settings
-      let activeCohort = 'Cohort 1';
-      let cohortsList = ['Cohort 1'];
-      try {
-        const cohortsSnap = await getDoc(doc(db, 'settings', 'cohorts'));
-        if (cohortsSnap.exists()) {
-          const cData = cohortsSnap.data();
-          activeCohort = cData.activeCohort || 'Cohort 1';
-          cohortsList = cData.cohortsList || ['Cohort 1'];
-        } else {
-          // Initialize cohorts setting
-          await setDoc(doc(db, 'settings', 'cohorts'), {
-            activeCohort: 'Cohort 1',
-            cohortsList: ['Cohort 1']
-          });
-        }
-      } catch (cohortErr) {
-        console.warn("Could not fetch settings/cohorts document:", cohortErr);
-      }
-      setCohortsConfig({ activeCohort, cohortsList });
-
-      // Save to local cache
-      localStorage.setItem('ciya_admin_cached_users_list', JSON.stringify(data));
+      // Save to local cache namespaced by cohort
+      const cacheKey = `ciya_admin_cached_users_list_${targetCohort}`;
+      localStorage.setItem(cacheKey, JSON.stringify(data));
       localStorage.setItem('ciya_admin_cached_users_time', Date.now().toString());
       localStorage.setItem('ciya_admin_cached_admins_list', JSON.stringify(adminIds));
       localStorage.setItem('ciya_admin_cached_admins_data', JSON.stringify(adminMap));
@@ -470,9 +465,40 @@ export default function UsersAdmin() {
     }
   };
 
+  // Load cohorts config on mount, and set filterCohort to the active cohort as default
   useEffect(() => {
-    fetchUsers(false);
+    const initCohorts = async () => {
+      let active = 'Cohort 1';
+      let list = ['Cohort 1'];
+      try {
+        const cohortsSnap = await getDoc(doc(db, 'settings', 'cohorts'));
+        if (cohortsSnap.exists()) {
+          const cData = cohortsSnap.data();
+          active = cData.activeCohort || 'Cohort 1';
+          list = cData.cohortsList || ['Cohort 1'];
+        } else {
+          // Initialize cohorts setting
+          await setDoc(doc(db, 'settings', 'cohorts'), {
+            activeCohort: 'Cohort 1',
+            cohortsList: ['Cohort 1']
+          });
+        }
+      } catch (cohortErr) {
+        console.warn("Could not fetch settings/cohorts document:", cohortErr);
+      }
+      setCohortsConfig({ activeCohort: active, cohortsList: list });
+      setFilterCohort(active); // This sets the selected active cohort as default and triggers the fetch
+    };
+
+    initCohorts();
   }, []);
+
+  // Fetch users specifically for the selected filterCohort when it changes
+  useEffect(() => {
+    if (filterCohort) {
+      fetchUsers(filterCohort, false);
+    }
+  }, [filterCohort]);
 
   const uniqueStates = Array.from(new Set(users.map(u => u.state).filter(Boolean))).sort() as string[];
   const uniqueCourses = Array.from(new Set(users.map(u => u.courseType || u.pathwaySelection).filter(Boolean))).sort() as string[];
@@ -750,7 +776,7 @@ export default function UsersAdmin() {
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold text-slate-800">Students & Onboarding Stats</h1>
             <button
-              onClick={() => fetchUsers(true)}
+              onClick={() => fetchUsers(filterCohort, true)}
               disabled={isRefreshing}
               className={`p-1.5 px-3 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 cursor-pointer shadow-sm transition-all flex items-center gap-1.5 text-xs font-bold ${isRefreshing ? 'opacity-60 cursor-not-allowed' : ''}`}
               title="Force sync latest student data from Firestore"
