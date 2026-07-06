@@ -6,6 +6,7 @@ import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircl
 import BrandingLogo from '../../components/BrandingLogo';
 import { Course } from '../../types';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 
 function getFirestoreTime(timestamp: any): number {
   if (!timestamp) return 0;
@@ -202,37 +203,7 @@ export default function UsersAdmin() {
 
     setLogoUploading(true);
     try {
-      const fileExt = file.name.split('.').pop() || '';
-      const cleanFileName = file.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
-      const fileName = `${Date.now()}-${cleanFileName}.${fileExt}`;
-      const filePath = `brand/${fileName}`;
-      const bucket = 'branding';
-
-      try {
-        const { data: buckets } = await supabase.storage.listBuckets();
-        const exists = buckets?.some(b => b.name === bucket);
-        if (!exists) {
-          await supabase.storage.createBucket(bucket, {
-            public: true,
-            fileSizeLimit: 104857600, // 100MB
-          });
-        }
-      } catch (bucketErr) {
-        console.warn("Storage bucket check/create warning:", bucketErr);
-      }
-
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      const publicUrl = getStoragePublicUrl(bucket, filePath);
+      const publicUrl = await uploadToCloudinary(file, 'branding');
 
       await setDoc(doc(db, 'settings', 'app'), {
         logo: publicUrl,
@@ -241,7 +212,7 @@ export default function UsersAdmin() {
 
       localStorage.setItem('ciya_brand_logo', publicUrl);
       setCurrentLogo(publicUrl);
-      alert("Website branding logo updated and synchronized successfully via Supabase Storage! 🎉");
+      alert("Website branding logo updated and synchronized successfully via Cloudinary! 🎉");
     } catch (err: any) {
       console.error("Error saving brand logo to Supabase storage / Firestore:", err);
       const reader = new FileReader();

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 import { db, handleFirestoreError, OperationType, triggerSystemSignal } from '../../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { 
@@ -637,41 +638,15 @@ export default function PromptsAdmin() {
     handleSaveModularPrompts(nextMods);
   };
 
-  // Helper to upload media file to Supabase Storage
+  // Helper to upload media file to Cloudinary
   const uploadToSupabaseStorage = async (file: File, bucket: string = 'prompts'): Promise<string> => {
-    // Generate a clean unique name
-    const fileExt = file.name.split('.').pop() || '';
-    const cleanFileName = file.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
-    const fileName = `${Date.now()}-${cleanFileName}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    // First, verify/create the bucket if it does not exist
     try {
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const exists = buckets?.some(b => b.name === bucket);
-      if (!exists) {
-        await supabase.storage.createBucket(bucket, {
-          public: true,
-          fileSizeLimit: 104857600, // 100MB
-        });
-      }
-    } catch (bucketErr) {
-      console.warn("Storage bucket check/create warning:", bucketErr);
+      const cloudinaryUrl = await uploadToCloudinary(file, bucket);
+      return cloudinaryUrl;
+    } catch (err: any) {
+      console.error("Cloudinary upload failed in PromptsAdmin:", err);
+      throw err;
     }
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: true
-      });
-
-    if (error) {
-      throw error;
-    }
-
-    const publicUrl = getStoragePublicUrl(bucket, filePath);
-    return publicUrl;
   };
 
   // Optimized file compression before conversion to Base64 (saves document size space)

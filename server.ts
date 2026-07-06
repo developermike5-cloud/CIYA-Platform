@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -56,7 +57,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
   // Add API routes here
   app.get("/api/health", (req, res) => {
@@ -228,6 +230,79 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
     } catch (err: any) {
       console.error("Smart prompt compilation failed:", err);
       res.status(500).json({ error: err.message || "Failed to compile tailored developer prompt." });
+    }
+  });
+
+  app.post("/api/cloudinary/upload", async (req: express.Request, res: express.Response) => {
+    try {
+      const { file, folder } = req.body;
+      if (!file) {
+        return res.status(400).json({ error: "No file data provided." });
+      }
+
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "dqrhmr7ms";
+      const apiKey = process.env.CLOUDINARY_API_KEY;
+      const apiSecret = process.env.CLOUDINARY_API_SECRET;
+      const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
+
+      if (!cloudName) {
+        return res.status(400).json({ error: "Cloudinary Cloud Name is not configured in the environment." });
+      }
+
+      const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+      const formData = new URLSearchParams();
+      formData.append("file", file);
+
+      if (apiSecret && apiKey) {
+        // Signed upload (Most secure, proxies using credentials)
+        const timestamp = Math.floor(Date.now() / 1000);
+        let paramString = `timestamp=${timestamp}`;
+        if (folder) {
+          paramString = `folder=${folder}&timestamp=${timestamp}`;
+        }
+
+        const signature = crypto
+          .createHash("sha1")
+          .update(`${paramString}${apiSecret}`)
+          .digest("hex");
+
+        formData.append("api_key", apiKey);
+        formData.append("timestamp", String(timestamp));
+        formData.append("signature", signature);
+        if (folder) {
+          formData.append("folder", folder);
+        }
+      } else if (uploadPreset) {
+        // Unsigned fallback
+        formData.append("upload_preset", uploadPreset);
+        if (folder) {
+          formData.append("folder", folder);
+        }
+      } else {
+        return res.status(400).json({
+          error: "Cloudinary credentials missing. Please set CLOUDINARY_API_KEY & CLOUDINARY_API_SECRET or CLOUDINARY_UPLOAD_PRESET in Secrets."
+        });
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: formData.toString(),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("Cloudinary upload raw error response:", errText);
+        return res.status(response.status).json({ error: `Cloudinary failed: ${errText}` });
+      }
+
+      const data = await response.json();
+      return res.json({ url: data.secure_url || data.url });
+    } catch (err: any) {
+      console.error("Cloudinary upload proxy error:", err);
+      return res.status(500).json({ error: err.message || "Cloudinary upload proxy failed." });
     }
   });
 

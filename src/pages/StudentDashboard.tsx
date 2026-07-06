@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType } from '../firebase';
 import { ref as dbRef, onValue } from 'firebase/database';
@@ -15,6 +15,7 @@ import { StudentBlog } from '../components/StudentBlog';
 import AdminKycbQuestionnaire from './admin/AdminKycbQuestionnaire';
 import { safeStorage } from '../utils/safeStorage';
 import { supabase, getStoragePublicUrl } from '../lib/supabase';
+import { uploadToCloudinary } from '../utils/cloudinary';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -846,7 +847,7 @@ interface CourseViewerProps {
   isEnrolled?: boolean;
   onLogin?: () => void;
   courses: Course[];
-  hasCompletedFirstCourse?: () => boolean;
+  hasCompletedFirstCourse?: boolean;
 }
 
 function renderBulletList(text: string, icon: string, textClass: string = "text-sm text-slate-800") {
@@ -946,6 +947,22 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   const handleEnroll = async (courseId: string, track: 'standard' | 'express') => {
     try {
       if (!currentUser) return;
+
+      // Optimistic local update to state and cache to ensure instant enrollment in the UI
+      const updatedProfile = {
+        ...userProfile,
+        progress: {
+          ...(userProfile?.progress || {}),
+          [courseId]: {
+            ...(userProfile?.progress?.[courseId] || {}),
+            durationMode: track,
+            createdAt: new Date().toISOString()
+          }
+        }
+      };
+      setUserProfile(updatedProfile);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
         [`progress.${courseId}.durationMode`]: track,
@@ -1143,6 +1160,19 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       }
 
       try {
+        const updatedProfile = {
+          ...userProfile,
+          progress: {
+            ...(userProfile?.progress || {}),
+            [courseId]: {
+              ...(userProfile?.progress?.[courseId] || {}),
+              watched: updatedWatched
+            }
+          }
+        };
+        setUserProfile(updatedProfile);
+        safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
         const userRef = doc(db, 'users', currentUser.uid);
         await updateDoc(userRef, {
           [`progress.${courseId}.watched`]: updatedWatched,
@@ -1177,6 +1207,20 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     }
 
     try {
+      const updatedProfile = {
+        ...userProfile,
+        progress: {
+          ...(userProfile?.progress || {}),
+          [courseId]: {
+            ...(userProfile?.progress?.[courseId] || {}),
+            watched: updatedWatched,
+            checkPassed: updatedPassed
+          }
+        }
+      };
+      setUserProfile(updatedProfile);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
         [`progress.${courseId}.watched`]: updatedWatched,
@@ -1245,6 +1289,22 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
   const handleAssignmentSubmit = async (key: string, data: any) => {
     try {
+      const updatedProfile = {
+        ...userProfile,
+        progress: {
+          ...(userProfile?.progress || {}),
+          [courseId]: {
+            ...(userProfile?.progress?.[courseId] || {}),
+            submissions: {
+              ...(userProfile?.progress?.[courseId]?.submissions || {}),
+              [key]: data
+            }
+          }
+        }
+      };
+      setUserProfile(updatedProfile);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
         [`progress.${courseId}.submissions.${key}`]: data,
@@ -1433,7 +1493,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                     return;
                   }
 
-                  const completedFirst = hasCompletedFirstCourse ? hasCompletedFirstCourse() : false;
+                  const completedFirst = hasCompletedFirstCourse ? hasCompletedFirstCourse : false;
                   if (!completedFirst) {
                     // Automatically ascribe to standard course
                     handleEnroll(course.id || '', 'standard');
@@ -2428,7 +2488,11 @@ export default function StudentDashboard() {
   const [leaderboardUsers, setLeaderboardUsers] = useState<any[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    const hasCachedCourses = !!safeStorage.getItem('ciya_cached_courses');
+    const hasCachedProfile = !!safeStorage.getItem('ciya_cached_profile');
+    return !(hasCachedCourses && hasCachedProfile);
+  });
   const [isRefreshingCourses, setIsRefreshingCourses] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   
@@ -2594,37 +2658,13 @@ export default function StudentDashboard() {
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const uploadToSupabaseStorage = async (file: File, bucket: string = 'assignments'): Promise<string> => {
-    const fileExt = file.name.split('.').pop() || '';
-    const cleanFileName = file.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
-    const fileName = `${Date.now()}-${cleanFileName}.${fileExt}`;
-    const filePath = `${fileName}`;
-
     try {
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const exists = buckets?.some(b => b.name === bucket);
-      if (!exists) {
-        await supabase.storage.createBucket(bucket, {
-          public: true,
-          fileSizeLimit: 104857600, // 100MB
-        });
-      }
-    } catch (bucketErr) {
-      console.warn("Storage bucket check/create warning:", bucketErr);
+      const cloudinaryUrl = await uploadToCloudinary(file, bucket);
+      return cloudinaryUrl;
+    } catch (err: any) {
+      console.error("Cloudinary upload failed:", err);
+      throw err;
     }
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: true
-      });
-
-    if (error) {
-      throw error;
-    }
-
-    const publicUrl = getStoragePublicUrl(bucket, filePath);
-    return publicUrl;
   };
 
   useEffect(() => {
@@ -2695,9 +2735,25 @@ export default function StudentDashboard() {
   }, [currentUser]);
 
   const handleDashboardAssignmentSubmit = async (dayIndex: number, data: any) => {
-    const activeCId = selectedAssignCourseId || registeredCoursesList[0]?.id;
+    const activeCId = selectedAssignCourseId || (registeredCoursesList && registeredCoursesList[0]?.id);
     if (!activeCId) return;
     try {
+      const updatedProfile = {
+        ...userProfile,
+        progress: {
+          ...(userProfile?.progress || {}),
+          [activeCId]: {
+            ...(userProfile?.progress?.[activeCId] || {}),
+            submissions: {
+              ...(userProfile?.progress?.[activeCId]?.submissions || {}),
+              [`day-${dayIndex}`]: data
+            }
+          }
+        }
+      };
+      setUserProfile(updatedProfile);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
         [`progress.${activeCId}.submissions.day-${dayIndex}`]: data,
@@ -2910,47 +2966,91 @@ export default function StudentDashboard() {
       setLoading(false);
     });
 
+    // Set up a direct real-time listener on the user's own profile doc!
+    const unsubProfile = onSnapshot(doc(db, 'users', activeUid), (snapshot) => {
+      if (!isSubscribed) return;
+      if (snapshot.exists()) {
+        const profileData = snapshot.data();
+        setUserProfile(profileData);
+        safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
+        if (!cleanupPerformedRef.current) {
+          cleanupPerformedRef.current = true;
+          cleanUpOldSubmissionsLocal(activeUid, profileData.progress);
+          cleanUpOldGlobalSubmissions(activeUid);
+        }
+      }
+    }, (error) => {
+      console.warn("Soft handling direct real-time user profile listener error:", error);
+    });
+
     return () => {
       isSubscribed = false;
       unsubSignals();
+      unsubProfile();
     };
   }, [currentUser]);
 
-  // Real-time listener for leaderboard aggregation
+  // Throttled 12-hour local cached fetcher for leaderboard aggregation to save database egress
   useEffect(() => {
     if (currentView !== 'courses') return;
 
-    setLeaderboardLoading(true);
-    const q = query(collection(db, 'users'));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach(doc => {
-        const d = doc.data();
-        const roleLower = String(d.role || '').toLowerCase();
-        const emailLower = String(d.email || '').toLowerCase();
-        const nameLower = String(d.fullName || '').toLowerCase();
-        const isAdminUser = 
-          roleLower.includes('admin') || 
-          emailLower.includes('admin') || 
-          nameLower.includes('admin') ||
-          emailLower === 'developermike5@gmail.com' ||
-          emailLower.includes('ciyacademy.com');
+    const CACHE_KEY = 'ciya_leaderboard_users';
+    const CACHE_TIME_KEY = 'ciya_leaderboard_time';
+    const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 
-        if (!isAdminUser && (d.fullName || d.email)) {
-          list.push({
-            id: doc.id,
-            ...d
-          });
+    const loadLeaderboard = async () => {
+      const now = Date.now();
+      const cachedTimeStr = safeStorage.getItem(CACHE_TIME_KEY);
+      const cachedTime = cachedTimeStr ? parseInt(cachedTimeStr, 10) : 0;
+      const cachedData = safeStorage.getItem(CACHE_KEY);
+
+      if (cachedData && cachedTime && (now - cachedTime < TWELVE_HOURS_MS)) {
+        try {
+          const parsed = JSON.parse(cachedData);
+          setLeaderboardUsers(parsed);
+          setLeaderboardLoading(false);
+          return;
+        } catch (e) {
+          // fallback to fetching if parse fails
         }
-      });
-      setLeaderboardUsers(list);
-      setLeaderboardLoading(false);
-    }, (error) => {
-      console.warn("Leaderboard loading error:", error);
-      setLeaderboardLoading(false);
-    });
+      }
 
-    return () => unsub();
+      setLeaderboardLoading(true);
+      try {
+        const q = query(collection(db, 'users'));
+        const snapshot = await getDocs(q);
+        const list: any[] = [];
+        snapshot.forEach(docSnap => {
+          const d = docSnap.data();
+          const roleLower = String(d.role || '').toLowerCase();
+          const emailLower = String(d.email || '').toLowerCase();
+          const nameLower = String(d.fullName || '').toLowerCase();
+          const isAdminUser = 
+            roleLower.includes('admin') || 
+            emailLower.includes('admin') || 
+            nameLower.includes('admin') ||
+            emailLower === 'developermike5@gmail.com' ||
+            emailLower.includes('ciyacademy.com');
+
+          if (!isAdminUser && (d.fullName || d.email)) {
+            list.push({
+              id: docSnap.id,
+              ...d
+            });
+          }
+        });
+
+        setLeaderboardUsers(list);
+        safeStorage.setItem(CACHE_KEY, JSON.stringify(list));
+        safeStorage.setItem(CACHE_TIME_KEY, String(now));
+      } catch (error) {
+        console.warn("Leaderboard loading error:", error);
+      } finally {
+        setLeaderboardLoading(false);
+      }
+    };
+
+    loadLeaderboard();
   }, [currentView]);
 
   const [timeLeft, setTimeLeft] = useState('');
@@ -3049,7 +3149,7 @@ export default function StudentDashboard() {
       const targetCourse = courses.find(c => c.id === cId);
       if (targetCourse) {
         const isRegistered = registeredCoursesList.some(r => r.id === cId);
-        if (!isRegistered && !hasCompletedFirstCourse()) {
+        if (!isRegistered && !hasCompletedFirstCourse) {
           alert("Access Restricted: You must fully complete your first assigned course path from onboarding (100% video lessons completed) before enrolling or switching to other curriculum tracks.");
           return;
         }
@@ -3076,6 +3176,29 @@ export default function StudentDashboard() {
     if (!isConfirmed) return;
 
     try {
+      const updatedProfile = {
+        ...userProfile,
+        progress: {
+          ...(userProfile?.progress || {}),
+          [cId]: {
+            watched: [],
+            textChecked: [],
+            watchedComplete: false,
+            watchedCount: 0,
+            watchedPercent: 0,
+            watchedRatio: 0,
+            watchedRatioPercent: 0,
+            checkedPassed: [],
+            submissions: {},
+            watchedList: [],
+            checkPassed: [],
+            quizScores: {}
+          }
+        }
+      };
+      setUserProfile(updatedProfile);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
         [`progress.${cId}`]: {
@@ -3146,6 +3269,27 @@ export default function StudentDashboard() {
       });
 
       // 2. Submit to student progress in users doc
+      const updatedProfile = {
+        ...userProfile,
+        progress: {
+          ...(userProfile?.progress || {}),
+          [registeredCourse.id]: {
+            ...(userProfile?.progress?.[registeredCourse.id] || {}),
+            submissions: {
+              ...(userProfile?.progress?.[registeredCourse.id]?.submissions || {}),
+              [`day-${submitDayIndex}`]: {
+                text: submitText,
+                link: submitLink,
+                images: uploadedImages,
+                submittedAt: new Date().toISOString()
+              }
+            }
+          }
+        }
+      };
+      setUserProfile(updatedProfile);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
         [`progress.${registeredCourse.id}.submissions.day-${submitDayIndex}`]: {
@@ -3201,6 +3345,13 @@ export default function StudentDashboard() {
     if (codeEntered === targetCode) {
       setUnlocking(true);
       try {
+        const updatedProfile = {
+          ...userProfile,
+          isDashboardUnlocked: true
+        };
+        setUserProfile(updatedProfile);
+        safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
         await updateDoc(doc(db, 'users', currentUser.uid), {
           isDashboardUnlocked: true,
           updatedAt: serverTimestamp()
@@ -3639,41 +3790,57 @@ export default function StudentDashboard() {
   };
 
   // Filter courses by registration (Admins see everything, students see their matched / enrolled courses)
-  const registeredCoursesList = courses.filter((c, idx, self) => {
-    if (isAdmin) return true;
-    if (c.isCloned || c.durationMode === 'express') return false; // Never show cloned or express-only course cards directly
-    
-    // Check progressed course keys
-    let isEnrolled = false;
-    if (userProfile?.progress && userProfile.progress[c.id]) {
-      isEnrolled = true;
-    }
+  const registeredCoursesList = useMemo(() => {
+    if (!courses || courses.length === 0) return [];
+    if (isAdmin) return courses;
 
-    // Check if enrolled in its cloned express version instead
-    if (!isEnrolled) {
-      const expressClone = courses.find(clone => clone.clonedFromId === c.id && clone.isCloned && clone.durationMode === 'express');
-      if (expressClone && userProfile?.progress && userProfile.progress[expressClone.id]) {
+    // Build a quick lookup of progress keys
+    const progressKeys = userProfile?.progress ? Object.keys(userProfile.progress) : [];
+    const progressSet = new Set(progressKeys);
+
+    // Build a lookup of cloned express courses from standard course ID
+    const standardToExpressCloneMap = new Map<string, string>();
+    courses.forEach(c => {
+      if (c.clonedFromId && c.isCloned && c.durationMode === 'express') {
+        standardToExpressCloneMap.set(c.clonedFromId, c.id);
+      }
+    });
+
+    // Check first matching index by title to de-duplicate efficiently
+    const firstTitleIndexMap = new Map<string, number>();
+    courses.forEach((c, idx) => {
+      const cTitle = (c.title || '').trim().toLowerCase();
+      if (!firstTitleIndexMap.has(cTitle)) {
+        firstTitleIndexMap.set(cTitle, idx);
+      }
+    });
+
+    return courses.filter((c, idx) => {
+      if (c.isCloned || c.durationMode === 'express') return false;
+
+      let isEnrolled = progressSet.has(c.id);
+
+      if (!isEnrolled) {
+        const expressCloneId = standardToExpressCloneMap.get(c.id);
+        if (expressCloneId && progressSet.has(expressCloneId)) {
+          isEnrolled = true;
+        }
+      }
+
+      if (!isEnrolled && isProfileRegisteredForCourse(userProfile, c)) {
         isEnrolled = true;
       }
-    }
 
-    // Check onboarding matched courses
-    if (!isEnrolled && isProfileRegisteredForCourse(userProfile, c)) {
-      isEnrolled = true;
-    }
-    
-    if (!isEnrolled) return false;
+      if (!isEnrolled) return false;
 
-    // De-duplicate registered courses by title to prevent showing different duration versions of the same course
-    const cTitle = (c.title || '').trim().toLowerCase();
-    const firstIdx = self.findIndex(item => (item.title || '').trim().toLowerCase() === cTitle);
-    if (firstIdx !== idx) return false;
-
-    return true;
-  });
+      // De-duplicate registered courses by title
+      const cTitle = (c.title || '').trim().toLowerCase();
+      return firstTitleIndexMap.get(cTitle) === idx;
+    });
+  }, [courses, userProfile, isAdmin]);
 
   // Helper to check if student has completed their first course path (at least one registered course is 100% completed)
-  const hasCompletedFirstCourse = (): boolean => {
+  const hasCompletedFirstCourse = useMemo((): boolean => {
     if (isAdmin) return true;
     if (!userProfile || !courses || courses.length === 0) return false;
     
@@ -3689,7 +3856,7 @@ export default function StudentDashboard() {
       }
     }
     return false;
-  };
+  }, [courses, userProfile, isAdmin]);
 
   // Filter courses by standard vs. express durationMode (disabled: show all)
   const coursesToSee = courses;
@@ -3698,26 +3865,33 @@ export default function StudentDashboard() {
     ? coursesToSee 
     : registeredCoursesList;
 
-  const notEnrolledCourses = isAdmin 
-    ? [] 
-    : courses.filter((c, idx, self) => {
-        // Exclude if already in registered list by ID
-        if (registeredCoursesList.some(r => r.id === c.id)) return false;
+  const notEnrolledCourses = useMemo(() => {
+    if (isAdmin) return [];
+    if (!courses || courses.length === 0) return [];
 
-        // Exclude cloned or express-only courses
-        if (c.isCloned || c.durationMode === 'express') return false;
+    // Build sets of registered course IDs and titles for O(1) lookup
+    const registeredIds = new Set(registeredCoursesList.map(r => r.id));
+    const registeredTitles = new Set(registeredCoursesList.map(r => (r.title || '').trim().toLowerCase()));
 
-        // Exclude if already enrolled in this course title (case-insensitive, trimmed)
-        const cTitle = (c.title || '').trim().toLowerCase();
-        const isAlreadyEnrolledInTitle = registeredCoursesList.some(r => (r.title || '').trim().toLowerCase() === cTitle);
-        if (isAlreadyEnrolledInTitle) return false;
+    // Precompute first matching title index map for de-duplication
+    const firstTitleIndexMap = new Map<string, number>();
+    courses.forEach((c, idx) => {
+      const cTitle = (c.title || '').trim().toLowerCase();
+      if (!firstTitleIndexMap.has(cTitle)) {
+        firstTitleIndexMap.set(cTitle, idx);
+      }
+    });
 
-        // De-duplicate the remaining unenrolled courses by title so we never show duplicates
-        const firstIdx = self.findIndex(item => (item.title || '').trim().toLowerCase() === cTitle);
-        if (firstIdx !== idx) return false;
+    return courses.filter((c, idx) => {
+      if (registeredIds.has(c.id)) return false;
+      if (c.isCloned || c.durationMode === 'express') return false;
 
-        return true;
-      });
+      const cTitle = (c.title || '').trim().toLowerCase();
+      if (registeredTitles.has(cTitle)) return false;
+
+      return firstTitleIndexMap.get(cTitle) === idx;
+    });
+  }, [courses, registeredCoursesList, isAdmin]);
 
   // Apply Skill tags sorting filters (locked courses are visible and carry padlocks)
   const filteredCourses = coursesToSee.filter(c => {
@@ -3757,12 +3931,20 @@ export default function StudentDashboard() {
 
   const handleDismissCompletionCongrats = async (courseId: string) => {
     try {
-      const userRef = doc(db, 'users', currentUser.uid);
       const currentCongratulated = userProfile?.congratulatedCourses || [];
       const updatedCongratulated = [...currentCongratulated];
       if (!updatedCongratulated.includes(courseId)) {
         updatedCongratulated.push(courseId);
       }
+
+      const updatedProfile = {
+        ...userProfile,
+        congratulatedCourses: updatedCongratulated
+      };
+      setUserProfile(updatedProfile);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
+      const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
         congratulatedCourses: updatedCongratulated,
         updatedAt: serverTimestamp()
@@ -4938,7 +5120,7 @@ export default function StudentDashboard() {
                       </div>
                     </div>
 
-                    {loading ? (
+                    {(loading || (!isAdmin && !liveCheckComplete)) ? (
                       <div className="flex items-center justify-center py-20 bg-white rounded-3xl border">
                         <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                       </div>
@@ -5226,7 +5408,7 @@ export default function StudentDashboard() {
                                     course={course} 
                                     userProfile={userProfile}
                                     isEnrolled={false}
-                                    isLocked={!hasCompletedFirstCourse()} 
+                                    isLocked={!hasCompletedFirstCourse} 
                                     onSelect={() => {
                                       handleSelectCourseId(course.id || null);
                                     }} 
