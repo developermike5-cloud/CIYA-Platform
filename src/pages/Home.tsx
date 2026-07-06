@@ -152,7 +152,9 @@ const useLogin = () => {
       }
       globalLoginActive = true;
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
+      if (provider && typeof (provider as any).setCustomParameters === 'function') {
+        (provider as any).setCustomParameters({ prompt: 'select_account' });
+      }
       const result = await signInWithPopup(auth, provider);
       if (result.user.email?.toLowerCase() === 'developermike5@gmail.com') {
         navigate('/admin');
