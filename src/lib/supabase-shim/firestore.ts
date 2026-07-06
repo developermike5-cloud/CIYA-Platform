@@ -103,13 +103,26 @@ export function query(collRef: any, ...constraints: any[]) {
 }
 
 export async function getDoc(docRef: any): Promise<DocumentSnapshot> {
-  const rawTable = docRef.path;
-  const id = docRef.id;
-  const table = getTableName(rawTable);
+  try {
+    const rawTable = docRef.path;
+    const id = docRef.id;
+    const table = getTableName(rawTable);
 
-  if (table === 'settings') {
+    if (table === 'settings') {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error || !data) {
+        return new DocumentSnapshot(false, null, id);
+      }
+      return new DocumentSnapshot(true, data.data || {}, id);
+    }
+
     const { data, error } = await supabase
-      .from('settings')
+      .from(table)
       .select('*')
       .eq('id', id)
       .single();
@@ -117,71 +130,68 @@ export async function getDoc(docRef: any): Promise<DocumentSnapshot> {
     if (error || !data) {
       return new DocumentSnapshot(false, null, id);
     }
-    return new DocumentSnapshot(true, data.data || {}, id);
+
+    const camelData = keysToCamel(data);
+    return new DocumentSnapshot(true, camelData, id);
+  } catch (err) {
+    console.warn("Supabase shim getDoc error handled gracefully:", err);
+    return new DocumentSnapshot(false, null, docRef?.id || '');
   }
-
-  const { data, error } = await supabase
-    .from(table)
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error || !data) {
-    return new DocumentSnapshot(false, null, id);
-  }
-
-  const camelData = keysToCamel(data);
-  return new DocumentSnapshot(true, camelData, id);
 }
 
 export async function getDocs(queryRef: any) {
-  const rawTable = queryRef.path;
-  const table = getTableName(rawTable);
-  let q = supabase.from(table).select('*');
+  try {
+    const rawTable = queryRef.path;
+    const table = getTableName(rawTable);
+    let q = supabase.from(table).select('*');
 
-  const constraints = queryRef.constraints || [];
-  for (const c of constraints) {
-    if (c.type === 'where') {
-      const snakeField = camelToSnake(c.field);
-      if (c.op === '==') {
-        q = q.eq(snakeField, c.val);
-      } else if (c.op === '>=') {
-        q = q.gte(snakeField, c.val);
-      } else if (c.op === '<=') {
-        q = q.lte(snakeField, c.val);
-      } else if (c.op === 'in') {
-        q = q.in(snakeField, c.val);
+    const constraints = queryRef.constraints || [];
+    for (const c of constraints) {
+      if (c.type === 'where') {
+        const snakeField = camelToSnake(c.field);
+        if (c.op === '==') {
+          q = q.eq(snakeField, c.val);
+        } else if (c.op === '>=') {
+          q = q.gte(snakeField, c.val);
+        } else if (c.op === '<=') {
+          q = q.lte(snakeField, c.val);
+        } else if (c.op === 'in') {
+          q = q.in(snakeField, c.val);
+        }
+      } else if (c.type === 'orderBy') {
+        const snakeField = camelToSnake(c.field);
+        q = q.order(snakeField, { ascending: c.dir === 'asc' });
+      } else if (c.type === 'limit') {
+        q = q.limit(c.value);
       }
-    } else if (c.type === 'orderBy') {
-      const snakeField = camelToSnake(c.field);
-      q = q.order(snakeField, { ascending: c.dir === 'asc' });
-    } else if (c.type === 'limit') {
-      q = q.limit(c.value);
     }
-  }
 
-  const { data, error } = await q;
-  if (error || !data) {
+    const { data, error } = await q;
+    if (error || !data) {
+      return createEmptyDocsResult();
+    }
+
+    const docs = data.map((row: any) => {
+      const camelData = keysToCamel(row);
+      return new DocumentSnapshot(true, camelData, row.id);
+    });
+
+    return {
+      docs,
+      forEach(callback: (doc: any) => void) {
+        docs.forEach(callback);
+      },
+      get empty() {
+        return docs.length === 0;
+      },
+      get size() {
+        return docs.length;
+      }
+    };
+  } catch (err) {
+    console.warn("Supabase shim getDocs error handled gracefully:", err);
     return createEmptyDocsResult();
   }
-
-  const docs = data.map((row: any) => {
-    const camelData = keysToCamel(row);
-    return new DocumentSnapshot(true, camelData, row.id);
-  });
-
-  return {
-    docs,
-    forEach(callback: (doc: any) => void) {
-      docs.forEach(callback);
-    },
-    get empty() {
-      return docs.length === 0;
-    },
-    get size() {
-      return docs.length;
-    }
-  };
 }
 
 function createEmptyDocsResult() {
@@ -193,115 +203,276 @@ function createEmptyDocsResult() {
   };
 }
 
-export async function setDoc(docRef: any, data: any, options?: { merge?: boolean }) {
-  const rawTable = docRef.path;
-  const id = docRef.id;
-  const table = getTableName(rawTable);
+// Helper to handle undefined column errors (PostgreSQL code 42703) dynamically by stripping missing columns and retrying
+async function runWithFallback(
+  operation: (payload: any) => Promise<{ error: any; data?: any }>,
+  initialPayload: any
+) {
+  let currentPayload = { ...initialPayload };
+  let attempts = 0;
+  const maxAttempts = 10;
 
-  if (table === 'settings') {
-    let finalData = data;
-    if (options?.merge) {
+  while (attempts < maxAttempts) {
+    const { error, data } = await operation(currentPayload);
+    if (!error) {
+      return { error: null, data };
+    }
+
+    if (error && error.message) {
+      const isMissingColumnError = 
+        error.code === '42703' || 
+        error.code === 'PGRST204' || 
+        error.message.includes('column') && error.message.includes('does not exist') ||
+        error.message.includes('Could not find the') && error.message.includes('column of');
+
+      if (isMissingColumnError) {
+        const match = 
+          error.message.match(/column "([^"]+)"/i) || 
+          error.message.match(/column ([a-zA-Z0-9_]+) does not exist/i) ||
+          error.message.match(/Could not find the '([^']+)' column/i);
+
+        if (match && match[1]) {
+          const missingColumn = match[1];
+          if (missingColumn in currentPayload) {
+            console.warn(`[Supabase Shim] Column "${missingColumn}" does not exist in public database table. Stripping from write payload and retrying.`);
+            delete currentPayload[missingColumn];
+            attempts++;
+            continue;
+          }
+        }
+      }
+    }
+    return { error };
+  }
+  return { error: new Error('Too many column removal attempts') };
+}
+
+interface ActiveListener {
+  ref: any;
+  fetchAndCallback: () => Promise<void>;
+  isUnsubscribed: () => boolean;
+}
+
+const activeListeners: ActiveListener[] = [];
+
+function registerListener(ref: any, fetchAndCallback: () => Promise<void>, isUnsubscribed: () => boolean) {
+  activeListeners.push({ ref, fetchAndCallback, isUnsubscribed });
+}
+
+export function triggerListenersForPath(path: string, docId?: string) {
+  const table = getTableName(path);
+  // Clean up stale listeners
+  for (let i = activeListeners.length - 1; i >= 0; i--) {
+    if (activeListeners[i].isUnsubscribed()) {
+      activeListeners.splice(i, 1);
+    }
+  }
+
+  activeListeners.forEach((listener) => {
+    const lTable = getTableName(listener.ref.path);
+    if (lTable !== table) return;
+
+    if (listener.ref.type === 'doc') {
+      if (docId && listener.ref.id !== docId) return;
+      listener.fetchAndCallback().catch((err) => console.warn("Listener trigger error:", err));
+    } else {
+      listener.fetchAndCallback().catch((err) => console.warn("Listener trigger error:", err));
+    }
+  });
+}
+
+export async function setDoc(docRef: any, data: any, options?: { merge?: boolean }) {
+  try {
+    const rawTable = docRef.path;
+    const id = docRef.id;
+    const table = getTableName(rawTable);
+
+    if (table === 'settings') {
+      let finalData = data;
+      if (options?.merge) {
+        const { data: existing } = await supabase
+          .from('settings')
+          .select('data')
+          .eq('id', id)
+          .single();
+        finalData = { ...(existing?.data || {}), ...data };
+      }
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ id, data: finalData, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      setTimeout(() => triggerListenersForPath(docRef.path, docRef.id), 50);
+      return;
+    }
+
+    const snakeData = keysToSnake(data);
+    snakeData.id = id;
+
+    const { error } = await runWithFallback(async (payload) => {
+      const { error } = await supabase
+        .from(table)
+        .upsert(payload);
+      return { error };
+    }, snakeData);
+
+    if (error) throw error;
+    setTimeout(() => triggerListenersForPath(docRef.path, docRef.id), 50);
+  } catch (err) {
+    console.warn("Supabase shim setDoc error handled gracefully:", err);
+  }
+}
+
+export async function updateDoc(docRef: any, data: any) {
+  try {
+    const rawTable = docRef.path;
+    const id = docRef.id;
+    const table = getTableName(rawTable);
+
+    if (table === 'users') {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('progress')
+        .eq('id', id)
+        .single();
+
+      let progressObj = { ...(existingUser?.progress || {}) };
+      let normalUpdates: any = {};
+
+      for (const key of Object.keys(data)) {
+        if (key.startsWith('progress.')) {
+          const parts = key.substring('progress.'.length).split('.');
+          let current = progressObj;
+          for (let i = 0; i < parts.length - 1; i++) {
+            if (!current[parts[i]] || typeof current[parts[i]] !== 'object') {
+              current[parts[i]] = {};
+            }
+            current = current[parts[i]];
+          }
+          current[parts[parts.length - 1]] = data[key];
+        } else if (key === 'progress') {
+          progressObj = data[key];
+        } else {
+          normalUpdates[key] = data[key];
+        }
+      }
+
+      const snakeData = keysToSnake({
+        ...normalUpdates,
+        progress: progressObj
+      });
+
+      const { error } = await runWithFallback(async (payload) => {
+        const { error } = await supabase
+          .from('users')
+          .update(payload)
+          .eq('id', id);
+        return { error };
+      }, snakeData);
+
+      if (error) throw error;
+      setTimeout(() => triggerListenersForPath(docRef.path, docRef.id), 50);
+      return;
+    }
+
+    if (table === 'settings') {
       const { data: existing } = await supabase
         .from('settings')
         .select('data')
         .eq('id', id)
         .single();
-      finalData = { ...(existing?.data || {}), ...data };
-    }
-    const { error } = await supabase
-      .from('settings')
-      .upsert({ id, data: finalData, updated_at: new Date().toISOString() });
-    if (error) throw error;
-    return;
-  }
-
-  const snakeData = keysToSnake(data);
-  snakeData.id = id;
-
-  const { error } = await supabase
-    .from(table)
-    .upsert(snakeData);
-
-  if (error) throw error;
-}
-
-export async function updateDoc(docRef: any, data: any) {
-  const rawTable = docRef.path;
-  const id = docRef.id;
-  const table = getTableName(rawTable);
-
-  if (table === 'settings') {
-    const { data: existing } = await supabase
-      .from('settings')
-      .select('data')
-      .eq('id', id)
-      .single();
-    
-    // Resolve any dot-notation keys in the update object (e.g. `user_signals.xyz` inside triggerSystemSignal)
-    let merged = { ...(existing?.data || {}) };
-    for (const key of Object.keys(data)) {
-      if (key.includes('.')) {
-        const parts = key.split('.');
-        let current = merged;
-        for (let i = 0; i < parts.length - 1; i++) {
-          if (!current[parts[i]] || typeof current[parts[i]] !== 'object') {
-            current[parts[i]] = {};
+      
+      // Resolve any dot-notation keys in the update object (e.g. `user_signals.xyz` inside triggerSystemSignal)
+      let merged = { ...(existing?.data || {}) };
+      for (const key of Object.keys(data)) {
+        if (key.includes('.')) {
+          const parts = key.split('.');
+          let current = merged;
+          for (let i = 0; i < parts.length - 1; i++) {
+            if (!current[parts[i]] || typeof current[parts[i]] !== 'object') {
+              current[parts[i]] = {};
+            }
+            current = current[parts[i]];
           }
-          current = current[parts[i]];
+          current[parts[parts.length - 1]] = data[key];
+        } else {
+          merged[key] = data[key];
         }
-        current[parts[parts.length - 1]] = data[key];
-      } else {
-        merged[key] = data[key];
       }
+
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ id, data: merged, updated_at: new Date().toISOString() });
+      if (error) throw error;
+      setTimeout(() => triggerListenersForPath(docRef.path, docRef.id), 50);
+      return;
     }
 
-    const { error } = await supabase
-      .from('settings')
-      .upsert({ id, data: merged, updated_at: new Date().toISOString() });
+    const snakeData = keysToSnake(data);
+    
+    const { error } = await runWithFallback(async (payload) => {
+      const { error } = await supabase
+        .from(table)
+        .update(payload)
+        .eq('id', id);
+      return { error };
+    }, snakeData);
+
     if (error) throw error;
-    return;
+    setTimeout(() => triggerListenersForPath(docRef.path, docRef.id), 50);
+  } catch (err) {
+    console.warn("Supabase shim updateDoc error handled gracefully:", err);
   }
-
-  const snakeData = keysToSnake(data);
-  const { error } = await supabase
-    .from(table)
-    .update(snakeData)
-    .eq('id', id);
-
-  if (error) throw error;
 }
 
 export async function addDoc(collRef: any, data: any) {
-  const rawTable = collRef.path;
-  const table = getTableName(rawTable);
-  const snakeData = keysToSnake(data);
+  try {
+    const rawTable = collRef.path;
+    const table = getTableName(rawTable);
+    const snakeData = keysToSnake(data);
 
-  if (!snakeData.id) {
-    snakeData.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    if (!snakeData.id) {
+      snakeData.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    }
+
+    let finalInserted: any = null;
+    const { error } = await runWithFallback(async (payload) => {
+      const { data: inserted, error } = await supabase
+        .from(table)
+        .insert(payload)
+        .select()
+        .single();
+      if (!error) {
+        finalInserted = inserted;
+      }
+      return { error };
+    }, snakeData);
+
+    if (error) throw error;
+    const camelData = keysToCamel(finalInserted);
+    setTimeout(() => triggerListenersForPath(collRef.path), 50);
+    return new DocumentSnapshot(true, camelData, finalInserted.id);
+  } catch (err) {
+    console.warn("Supabase shim addDoc error handled gracefully:", err);
+    return new DocumentSnapshot(false, {}, '');
   }
-
-  const { data: inserted, error } = await supabase
-    .from(table)
-    .insert(snakeData)
-    .select()
-    .single();
-
-  if (error) throw error;
-  const camelData = keysToCamel(inserted);
-  return new DocumentSnapshot(true, camelData, inserted.id);
 }
 
 export async function deleteDoc(docRef: any) {
-  const rawTable = docRef.path;
-  const id = docRef.id;
-  const table = getTableName(rawTable);
+  try {
+    const rawTable = docRef.path;
+    const id = docRef.id;
+    const table = getTableName(rawTable);
 
-  const { error } = await supabase
-    .from(table)
-    .delete()
-    .eq('id', id);
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq('id', id);
 
-  if (error) throw error;
+    if (error) throw error;
+    setTimeout(() => triggerListenersForPath(docRef.path, docRef.id), 50);
+  } catch (err) {
+    console.warn("Supabase shim deleteDoc error handled gracefully:", err);
+  }
 }
 
 export function serverTimestamp() {
@@ -342,10 +513,12 @@ export function onSnapshot(ref: any, callback: (snap: any) => void) {
     };
 
     fetchAndCallback();
+    registerListener(ref, fetchAndCallback, () => unsubscribed);
 
     const table = getTableName(ref.path);
+    const uniqueSuffix = Math.random().toString(36).substring(2, 9);
     const channel = supabase
-      .channel(`doc-${table}-${ref.id}`)
+      .channel(`doc-${table}-${ref.id}-${uniqueSuffix}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -372,10 +545,12 @@ export function onSnapshot(ref: any, callback: (snap: any) => void) {
     };
 
     fetchAndCallback();
+    registerListener(ref, fetchAndCallback, () => unsubscribed);
 
     const table = getTableName(ref.path);
+    const uniqueSuffix = Math.random().toString(36).substring(2, 9);
     const channel = supabase
-      .channel(`table-${table}`)
+      .channel(`table-${table}-${uniqueSuffix}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

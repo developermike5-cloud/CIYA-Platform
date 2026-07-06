@@ -5,6 +5,7 @@ import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 import { Course } from '../../types';
+import { supabase, getStoragePublicUrl } from '../../lib/supabase';
 
 function getFirestoreTime(timestamp: any): number {
   if (!timestamp) return 0;
@@ -171,7 +172,7 @@ export default function UsersAdmin() {
   const [adminsData, setAdminsData] = useState<Record<string, { email: string, role?: string, permissions?: string[] }>>({});
   const [adminDrafts, setAdminDrafts] = useState<Record<string, { role: string, permissions: string[] }>>({});
   const [savingAdminId, setSavingAdminId] = useState<string | null>(null);
-  const isSuperAdmin = auth.currentUser?.email === 'developermike5@gmail.com';
+  const isSuperAdmin = auth.currentUser?.email?.toLowerCase() === 'developermike5@gmail.com';
 
   const cachedUserStr = localStorage.getItem('ciya_cached_user');
   let userDetails: any = null;
@@ -181,7 +182,7 @@ export default function UsersAdmin() {
     }
   } catch (e) { }
 
-  const isSuperAdminLocal = userDetails?.email === 'developermike5@gmail.com' || userDetails?.role === 'super_admin';
+  const isSuperAdminLocal = userDetails?.email?.toLowerCase() === 'developermike5@gmail.com' || userDetails?.role === 'super_admin';
   const hasBrandingPermission = isSuperAdminLocal || userDetails?.permissions?.includes('manage_branding');
 
   // Logo upload state
@@ -194,32 +195,76 @@ export default function UsersAdmin() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 250 * 1024) {
-      alert("Please select an image smaller than 250KB to keep page loads lightning-fast.");
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Please select an image smaller than 2MB.");
       return;
     }
 
     setLogoUploading(true);
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64String = reader.result as string;
-      try {
-        await setDoc(doc(db, 'settings', 'app'), {
-          logo: base64String,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
+    try {
+      const fileExt = file.name.split('.').pop() || '';
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
+      const fileName = `${Date.now()}-${cleanFileName}.${fileExt}`;
+      const filePath = `brand/${fileName}`;
+      const bucket = 'branding';
 
-        localStorage.setItem('ciya_brand_logo', base64String);
-        setCurrentLogo(base64String);
-        alert("Website branding logo updated and synchronized successfully! 🎉");
-      } catch (err) {
-        console.error("Error saving brand logo to Firestore settings:", err);
-        alert("Could not save branding logo to database settings. Check permission rules.");
-      } finally {
-        setLogoUploading(false);
+      try {
+        const { data: buckets } = await supabase.storage.listBuckets();
+        const exists = buckets?.some(b => b.name === bucket);
+        if (!exists) {
+          await supabase.storage.createBucket(bucket, {
+            public: true,
+            fileSizeLimit: 104857600, // 100MB
+          });
+        }
+      } catch (bucketErr) {
+        console.warn("Storage bucket check/create warning:", bucketErr);
       }
-    };
-    reader.readAsDataURL(file);
+
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      const publicUrl = getStoragePublicUrl(bucket, filePath);
+
+      await setDoc(doc(db, 'settings', 'app'), {
+        logo: publicUrl,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      localStorage.setItem('ciya_brand_logo', publicUrl);
+      setCurrentLogo(publicUrl);
+      alert("Website branding logo updated and synchronized successfully via Supabase Storage! 🎉");
+    } catch (err: any) {
+      console.error("Error saving brand logo to Supabase storage / Firestore:", err);
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        try {
+          await setDoc(doc(db, 'settings', 'app'), {
+            logo: base64String,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+
+          localStorage.setItem('ciya_brand_logo', base64String);
+          setCurrentLogo(base64String);
+          alert("Website branding logo synchronized successfully (Local Fallback)! 🎉");
+        } catch (subErr) {
+          console.error("Local fallback logo save error:", subErr);
+          alert("Could not save branding logo to database settings. Check permission rules.");
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setLogoUploading(false);
+    }
   };
 
   const handleResetLogo = async () => {
@@ -249,7 +294,7 @@ export default function UsersAdmin() {
     const isAdminCurrently = admins.includes(targetUser.id);
     try {
       if (isAdminCurrently) {
-        if (targetUser.email === 'developermike5@gmail.com') {
+        if (targetUser.email?.toLowerCase() === 'developermike5@gmail.com') {
           alert("Cannot demote the super admin!");
           return;
         }
@@ -388,7 +433,7 @@ export default function UsersAdmin() {
       setIsRefreshing(true);
     } else {
       // Stale-while-revalidate: Load from cache instantly, namespaced by cohort, then fetch fresh in background
-      const cacheKey = `ciya_admin_cached_users_list_${targetCohort}`;
+      const cacheKey = `ciya_admin_cached_users_list_All`;
       const cachedUsersStr = localStorage.getItem(cacheKey);
       const cachedAdminsStr = localStorage.getItem('ciya_admin_cached_admins_list');
       const cachedAdminsDataStr = localStorage.getItem('ciya_admin_cached_admins_data');
@@ -412,10 +457,8 @@ export default function UsersAdmin() {
     }
 
     try {
-      // Fresh Firestore fetch (Restricted by targetCohort to streamline reads!)
-      const q = (targetCohort && targetCohort !== 'All')
-        ? query(collection(db, 'users'), where('cohort', '==', targetCohort))
-        : query(collection(db, 'users'));
+      // Fresh Firestore fetch (Fetch all users to ensure legacy users without explicit cohort are loaded and correctly categorized in-memory)
+      const q = query(collection(db, 'users'));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile));
       
@@ -447,7 +490,7 @@ export default function UsersAdmin() {
       setAdminsData(adminMap);
 
       // Save to local cache namespaced by cohort
-      const cacheKey = `ciya_admin_cached_users_list_${targetCohort}`;
+      const cacheKey = `ciya_admin_cached_users_list_All`;
       localStorage.setItem(cacheKey, JSON.stringify(data));
       localStorage.setItem('ciya_admin_cached_users_time', Date.now().toString());
       localStorage.setItem('ciya_admin_cached_admins_list', JSON.stringify(adminIds));
@@ -1300,13 +1343,13 @@ export default function UsersAdmin() {
                                     <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/50 mt-1">
                                       <span className="text-slate-500 font-semibold">User Role:</span>
                                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                        u.email === 'developermike5@gmail.com'
+                                        u.email?.toLowerCase() === 'developermike5@gmail.com'
                                           ? 'bg-purple-101 text-purple-800'
                                           : admins.includes(u.id)
                                             ? 'bg-indigo-101 text-indigo-805 animate-pulse'
                                             : 'bg-slate-101 text-slate-700'
                                       }`}>
-                                        {u.email === 'developermike5@gmail.com'
+                                        {u.email?.toLowerCase() === 'developermike5@gmail.com'
                                           ? 'Super Admin 👑'
                                           : admins.includes(u.id)
                                             ? `${adminsData[u.id]?.role || 'CIYA Admin'} 💻`
@@ -1314,7 +1357,7 @@ export default function UsersAdmin() {
                                       </span>
                                     </div>
 
-                                    {isSuperAdmin && u.email !== 'developermike5@gmail.com' && (
+                                    {isSuperAdmin && u.email?.toLowerCase() !== 'developermike5@gmail.com' && (
                                       <>
                                         <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/50 mt-1">
                                           <span className="text-slate-500 font-semibold">Admin Access:</span>

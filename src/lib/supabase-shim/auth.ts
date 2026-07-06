@@ -30,6 +30,8 @@ supabase.auth.getSession().then(({ data: { session } }) => {
   if (session?.user) {
     cachedUser = mapSupabaseUserToFirebase(session.user);
   }
+}).catch(e => {
+  console.warn("Supabase auth initial session check failed gracefully:", e);
 });
 
 supabase.auth.onAuthStateChange((_event, session) => {
@@ -52,6 +54,10 @@ export function initializeAuth() {
 
 export class GoogleAuthProvider {
   static PROVIDER_ID = 'google.com';
+  setCustomParameters(params: any) {
+    // No-op to support Firebase compatibility
+    return this;
+  }
 }
 
 export const browserLocalPersistence = 'LOCAL';
@@ -75,6 +81,58 @@ export async function signInWithPopup(authObj: any, provider: any) {
       displayName: 'Google User',
     }
   };
+}
+
+export async function signInWithEmailAndPassword(authObj: any, email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error) throw error;
+  
+  cachedUser = mapSupabaseUserToFirebase(data.user);
+  return { user: cachedUser };
+}
+
+export async function createUserWithEmailAndPassword(authObj: any, email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  });
+  if (error) {
+    if (
+      error.message?.toLowerCase().includes('already registered') ||
+      error.message?.toLowerCase().includes('already exists') ||
+      error.message?.toLowerCase().includes('already in use') ||
+      error.message?.toLowerCase().includes('already-in-use')
+    ) {
+      throw new Error('User already registered');
+    }
+    throw error;
+  }
+  
+  if (data.user && data.user.identities && data.user.identities.length === 0) {
+    throw new Error('User already registered');
+  }
+  
+  cachedUser = mapSupabaseUserToFirebase(data.user);
+  return { user: cachedUser };
+}
+
+export async function updateProfile(userObj: any, profileData: { displayName?: string; photoURL?: string }) {
+  const { data, error } = await supabase.auth.updateUser({
+    data: {
+      full_name: profileData.displayName,
+      avatar_url: profileData.photoURL
+    }
+  });
+  if (error) throw error;
+  
+  if (cachedUser) {
+    cachedUser.displayName = profileData.displayName || cachedUser.displayName;
+    cachedUser.photoURL = profileData.photoURL || cachedUser.photoURL;
+  }
+  return data;
 }
 
 export async function signOut() {

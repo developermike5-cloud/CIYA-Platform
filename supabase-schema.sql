@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     approval_status TEXT DEFAULT 'Pending',
     is_dashboard_unlocked BOOLEAN DEFAULT FALSE,
     admin_code TEXT,
+    cohort TEXT DEFAULT 'Cohort 1',
     progress JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -107,13 +108,13 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 -- Users can read and write their own profile
 CREATE POLICY "Allow users to read their own profile" ON public.users
-    FOR SELECT USING (auth.jwt()->>'email' = email);
+    FOR SELECT USING (auth.uid()::text = id OR auth.jwt()->>'email' = email);
 
 CREATE POLICY "Allow users to update their own profile" ON public.users
-    FOR UPDATE USING (auth.jwt()->>'email' = email);
+    FOR UPDATE USING (auth.uid()::text = id OR auth.jwt()->>'email' = email);
 
 CREATE POLICY "Allow users to insert their own profile" ON public.users
-    FOR INSERT WITH CHECK (auth.jwt()->>'email' = email);
+    FOR INSERT WITH CHECK (auth.uid()::text = id OR auth.jwt()->>'email' = email);
 
 -- Admins can read and manage all profiles
 CREATE POLICY "Allow admins full access to profiles" ON public.users
@@ -338,6 +339,7 @@ CREATE TABLE IF NOT EXISTS public.blog (
     content TEXT NOT NULL,
     image_url TEXT,
     author TEXT,
+    published_date TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

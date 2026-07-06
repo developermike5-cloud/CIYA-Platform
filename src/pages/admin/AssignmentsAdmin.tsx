@@ -57,7 +57,26 @@ export default function AssignmentsAdmin() {
         qUnsubscribe = onSnapshot(q, (snapshot) => {
           const list: Submission[] = [];
           snapshot.forEach((docSnap) => {
-            list.push({ id: docSnap.id, ...docSnap.data() } as Submission);
+            const data = docSnap.data();
+            let submittedText = data.submittedText || '';
+            let images = data.images || [];
+
+            if (submittedText.includes("---IMAGES_JSON---")) {
+              const parts = submittedText.split("---IMAGES_JSON---");
+              submittedText = parts[0].trim();
+              try {
+                images = JSON.parse(parts[1].trim());
+              } catch (e) {
+                console.error("Error parsing images JSON", e);
+              }
+            }
+
+            list.push({ 
+              id: docSnap.id, 
+              ...data,
+              submittedText,
+              images
+            } as Submission);
           });
           setSubmissions(list);
           setLoading(false);
@@ -356,7 +375,13 @@ export default function AssignmentsAdmin() {
                   </div>
 
                   {/* Image render sandbox if it is an image */}
-                  {(selectedSub.fileUrl.startsWith('data:image') || selectedSub.fileName?.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif)$/)) && (
+                  {(selectedSub.fileUrl.startsWith('data:image') || 
+                    selectedSub.fileUrl.match(/\.(jpg|jpeg|png|webp|gif|svg|bmp|jfif|ico)/i) ||
+                    selectedSub.fileUrl.includes('supabase') ||
+                    selectedSub.fileUrl.includes('storage') ||
+                    selectedSub.fileUrl.includes('firebasestorage') ||
+                    selectedSub.fileUrl.includes('cloudinary') ||
+                    selectedSub.fileName?.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif|svg|bmp|jfif|ico)$/)) && (
                     <div className="mt-2 text-center border p-2 rounded-xl bg-slate-50 overflow-hidden">
                       <img 
                         src={selectedSub.fileUrl} 

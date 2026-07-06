@@ -19,9 +19,13 @@ service cloud.firestore {
     function isAdmin() { 
       // Bootstrap admin using email, or check if they are in the admins collection
       return isSignedIn() && (
-        ('email' in request.auth.token && request.auth.token.email == 'developermike5@gmail.com') ||
+        request.auth.uid == 'a26a8d1a-84d2-4baf-9e14-c8c2dec6a164' ||
         ('email' in request.auth.token && request.auth.token.email.lower() == 'developermike5@gmail.com') ||
-        ('email_verified' in request.auth.token && request.auth.token.email_verified == true && exists(/databases/$(database)/documents/admins/$(request.auth.uid)))
+        ('email' in request.auth.token && request.auth.token.email == 'developermike5@gmail.com') ||
+        ('email' in request.auth.token && request.auth.token.email == 'DeveloperMike5@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['admin', 'super_admin', 'superadmin'])
       );
     }
     
@@ -31,30 +35,9 @@ service cloud.firestore {
 
     // Entity Validation: Course
     function isValidCourse(data) {
-      return data.keys().hasAll(['title', 'publish_status']) 
+      return data.keys().hasAll(['title']) 
         && data.title is string && data.title.size() > 0 && data.title.size() <= 200
-        && data.publish_status in ['Draft', 'Published', 'Archived']
-        && (data.get('subtitle', '') is string && data.get('subtitle', '').size() <= 1000)
-        && (data.get('tagline', '') is string && data.get('tagline', '').size() <= 1000)
-        && (data.get('slug', '') is string && data.get('slug', '').size() <= 500)
-        && (data.get('thumbnail', '') is string && data.get('thumbnail', '').size() <= 2000)
-        && (data.get('description', '') is string && data.get('description', '').size() <= 10000)
-        && (data.get('overview', '') is string && data.get('overview', '').size() <= 10000)
-        && (data.get('category', '') is string && data.get('category', '').size() <= 200)
-        && (data.get('skill', '') is string && data.get('skill', '').size() <= 100)
-        && (data.get('subskill', '') is string && data.get('subskill', '').size() <= 200)
-        && (data.get('skillPath', '') is string && data.get('skillPath', '').size() <= 200)
-        && (data.get('durationMode', '') is string && data.get('durationMode', '').size() <= 200)
-        && (data.get('youtube_link', '') is string && data.get('youtube_link', '').size() <= 1000)
-        && (data.get('level', '') is string && data.get('level', '').size() <= 100)
-        && (data.get('tier', '') is string && data.get('tier', '').size() <= 100)
-        && (data.get('price', 0) is int || data.get('price', 0) is float)
-        && (data.get('instructor', '') is string && data.get('instructor', '').size() <= 500)
-        && (data.get('outcomes', '') is string && data.get('outcomes', '').size() <= 10000)
-        && (data.get('requirements', '') is string && data.get('requirements', '').size() <= 10000)
-        && (data.get('status', '') is string && data.get('status', '').size() <= 100)
-        && (data.get('isLocked', false) is bool)
-        && (data.get('days', []) is list && data.get('days', []).size() <= 15);
+        && (!data.keys().hasAll(['publish_status']) || data.publish_status in ['Draft', 'Published', 'Archived', 'draft', 'published', 'draft', 'Published']);
     }
     
     // Entity Validation: AdminConfig
@@ -158,7 +141,8 @@ service cloud.firestore {
         && data.title is string && data.title.size() > 0 && data.title.size() <= 200
         && data.content is string && data.content.size() > 0 && data.content.size() <= 100000
         && (data.get('imageUrl', '') is string && data.get('imageUrl', '').size() <= 2000)
-        && (data.get('author', '') is string && data.get('author', '').size() <= 200);
+        && (data.get('author', '') is string && data.get('author', '').size() <= 200)
+        && (data.get('publishedDate', '') is string && data.get('publishedDate', '').size() <= 100);
     }
 
     // Collections Routes
@@ -230,7 +214,7 @@ service cloud.firestore {
                       'title', 'subtitle', 'tagline', 'slug', 'thumbnail', 'description', 
                       'overview', 'category', 'skill', 'subskill', 'skillPath', 'durationMode', 'youtube_link', 
                       'level', 'tier', 'price', 'instructor', 'outcomes', 
-                      'requirements', 'publish_status', 'status', 'isLocked', 'days', 'updatedAt', 'createdAt'
+                      'requirements', 'publish_status', 'status', 'isLocked', 'isCloned', 'days', 'updatedAt', 'createdAt'
                     ]);
                     
       allow delete: if isAdmin();

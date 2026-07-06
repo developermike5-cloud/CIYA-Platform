@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
-import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag } from 'lucide-react';
+import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag, Mail, Lock } from 'lucide-react';
 import { auth, db } from '../firebase';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import LoginModal from '../components/LoginModal';
+import { safeStorage } from '../utils/safeStorage';
 
 type Pathway = 'A' | 'B' | 'C' | null;
 
@@ -13,6 +15,7 @@ let globalOnboardingSignInActive = false;
 export default function Onboarding() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [pathway, setPathway] = useState<Pathway>(null);
   const [showCareWarningModal, setShowCareWarningModal] = useState(() => {
     try {
@@ -55,7 +58,9 @@ export default function Onboarding() {
     state: '',
     referralCode: '',
     myReferralCode: '',
-    isActivated: false
+    isActivated: false,
+    email: '',
+    password: ''
   });
 
   const [loading, setLoading] = useState(false);
@@ -68,66 +73,38 @@ export default function Onboarding() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        if (user.email) {
+          setData(d => ({ 
+            ...d, 
+            email: user.email || '',
+            fullName: d.fullName || user.displayName || ''
+          }));
+        }
         try {
           const docSnap = await getDoc(doc(db, 'users', user.uid));
           if (docSnap.exists()) {
             navigate('/dashboard', { replace: true });
           }
-        } catch (err) {
+        } catch (err: any) {
           console.warn("Auto-redirect check failed:", err);
+          setFormError(`Connection Error: ${err.message || 'Could not verify existing account.'}`);
         }
       }
     });
     return () => unsub();
   }, [navigate]);
 
-  const nextStep = () => setStep(s => s + 1);
-  const prevStep = () => setStep(s => Math.max(1, s - 1));
+  const nextStep = () => {
+    setFormError('');
+    setStep(s => s + 1);
+  };
+  const prevStep = () => {
+    setFormError('');
+    setStep(s => Math.max(1, s - 1));
+  };
 
-  const handleDirectLogin = async () => {
-    if (globalOnboardingSignInActive) return;
-    setLoading(true);
-    try {
-      globalOnboardingSignInActive = true;
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
-      if (result.user.email === 'developermike5@gmail.com') {
-        navigate('/admin', { replace: true });
-      } else {
-        const docSnap = await getDoc(doc(db, 'users', result.user.uid));
-        if (docSnap.exists()) {
-           navigate('/dashboard', { replace: true });
-        } else {
-           await auth.signOut();
-           alert("No registered account found under this email. Let's guide you through the registration setup questions to create your student profile!");
-           setStep(2);
-        }
-      }
-    } catch (e: any) {
-      if (e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user') {
-        return;
-      }
-      console.error(e);
-      if (
-        e.code === 'auth/popup-blocked' || 
-        e.message?.toLowerCase().includes('popup-blocked') || 
-        e.message?.toLowerCase().includes('popup estuvo bloqueado') ||
-        e.message?.includes('Pending promise was never set') ||
-        e.message?.includes('INTERNAL ASSERTION FAILED')
-      ) {
-        setShowPopupBlocked(true);
-        return;
-      }
-      if (e.message?.includes('offline') || e.code === 'unavailable') {
-        alert("Network error: Please check your internet connection and try again.");
-      } else {
-        alert("An error occurred: " + e.message);
-      }
-    } finally {
-      globalOnboardingSignInActive = false;
-      setLoading(false);
-    }
+  const handleDirectLogin = () => {
+    setIsLoginOpen(true);
   };
 
   const selectData = (key: keyof typeof data, value: string | boolean) => {
@@ -171,153 +148,211 @@ export default function Onboarding() {
     'I want to become an expert/master'
   ];
 
-  const validateForm = () => {
+  const validateForm = (isGoogle: boolean = false) => {
     setFormError('');
     if (!data.fullName.trim()) { setFormError('Full Name is required.'); return false; }
     if (!data.gender) { setFormError('Gender is required.'); return false; }
     if (!data.ageRange) { setFormError('Age Range is required.'); return false; }
     if (!data.whatsapp.trim()) { setFormError('WhatsApp Number is required.'); return false; }
     if (!data.state) { setFormError('State is required.'); return false; }
+    
+    if (!isGoogle) {
+      if (!data.email.trim() || !data.email.includes('@')) {
+        setFormError('A valid Email Address is required.');
+        return false;
+      }
+      if (!data.password || data.password.length < 6) {
+        setFormError('Password must be at least 6 characters long.');
+        return false;
+      }
+    }
     return true;
   };
 
+  const handleRegisterSuccess = async (user: any) => {
+    if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
+      navigate('/admin', { replace: true });
+      return;
+    }
+
+    const docRef = doc(db, 'users', user.uid);
+    let docSnap: any = null;
+    try {
+      docSnap = await getDoc(docRef);
+    } catch (err) {
+      console.warn("Onboarding handleRegisterSuccess getDoc failed:", err);
+    }
+
+    if (docSnap && docSnap.exists()) {
+        navigate('/dashboard', { replace: true });
+        return;
+    }
+
+    const userCode = data.myReferralCode || user.uid.slice(0, 6).toUpperCase();
+    
+    let recommendedPath = '';
+    if (pathway === 'A') {
+      if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
+        recommendedPath = 'Professional Conversion Page Builder';
+      } else if (data.experience.includes('expert')) {
+        recommendedPath = 'Conversion Funnel Agency Masterclass';
+      } else {
+        recommendedPath = 'Landing Page Foundations';
+      }
+    } else if (pathway === 'C') {
+      if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
+        recommendedPath = 'Professional Portfolio Builder';
+      } else if (data.experience.includes('expert')) {
+        recommendedPath = 'Portfolio Agency Masterclass';
+      } else {
+        recommendedPath = 'Portfolio Website Foundations';
+      }
+    } else {
+      if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
+        recommendedPath = 'Professional Store Builder';
+      } else if (data.experience.includes('expert')) {
+        recommendedPath = 'E-Commerce Agency Growth Masterclass';
+      } else {
+        recommendedPath = 'E-commerce Essentials';
+      }
+    }
+
+    let isActivated = false;
+    let activeCohort = 'Cohort 1';
+    try {
+      const cohortsSnap = await getDoc(doc(db, 'settings', 'cohorts'));
+      if (cohortsSnap.exists()) {
+        activeCohort = cohortsSnap.data().activeCohort || 'Cohort 1';
+      }
+    } catch (err) {
+      console.warn("Could not fetch active cohort settings during registration:", err);
+    }
+
+    setCreationTime(new Date().getTime());
+    const generatedAdminCode = `CIYA-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    await setDoc(docRef, {
+      email: user.email,
+      intent: data.intent,
+      experience: data.experience,
+      courseType: data.courseType,
+      pathwaySelection: data.pathwaySelection,
+      pathwayReason: data.pathwayReason,
+      pathwayExperience: data.pathwayExperience,
+      recommendedPath: recommendedPath,
+      goal: data.goal,
+      availability: data.availability,
+      learningTool: data.learningTool || '',
+      educationLevel: data.educationLevel || '',
+      ageRange: data.ageRange || '',
+      fullName: data.fullName,
+      gender: data.gender,
+      whatsapp: data.whatsapp,
+      state: data.state,
+      referralCode: data.referralCode || '',
+      myReferralCode: userCode,
+      isActivated: false,
+      referralsCount: 0,
+      approvalStatus: 'Pending',
+      adminCode: generatedAdminCode,
+      isDashboardUnlocked: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      cohort: activeCohort
+    });
+
+    // Seed local cache immediately so the dashboard review page displays instantly
+    try {
+      const freshProfile = {
+        email: user.email,
+        intent: data.intent,
+        experience: data.experience,
+        courseType: data.courseType,
+        pathwaySelection: data.pathwaySelection,
+        pathwayReason: data.pathwayReason,
+        pathwayExperience: data.pathwayExperience,
+        recommendedPath: recommendedPath,
+        goal: data.goal,
+        availability: data.availability,
+        learningTool: data.learningTool || '',
+        educationLevel: data.educationLevel || '',
+        ageRange: data.ageRange || '',
+        fullName: data.fullName,
+        gender: data.gender,
+        whatsapp: data.whatsapp,
+        state: data.state,
+        referralCode: data.referralCode || '',
+        myReferralCode: userCode,
+        isActivated: false,
+        referralsCount: 0,
+        approvalStatus: 'Pending',
+        adminCode: generatedAdminCode,
+        isDashboardUnlocked: false,
+        cohort: activeCohort
+      };
+
+      safeStorage.setItem('ciya_cached_user', JSON.stringify({
+        uid: user.uid,
+        email: user.email,
+        role: 'student'
+      }));
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(freshProfile));
+      safeStorage.setItem('ciya_cached_profile_time', Date.now().toString());
+    } catch (cacheErr) {
+      console.warn("Could not seed safeStorage on onboarding completion:", cacheErr);
+    }
+    
+    setData(d => ({ ...d, recommendedPath, myReferralCode: userCode, isActivated }));
+
+    if (data.referralCode) {
+      try {
+        const referrersRef = collection(db, 'users');
+        const q = query(referrersRef, where('myReferralCode', '==', data.referralCode.trim().toUpperCase()));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const referrerDoc = querySnapshot.docs[0];
+          const prevCount = referrerDoc.data().referralsCount || 0;
+          await updateDoc(doc(db, 'users', referrerDoc.id), {
+            isActivated: true,
+            referralsCount: prevCount + 1,
+            updatedAt: serverTimestamp()
+          });
+        }
+      } catch(e) { console.error('Error activating referral:', e); }
+    }
+
+    nextStep(); 
+  };
+
   const doAuthAndSave = async () => {
-    if (!validateForm()) return;
+    const isAlreadyLoggedIn = !!auth.currentUser;
+    if (!validateForm(isAlreadyLoggedIn)) return;
     if (globalOnboardingSignInActive) return;
     setLoading(true);
     try {
       globalOnboardingSignInActive = true;
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      
-      if (user) {
-        if (user.email === 'developermike5@gmail.com') {
-          navigate('/admin', { replace: true });
-          return;
-        }
-
-        const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-            navigate('/dashboard', { replace: true });
-            return;
-        }
-
-        const userCode = data.myReferralCode || user.uid.slice(0, 6).toUpperCase();
-        
-        let recommendedPath = '';
-        if (pathway === 'A') {
-          if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
-            recommendedPath = 'Professional Conversion Page Builder';
-          } else if (data.experience.includes('expert')) {
-            recommendedPath = 'Conversion Funnel Agency Masterclass';
-          } else {
-            recommendedPath = 'Landing Page Foundations';
-          }
-        } else if (pathway === 'C') {
-          if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
-            recommendedPath = 'Professional Portfolio Builder';
-          } else if (data.experience.includes('expert')) {
-            recommendedPath = 'Portfolio Agency Masterclass';
-          } else {
-            recommendedPath = 'Portfolio Website Foundations';
-          }
-        } else {
-          if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
-            recommendedPath = 'Professional Store Builder';
-          } else if (data.experience.includes('expert')) {
-            recommendedPath = 'E-Commerce Agency Growth Masterclass';
-          } else {
-            recommendedPath = 'E-commerce Essentials';
-          }
-        }
-
-        let isActivated = false;
-        let activeCohort = 'Cohort 1';
+      let user = auth.currentUser;
+      if (!user) {
+        const result = await createUserWithEmailAndPassword(auth, data.email, data.password);
+        user = result.user;
         try {
-          const cohortsSnap = await getDoc(doc(db, 'settings', 'cohorts'));
-          if (cohortsSnap.exists()) {
-            activeCohort = cohortsSnap.data().activeCohort || 'Cohort 1';
-          }
-        } catch (err) {
-          console.warn("Could not fetch active cohort settings during registration:", err);
+          await updateProfile(user, { displayName: data.fullName });
+        } catch (profileErr) {
+          console.warn("Could not update display name:", profileErr);
         }
-
-        setCreationTime(new Date().getTime());
-        await setDoc(docRef, {
-          email: user.email,
-          intent: data.intent,
-          experience: data.experience,
-          courseType: data.courseType,
-          pathwaySelection: data.pathwaySelection,
-          pathwayReason: data.pathwayReason,
-          pathwayExperience: data.pathwayExperience,
-          recommendedPath: recommendedPath,
-          goal: data.goal,
-          availability: data.availability,
-          learningTool: data.learningTool || '',
-          educationLevel: data.educationLevel || '',
-          ageRange: data.ageRange || '',
-          fullName: data.fullName,
-          gender: data.gender,
-          whatsapp: data.whatsapp,
-          state: data.state,
-          referralCode: data.referralCode,
-          myReferralCode: userCode,
-          isActivated: false,
-          referralsCount: 0,
-          approvalStatus: 'Pending',
-          adminCode: `CIYA-${Math.floor(100000 + Math.random() * 900000)}`,
-          isDashboardUnlocked: false,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          cohort: activeCohort
-        });
-        
-        setData(d => ({ ...d, recommendedPath, myReferralCode: userCode, isActivated }));
-
-        if (data.referralCode) {
-          try {
-            const referrersRef = collection(db, 'users');
-            const q = query(referrersRef, where('myReferralCode', '==', data.referralCode.trim().toUpperCase()));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-              const referrerDoc = querySnapshot.docs[0];
-              const prevCount = referrerDoc.data().referralsCount || 0;
-              await updateDoc(doc(db, 'users', referrerDoc.id), {
-                isActivated: true,
-                referralsCount: prevCount + 1,
-                updatedAt: serverTimestamp()
-              });
-            }
-          } catch(e) { console.error('Error activating referral:', e); }
-        }
-
-        nextStep(); 
       }
+      
+      await handleRegisterSuccess(user);
     } catch (e: any) {
-      if (e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user') {
-        return;
-      }
       console.error(e);
-      if (
-        e.code === 'auth/popup-blocked' || 
-        e.message?.toLowerCase().includes('popup-blocked') || 
-        e.message?.toLowerCase().includes('popup estuvo bloqueado') ||
-        e.message?.includes('Pending promise was never set') ||
-        e.message?.includes('INTERNAL ASSERTION FAILED')
-      ) {
-        setShowPopupBlocked(true);
-        return;
+      let errMsg = e.message || 'An error occurred during sign up.';
+      if (e.message?.toLowerCase().includes('email already in use') || e.message?.toLowerCase().includes('already registered')) {
+        errMsg = 'This email is already registered. Try logging in instead!';
+      } else if (e.message?.includes('offline')) {
+        errMsg = 'Network error. Please check your internet connection.';
       }
-      if (e.message?.includes('offline') || e.code === 'unavailable') {
-        alert("Network error: Please check your internet connection and try again.");
-      } else {
-        alert('Error during sign up: ' + e.message);
-      }
+      setFormError(errMsg);
+      alert(`Registration Error: ${errMsg}`);
     } finally {
       globalOnboardingSignInActive = false;
       setLoading(false);
@@ -436,13 +471,19 @@ export default function Onboarding() {
 
       {/* TOP warning banner for persistent warning notice */}
       {step > 1 && step < 11 && (
-        <div className="w-full max-w-2xl px-4 z-10">
+        <div className="w-full max-w-2xl px-4 z-10 space-y-3">
           <div className="w-full py-2.5 px-4 bg-slate-900/60 border border-teal-500/20 rounded-2xl flex items-center gap-3 shadow-md backdrop-blur-sm">
             <div className="w-2 h-2 rounded-full bg-teal-400 animate-ping shrink-0" />
             <p className="text-[11px] md:text-xs font-semibold text-slate-300 leading-normal">
               <strong className="text-teal-400 font-bold uppercase mr-1">CARE REQUIRED:</strong> Answers are final & cannot be changed later. This form sets up your direct dashboard access!
             </p>
           </div>
+          {formError && (
+            <div className="w-full p-4 bg-red-950/80 border border-red-800/40 text-red-200 text-sm font-semibold rounded-2xl flex items-center justify-between gap-3 shadow-lg">
+              <span>{formError}</span>
+              <button onClick={() => setFormError('')} className="text-red-400 hover:text-red-200 bg-transparent border-0 cursor-pointer font-bold text-base p-1 leading-none">✕</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -654,6 +695,14 @@ export default function Onboarding() {
                 {formError && (
                   <div className="p-3 bg-red-950/50 border border-red-800/40 text-red-200 text-sm font-semibold rounded-xl">{formError}</div>
                 )}
+                {auth.currentUser && (
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs font-semibold rounded-2xl flex items-start gap-2.5">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+                    <div>
+                      You are logged in as <span className="text-white font-black">{auth.currentUser.email}</span>, but your profile details are incomplete. Fill in your details below to activate your student dashboard.
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Full Name *</label>
                   <div className="relative">
@@ -704,9 +753,36 @@ export default function Onboarding() {
                     </select>
                   </div>
                 </div>
+                
+                {/* Email Address */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Email Address *</label>
+                  <div className="relative">
+                    <Mail className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input 
+                      type="email" 
+                      value={data.email} 
+                      onChange={e => selectData('email', e.target.value)} 
+                      disabled={!!auth.currentUser}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold disabled:opacity-60" 
+                      placeholder="your@email.com" 
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                {!auth.currentUser && (
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Password *</label>
+                    <div className="relative">
+                      <Lock className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input type="password" value={data.password} onChange={e => selectData('password', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold" placeholder="Min. 6 characters" />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="mt-6">
+              <div className="mt-6 space-y-4">
                 <button 
                   onClick={doAuthAndSave} 
                   disabled={loading} 
@@ -721,7 +797,7 @@ export default function Onboarding() {
                     </div>
                   ) : (
                     <>
-                      Sign Up
+                      Register Student Profile
                     </>
                   )}
                 </button>
@@ -751,7 +827,7 @@ export default function Onboarding() {
                 </div>
 
                 <div className="mt-8">
-                  <button onClick={() => navigate('/dashboard')} className="px-6 py-4.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black rounded-full text-base transition-all shadow-lg hover:shadow-teal-500/20 w-full cursor-pointer border-0 uppercase tracking-wider">
+                  <button onClick={() => { window.location.href = '/dashboard'; }} className="px-6 py-4.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black rounded-full text-base transition-all shadow-lg hover:shadow-teal-500/20 w-full cursor-pointer border-0 uppercase tracking-wider">
                     Go to My Dashboard 🚀
                   </button>
                 </div>
@@ -797,6 +873,8 @@ export default function Onboarding() {
           </div>
         </div>
       )}
+
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
     </div>
   );
 }

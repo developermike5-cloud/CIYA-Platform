@@ -57,7 +57,7 @@ export default function NotificationsAdmin() {
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
   
   // Super Admin Check
-  const isSuperAdmin = currentUser?.email === 'developermike5@gmail.com';
+  const isSuperAdmin = currentUser?.email?.toLowerCase() === 'developermike5@gmail.com';
 
   useEffect(() => {
     let unsubTemplates: (() => void) | null = null;

@@ -9,6 +9,20 @@ export default defineConfig(({mode}) => {
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(
+        process.env.VITE_SUPABASE_URL ||
+        process.env.SUPABASE_URL ||
+        env.VITE_SUPABASE_URL ||
+        env.SUPABASE_URL ||
+        'https://yfntfkblqsjgtgmmfqub.supabase.co'
+      ),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
+        process.env.VITE_SUPABASE_ANON_KEY ||
+        process.env.SUPABASE_ANON_KEY ||
+        env.VITE_SUPABASE_ANON_KEY ||
+        env.SUPABASE_ANON_KEY ||
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlmbnRma2JscXNqZ3RnbW1mcXViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MTM2MTIsImV4cCI6MjA5ODQ4OTYxMn0.r1b9MbLEUtoovsltbfVMq_tlHtHijKHdBiyGVkFDr3Y'
+      ),
     },
     resolve: {
       alias: {

@@ -720,9 +720,7 @@ export default function CourseEdit() {
     const srcVideo = (srcDay.videos || [])[srcVidIdx];
     if (!srcVideo) return;
 
-    if (!confirm(`Are you sure you want to copy the details of "${srcVideo.title}" into this lesson slot? This will overwrite the current title, URL, description, resources, comprehension quiz, and fun facts for this slot.`)) {
-      return;
-    }
+    // Proceed directly with non-blocking copy so that sandboxed browser iframes never freeze or ignore clicks
 
     setForm(prev => {
       const updatedDays = [...(prev.days || DAYS_RANGE.map(d => emptyDay(d)))];

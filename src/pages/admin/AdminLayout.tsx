@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, Navigate, Link, useLocation, useNavigate } from 'react-router';
 import { auth, db, getActiveDatabaseId, setActiveDatabaseId, handleFirestoreError, OperationType } from '../../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Menu, X, Database } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 
@@ -12,7 +12,7 @@ export default function AdminLayout() {
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (parsed && (parsed.email === 'developermike5@gmail.com' || parsed.role === 'admin')) {
+        if (parsed && (parsed.email?.toLowerCase() === 'developermike5@gmail.com' || parsed.role === 'admin')) {
           return parsed;
         }
       } catch (e) {
@@ -31,7 +31,7 @@ export default function AdminLayout() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        if (currentUser.email === 'developermike5@gmail.com') {
+        if (currentUser.email?.toLowerCase() === 'developermike5@gmail.com') {
           const userData = {
             uid: currentUser.uid,
             email: currentUser.email,
@@ -42,6 +42,32 @@ export default function AdminLayout() {
           localStorage.setItem('ciya_cached_user', JSON.stringify(userData));
           setUser(userData);
           setLoading(false);
+
+          // Auto-provision Super Admin records in database to satisfy RLS policies
+          try {
+            setDoc(doc(db, 'admins', currentUser.uid), {
+              email: currentUser.email?.toLowerCase() || 'developermike5@gmail.com',
+              role: 'superadmin',
+              permissions: ['all']
+            }, { merge: true }).catch(e => console.warn("Auto-provision admins failed:", e));
+
+            // Also ensure they have a user profile record
+            getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
+              if (!snap.exists()) {
+                setDoc(doc(db, 'users', currentUser.uid), {
+                  email: currentUser.email?.toLowerCase() || 'developermike5@gmail.com',
+                  fullName: 'Super Admin',
+                  approvalStatus: 'Approved',
+                  isDashboardUnlocked: true,
+                  cohort: 'Cohort 1',
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
+                }).catch(e => console.warn("Auto-provision users failed:", e));
+              }
+            }).catch(e => console.warn("AdminLayout getDoc users failed:", e));
+          } catch (e) {
+            console.warn("Could not auto-provision superadmin records:", e);
+          }
         } else {
           try {
             const adminDocRef = doc(db, 'admins', currentUser.uid);
@@ -86,7 +112,7 @@ export default function AdminLayout() {
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
-            if (parsed && (parsed.email === 'developermike5@gmail.com' || parsed.role === 'admin')) {
+            if (parsed && (parsed.email?.toLowerCase() === 'developermike5@gmail.com' || parsed.role === 'admin')) {
               setUser(parsed);
             } else {
               localStorage.removeItem('ciya_cached_user');
@@ -108,6 +134,7 @@ export default function AdminLayout() {
   const handleLogout = async () => {
     localStorage.removeItem('ciya_cached_user');
     await signOut(auth);
+    navigate('/?login=true');
   };
 
   if (loading) {
@@ -118,7 +145,7 @@ export default function AdminLayout() {
     return <Navigate to="/dashboard" />;
   }
 
-  const isSuperAdmin = user?.email === 'developermike5@gmail.com' || user?.role === 'super_admin';
+  const isSuperAdmin = user?.email?.toLowerCase() === 'developermike5@gmail.com' || user?.role === 'super_admin';
   const userPermissions = user?.permissions || [];
   const activeRole = user?.adminRole || (isSuperAdmin ? 'Super Admin' : 'CIYA Admin');
 

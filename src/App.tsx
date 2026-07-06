@@ -16,6 +16,7 @@ import Onboarding from './pages/Onboarding';
 import WaitingOnboarding from './pages/WaitingOnboarding';
 import GetStarted from './pages/GetStarted';
 import { BrandedAlertContainer } from './components/BrandedAlert';
+import { safeStorage } from './utils/safeStorage';
 
 function NavigationTracker() {
   const location = useLocation();
@@ -23,13 +24,19 @@ function NavigationTracker() {
 
   useEffect(() => {
     // Only attempt to restore the last visited path ONCE per browser session (tab)
-    const hasRestored = sessionStorage.getItem('ciya_initial_path_restored');
+    let hasRestored = 'false';
+    try {
+      hasRestored = sessionStorage.getItem('ciya_initial_path_restored') || 'false';
+    } catch (e) {}
+
     if (hasRestored === 'true') {
       return;
     }
     
     // Mark as restored immediately so it never runs again during this session
-    sessionStorage.setItem('ciya_initial_path_restored', 'true');
+    try {
+      sessionStorage.setItem('ciya_initial_path_restored', 'true');
+    } catch (e) {}
 
     // ONLY restore if the user initially landed on the root page '/'
     const isRootPath = window.location.pathname === '/' || window.location.pathname === '';
@@ -37,34 +44,34 @@ function NavigationTracker() {
       return;
     }
 
-    const savedPath = localStorage.getItem('ciya_last_visited_path');
+    const savedPath = safeStorage.getItem('ciya_last_visited_path');
     const currentPath = window.location.pathname + window.location.search;
     
     if (savedPath && savedPath !== currentPath) {
       // Loop protection: check if we've recently redirected to this path and got bounced back
-      const lastRedirectTime = localStorage.getItem('ciya_last_redirect_time');
-      const lastRedirectPath = localStorage.getItem('ciya_last_redirect_path');
+      const lastRedirectTime = safeStorage.getItem('ciya_last_redirect_time');
+      const lastRedirectPath = safeStorage.getItem('ciya_last_redirect_path');
       const now = Date.now();
       
       if (lastRedirectPath === savedPath && lastRedirectTime && (now - parseInt(lastRedirectTime, 10) < 3000)) {
         console.warn("Redirect loop detected for path:", savedPath, ". Clearing saved path to prevent freezing.");
-        localStorage.removeItem('ciya_last_visited_path');
-        localStorage.removeItem('ciya_last_redirect_path');
-        localStorage.removeItem('ciya_last_redirect_time');
+        safeStorage.removeItem('ciya_last_visited_path');
+        safeStorage.removeItem('ciya_last_redirect_path');
+        safeStorage.removeItem('ciya_last_redirect_time');
         return;
       }
       
       // Save redirect attempt details for loop detection
-      localStorage.setItem('ciya_last_redirect_path', savedPath);
-      localStorage.setItem('ciya_last_redirect_time', now.toString());
+      safeStorage.setItem('ciya_last_redirect_path', savedPath);
+      safeStorage.setItem('ciya_last_redirect_time', now.toString());
       
       // Only restore protected routes if we actually have a cached user session
       const isProtected = savedPath.startsWith('/admin') || savedPath.startsWith('/dashboard');
-      const hasCachedUser = localStorage.getItem('ciya_cached_user');
+      const hasCachedUser = safeStorage.getItem('ciya_cached_user');
       
       if (isProtected && !hasCachedUser) {
         // Do not auto-redirect guest users to protected pages
-        localStorage.removeItem('ciya_last_visited_path');
+        safeStorage.removeItem('ciya_last_visited_path');
         return;
       }
       
@@ -75,7 +82,7 @@ function NavigationTracker() {
   useEffect(() => {
     if (location.pathname) {
       const fullPath = location.pathname + location.search;
-      localStorage.setItem('ciya_last_visited_path', fullPath);
+      safeStorage.setItem('ciya_last_visited_path', fullPath);
     }
   }, [location]);
 

@@ -37,8 +37,9 @@ export function onValue(refObj: any, callback: (snapshot: any) => void) {
 
   fetchAndCallback();
 
+  const uniqueSuffix = Math.random().toString(36).substring(2, 9);
   const channel = supabase
-    .channel(`rtdb-${docId}`)
+    .channel(`rtdb-${docId}-${uniqueSuffix}`)
     .on('postgres_changes', {
       event: '*',
       schema: 'public',

@@ -27,6 +27,7 @@ export default function BlogAdmin() {
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [author, setAuthor] = useState('CIYA Team');
+  const [deleteModalPostId, setDeleteModalPostId] = useState<string | null>(null);
   const [publishedDate, setPublishedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [formTab, setFormTab] = useState<'write' | 'preview'>('write');
 
@@ -170,10 +171,6 @@ export default function BlogAdmin() {
   };
 
   const handleDelete = async (postId: string) => {
-    if (!window.confirm("Are you absolutely sure you want to permanently delete this blog post? This action is irreversible.")) {
-      return;
-    }
-
     try {
       const docRef = doc(db, 'blog', postId);
       await deleteDoc(docRef);
@@ -597,7 +594,7 @@ export default function BlogAdmin() {
                       </button>
                       <button
                         id={`admin-blog-delete-${post.id}`}
-                        onClick={() => handleDelete(post.id)}
+                        onClick={() => setDeleteModalPostId(post.id)}
                         title="Delete Article"
                         className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg border-0 bg-transparent cursor-pointer transition-colors"
                       >
@@ -611,6 +608,39 @@ export default function BlogAdmin() {
           </div>
         </div>
       </div>
+
+      {/* CUSTOM CONFIRMATION MODAL TO AVOID IFRAME BLOCK */}
+      {deleteModalPostId && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[24px] max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
+            <div className="mx-auto w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center text-xl text-rose-650 select-none">
+              ⚠️
+            </div>
+            <h3 className="font-extrabold text-lg text-slate-900 tracking-tight">Delete Blog Post?</h3>
+            <p className="text-slate-505 text-xs font-semibold leading-relaxed">
+              Are you sure you want to permanently delete this blog post? This action is irreversible.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setDeleteModalPostId(null)}
+                className="flex-1 py-2.5 bg-slate-150 hover:bg-slate-200 text-slate-700 font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all border-0 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const id = deleteModalPostId;
+                  setDeleteModalPostId(null);
+                  await handleDelete(id);
+                }}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all border-0 cursor-pointer shadow-sm shadow-rose-600/15"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -56,6 +56,13 @@ export default function CoursesAdmin() {
   const [filterSkill, setFilterSkill] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterDuration, setFilterDuration] = useState<string>('all');
+  
+  // Custom non-blocking modal dialog states for sandboxed iframes
+  const [cloneDialogCourse, setCloneDialogCourse] = useState<Course | null>(null);
+  const [cloneDialogName, setCloneDialogName] = useState<string>('');
+  const [deleteDialogCourse, setDeleteDialogCourse] = useState<Course | null>(null);
+  const [isPerformingAction, setIsPerformingAction] = useState(false);
+
   const navigate = useNavigate();
 
   // Load courses in real-time
@@ -105,25 +112,36 @@ export default function CoursesAdmin() {
   }, []);
 
   // Inline DB Actions
-  const handleTogglePublish = async (courseId: string, currentStatus: string) => {
+  const handleTogglePublish = async (courseId: string, isCurrentlyPublished: boolean) => {
+    const nextStatus = isCurrentlyPublished ? 'draft' : 'published';
+    const nextPublishStatus = nextStatus === 'published' ? 'Published' : 'Draft';
+    
+    // Optimistic update
+    setCourses(prev => prev.map(c => c.id === courseId ? { ...c, status: nextStatus, publish_status: nextPublishStatus } : c));
+
     try {
-      const nextStatus = currentStatus === 'published' ? 'draft' : 'published';
       const docRef = doc(db, 'courses', courseId);
       await updateDoc(docRef, {
         status: nextStatus,
-        publish_status: nextStatus === 'published' ? 'Published' : 'Draft',
+        publish_status: nextPublishStatus,
         updatedAt: serverTimestamp()
       });
       await triggerSystemSignal('courses');
     } catch (e) {
       console.error(e);
-      alert('Error updating course status.');
+      // Revert on failure
+      setCourses(prev => prev.map(c => c.id === courseId ? { ...c, status: isCurrentlyPublished ? 'published' : 'draft', publish_status: isCurrentlyPublished ? 'Published' : 'Draft' } : c));
+      alert('Error updating course status. Make sure your Admin account is correctly synchronized with the database.');
     }
   };
 
   const handleToggleLock = async (courseId: string, currentLocked: boolean) => {
+    const nextLocked = !currentLocked;
+    
+    // Optimistic update
+    setCourses(prev => prev.map(c => c.id === courseId ? { ...c, isLocked: nextLocked } : c));
+
     try {
-      const nextLocked = !currentLocked;
       const docRef = doc(db, 'courses', courseId);
       await updateDoc(docRef, {
         isLocked: nextLocked,
@@ -132,59 +150,103 @@ export default function CoursesAdmin() {
       await triggerSystemSignal('courses');
     } catch (e) {
       console.error(e);
+      // Revert on failure
+      setCourses(prev => prev.map(c => c.id === courseId ? { ...c, isLocked: currentLocked } : c));
       alert('Error updating course lock status.');
     }
   };
 
-  const handleDeleteCourse = async (courseId: string) => {
-    if (!window.confirm('Are you absolutely sure you want to delete this course from catalog? This cannot be undone.')) {
-      return;
-    }
+  const confirmDeleteCourse = async () => {
+    if (!deleteDialogCourse?.id) return;
+    setIsPerformingAction(true);
     try {
-      const docRef = doc(db, 'courses', courseId);
+      const docRef = doc(db, 'courses', deleteDialogCourse.id);
       await deleteDoc(docRef);
       await triggerSystemSignal('courses');
+      setDeleteDialogCourse(null);
     } catch (e) {
       console.error(e);
       alert('Failed to delete course.');
+    } finally {
+      setIsPerformingAction(false);
     }
   };
 
-  const handleCloneCourse = async (sourceCourse: Course) => {
-    const confirmName = window.prompt(
-      `Enter a title for the cloned course:`, 
-      `${sourceCourse.title} (Clone)`
-    );
-    if (confirmName === null) return; // Cancelled
-    const clonedTitle = confirmName.trim() || `${sourceCourse.title} (Clone)`;
+  const confirmCloneCourse = async () => {
+    if (!cloneDialogCourse) return;
+    const clonedTitle = cloneDialogName.trim() || `${cloneDialogCourse.title} (Clone)`;
+    setIsPerformingAction(true);
 
     try {
-      const clonedDays = sourceCourse.days 
-        ? sourceCourse.days.map(day => {
-            const { assignment, ...rest } = day;
-            return rest;
-          })
-        : [];
+      // Map and clean Days to ensure no undefined fields and full deep cloning of quizzes, videos, assignments
+      const clonedDays = (cloneDialogCourse.days || []).map((day, dIdx) => ({
+        dayNumber: day.dayNumber || (dIdx + 1),
+        title: day.title || `Day ${dIdx + 1}`,
+        description: day.description || '',
+        assignment: day.assignment ? {
+          prompt: day.assignment.prompt || '',
+          dueNote: day.assignment.dueNote || ''
+        } : { prompt: '', dueNote: '' },
+        videos: (day.videos || []).map((v) => ({
+          id: Math.random().toString(36).substring(2, 9),
+          title: v.title || '',
+          video_url: v.video_url || v.url || '',
+          url: v.video_url || v.url || '',
+          duration: v.duration || '10 min',
+          description: v.description || '',
+          resources: v.resources || '',
+          checkType: v.checkType || 'none',
+          check: v.check ? JSON.parse(JSON.stringify(v.check)) : null,
+          funFact: v.funFact ? { ...v.funFact } : null
+        }))
+      }));
 
-      const clonedCourseData = {
-        ...sourceCourse,
+      // Explicitly construct cloned payload to strictly conform to firestore rules
+      const payload: Record<string, any> = {
         title: clonedTitle,
+        subtitle: cloneDialogCourse.tagline || cloneDialogCourse.subtitle || '',
+        tagline: cloneDialogCourse.tagline || cloneDialogCourse.subtitle || '',
+        thumbnail: cloneDialogCourse.thumbnail || '',
+        description: cloneDialogCourse.overview || cloneDialogCourse.description || '',
+        overview: cloneDialogCourse.overview || cloneDialogCourse.description || '',
+        category: cloneDialogCourse.category || 'AI Website Class',
+        skill: cloneDialogCourse.skill || 'web',
+        subskill: cloneDialogCourse.subskill || '',
+        skillPath: cloneDialogCourse.skillPath || '',
+        durationMode: 'express',
+        clonedFromId: cloneDialogCourse.id || '',
+        level: cloneDialogCourse.level || 'Beginner',
+        tier: cloneDialogCourse.tier || 'beginner',
+        price: Number(cloneDialogCourse.price) || 0,
+        instructor: cloneDialogCourse.instructor || 'CIYA Team',
+        outcomes: cloneDialogCourse.outcomes || '',
+        requirements: cloneDialogCourse.requirements || '',
+        publish_status: 'Draft',
+        status: 'draft',
+        isLocked: !!cloneDialogCourse.isLocked,
         isCloned: true,
         days: clonedDays,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        status: 'draft',
-        publish_status: 'Draft'
+        updatedAt: serverTimestamp()
       };
-      
-      delete (clonedCourseData as any).id;
 
-      await addDoc(collection(db, 'courses'), clonedCourseData);
+      // Sanitize fields to ensure absolutely NO undefined values are passed to Firestore
+      const cleanedPayload: Record<string, any> = {};
+      Object.entries(payload).forEach(([k, v]) => {
+        if (v !== undefined) {
+          cleanedPayload[k] = v;
+        }
+      });
+
+      await addDoc(collection(db, 'courses'), cleanedPayload);
       await triggerSystemSignal('courses');
-      alert(`Course "${sourceCourse.title}" cloned successfully! Saved as Draft: "${clonedTitle}".`);
+      setCloneDialogCourse(null);
+      alert(`Course cloned successfully! Saved as Draft: "${clonedTitle}".`);
     } catch (err: any) {
       console.error("Error cloning course:", err);
       alert("Failed to clone course. Error: " + err.message);
+    } finally {
+      setIsPerformingAction(false);
     }
   };
 
@@ -380,7 +442,7 @@ export default function CoursesAdmin() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleTogglePublish(c.id!, c.status!)}
+                          onClick={() => handleTogglePublish(c.id!, isPublished)}
                           className={`px-3 py-1.5 rounded-lg border font-bold text-xs cursor-pointer transition-all ${
                             isPublished
                               ? 'border-amber-205 bg-amber-50 text-amber-700'
@@ -391,7 +453,10 @@ export default function CoursesAdmin() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleCloneCourse(c)}
+                          onClick={() => {
+                            setCloneDialogCourse(c);
+                            setCloneDialogName(`${c.title} (Clone)`);
+                          }}
                           className="px-3 py-1.5 bg-indigo-50 border-2 border-indigo-200 rounded-lg text-indigo-700 font-extrabold hover:bg-indigo-100 transition-all shadow-sm flex items-center gap-1 cursor-pointer"
                           title="Clone/duplicate this course"
                         >
@@ -406,7 +471,7 @@ export default function CoursesAdmin() {
                         </Link>
                         <button
                           type="button"
-                          onClick={() => handleDeleteCourse(c.id!)}
+                          onClick={() => setDeleteDialogCourse(c)}
                           className="p-1.5 text-red-500 hover:bg-red-50 hover:border-red-200 border border-transparent rounded-lg transition-all cursor-pointer"
                           title="Click to delete course permanently"
                         >
@@ -419,6 +484,77 @@ export default function CoursesAdmin() {
               })}
             </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {deleteDialogCourse && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-left">
+            <h3 className="text-lg font-black text-slate-900 mb-2">🗑️ Delete Course Permanently?</h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Are you absolutely sure you want to delete <span className="font-extrabold text-slate-800">"{deleteDialogCourse.title}"</span>? All modules, days, lesson videos, resources, quizzes, and student submissions will be lost forever. This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                disabled={isPerformingAction}
+                onClick={() => setDeleteDialogCourse(null)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isPerformingAction}
+                onClick={confirmDeleteCourse}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold rounded-xl transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isPerformingAction ? 'Deleting...' : 'Yes, Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Clone Prompt Modal */}
+      {cloneDialogCourse && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 text-left">
+            <h3 className="text-lg font-black text-slate-900 mb-2">📋 Clone & Duplicate Course</h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              This will create a draft duplicate of <span className="font-extrabold text-slate-800">"{cloneDialogCourse.title}"</span> including all day configurations, video playlists, and assignments. Please specify a title for the clone:
+            </p>
+            <div className="mb-4">
+              <label className="block text-[10px] uppercase font-black text-slate-400 mb-1">New Course Title</label>
+              <input
+                type="text"
+                required
+                value={cloneDialogName}
+                onChange={(e) => setCloneDialogName(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:border-indigo-400 focus:bg-white transition-all"
+                placeholder="Enter cloned course title..."
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                disabled={isPerformingAction}
+                onClick={() => setCloneDialogCourse(null)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isPerformingAction || !cloneDialogName.trim()}
+                onClick={confirmCloneCourse}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isPerformingAction ? 'Cloning...' : 'Clone Course'}
+              </button>
+            </div>
           </div>
         </div>
       )}

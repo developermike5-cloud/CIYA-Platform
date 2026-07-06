@@ -210,8 +210,17 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null, shouldThrow = false) {
+  let errorMessage = '';
+  if (error instanceof Error) {
+    errorMessage = error.message;
+  } else if (error && typeof error === 'object') {
+    errorMessage = (error as any).message || (error as any).hint || JSON.stringify(error);
+  } else {
+    errorMessage = String(error);
+  }
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -320,7 +329,7 @@ export async function triggerSystemSignal(field: 'courses' | 'settings' | 'blog'
         ...(field === 'user_signals' && subField ? { user_signals: { [subField]: Date.now() } } : {})
       }, { merge: true });
     } catch (e) {
-      console.error("Critical error updating system_signals document:", e);
+      console.warn("Could not update system_signals in Firestore (likely permission-restricted in current session):", e);
     }
   }
 }

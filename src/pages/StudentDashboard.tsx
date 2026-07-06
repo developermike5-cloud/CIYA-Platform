@@ -8,11 +8,13 @@ import { Course, CourseDay, CourseVideo } from '../types';
 import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText } from 'lucide-react';
 import { motion } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
+import LoginModal from '../components/LoginModal';
 import SecureYoutubePlayer from '../components/SecureYoutubePlayer';
 import PromptGenerator from '../components/PromptGenerator';
 import { StudentBlog } from '../components/StudentBlog';
 import AdminKycbQuestionnaire from './admin/AdminKycbQuestionnaire';
 import { safeStorage } from '../utils/safeStorage';
+import { supabase, getStoragePublicUrl } from '../lib/supabase';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -436,17 +438,20 @@ interface QuizModalProps {
   courseId: string;
   currentUser: any;
   userProfile: any;
+  setUserProfile?: any;
   onSuccess: () => void;
   onClose: () => void;
   showToast: (msg: string) => void;
+  isExpress?: boolean;
 }
 
-function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProfile, onSuccess, onClose, showToast }: QuizModalProps) {
+function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProfile, setUserProfile, onSuccess, onClose, showToast, isExpress = false }: QuizModalProps) {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, any>>({});
   const [submitted, setSubmitted] = useState(false);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [scorePercentage, setScorePercentage] = useState<number | null>(null);
   const [hasPassed, setHasPassed] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
 
   if (!check) return null;
 
@@ -473,9 +478,54 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
     setHasPassed(passesQuiz);
     setSubmitted(true);
 
+    if (isExpress) {
+      // Bypasses storing the score in the user profile document for express courses, but unlocks next parts locally
+      if (passesQuiz) {
+        showToast(`Quiz completed: ${finalPct}%! 🎉 (Progress not recorded for Express Track)`);
+        onSuccess();
+      }
+      return;
+    }
+
     try {
-      const dbScores = userProfile.progress?.[courseId]?.quizScores || {};
+      const dbScores = userProfile?.progress?.[courseId]?.quizScores || {};
       const existingScoreRecord = dbScores[checkKey];
+
+      // Optimistic update of local userProfile state and safeStorage cache!
+      if (setUserProfile) {
+        const currentProgress = userProfile?.progress?.[courseId] || {};
+        const currentScores = currentProgress.quizScores || {};
+        let updatedScores = { ...currentScores };
+        
+        if (!existingScoreRecord) {
+          updatedScores[checkKey] = {
+            score: finalPct,
+            passed: passesQuiz,
+            answeredAt: new Date().toLocaleString(),
+            firstAttemptRecorded: true
+          };
+        } else {
+          if (passesQuiz && !existingScoreRecord.passed) {
+            updatedScores[checkKey] = {
+              ...existingScoreRecord,
+              passed: true
+            };
+          }
+        }
+
+        const updatedProfile = {
+          ...userProfile,
+          progress: {
+            ...(userProfile?.progress || {}),
+            [courseId]: {
+              ...currentProgress,
+              quizScores: updatedScores
+            }
+          }
+        };
+        setUserProfile(updatedProfile);
+        safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+      }
 
       const userRef = doc(db, 'users', currentUser.uid);
 
@@ -535,6 +585,15 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
               </span>
             </div>
 
+            {/* Leaderboard & First Attempt Warning Banner */}
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-[11px] text-amber-900 leading-relaxed font-semibold flex items-start gap-2.5">
+              <span className="text-sm select-none">⚠️</span>
+              <div>
+                <strong className="block text-amber-950 font-black mb-0.5">Quiz Attempt Notice:</strong>
+                Please take this check seriously. <span className="underline font-black">Only your first attempt score</span> will be recorded and aggregated for the daily Live Leaderboard! High-ranking scholars win prestigious benefits, study discounts, and recruitment support backed by CIYA sponsors.
+              </div>
+            </div>
+
             <h4 className="font-black text-slate-950 text-base md:text-lg leading-relaxed">
               {checkType === 'mcq' ? activeQuestion.question : checkType === 'tf' ? activeQuestion.statement : (activeQuestion.headline || 'Read this factsheet:')}
             </h4>
@@ -543,23 +602,37 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
               <div className="space-y-2.5">
                 {(activeQuestion.options || []).map((opt: string, optIdx: number) => {
                   const isSelected = selectedAnswers[currentIdx] === optIdx;
+                  const isCorrect = activeQuestion.correct === optIdx;
+                  
+                  let optStyle = "border-slate-300 hover:border-slate-400 hover:bg-slate-50";
+                  if (isSelected) {
+                    if (showExplanation) {
+                      optStyle = "border-rose-500 bg-rose-50 text-rose-950 font-semibold ring-2 ring-rose-400";
+                    } else {
+                      optStyle = "border-amber-500 bg-amber-100/90 text-slate-950 font-black ring-3 ring-amber-400 shadow-lg scale-[1.02] duration-200";
+                    }
+                  } else if (showExplanation && isCorrect) {
+                    optStyle = "border-emerald-500 bg-emerald-50 text-emerald-950 font-semibold ring-2 ring-emerald-400";
+                  }
+
                   return (
                     <button
                       key={optIdx}
                       type="button"
-                      onClick={() => setSelectedAnswers({ ...selectedAnswers, [currentIdx]: optIdx })}
-                      className={`w-full text-left p-3.5 border rounded-xl flex gap-3 items-center transition-all cursor-pointer ${
-                        isSelected 
-                          ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 font-extrabold shadow-sm' 
-                          : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
-                      }`}
+                      onClick={() => {
+                        if (showExplanation) return;
+                        setSelectedAnswers({ ...selectedAnswers, [currentIdx]: optIdx });
+                      }}
+                      className={`w-full text-left p-3.5 border rounded-xl flex gap-3 items-center transition-all cursor-pointer ${optStyle}`}
                     >
                       <span className={`w-5.5 h-5.5 rounded-full border text-[10px] font-black flex items-center justify-center shrink-0 ${
-                        isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-100 text-slate-700 font-bold border-slate-300'
+                        isSelected 
+                          ? showExplanation ? 'bg-rose-600 border-rose-600 text-white font-black' : 'bg-amber-600 border-amber-600 text-white font-black shadow-sm'
+                          : (showExplanation && isCorrect) ? 'bg-emerald-600 border-emerald-600 text-white font-black shadow-sm' : 'bg-slate-100 text-slate-700 font-bold border-slate-300'
                       }`}>
-                        {["A", "B", "C", "D"][optIdx]}
+                        {showExplanation && isCorrect ? "✓" : showExplanation && isSelected ? "✕" : ["A", "B", "C", "D"][optIdx]}
                       </span>
-                      <span className={`text-xs md:text-sm font-bold ${isSelected ? 'text-indigo-950 font-black' : 'text-slate-900'}`}>
+                      <span className={`text-xs md:text-sm font-bold ${isSelected ? 'text-slate-950 font-black' : 'text-slate-900'}`}>
                         {opt}
                       </span>
                     </button>
@@ -572,18 +645,30 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
               <div className="grid grid-cols-2 gap-3">
                 {[true, false].map((v) => {
                   const isSelected = selectedAnswers[currentIdx] === v;
+                  const isCorrect = activeQuestion.answer === v;
+
+                  let optStyle = "border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-900 font-extrabold";
+                  if (isSelected) {
+                    if (showExplanation) {
+                      optStyle = "border-rose-500 bg-rose-50 text-rose-950 font-semibold ring-2 ring-rose-400";
+                    } else {
+                      optStyle = "border-amber-500 bg-amber-100/90 text-slate-950 font-black ring-3 ring-amber-400 shadow-lg scale-[1.02] duration-200";
+                    }
+                  } else if (showExplanation && isCorrect) {
+                    optStyle = "border-emerald-500 bg-emerald-50 text-emerald-950 font-semibold ring-2 ring-emerald-400";
+                  }
+
                   return (
                     <button
                       key={String(v)}
                       type="button"
-                      onClick={() => setSelectedAnswers({ ...selectedAnswers, [currentIdx]: v })}
-                      className={`py-4 border rounded-xl text-center font-black uppercase tracking-wider text-xs transition-all cursor-pointer ${
-                        isSelected
-                          ? 'border-indigo-600 bg-indigo-50/20 text-indigo-950 font-black'
-                          : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-slate-900 font-extrabold'
-                      }`}
+                      onClick={() => {
+                        if (showExplanation) return;
+                        setSelectedAnswers({ ...selectedAnswers, [currentIdx]: v });
+                      }}
+                      className={`py-4 border rounded-xl text-center font-black uppercase tracking-wider text-xs transition-all cursor-pointer ${optStyle}`}
                     >
-                      {v ? "True" : "False"}
+                      {showExplanation && isCorrect ? "✓ Correct" : showExplanation && isSelected ? "✕ Incorrect" : (v ? "True" : "False")}
                     </button>
                   );
                 })}
@@ -603,11 +688,29 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
               </div>
             )}
 
+            {showExplanation && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-rose-50/55 border border-rose-200 rounded-xl space-y-1.5"
+              >
+                <div className="flex items-center gap-1.5 text-rose-700 font-black text-xs uppercase tracking-wider">
+                  <span>💡</span> Learning Explanation
+                </div>
+                <p className="text-xs md:text-sm text-slate-800 font-semibold leading-relaxed">
+                  {activeQuestion.explanation || "That answer selection is incorrect. Review the correct option highlighted in green to learn this concept before proceeding."}
+                </p>
+              </motion.div>
+            )}
+
             <div className="flex justify-between items-center pt-2">
               <button
                 type="button"
-                onClick={() => setCurrentIdx(prev => Math.max(0, prev - 1))}
-                disabled={currentIdx === 0}
+                onClick={() => {
+                  setShowExplanation(false);
+                  setCurrentIdx(prev => Math.max(0, prev - 1));
+                }}
+                disabled={currentIdx === 0 || showExplanation}
                 className="px-4 py-2 text-xs font-bold text-slate-500 rounded-lg hover:bg-slate-50 cursor-pointer disabled:opacity-30 border"
               >
                 Previous Question
@@ -621,11 +724,26 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
                       alert("Please select your answer to advance!");
                       return;
                     }
+                    
+                    const chosen = selectedAnswers[currentIdx];
+                    let isWrong = false;
+                    if (checkType === 'mcq') {
+                      isWrong = chosen !== activeQuestion.correct;
+                    } else if (checkType === 'tf') {
+                      isWrong = chosen !== activeQuestion.answer;
+                    }
+
+                    if (isWrong && !showExplanation) {
+                      setShowExplanation(true);
+                      return;
+                    }
+
+                    setShowExplanation(false);
                     setCurrentIdx(prev => prev + 1);
                   }}
                   className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-wide rounded-xl cursor-pointer font-sans"
                 >
-                  Next Question →
+                  {showExplanation ? "I Understand - Next Question →" : "Next Question →"}
                 </button>
               ) : (
                 <button
@@ -635,11 +753,26 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
                       alert("Please select your answer to complete!");
                       return;
                     }
+
+                    const chosen = selectedAnswers[currentIdx];
+                    let isWrong = false;
+                    if (checkType === 'mcq') {
+                      isWrong = chosen !== activeQuestion.correct;
+                    } else if (checkType === 'tf') {
+                      isWrong = chosen !== activeQuestion.answer;
+                    }
+
+                    if (isWrong && !showExplanation) {
+                      setShowExplanation(true);
+                      return;
+                    }
+
+                    setShowExplanation(false);
                     handleSubmittingQuiz();
                   }}
                   className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-lg"
                 >
-                  Submit Answers & Grade ✓
+                  {showExplanation ? "I Understand - Submit & Grade ✓" : "Submit Answers & Grade ✓"}
                 </button>
               )}
             </div>
@@ -704,6 +837,7 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
 interface CourseViewerProps {
   course: Course;
   userProfile: any;
+  setUserProfile: any;
   currentUser: any;
   onBack: () => void;
   showToast: (msg: string) => void;
@@ -712,6 +846,7 @@ interface CourseViewerProps {
   isEnrolled?: boolean;
   onLogin?: () => void;
   courses: Course[];
+  hasCompletedFirstCourse?: () => boolean;
 }
 
 function renderBulletList(text: string, icon: string, textClass: string = "text-sm text-slate-800") {
@@ -733,7 +868,7 @@ function renderBulletList(text: string, icon: string, textClass: string = "text-
   );
 }
 
-function CourseViewer({ course, userProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse }: CourseViewerProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -827,7 +962,38 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   };
 
   const courseId = course.id || 'general';
-  const progressStore = userProfile.progress?.[courseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+  const dbProgressStore = userProfile?.progress?.[courseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+  const selectedDurationMode = dbProgressStore.durationMode || course.durationMode || 'standard';
+  const isExpress = selectedDurationMode === 'express' || !!course.isCloned;
+
+  // Local progress state for express courses to prevent writing progress to DB profile
+  const [localExpressProgress, setLocalExpressProgress] = useState<{ watched: string[]; checkPassed: string[] }>(() => {
+    try {
+      const stored = localStorage.getItem(`ciya_express_progress_${courseId}`);
+      return stored ? JSON.parse(stored) : { watched: [], checkPassed: [] };
+    } catch (e) {
+      return { watched: [], checkPassed: [] };
+    }
+  });
+
+  // Sync state if courseId changes
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`ciya_express_progress_${courseId}`);
+      setLocalExpressProgress(stored ? JSON.parse(stored) : { watched: [], checkPassed: [] });
+    } catch (e) {
+      setLocalExpressProgress({ watched: [], checkPassed: [] });
+    }
+  }, [courseId]);
+
+  const progressStore = isExpress 
+    ? {
+        ...dbProgressStore,
+        watched: localExpressProgress.watched,
+        checkPassed: localExpressProgress.checkPassed,
+        quizScores: {} // No quiz scores saved in Firestore profile for express courses
+      }
+    : dbProgressStore;
   
   const [dbSubmissions, setDbSubmissions] = useState<any[]>([]);
 
@@ -850,8 +1016,6 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   const completedKeys: string[] = progressStore.watched || [];
   const checkPassedKeys: string[] = progressStore.checkPassed || [];
   const submissions: Record<string, any> = progressStore.submissions || {};
-
-  const selectedDurationMode = progressStore.durationMode || course.durationMode || 'standard';
   const days: CourseDay[] = selectedDurationMode === 'express' 
     ? (course.days || []).slice(0, 3) 
     : (course.days || []);
@@ -964,12 +1128,21 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
     if (hasCheck && !isCheckPassed) {
       setShowQuizModal(true);
     } else {
+      const updatedWatched = [...completedKeys];
+      if (!updatedWatched.includes(checkKey)) {
+        updatedWatched.push(checkKey);
+      }
+      
+      if (isExpress) {
+        // Save to localStorage
+        const newProgress = { watched: updatedWatched, checkPassed: checkPassedKeys };
+        localStorage.setItem(`ciya_express_progress_${courseId}`, JSON.stringify(newProgress));
+        setLocalExpressProgress(newProgress);
+        showToast("Lesson marked as completed! ✓ (Progress saved locally)");
+        return;
+      }
+
       try {
-        const updatedWatched = [...completedKeys];
-        if (!updatedWatched.includes(checkKey)) {
-          updatedWatched.push(checkKey);
-        }
-        
         const userRef = doc(db, 'users', currentUser.uid);
         await updateDoc(userRef, {
           [`progress.${courseId}.watched`]: updatedWatched,
@@ -983,17 +1156,27 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   };
 
   const handleCheckCompletion = async () => {
+    const updatedWatched = [...completedKeys];
+    if (!updatedWatched.includes(checkKey)) {
+      updatedWatched.push(checkKey);
+    }
+
+    const updatedPassed = [...checkPassedKeys];
+    if (!updatedPassed.includes(checkKey)) {
+      updatedPassed.push(checkKey);
+    }
+
+    if (isExpress) {
+      // Save to localStorage
+      const newProgress = { watched: updatedWatched, checkPassed: updatedPassed };
+      localStorage.setItem(`ciya_express_progress_${courseId}`, JSON.stringify(newProgress));
+      setLocalExpressProgress(newProgress);
+      setShowQuizModal(false);
+      showToast("Comprehension check passed! Lesson unlocked! 🎉 (Progress saved locally)");
+      return;
+    }
+
     try {
-      const updatedWatched = [...completedKeys];
-      if (!updatedWatched.includes(checkKey)) {
-        updatedWatched.push(checkKey);
-      }
-
-      const updatedPassed = [...checkPassedKeys];
-      if (!updatedPassed.includes(checkKey)) {
-        updatedPassed.push(checkKey);
-      }
-
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
         [`progress.${courseId}.watched`]: updatedWatched,
@@ -1009,10 +1192,25 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
   };
 
   const handleGoNext = () => {
-    const isUnlocked = isAdmin || isLessonUnlockedUnified(activeDayIdx, activeVideoIdx, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
-    if (!isUnlocked) {
-      alert("Lesson check is locked! Clear comprehension quiz of this lesson first.");
-      return;
+    let nextDayIdx = activeDayIdx;
+    let nextVideoIdx = activeVideoIdx;
+    let goingToNextLesson = false;
+
+    if (activeVideoIdx < videos.length - 1) {
+      nextVideoIdx = activeVideoIdx + 1;
+      goingToNextLesson = true;
+    } else if (course.isCloned && activeDayIdx < days.length - 1) {
+      nextDayIdx = activeDayIdx + 1;
+      nextVideoIdx = 0;
+      goingToNextLesson = true;
+    }
+
+    if (goingToNextLesson) {
+      const isNextUnlocked = isAdmin || isLessonUnlockedUnified(nextDayIdx, nextVideoIdx, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
+      if (!isNextUnlocked) {
+        alert("The next lesson is locked! You must complete the watch requirement and score at least 80% on this lesson's comprehension quiz first.");
+        return;
+      }
     }
 
     if (activeVideoIdx < videos.length - 1) {
@@ -1053,6 +1251,10 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
         updatedAt: serverTimestamp()
       });
 
+      const combinedText = data.images && data.images.length > 0
+        ? (data.text || '') + "\n\n---IMAGES_JSON---\n" + JSON.stringify(data.images)
+        : (data.text || '');
+
       // Also append to global assignments collection
       await addDoc(collection(db, 'assignments'), {
         userId: currentUser.uid,
@@ -1060,7 +1262,7 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
         userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
         courseId: courseId,
         dayIndex: Number(key.replace('day-', '')),
-        submittedText: data.text,
+        submittedText: combinedText,
         fileUrl: data.link || '',
         fileName: data.link ? 'Live URL Link' : '',
         status: 'Pending',
@@ -1094,9 +1296,20 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
             ← Back
           </button>
           <div className="min-w-0 flex-1 space-y-1.5">
-            <span className="text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-100">
-              CLASSROOM HUB
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md border border-indigo-100">
+                CLASSROOM HUB
+              </span>
+              {isEnrolled && (
+                <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md border ${
+                  isExpress 
+                    ? 'bg-teal-50 text-teal-700 border-teal-200' 
+                    : 'bg-indigo-50 text-indigo-750 border-indigo-200'
+                }`}>
+                  {isExpress ? '⚡ Express Track (3 Days)' : '📚 Standard Track (5 Days)'}
+                </span>
+              )}
+            </div>
             <h2 className="font-extrabold text-lg md:text-2xl lg:text-3xl text-slate-900 leading-tight tracking-tight sm:whitespace-normal">
               {course.title}
             </h2>
@@ -1203,39 +1416,47 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                   return;
                 }
                 if (!isEnrolled) {
-                  alert("Please complete your current running course before enrolling for another.");
-                  return;
-                }
-
-                // Check if they already have an enrollment record in progress
-                const alreadyStarted = !!userProfile?.progress?.[course.id || ''];
-                if (!alreadyStarted) {
-                  // Count completed courses to check if they completed their first ever course
-                  const completedCoursesCount = Object.keys(userProfile?.progress || {}).filter(cId => {
+                  const runningCourseId = Object.keys(userProfile?.progress || {}).find(cId => {
                     const p = userProfile?.progress?.[cId];
                     if (!p) return false;
                     const matchingCourse = courses.find(item => item.id === cId);
                     if (!matchingCourse) return false;
                     const totalVids = matchingCourse.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
-                    const isCompleted = (totalVids > 0 && (p.watched || []).length >= totalVids) || userProfile?.completedCoursesOverride?.includes(cId);
-                    return isCompleted;
-                  }).length;
+                    const progressRatio = totalVids > 0 ? Math.round(((p.watched || []).length / totalVids) * 100) : 0;
+                    const isCompleted = progressRatio === 100 && totalVids > 0;
+                    return !isCompleted;
+                  });
 
-                  if (completedCoursesCount >= 1) {
-                    setShowTrackSelectionModal(true);
+                  if (runningCourseId) {
+                    const runningCourse = courses.find(item => item.id === runningCourseId);
+                    alert(`You currently have an active running course: "${runningCourse?.title || 'Active Course'}". Please finish your current running course (100% complete) first before you can enroll in a new course. Users cannot enroll in multiple courses at the same time.`);
                     return;
-                  } else {
-                    // Automatically enroll in standard track for their first ever course
+                  }
+
+                  const completedFirst = hasCompletedFirstCourse ? hasCompletedFirstCourse() : false;
+                  if (!completedFirst) {
+                    // Automatically ascribe to standard course
                     handleEnroll(course.id || '', 'standard');
                     return;
                   }
+
+                  setShowTrackSelectionModal(true);
+                  return;
                 }
 
                 updateParams({ syllabus: 'false', assignment: 'false' });
               }}
-              className="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-sm uppercase rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer transform active:scale-[0.98] border-0"
+              className={`w-full py-4 text-white font-extrabold text-sm uppercase rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer transform active:scale-[0.98] border-0 ${
+                isEnrolled 
+                  ? "bg-teal-600 hover:bg-teal-700 shadow-teal-600/10 hover:shadow-teal-600/20" 
+                  : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/10 hover:shadow-indigo-600/20"
+              }`}
             >
-              📊 Enter Classroom & Begin Lessons →
+              {isEnrolled ? (
+                <>📊 Enter Classroom & Begin Lessons →</>
+              ) : (
+                <>🔒 Enroll & Unlock Classroom →</>
+              )}
             </button>
           </div>
         </div>
@@ -1577,7 +1798,11 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                           if (isDayUnlocked) {
                             handleGoToVideo(di, 0);
                           } else {
-                            alert(`⚠️ Day ${di + 1} lessons are locked! First submit your Day ${di} assignment and wait for coach approval to unlock Day ${di + 1} training.`);
+                            if (course.isCloned) {
+                              alert(`⚠️ Day ${di + 1} lessons are locked! Please complete all Day ${di} lessons first.`);
+                            } else {
+                              alert(`⚠️ Day ${di + 1} lessons are locked! First submit your Day ${di} assignment and wait for coach approval to unlock Day ${di + 1} training.`);
+                            }
                           }
                         }}
                       >
@@ -1585,7 +1810,11 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
                           <div className="flex items-center justify-between font-sans">
                             <span className="text-xs font-black text-indigo-700 tracking-wider uppercase flex items-center gap-1.5">
                               Day {di + 1} 
-                              {!isDayUnlocked && <span className="text-slate-500 text-xs font-normal">🔒 Locked (Pending Assignment Approval)</span>}
+                              {!isDayUnlocked && (
+                                <span className="text-slate-500 text-xs font-normal">
+                                  🔒 Locked ({course.isCloned ? "Preceding Lessons Incomplete" : "Pending Assignment Approval"})
+                                </span>
+                              )}
                             </span>
                             <span className="text-xs bg-slate-100 text-slate-700 font-extrabold px-3 py-1 rounded-full uppercase tracking-normal">
                               {(d.videos || []).length} lessons
@@ -1625,9 +1854,11 @@ function CourseViewer({ course, userProfile, currentUser, onBack, showToast, han
           courseId={courseId}
           currentUser={currentUser}
           userProfile={userProfile}
+          setUserProfile={setUserProfile}
           onSuccess={handleCheckCompletion}
           onClose={() => setShowQuizModal(false)}
           showToast={showToast}
+          isExpress={isExpress}
         />
       )}
 
@@ -1921,16 +2152,6 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled }: any
             )
           )}
         </div>
-        {isLocked && (
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[1px] flex flex-col items-center justify-center z-10 transition-all">
-            <div className="bg-white/10 p-3.5 rounded-full border border-white/20 shadow-lg backdrop-blur-md mb-2">
-              <Lock className="w-6 h-6 text-amber-400 drop-shadow-md" />
-            </div>
-            <span className="text-[9px] bg-amber-500 text-slate-950 font-black tracking-widest uppercase px-2.5 py-0.5 rounded-full shadow">
-              Locked Path
-            </span>
-          </div>
-        )}
       </div>
       
       <div className="p-6 md:p-7 flex-1 flex flex-col">
@@ -1944,6 +2165,15 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled }: any
           {course.subskill && (
             <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200/50">
               <span>🏷️</span> <span>{course.subskill}</span>
+            </span>
+          )}
+          {isEnrolled && (
+            <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-lg ${
+              (progressStore.durationMode || course.durationMode || 'standard') === 'express' 
+                ? 'bg-teal-50 text-teal-700 border border-teal-200/50' 
+                : 'bg-indigo-50 text-indigo-700 border border-indigo-200/50'
+            }`}>
+              <span>{(progressStore.durationMode || course.durationMode || 'standard') === 'express' ? '⚡ Express Track' : '📚 Standard Track'}</span>
             </span>
           )}
         </div>
@@ -2186,9 +2416,21 @@ function TrainingCountdown({ targetDateStr }: { targetDateStr: string }) {
 
 export default function StudentDashboard() {
   const location = useLocation();
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<Course[]>(() => {
+    try {
+      const cached = safeStorage.getItem('ciya_cached_courses');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [coursesViewTab, setCoursesViewTab] = useState<'courses' | 'leaderboard'>('courses');
+  const [leaderboardUsers, setLeaderboardUsers] = useState<any[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [isRefreshingCourses, setIsRefreshingCourses] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const cached = safeStorage.getItem('ciya_cached_user');
@@ -2210,12 +2452,27 @@ export default function StudentDashboard() {
         return JSON.parse(cachedProfile);
       } catch (e) {}
     }
+    const cachedUser = safeStorage.getItem('ciya_cached_user');
+    if (cachedUser) {
+      try {
+        const u = JSON.parse(cachedUser);
+        return {
+          fullName: u.displayName || u.email?.split('@')[0] || "CIYA Scholar",
+          email: u.email,
+          approvalStatus: "Approved",
+          isActivated: true,
+          isDashboardUnlocked: true
+        };
+      } catch (e) {}
+    }
     return null;
   });
 
   const [authChecking, setAuthChecking] = useState(() => {
-    return !(safeStorage.getItem('ciya_cached_user') && safeStorage.getItem('ciya_cached_profile'));
+    return !safeStorage.getItem('ciya_cached_user');
   });
+
+  const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
 
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
@@ -2334,6 +2591,41 @@ export default function StudentDashboard() {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [submittingAssignment, setSubmittingAssignment] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const uploadToSupabaseStorage = async (file: File, bucket: string = 'assignments'): Promise<string> => {
+    const fileExt = file.name.split('.').pop() || '';
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
+    const fileName = `${Date.now()}-${cleanFileName}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const exists = buckets?.some(b => b.name === bucket);
+      if (!exists) {
+        await supabase.storage.createBucket(bucket, {
+          public: true,
+          fileSizeLimit: 104857600, // 100MB
+        });
+      }
+    } catch (bucketErr) {
+      console.warn("Storage bucket check/create warning:", bucketErr);
+    }
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const publicUrl = getStoragePublicUrl(bucket, filePath);
+    return publicUrl;
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -2378,7 +2670,23 @@ export default function StudentDashboard() {
       where('userId', '==', currentUser.uid)
     );
     const unsubscribe = onSnapshot(q, (snap) => {
-      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const list = snap.docs.map(doc => {
+        const data = doc.data();
+        let submittedText = data.submittedText || '';
+        let images = data.images || [];
+
+        if (submittedText.includes("---IMAGES_JSON---")) {
+          const parts = submittedText.split("---IMAGES_JSON---");
+          submittedText = parts[0].trim();
+          try {
+            images = JSON.parse(parts[1].trim());
+          } catch (e) {
+            console.error("Error parsing images JSON", e);
+          }
+        }
+
+        return { id: doc.id, ...data, submittedText, images };
+      });
       setAllMySubmissions(list);
     }, (error) => {
       console.error("Error loading student assignments:", error);
@@ -2396,6 +2704,10 @@ export default function StudentDashboard() {
         updatedAt: serverTimestamp()
       });
 
+      const combinedText = data.images && data.images.length > 0
+        ? (data.text || '') + "\n\n---IMAGES_JSON---\n" + JSON.stringify(data.images)
+        : (data.text || '');
+
       // Also append to global assignments collection so it displays in Assignments Inbox
       await addDoc(collection(db, 'assignments'), {
         userId: currentUser.uid,
@@ -2403,7 +2715,7 @@ export default function StudentDashboard() {
         userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
         courseId: activeCId,
         dayIndex: dayIndex,
-        submittedText: data.text,
+        submittedText: combinedText,
         fileUrl: data.link || '',
         fileName: data.link ? 'Live URL Link' : '',
         status: 'Pending',
@@ -2604,6 +2916,43 @@ export default function StudentDashboard() {
     };
   }, [currentUser]);
 
+  // Real-time listener for leaderboard aggregation
+  useEffect(() => {
+    if (currentView !== 'courses') return;
+
+    setLeaderboardLoading(true);
+    const q = query(collection(db, 'users'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        const roleLower = String(d.role || '').toLowerCase();
+        const emailLower = String(d.email || '').toLowerCase();
+        const nameLower = String(d.fullName || '').toLowerCase();
+        const isAdminUser = 
+          roleLower.includes('admin') || 
+          emailLower.includes('admin') || 
+          nameLower.includes('admin') ||
+          emailLower === 'developermike5@gmail.com' ||
+          emailLower.includes('ciyacademy.com');
+
+        if (!isAdminUser && (d.fullName || d.email)) {
+          list.push({
+            id: doc.id,
+            ...d
+          });
+        }
+      });
+      setLeaderboardUsers(list);
+      setLeaderboardLoading(false);
+    }, (error) => {
+      console.warn("Leaderboard loading error:", error);
+      setLeaderboardLoading(false);
+    });
+
+    return () => unsub();
+  }, [currentView]);
+
   const [timeLeft, setTimeLeft] = useState('');
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     const cached = safeStorage.getItem('ciya_cached_user');
@@ -2681,6 +3030,7 @@ export default function StudentDashboard() {
   });
   
   const [activeSkillFilter, setActiveSkillFilter] = useState<string>('all');
+  const [activeDurationFilter, setActiveDurationFilter] = useState<'standard' | 'express'>('standard');
   const navigate = useNavigate();
 
   const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog', cId: string | null = null) => {
@@ -2695,6 +3045,16 @@ export default function StudentDashboard() {
   };
 
   const handleSelectCourseId = (cId: string | null) => {
+    if (cId && !isAdmin) {
+      const targetCourse = courses.find(c => c.id === cId);
+      if (targetCourse) {
+        const isRegistered = registeredCoursesList.some(r => r.id === cId);
+        if (!isRegistered && !hasCompletedFirstCourse()) {
+          alert("Access Restricted: You must fully complete your first assigned course path from onboarding (100% video lessons completed) before enrolling or switching to other curriculum tracks.");
+          return;
+        }
+      }
+    }
     setSelectedCourseId(cId);
     if (cId) {
       navigate(`/dashboard?view=${currentView}&courseId=${cId}`);
@@ -2766,6 +3126,10 @@ export default function StudentDashboard() {
 
     setSubmittingAssignment(true);
     try {
+      const combinedSubmittedText = uploadedImages.length > 0
+        ? submitText + "\n\n---IMAGES_JSON---\n" + JSON.stringify(uploadedImages)
+        : submitText;
+
       // 1. Submit to assignments collection
       await addDoc(collection(db, 'assignments'), {
         userId: currentUser.uid,
@@ -2773,7 +3137,7 @@ export default function StudentDashboard() {
         userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
         courseId: registeredCourse.id,
         dayIndex: submitDayIndex,
-        submittedText: submitText,
+        submittedText: combinedSubmittedText,
         fileUrl: submitLink,
         images: uploadedImages,
         fileName: 'Live URL Link',
@@ -2821,6 +3185,7 @@ export default function StudentDashboard() {
   const [activationCode, setActivationCode] = useState('');
   const [activationError, setActivationError] = useState('');
   const [showCongratsPopup, setShowCongratsPopup] = useState(false);
+  const [courseCompletionModal, setCourseCompletionModal] = useState<any | null>(null);
   const [unlocking, setUnlocking] = useState(false);
 
   const handleVerifyCode = async () => {
@@ -2852,56 +3217,8 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleLogin = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
-      if (result.user.email === 'developermike5@gmail.com') {
-        navigate('/admin');
-        return;
-      }
-      let isUserAdmin = false;
-      try {
-        const adminSnap = await getDoc(doc(db, 'admins', result.user.uid));
-        isUserAdmin = adminSnap.exists();
-      } catch (err) {
-        console.warn("User does not have permission to read admin documents, treating as regular student:", err);
-      }
-      setIsAdmin(isUserAdmin);
-      const docSnap = await getDoc(doc(db, 'users', result.user.uid));
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setCurrentUser(result.user);
-        setUserProfile(data);
-        const userData = {
-          uid: result.user.uid,
-          email: result.user.email,
-          role: isUserAdmin ? 'admin' : 'student'
-        };
-        safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
-        safeStorage.setItem('ciya_cached_profile', JSON.stringify(data));
-        setLiveCheckComplete(true);
-      } else {
-        navigate('/onboarding', { replace: true });
-      }
-    } catch (e: any) {
-      if (e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user') {
-        return;
-      }
-      console.error(e);
-      if (
-        e.code === 'auth/popup-blocked' || 
-        e.message?.toLowerCase().includes('popup-blocked') || 
-        e.message?.toLowerCase().includes('popup estuvo bloqueado') ||
-        e.message?.includes('Pending promise was never set') ||
-        e.message?.includes('INTERNAL ASSERTION FAILED')
-      ) {
-        alert("Google Login popup was blocked by your browser. Please allow popups for this site or open in a new tab to complete log in.");
-        return;
-      }
-      alert("An error occurred during log in: " + e.message);
-    }
+  const handleLogin = () => {
+    setIsLoginOpen(true);
   };
 
   useEffect(() => {
@@ -2910,9 +3227,34 @@ export default function StudentDashboard() {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         let isUserAdmin = false;
-        if (user.email === 'developermike5@gmail.com') {
+        if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
           isUserAdmin = true;
           setIsAdmin(true);
+          // Auto-provision Super Admin records in public database
+          try {
+            setDoc(doc(db, 'admins', user.uid), {
+              email: user.email?.toLowerCase() || 'developermike5@gmail.com',
+              role: 'superadmin',
+              permissions: ['all']
+            }, { merge: true }).catch(e => console.warn("Auto-provision admins failed:", e));
+
+            // Also ensure they have a user profile record so they show up in selectors/lists
+            getDoc(doc(db, 'users', user.uid)).then(snap => {
+              if (!snap.exists()) {
+                setDoc(doc(db, 'users', user.uid), {
+                  email: user.email?.toLowerCase() || 'developermike5@gmail.com',
+                  fullName: 'Super Admin',
+                  approvalStatus: 'Approved',
+                  isDashboardUnlocked: true,
+                  cohort: 'Cohort 1',
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
+                }).catch(e => console.warn("Auto-provision users failed:", e));
+              }
+            }).catch(e => console.warn("StudentDashboard getDoc users failed:", e));
+          } catch (e) {
+            console.warn("Could not auto-provision superadmin records:", e);
+          }
         } else {
           // Check if upgraded admin
           try {
@@ -2975,7 +3317,7 @@ export default function StudentDashboard() {
               }
               setAuthChecking(false);
               setLiveCheckComplete(true);
-            } else if (user.email === 'developermike5@gmail.com') {
+            } else if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
               const mockProfile = {
                 fullName: "Admissions Administrator (Super Admin)",
                 email: user.email,
@@ -2999,17 +3341,36 @@ export default function StudentDashboard() {
               setAuthChecking(false);
               setLiveCheckComplete(true);
             } else {
-              if (auth.currentUser) {
-                safeStorage.removeItem('ciya_cached_user');
-                safeStorage.removeItem('ciya_cached_profile');
-                setLiveCheckComplete(false);
-                navigate('/onboarding', { replace: true });
-                setAuthChecking(false);
+              // Silently auto-create profile doc in firestore so they can use the dashboard immediately without any validation locks!
+              const newProfile = {
+                fullName: user.displayName || user.email?.split('@')[0] || 'CIYA Scholar',
+                email: user.email,
+                approvalStatus: 'Approved',
+                isActivated: true,
+                isDashboardUnlocked: true,
+                cohort: 'Cohort 1',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              };
+              try {
+                await setDoc(docRef, newProfile);
+              } catch (e) {
+                console.warn("Auto-creation of profile document failed:", e);
               }
+              setUserProfile(newProfile);
+              const userData = {
+                uid: user.uid,
+                email: user.email,
+                role: 'student'
+              };
+              safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
+              safeStorage.setItem('ciya_cached_profile', JSON.stringify(newProfile));
+              setAuthChecking(false);
+              setLiveCheckComplete(true);
             }
           } catch (error: any) {
             console.error("Initial profile load error:", error);
-            if (user.email === 'developermike5@gmail.com') {
+            if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
               const mockProfile = {
                 fullName: "Admissions Administrator (Super Admin)",
                 email: user.email,
@@ -3080,17 +3441,15 @@ export default function StudentDashboard() {
     };
   }, [navigate]);
 
-  // Immediate unlock real-time sync for unapproved / locked users
+  // Real-time profile synchronization for progress, quiz, and locking states
   useEffect(() => {
-    if (!currentUser || userProfile?.isDashboardUnlocked === true) return;
+    if (!currentUser) return;
 
     const unsubProfile = onSnapshot(doc(db, 'users', currentUser.uid), (snapshot) => {
       if (snapshot.exists()) {
         const freshProfile = snapshot.data();
-        if (freshProfile?.isDashboardUnlocked === true || freshProfile?.approvalStatus === 'Approved') {
-          setUserProfile(freshProfile);
-          safeStorage.setItem('ciya_cached_profile', JSON.stringify(freshProfile));
-        }
+        setUserProfile(freshProfile);
+        safeStorage.setItem('ciya_cached_profile', JSON.stringify(freshProfile));
       }
     }, (error) => {
       console.warn("Real-time profile sync listener error:", error);
@@ -3099,7 +3458,7 @@ export default function StudentDashboard() {
     return () => {
       unsubProfile();
     };
-  }, [currentUser, userProfile?.isDashboardUnlocked]);
+  }, [currentUser]);
 
   useEffect(() => {
     if (userProfile && !userProfile.isActivated) {
@@ -3139,6 +3498,12 @@ export default function StudentDashboard() {
       return () => clearInterval(interval);
     }
   }, [userProfile]);
+
+  useEffect(() => {
+    if (!authChecking && !currentUser) {
+      navigate('/?login=true', { replace: true });
+    }
+  }, [authChecking, currentUser, navigate]);
 
   // Set up real-time listener for published courses to ensure immediate synchronization with student dashboards
   useEffect(() => {
@@ -3187,6 +3552,7 @@ export default function StudentDashboard() {
     await signOut(auth);
     setCurrentUser(null);
     setUserProfile(null);
+    navigate('/?login=true');
   };
 
   const isGuest = !currentUser || !userProfile;
@@ -3194,7 +3560,12 @@ export default function StudentDashboard() {
   if (authChecking) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Validating Authorization Credentials...</div>;
   }
-  if (!userProfile && currentUser) {
+
+  if (!currentUser) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Redirecting to login...</div>;
+  }
+
+  if (!userProfile) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Retrieving Student Profile...</div>;
   }
 
@@ -3203,29 +3574,150 @@ export default function StudentDashboard() {
   const isPending = approvalStatus === 'Pending';
   const isDisapproved = approvalStatus === 'Disapproved';
 
-  // Filter courses by registration (Lifted pathway restrictions so everyone can see their enrolled and registered courses without restriction)
-  const registeredCoursesList = courses.filter(c => {
-    if (isAdmin) return true;
+  const isProfileRegisteredForCourse = (profile: any, course: any): boolean => {
+    if (!profile || !course) return false;
     
-    // Check progressed course keys
-    if (userProfile?.progress && userProfile.progress[c.id]) {
+    // Rule 1: If they have explicit progress for this course, they are registered!
+    if (profile.progress && profile.progress[course.id]) {
       return true;
     }
 
-    // Exclude cloned courses unless they have progress (meaning they are registered for them)
-    if (c.isCloned) {
+    // Or if they have progress for its cloned express version, or selected express track on standard course
+    const expressClone = courses.find(c => c.clonedFromId === course.id && c.isCloned && c.durationMode === 'express');
+    if (expressClone && profile.progress && (profile.progress[expressClone.id] || profile.progress[course.id]?.durationMode === 'express')) {
+      return true;
+    }
+
+    // Rule 2: Exclude cloned courses entirely from matching onboarding selections
+    if (course.isCloned) {
       return false;
     }
+
+    // Rule 3: Fuzzy keyword matching based on onboarding path, course type and pathway selection
+    const courseTitle = (course.title || '').toLowerCase();
+    const courseSkillPath = (course.skillPath || '').toLowerCase();
+    const courseCategory = (course.category || '').toLowerCase();
+
+    const recPath = (profile.recommendedPath || '').toLowerCase();
+    const courseType = (profile.courseType || '').toLowerCase();
+    const pathwaySel = (profile.pathwaySelection || '').toLowerCase();
+
+    // Portfolio Path
+    const isCoursePortfolio = courseTitle.includes('portfolio') || courseSkillPath.includes('portfolio') || courseCategory.includes('portfolio');
+    const isProfilePortfolio = recPath.includes('portfolio') || courseType.includes('portfolio') || pathwaySel.includes('portfolio');
+    if (isCoursePortfolio && isProfilePortfolio) {
+      return true;
+    }
+
+    // Landing Page Path
+    const isCourseLanding = courseTitle.includes('landing') || courseSkillPath.includes('landing') || courseCategory.includes('landing') || courseTitle.includes('conversion');
+    const isProfileLanding = recPath.includes('landing') || courseType.includes('landing') || pathwaySel.includes('landing') || recPath.includes('conversion') || recPath.includes('funnel') || pathwaySel.includes('funnel');
+    if (isCourseLanding && isProfileLanding) {
+      return true;
+    }
+
+    // E-Commerce Path
+    const isCourseEcommerce = courseTitle.includes('e-commerce') || courseTitle.includes('ecommerce') || courseSkillPath.includes('e-commerce') || courseSkillPath.includes('ecommerce') || courseTitle.includes('store') || courseCategory.includes('e-commerce') || courseCategory.includes('ecommerce');
+    const isProfileEcommerce = recPath.includes('e-commerce') || recPath.includes('ecommerce') || courseType.includes('e-commerce') || courseType.includes('ecommerce') || pathwaySel.includes('e-commerce') || pathwaySel.includes('ecommerce') || recPath.includes('store') || pathwaySel.includes('store');
+    if (isCourseEcommerce && isProfileEcommerce) {
+      return true;
+    }
+
+    // Fallback: Direct exact or fuzzy match
+    const courseTitleClean = courseTitle.trim();
+    const profileRecommendedPathClean = recPath.trim();
+
+    if (profileRecommendedPathClean && (
+      courseTitleClean === profileRecommendedPathClean ||
+      courseTitleClean.includes(profileRecommendedPathClean) ||
+      profileRecommendedPathClean.includes(courseTitleClean)
+    )) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Filter courses by registration (Admins see everything, students see their matched / enrolled courses)
+  const registeredCoursesList = courses.filter((c, idx, self) => {
+    if (isAdmin) return true;
+    if (c.isCloned || c.durationMode === 'express') return false; // Never show cloned or express-only course cards directly
     
-    // All regular (non-cloned) courses are available as enrolled/registered courses without restriction
+    // Check progressed course keys
+    let isEnrolled = false;
+    if (userProfile?.progress && userProfile.progress[c.id]) {
+      isEnrolled = true;
+    }
+
+    // Check if enrolled in its cloned express version instead
+    if (!isEnrolled) {
+      const expressClone = courses.find(clone => clone.clonedFromId === c.id && clone.isCloned && clone.durationMode === 'express');
+      if (expressClone && userProfile?.progress && userProfile.progress[expressClone.id]) {
+        isEnrolled = true;
+      }
+    }
+
+    // Check onboarding matched courses
+    if (!isEnrolled && isProfileRegisteredForCourse(userProfile, c)) {
+      isEnrolled = true;
+    }
+    
+    if (!isEnrolled) return false;
+
+    // De-duplicate registered courses by title to prevent showing different duration versions of the same course
+    const cTitle = (c.title || '').trim().toLowerCase();
+    const firstIdx = self.findIndex(item => (item.title || '').trim().toLowerCase() === cTitle);
+    if (firstIdx !== idx) return false;
+
     return true;
   });
 
-  // Filter courses carefully: admins see everything, students see only their registered course list (no cross courses)
+  // Helper to check if student has completed their first course path (at least one registered course is 100% completed)
+  const hasCompletedFirstCourse = (): boolean => {
+    if (isAdmin) return true;
+    if (!userProfile || !courses || courses.length === 0) return false;
+    
+    // Check if there is at least one registered course that the user has completed (progress = 100%)
+    const registeredOnboarded = courses.filter(c => !c.isCloned && isProfileRegisteredForCourse(userProfile, c));
+    for (const r of registeredOnboarded) {
+      const progressStore = userProfile.progress?.[r.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+      const completedKeys: string[] = progressStore.watched || [];
+      const totalVideos = r.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
+      const progressRatio = totalVideos > 0 ? Math.round((completedKeys.length / totalVideos) * 100) : 0;
+      if (progressRatio === 100 && totalVideos > 0) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Filter courses by standard vs. express durationMode (disabled: show all)
   const coursesToSee = courses;
 
-  const enrolledCourses = isAdmin ? courses : registeredCoursesList;
-  const notEnrolledCourses = isAdmin ? [] : courses.filter(c => !registeredCoursesList.some(r => r.id === c.id) && !c.isCloned);
+  const enrolledCourses = isAdmin 
+    ? coursesToSee 
+    : registeredCoursesList;
+
+  const notEnrolledCourses = isAdmin 
+    ? [] 
+    : courses.filter((c, idx, self) => {
+        // Exclude if already in registered list by ID
+        if (registeredCoursesList.some(r => r.id === c.id)) return false;
+
+        // Exclude cloned or express-only courses
+        if (c.isCloned || c.durationMode === 'express') return false;
+
+        // Exclude if already enrolled in this course title (case-insensitive, trimmed)
+        const cTitle = (c.title || '').trim().toLowerCase();
+        const isAlreadyEnrolledInTitle = registeredCoursesList.some(r => (r.title || '').trim().toLowerCase() === cTitle);
+        if (isAlreadyEnrolledInTitle) return false;
+
+        // De-duplicate the remaining unenrolled courses by title so we never show duplicates
+        const firstIdx = self.findIndex(item => (item.title || '').trim().toLowerCase() === cTitle);
+        if (firstIdx !== idx) return false;
+
+        return true;
+      });
 
   // Apply Skill tags sorting filters (locked courses are visible and carry padlocks)
   const filteredCourses = coursesToSee.filter(c => {
@@ -3243,10 +3735,61 @@ export default function StudentDashboard() {
     return true;
   });
 
-  const selectedCourse = coursesToSee.find(c => c.id === selectedCourseId);
+  // Course completion congrats checker
+  useEffect(() => {
+    if (!currentUser || !userProfile || !courses || courses.length === 0 || isAdmin) return;
+
+    for (const r of registeredCoursesList) {
+      const progressStore = userProfile.progress?.[r.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+      const completedKeys: string[] = progressStore.watched || [];
+      const totalVideos = r.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
+      const progressRatio = totalVideos > 0 ? Math.round((completedKeys.length / totalVideos) * 100) : 0;
+      
+      const isCompleted = progressRatio === 100 && totalVideos > 0;
+      const alreadyCongratulated = userProfile.congratulatedCourses?.includes(r.id);
+
+      if (isCompleted && !alreadyCongratulated) {
+        setCourseCompletionModal(r);
+        break;
+      }
+    }
+  }, [currentUser, userProfile, courses, registeredCoursesList, isAdmin]);
+
+  const handleDismissCompletionCongrats = async (courseId: string) => {
+    try {
+      const userRef = doc(db, 'users', currentUser.uid);
+      const currentCongratulated = userProfile?.congratulatedCourses || [];
+      const updatedCongratulated = [...currentCongratulated];
+      if (!updatedCongratulated.includes(courseId)) {
+        updatedCongratulated.push(courseId);
+      }
+      await updateDoc(userRef, {
+        congratulatedCourses: updatedCongratulated,
+        updatedAt: serverTimestamp()
+      });
+      setCourseCompletionModal(null);
+    } catch (err) {
+      console.error("Error updating congratulated courses:", err);
+      setCourseCompletionModal(null);
+    }
+  };
+
+  let selectedCourse = courses.find(c => c.id === selectedCourseId);
+  if (selectedCourse && !selectedCourse.isCloned && !isAdmin) {
+    // If the selected course is a standard course, check if the student is enrolled in its cloned express version instead,
+    // or if they have selected the express track for the standard course!
+    const enrolledExpress = courses.find(c => c.clonedFromId === selectedCourseId && c.isCloned && c.durationMode === 'express' && (
+      (userProfile?.progress?.[c.id]) ||
+      (userProfile?.progress?.[selectedCourseId]?.durationMode === 'express')
+    ));
+    if (enrolledExpress) {
+      selectedCourse = enrolledExpress;
+    }
+  }
 
   // Master Full-Screen Gating Page for Unapproved or Locked Users (No dashboard UI visible)
-  if (!isGuest && userProfile?.isDashboardUnlocked !== true) {
+  // Bypassed completely as requested: as long as a user is signed in, nothing should validate or block their session
+  if (false && !isGuest && userProfile?.isDashboardUnlocked !== true) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8 font-sans">
         {(!liveCheckComplete && !isApproved) ? (
@@ -3263,10 +3806,7 @@ export default function StudentDashboard() {
             
             <div className="text-slate-900 text-sm leading-relaxed max-w-md mx-auto space-y-3 font-semibold">
               <p>
-                Hello <strong className="text-slate-900 font-extrabold">{userProfile.fullName || 'Student'}</strong>! Thank you for lodging your request. Your onboarding metrics are currently under active verification.
-              </p>
-              <p className="italic text-xs text-slate-700 bg-slate-50 border p-3 rounded-2xl leading-normal mt-2">
-                Keep eye contact with your personal inbox because once checked, notification pathways automatically transmit the link. Checking junk mail ensures zero latency!
+                Hello <strong className="text-slate-900 font-extrabold">{userProfile?.fullName || 'Student'}</strong>! Thank you for lodging your request. Your onboarding metrics are currently under active verification.
               </p>
             </div>
 
@@ -3321,7 +3861,7 @@ export default function StudentDashboard() {
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">Application Reviewed ❌</h2>
             
             <p className="text-slate-600 text-sm leading-relaxed max-w-sm mx-auto font-medium">
-              Hello <strong>{userProfile.fullName || 'Student'}</strong>! After reviewing your submitted metrics, we regret to notify that you were not chosen for this specific cohort. We received a massive scale of CIYA Five days Free Website Development Training requests. We wish you rapid career velocity!
+              Hello <strong>{userProfile?.fullName || 'Student'}</strong>! After reviewing your submitted metrics, we regret to notify that you were not chosen for this specific cohort. We received a massive scale of CIYA Five days Free Website Development Training requests. We wish you rapid career velocity!
             </p>
 
             <div className="w-full">
@@ -3349,7 +3889,7 @@ export default function StudentDashboard() {
               </span>
               <h2 className="text-3xl font-black text-slate-900 tracking-tight">Access Verification Required</h2>
               <p className="text-slate-700 text-base leading-relaxed max-w-md mx-auto font-semibold">
-                Congratulations, <strong className="text-teal-800 font-bold">{userProfile.fullName || 'Scholar'}</strong>! Your student onboarding profile has been registered successfully.
+                Congratulations, <strong className="text-teal-800 font-bold">{userProfile?.fullName || 'Scholar'}</strong>! Your student onboarding profile has been registered successfully.
               </p>
               <p className="text-slate-600 text-sm leading-relaxed max-w-md mx-auto">
                 Your learning dashboard is currently locked. To activate your full learning access, please contact the administrator via WhatsApp below to verify and unlock your account.
@@ -3358,7 +3898,7 @@ export default function StudentDashboard() {
 
             <div className="max-w-sm mx-auto space-y-4">
               {(() => {
-                const reqMsg = `Hello Admissions! I have successfully completed my onboarding profile on the CIYA Digital Academy. Could you please verify and unlock my student dashboard access? My name is ${userProfile.fullName || ''} (${userProfile.email || currentUser?.email || ''}). Thank you!`;
+                const reqMsg = `Hello Admissions! I have successfully completed my onboarding profile on the CIYA Digital Academy. Could you please verify and unlock my student dashboard access? My name is ${userProfile?.fullName || ''} (${userProfile?.email || currentUser?.email || ''}). Thank you!`;
                 const whatsappUrl = `https://api.whatsapp.com/send?phone=2349042544355&text=${encodeURIComponent(reqMsg)}`;
                 return (
                   <a 
@@ -3464,7 +4004,7 @@ export default function StudentDashboard() {
           >
             <div className="flex items-center gap-3">
               <Sparkles className="w-4 h-4 text-teal-400" />
-              <span>Prompt Generator</span>
+              <span>Prompt Template</span>
             </div>
             {!isAdmin && appSettings?.lockedSections?.prompts && (
               <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -3599,7 +4139,7 @@ export default function StudentDashboard() {
                         ? 'KYCB Workspace (Know Your Client & Business)'
                         : currentView === 'blog'
                           ? 'CIYA News & Resource Desk'
-                          : 'Prompt Generator Lab'}
+                          : 'Prompt Template Lab'}
             </h2>
           </div>
           <div className="flex items-center gap-4">
@@ -3761,7 +4301,7 @@ export default function StudentDashboard() {
                       <div>
                         <h3 className="font-extrabold text-slate-805 text-xs tracking-tight uppercase tracking-wider text-indigo-700">Course Quizzes Score Sheet</h3>
                         <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-                          Your first-attempt scores are locked in your profile. Click 'Reset Progress' below to start fresh.
+                          Your first-attempt scores are securely locked in your profile to preserve leaderboard integrity.
                         </p>
                       </div>
                     </div>
@@ -3777,54 +4317,112 @@ export default function StudentDashboard() {
                             <div key={courseId} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left">
                               <div className="flex items-center justify-between border-b pb-2 mb-3">
                                 <span className="font-extrabold text-xs text-slate-900">📚 {course.title}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleResetProgress(courseId)}
-                                  className="text-[10px] font-black text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-0.75 rounded-md border-0 uppercase cursor-pointer transition-colors"
-                                >
-                                  Reset Progress & Scores
-                                </button>
                               </div>
 
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-xs text-left text-slate-500 font-semibold">
-                                  <thead className="text-[9px] uppercase font-black tracking-wider text-slate-400 bg-white border border-slate-200">
-                                    <tr>
-                                      <th className="px-3 py-2">Day/Lesson</th>
-                                      <th className="px-3 py-2 text-center">First Attempt Score</th>
-                                      <th className="px-3 py-2 text-center">Status</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-100 bg-white border-x border-b border-slate-200">
-                                    {Object.entries(cScores).map(([key, dataVal]: [string, any]) => {
-                                      const [diStr, viStr] = key.split('-');
-                                      const dIdx = parseInt(diStr);
-                                      const vIdx = parseInt(viStr);
-                                      const dayObj = course.days?.[dIdx];
-                                      const lessonVideo = dayObj?.videos?.[vIdx];
-                                      const label = lessonVideo?.title ? `Day ${dIdx+1} - ${lessonVideo.title}` : `Day ${dIdx+1} - Lesson ${vIdx+1}`;
-                                      const passed = dataVal.passed;
-                                      
-                                      return (
-                                        <tr key={key} className="hover:bg-slate-50">
-                                          <td className="px-3 py-2.5 font-bold text-slate-800 truncate max-w-[200px]" title={label}>{label}</td>
-                                          <td className="px-3 py-2.5 text-center font-bold text-slate-900 font-mono">
-                                            {dataVal.score}%
-                                          </td>
-                                          <td className="px-3 py-2.5 text-center">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                              passed 
-                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              <div className="space-y-2.5">
+                                {course.days.map((day, dIdx) => {
+                                  const quizzes = (day.videos || []).filter(v => v.checkType && v.checkType !== 'none');
+                                  if (quizzes.length === 0) return null; // Skip days with no quizzes
+
+                                  const isExpanded = !!expandedDays[`${courseId}-${dIdx}`];
+                                  
+                                  const dayScores = quizzes.map((q) => {
+                                    const vIdx = (day.videos || []).findIndex(v => v.id === q.id);
+                                    const scoreKey = `${dIdx}-${vIdx}`;
+                                    const scoreRecord = cScores[scoreKey];
+                                    return {
+                                      video: q,
+                                      scoreRecord,
+                                      vIdx
+                                    };
+                                  });
+
+                                  const attemptedCount = dayScores.filter(item => item.scoreRecord).length;
+                                  const passedCount = dayScores.filter(item => item.scoreRecord?.passed).length;
+                                  
+                                  const totalScoreSum = dayScores.reduce((sum, item) => sum + (item.scoreRecord?.score || 0), 0);
+                                  const avgScore = attemptedCount > 0 ? Math.round(totalScoreSum / attemptedCount) : null;
+
+                                  return (
+                                    <div key={dIdx} className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-sm">
+                                      {/* Accordion Header */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedDays(prev => ({
+                                          ...prev,
+                                          [`${courseId}-${dIdx}`]: !prev[`${courseId}-${dIdx}`]
+                                        }))}
+                                        className="w-full flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 transition-all text-left border-0 cursor-pointer outline-none"
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <span className="text-xs font-black text-slate-800">
+                                            Day {dIdx + 1}: {day.title}
+                                          </span>
+                                          <span className="text-[10px] bg-indigo-50 text-indigo-700 font-extrabold px-2 py-0.5 rounded-full">
+                                            {quizzes.length} {quizzes.length === 1 ? 'Quiz' : 'Quizzes'}
+                                          </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2.5">
+                                          {attemptedCount > 0 && (
+                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                              passedCount === quizzes.length 
+                                                ? 'bg-emerald-50 text-emerald-700' 
+                                                : 'bg-amber-50 text-amber-700'
                                             }`}>
-                                              {passed ? 'PASSED (>=80%)' : 'RETAKE REQUIRED'}
+                                              {passedCount}/{quizzes.length} Cleared {avgScore !== null && `(Avg: ${avgScore}%)`}
                                             </span>
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
+                                          )}
+                                          <span className="text-slate-400 text-xs font-black">
+                                            {isExpanded ? '▲' : '▼'}
+                                          </span>
+                                        </div>
+                                      </button>
+
+                                      {/* Accordion Content */}
+                                      {isExpanded && (
+                                        <div className="p-3 divide-y divide-slate-100 bg-white border-t border-slate-100">
+                                          {dayScores.map(({ video, scoreRecord, vIdx }, idx) => {
+                                            const hasRecord = !!scoreRecord;
+                                            const score = scoreRecord?.score;
+                                            const passed = scoreRecord?.passed;
+
+                                            return (
+                                              <div key={idx} className="py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+                                                <div className="flex items-start gap-2.5 max-w-sm">
+                                                  <span className="text-slate-400 font-black font-mono shrink-0 mt-0.5">L{vIdx + 1}</span>
+                                                  <div>
+                                                    <p className="font-extrabold text-slate-900 leading-tight">{video.title}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">First attempted: {scoreRecord?.answeredAt || 'Never'}</p>
+                                                  </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                                                  <div className="text-right">
+                                                    <span className="text-[10px] uppercase font-bold text-slate-400 block">First Attempt Score</span>
+                                                    <span className={`font-black font-mono text-sm ${hasRecord ? 'text-slate-900' : 'text-slate-400'}`}>
+                                                      {hasRecord ? `${score}%` : '—'}
+                                                    </span>
+                                                  </div>
+
+                                                  <span className={`px-2 py-1 rounded text-[9px] font-black tracking-wide border ${
+                                                    !hasRecord 
+                                                      ? 'bg-slate-50 text-slate-400 border-slate-200' 
+                                                      : passed 
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                                        : 'bg-rose-50 text-rose-700 border-rose-200'
+                                                  }`}>
+                                                    {!hasRecord ? 'NOT ATTEMPTED' : passed ? 'PASSED' : 'RETAKE NEEDED'}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           );
@@ -4000,9 +4598,39 @@ export default function StudentDashboard() {
                               ● {matchedSubForSelectedDay.status === 'Approved' ? 'APPROVED ✓' : matchedSubForSelectedDay.status === 'Disapproved' ? 'DISAPPROVED ✗' : 'PENDING REVIEW'}
                             </span>
                           </div>
-                          <p className="font-bold text-xs text-slate-700 whitespace-pre-wrap">
-                            Description: {matchedSubForSelectedDay.submittedText}
-                          </p>
+                          {(() => {
+                            let displayText = matchedSubForSelectedDay.submittedText || '';
+                            let displayImages: string[] = matchedSubForSelectedDay.images || [];
+                            if (displayText.includes('---IMAGES_JSON---')) {
+                              const parts = displayText.split('---IMAGES_JSON---');
+                              displayText = parts[0].trim();
+                              try {
+                                displayImages = JSON.parse(parts[1].trim());
+                              } catch (e) {}
+                            }
+                            return (
+                              <div className="space-y-3">
+                                {displayText && (
+                                  <p className="font-bold text-xs text-slate-700 whitespace-pre-wrap">
+                                    <span className="text-slate-400 font-extrabold uppercase tracking-wider text-[9px] block">Description / Summary</span>
+                                    {displayText}
+                                  </p>
+                                )}
+                                {displayImages && displayImages.length > 0 && (
+                                  <div className="space-y-1.5">
+                                    <span className="text-slate-400 font-extrabold uppercase tracking-wider text-[9px] block">Workspace Screenshots</span>
+                                    <div className="flex gap-2 flex-wrap">
+                                      {displayImages.map((src, i) => (
+                                        <a href={src} target="_blank" rel="noreferrer" key={i} className="relative block w-16 h-16 rounded-xl border border-slate-200 overflow-hidden bg-slate-100 hover:border-indigo-400 cursor-zoom-in transition-all">
+                                          <img src={src} className="w-full h-full object-cover" alt="Screenshot" referrerPolicy="no-referrer" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                           {matchedSubForSelectedDay.fileUrl && (
                             <p className="font-mono text-indigo-600 mt-1">
                               🔗 Link: <a href={matchedSubForSelectedDay.fileUrl} target="_blank" rel="noreferrer" className="underline">{matchedSubForSelectedDay.fileUrl}</a>
@@ -4065,18 +4693,33 @@ export default function StudentDashboard() {
                                   alert("Maximum limit of 3 uploaded screenshot images reached!");
                                   return;
                                 }
-                                files.slice(0, slots).forEach(file => {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    if (typeof reader.result === 'string') {
-                                      setUploadedImages(prev => [...prev, reader.result as string]);
-                                    }
-                                  };
-                                  reader.readAsDataURL(file);
+                                files.slice(0, slots).forEach(async (file) => {
+                                  setUploadingImage(true);
+                                  showToast(`Uploading ${file.name} to backend storage...`);
+                                  try {
+                                    const publicUrl = await uploadToSupabaseStorage(file, 'assignments');
+                                    setUploadedImages(prev => [...prev, publicUrl]);
+                                    showToast(`Successfully uploaded ${file.name}!`);
+                                  } catch (err) {
+                                    console.warn("Supabase Storage upload failed, falling back to base64:", err);
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                      if (typeof reader.result === 'string') {
+                                        setUploadedImages(prev => [...prev, reader.result as string]);
+                                      }
+                                    };
+                                    reader.readAsDataURL(file);
+                                  } finally {
+                                    setUploadingImage(false);
+                                  }
                                 });
                               }}
                               onClick={() => document.getElementById('assignment-images-upload-input')?.click()}
-                              className="border-2 border-dashed border-slate-200 bg-slate-50/50 hover:bg-slate-50 rounded-2xl p-6 text-center cursor-pointer transition-all"
+                              className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
+                                uploadingImage 
+                                  ? 'border-indigo-400 bg-indigo-50/20 animate-pulse' 
+                                  : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
+                              }`}
                             >
                               <input
                                 id="assignment-images-upload-input"
@@ -4091,21 +4734,34 @@ export default function StudentDashboard() {
                                       alert("Maximum limit of 3 uploaded screenshot images reached!");
                                       return;
                                     }
-                                    files.slice(0, slots).forEach(file => {
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => {
-                                        if (typeof reader.result === 'string') {
-                                          setUploadedImages(prev => [...prev, reader.result as string]);
-                                        }
-                                      };
-                                      reader.readAsDataURL(file);
+                                    files.slice(0, slots).forEach(async (file) => {
+                                      setUploadingImage(true);
+                                      showToast(`Uploading ${file.name} to backend storage...`);
+                                      try {
+                                        const publicUrl = await uploadToSupabaseStorage(file, 'assignments');
+                                        setUploadedImages(prev => [...prev, publicUrl]);
+                                        showToast(`Successfully uploaded ${file.name}!`);
+                                      } catch (err) {
+                                        console.warn("Supabase Storage upload failed, falling back to base64:", err);
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => {
+                                          if (typeof reader.result === 'string') {
+                                            setUploadedImages(prev => [...prev, reader.result as string]);
+                                          }
+                                        };
+                                        reader.readAsDataURL(file);
+                                      } finally {
+                                        setUploadingImage(false);
+                                      }
                                     });
                                   }
                                 }}
                                 className="hidden"
                               />
-                              <span className="text-2xl block mb-2 select-none">📸</span>
-                              <p className="text-xs font-bold text-slate-800">Drag & Drop images or click to browse</p>
+                              <span className="text-2xl block mb-2 select-none">{uploadingImage ? "⏳" : "📸"}</span>
+                              <p className="text-xs font-bold text-slate-800">
+                                {uploadingImage ? "Uploading to Supabase Cloud Storage..." : "Drag & Drop images or click to browse"}
+                              </p>
                               <p className="text-[10px] text-slate-400 mt-1">Upload up to 3 screenshots confirming your active workspace outputs, or leave blank if providing text/links.</p>
                             </div>
 
@@ -4189,21 +4845,16 @@ export default function StudentDashboard() {
                 <CourseViewer 
                   course={selectedCourse}
                   userProfile={userProfile}
+                  setUserProfile={setUserProfile}
                   currentUser={currentUser}
                   onBack={() => handleSelectCourseId(null)}
                   showToast={showToast}
                   handleResetProgress={handleResetProgress}
                   isAdmin={isAdmin}
-                  isEnrolled={isAdmin || registeredCoursesList.some(r => r.id === selectedCourse.id) || (registeredCoursesList.length > 0 && registeredCoursesList.every(r => {
-                    const progressStore = userProfile?.progress?.[r.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
-                    const completedKeys: string[] = progressStore.watched || [];
-                    const totalVideos = r.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
-                    const progressRatio = totalVideos > 0 ? Math.round((completedKeys.length / totalVideos) * 100) : 0;
-                    const isCompleted = (progressRatio === 100 && totalVideos > 0) || userProfile?.completedCoursesOverride?.includes(r.id || '');
-                    return isCompleted;
-                  }))}
+                  isEnrolled={isAdmin || !!(userProfile?.progress && userProfile.progress[selectedCourse.id]) || isProfileRegisteredForCourse(userProfile, selectedCourse)}
                   onLogin={handleLogin}
                   courses={courses}
+                  hasCompletedFirstCourse={hasCompletedFirstCourse}
                 />
               ) : (
                 <div className="space-y-8">
@@ -4271,16 +4922,6 @@ export default function StudentDashboard() {
                   <div className="space-y-4 text-left">
                     <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
                       <div className="flex flex-wrap gap-2 items-center">
-                        <button
-                          onClick={() => setActiveSkillFilter("all")}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                            activeSkillFilter === "all"
-                              ? "border-teal-600 bg-teal-50 text-teal-700 font-extrabold"
-                              : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-                          }`}
-                        >
-                          All Tracks in Catalog
-                        </button>
                         {Object.entries(SKILLS).map(([k, v]) => (
                           <button
                             key={k}
@@ -4294,17 +4935,6 @@ export default function StudentDashboard() {
                             {v.icon} {v.label}
                           </button>
                         ))}
-                      </div>
-
-                      <div
-                        className="p-1.5 px-3 rounded-xl border border-teal-200/55 text-teal-700 bg-teal-50/60 shadow-sm transition-all flex items-center justify-center gap-2 text-xs font-bold shrink-0 select-none"
-                        title="Your training syllabus is automatically synchronized in real-time with your coaches"
-                      >
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
-                        </span>
-                        <span>Auto Synced with Coaches</span>
                       </div>
                     </div>
 
@@ -4320,38 +4950,256 @@ export default function StudentDashboard() {
                       </div>
                     ) : (
                       <div className="space-y-12">
-                        {/* SECTION 1: REGISTERED/ENROLLED COURSES */}
-                        {!isGuest && (
+                        {/* SECTION 1: REGISTERED/ENROLLED COURSES OR LEADERBOARD */}
+                        {!isGuest ? (
+                          <div className="space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-2 gap-3">
+                              <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2">
+                                <span>🎓</span> My Registered Course
+                              </h3>
+                              
+                              {/* Live Leaderboard Switch Button */}
+                              <div className="flex bg-slate-100 p-1 rounded-2xl self-start sm:self-auto shadow-inner border border-slate-200">
+                                <button
+                                  type="button"
+                                  onClick={() => setCoursesViewTab('courses')}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border-0 cursor-pointer ${
+                                    coursesViewTab === 'courses'
+                                      ? 'bg-white text-indigo-700 shadow-sm'
+                                      : 'text-slate-500 bg-transparent hover:text-slate-800'
+                                  }`}
+                                >
+                                  📚 Course Paths
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCoursesViewTab('leaderboard')}
+                                  className={`px-3 py-1 rounded-xl text-xs font-black transition-all border-0 cursor-pointer flex items-center gap-1.5 ${
+                                    coursesViewTab === 'leaderboard'
+                                      ? 'bg-white text-amber-700 shadow-sm font-black'
+                                      : 'text-slate-500 bg-transparent hover:text-slate-800'
+                                  }`}
+                                >
+                                  🏆 Live Leaderboard
+                                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {coursesViewTab === 'leaderboard' ? (
+                              /* Live Leaderboard Table View */
+                              <div className="space-y-6">
+                                {/* Sparkly header info card */}
+                                <div className="bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-teal-500/10 border border-amber-500/20 rounded-2xl p-4 text-left shadow-sm">
+                                  <div className="flex items-start gap-3">
+                                    <span className="text-2xl select-none mt-0.5">🏆</span>
+                                    <div>
+                                      <h4 className="text-sm font-black text-amber-900 leading-tight">CIYA Daily Scholar Leaderboard</h4>
+                                      <p className="text-xs text-slate-600 mt-1 font-semibold leading-relaxed">
+                                        Real-time aggregated points computed solely from <span className="text-indigo-700 font-extrabold underline">first-attempt scores</span> on daily lesson comprehension checks! Consistent high performance gets rewarded with valuable discounts, certifications, cloud lab credits, and direct employment support sponsored by CIYA's network of tech partners.
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {leaderboardLoading ? (
+                                  <div className="flex flex-col items-center justify-center py-12 bg-white rounded-3xl border border-slate-100">
+                                    <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-2" />
+                                    <span className="text-xs text-slate-400 font-bold">Synchronizing real-time scores...</span>
+                                  </div>
+                                ) : (
+                                  (() => {
+                                    const leaderboardData = leaderboardUsers.map(user => {
+                                      let totalPoints = 0;
+                                      let quizCount = 0;
+                                      let sumScore = 0;
+                                      
+                                      if (user.progress) {
+                                        Object.keys(user.progress).forEach(courseId => {
+                                          const courseProg = user.progress[courseId];
+                                          if (courseProg && courseProg.quizScores) {
+                                            Object.keys(courseProg.quizScores).forEach(quizKey => {
+                                              const record = courseProg.quizScores[quizKey];
+                                              if (record && typeof record.score === 'number') {
+                                                totalPoints += record.score;
+                                                sumScore += record.score;
+                                                quizCount++;
+                                              }
+                                            });
+                                          }
+                                        });
+                                      }
+                                      
+                                      const avgAccuracy = quizCount > 0 ? Math.round(sumScore / quizCount) : 0;
+                                      
+                                      return {
+                                        id: user.id,
+                                        fullName: user.fullName || user.email?.split('@')[0] || "Anonymous Scholar",
+                                        email: user.email,
+                                        cohort: user.cohort || "Cohort 1",
+                                        quizzesAttempted: quizCount,
+                                        avgAccuracy,
+                                        totalPoints,
+                                      };
+                                    })
+                                    .filter(u => u.totalPoints > 0)
+                                    .sort((a, b) => {
+                                      if (b.totalPoints !== a.totalPoints) {
+                                        return b.totalPoints - a.totalPoints;
+                                      }
+                                      return b.avgAccuracy - a.avgAccuracy;
+                                    });
+
+                                    if (leaderboardData.length === 0) {
+                                      return (
+                                        <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                                          No scores recorded on the leaderboard yet. Start answering comprehension quizzes to claim the lead!
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                                        <div className="overflow-x-auto">
+                                          <table className="w-full text-xs text-left border-collapse">
+                                            <thead>
+                                              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-black uppercase text-[10px] tracking-wider">
+                                                <th className="px-4 py-3 text-center w-16">Rank</th>
+                                                <th className="px-4 py-3">Scholar</th>
+                                                <th className="px-4 py-3">Cohort</th>
+                                                <th className="px-4 py-3 text-center w-28">Quizzes Cleared</th>
+                                                <th className="px-4 py-3 text-center w-28">Avg Accuracy</th>
+                                                <th className="px-4 py-3 text-right pr-6 w-32">Total Score</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 font-semibold">
+                                              {leaderboardData.map((u, index) => {
+                                                const rank = index + 1;
+                                                const isCurrentUser = u.id === currentUser?.uid;
+                                                
+                                                let rankBadge = <span className="font-bold text-slate-500 font-mono">#{rank}</span>;
+                                                let rowBg = "bg-white";
+                                                if (rank === 1) {
+                                                  rankBadge = <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-black shadow-sm ring-1 ring-amber-300">🥇</span>;
+                                                  rowBg = "bg-amber-50/10";
+                                                } else if (rank === 2) {
+                                                  rankBadge = <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-700 text-xs font-black shadow-sm ring-1 ring-slate-300">🥈</span>;
+                                                } else if (rank === 3) {
+                                                  rankBadge = <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-100 text-orange-700 text-xs font-black shadow-sm ring-1 ring-orange-300">🥉</span>;
+                                                }
+
+                                                return (
+                                                  <tr 
+                                                    key={u.id} 
+                                                    className={`hover:bg-slate-50 transition-all ${rowBg} ${isCurrentUser ? 'bg-indigo-50/30 font-black border-y border-indigo-100' : ''}`}
+                                                  >
+                                                    <td className="px-4 py-3.5 text-center">{rankBadge}</td>
+                                                    <td className="px-4 py-3.5">
+                                                      <div className="flex items-center gap-2.5">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ring-2 shrink-0 ${
+                                                          rank === 1 ? 'bg-amber-500 text-white ring-amber-300' :
+                                                          rank === 2 ? 'bg-slate-400 text-white ring-slate-200' :
+                                                          rank === 3 ? 'bg-orange-400 text-white ring-orange-200' :
+                                                          'bg-teal-600 text-white ring-teal-100'
+                                                        }`}>
+                                                          {u.fullName.slice(0, 2).toUpperCase()}
+                                                        </div>
+                                                        <div className="text-left">
+                                                          <div className="flex items-center gap-1.5">
+                                                            <span className="text-slate-900 font-extrabold text-xs">{u.fullName}</span>
+                                                            {isCurrentUser && (
+                                                              <span className="bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full">YOU</span>
+                                                            )}
+                                                          </div>
+                                                          <span className="text-[10px] text-slate-400 font-bold block mt-0.5">{u.email}</span>
+                                                        </div>
+                                                      </div>
+                                                    </td>
+                                                    <td className="px-4 py-3.5">
+                                                      <span className="text-slate-600 text-xs font-extrabold">{u.cohort}</span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-center">
+                                                      <span className="text-slate-700 font-mono text-xs">{u.quizzesAttempted}</span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-center">
+                                                      <div className="flex flex-col items-center">
+                                                        <span className="text-slate-800 font-mono font-extrabold text-xs">{u.avgAccuracy}%</span>
+                                                        <div className="w-12 bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
+                                                          <div className="bg-teal-500 h-full rounded-full" style={{ width: `${u.avgAccuracy}%` }} />
+                                                        </div>
+                                                      </div>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-right pr-6">
+                                                      <span className="text-teal-700 font-mono font-black text-xs md:text-sm">{u.totalPoints.toLocaleString()} pts</span>
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()
+                                )}
+                              </div>
+                            ) : (
+                              /* Course Paths view */
+                              filteredRegisteredCourses.length === 0 ? (
+                                <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                                  No enrolled courses in this track.
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                                  {filteredRegisteredCourses.map(course => (
+                                    <CourseCard 
+                                      key={course.id} 
+                                      course={course} 
+                                      userProfile={userProfile}
+                                      isEnrolled={true}
+                                      isLocked={isAdmin ? false : (isGuest || appSettings?.lockedSections?.courses || course.isLocked)} 
+                                      onSelect={() => {
+                                        if (isAdmin) {
+                                          handleSelectCourseId(course.id || null);
+                                        } else if (isGuest) {
+                                          alert("This premium course is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
+                                          handleLogin();
+                                        } else if (!isAdmin && appSettings?.lockedSections?.courses) {
+                                          alert("The main courses and learning arena are temporarily locked by the course administrators. Please contact your instructor to unlock access.");
+                                        } else if (course.isLocked) {
+                                          alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
+                                        } else {
+                                          handleSelectCourseId(course.id || null);
+                                        }
+                                      }} 
+                                    />
+                                  ))}
+                                </div>
+                              )
+                            )}
+                          </div>
+                        ) : (
+                          /* Guest Viewer */
                           <div className="space-y-4">
                             <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2 border-b pb-2">
-                              <span>🎓</span> My Registered Course
+                              <span>🎓</span> CIYA Premium Academy Courses
                             </h3>
-                            {filteredRegisteredCourses.length === 0 ? (
+                            {filteredCourses.length === 0 ? (
                               <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
-                                No enrolled courses in this track.
+                                No courses available in this track.
                               </div>
                             ) : (
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                                {filteredRegisteredCourses.map(course => (
+                                {filteredCourses.map(course => (
                                   <CourseCard 
                                     key={course.id} 
                                     course={course} 
                                     userProfile={userProfile}
-                                    isEnrolled={true}
-                                    isLocked={isAdmin ? false : (isGuest || appSettings?.lockedSections?.courses || course.isLocked)} 
+                                    isEnrolled={false}
+                                    isLocked={true} 
                                     onSelect={() => {
-                                      if (isAdmin) {
-                                        handleSelectCourseId(course.id || null);
-                                      } else if (isGuest) {
-                                        alert("This premium course is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
-                                        handleLogin();
-                                      } else if (!isAdmin && appSettings?.lockedSections?.courses) {
-                                        alert("The main courses and learning arena are temporarily locked by the course administrators. Please contact your instructor to unlock access.");
-                                      } else if (course.isLocked) {
-                                        alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
-                                      } else {
-                                        handleSelectCourseId(course.id || null);
-                                      }
+                                      alert("Please Sign In with Google to unlock full access to mini-videos, daily study materials, quizzes, live assignments and certificate tracking!");
+                                      handleLogin();
                                     }} 
                                   />
                                 ))}
@@ -4360,8 +5208,8 @@ export default function StudentDashboard() {
                           </div>
                         )}
 
-                        {/* SECTION 2: OTHER AVAILABLE COURSES (NOT ENROLLED) */}
-                        {!isAdmin && (
+                        {/* SECTION 2: OTHER AVAILABLE COURSES (NOT ENROLLED) - Only show when viewing 'courses' tab */}
+                        {!isAdmin && !isGuest && coursesViewTab === 'courses' && (
                           <div className="space-y-4">
                             <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2 border-b pb-2">
                               <span>🌐</span> Other Courses (Not Enrolled)
@@ -4378,7 +5226,7 @@ export default function StudentDashboard() {
                                     course={course} 
                                     userProfile={userProfile}
                                     isEnrolled={false}
-                                    isLocked={false} 
+                                    isLocked={!hasCompletedFirstCourse()} 
                                     onSelect={() => {
                                       handleSelectCourseId(course.id || null);
                                     }} 
@@ -4494,6 +5342,53 @@ export default function StudentDashboard() {
 
 
 
+      {/* COURSE COMPLETION CONGRATS OVERLAY MODAL */}
+      {courseCompletionModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl p-8 md:p-12 max-w-lg w-full text-center relative border border-slate-100 shadow-2xl overflow-hidden"
+          >
+            {/* Emerald border banner */}
+            <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-600" />
+            
+            <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-emerald-100 shadow-inner select-none text-4xl">
+              🏆
+            </div>
+
+            <div className="space-y-4">
+              <span className="inline-block bg-emerald-100 text-emerald-800 text-[10px] uppercase font-black tracking-wider px-3 py-1 rounded-full">
+                Course 100% Complete!
+              </span>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight leading-tight">
+                Congratulations, {userProfile?.fullName ? userProfile.fullName.split(' ')[0] : 'Scholar'}!
+              </h2>
+              
+              <p className="text-slate-600 text-sm leading-relaxed font-semibold">
+                You have officially completed 100% of the daily modules, lesson clips, and assessments for <strong className="text-teal-700 font-extrabold">"{courseCompletionModal.title}"</strong>! This is an incredible milestone.
+              </p>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-left mt-6 space-y-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">🎓 What's Next?</span>
+                <p className="font-bold text-slate-700 text-xs leading-normal">
+                  You are now fully eligible to enroll in any other available tracks! Choose standard or express courses from your dashboard catalog to keep learning and expanding your technical skillsets.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <button
+                onClick={() => handleDismissCompletionCongrats(courseCompletionModal.id)}
+                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-amber-400 font-extrabold text-lg rounded-xl transition-all shadow-xl shadow-slate-900/15 cursor-pointer transform active:scale-95 border-0"
+              >
+                Awesome, Let's continue! 🚀
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Dynamic Toast feedback overlay */}
       {toastMsg && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-slate-900 border border-slate-800 text-white font-extrabold text-xs px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 max-w-sm truncate select-none">
@@ -4501,6 +5396,8 @@ export default function StudentDashboard() {
           <span>{toastMsg}</span>
         </div>
       )}
+
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
     </div>
   );
 }

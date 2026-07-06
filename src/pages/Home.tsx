@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useLocation } from 'react-router';
 import BrandingLogo from '../components/BrandingLogo';
+import LoginModal from '../components/LoginModal';
 import { 
   Lightbulb, Gift, Bot, Wallet, Check, Smartphone, Briefcase, Zap, TrendingUp, Globe, Film, Palette, Sparkles
 } from 'lucide-react';
@@ -137,7 +138,7 @@ const useLogin = () => {
     }
     try {
       if (auth.currentUser) {
-        if (auth.currentUser.email === 'developermike5@gmail.com') {
+        if (auth.currentUser.email?.toLowerCase() === 'developermike5@gmail.com') {
           navigate('/admin');
         } else {
           const docSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
@@ -153,7 +154,7 @@ const useLogin = () => {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
-      if (result.user.email === 'developermike5@gmail.com') {
+      if (result.user.email?.toLowerCase() === 'developermike5@gmail.com') {
         navigate('/admin');
       } else {
         const docSnap = await getDoc(doc(db, 'users', result.user.uid));
@@ -205,9 +206,16 @@ const navAnimation: any = {
   visible: { y: 0, opacity: 1, transition: { duration: 0.5, ease: "easeOut" } }
 };
 
-function Navbar() {
-  const login = useLogin();
+function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
+  const [user, setUser] = useState<any>(null);
   const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -237,6 +245,16 @@ function Navbar() {
         </Link>
         <a href="#how" className="hover:text-amber-400 transition-colors">How it works</a>
         <a href="#why" className="hover:text-amber-400 transition-colors">Why CIYA</a>
+
+        {user ? (
+          <Link to="/dashboard" className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-full text-xs shadow-lg shadow-amber-500/10 transition-all cursor-pointer">
+            My Dashboard
+          </Link>
+        ) : (
+          <button onClick={onOpenLogin} className="px-5 py-2.5 bg-teal-900 border border-teal-800 hover:bg-teal-800 text-teal-50 font-bold rounded-full text-xs transition-all cursor-pointer border-0">
+            Student Login
+          </button>
+        )}
       </div>
     </motion.nav>
   );
@@ -843,18 +861,31 @@ function Footer() {
 }
 
 export default function App() {
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('login') === 'true') {
+      setIsLoginOpen(true);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        if (user.email === 'developermike5@gmail.com') {
+        if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
           navigate('/admin');
         } else {
-          const docSnap = await getDoc(doc(db, 'users', user.uid));
-          if (docSnap.exists()) {
-            navigate('/dashboard');
+          try {
+            const docSnap = await getDoc(doc(db, 'users', user.uid));
+            if (docSnap.exists()) {
+              navigate('/dashboard');
+            }
+          } catch (err) {
+            console.warn("Home component user profile lookup failed gracefully:", err);
           }
         }
       }
@@ -874,7 +905,7 @@ export default function App() {
 
   return (
     <div className="bg-teal-950 font-sans text-teal-50 min-h-screen selection:bg-amber-500/30 selection:text-amber-200 flex flex-col">
-      <Navbar />
+      <Navbar onOpenLogin={() => setIsLoginOpen(true)} />
       <main className="flex-1">
         <Hero />
         <Mission />
@@ -884,6 +915,8 @@ export default function App() {
         <CTA />
       </main>
       <Footer />
+
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
 
       {/* POPUP BLOCKED ALERT MODAL */}
       {showPopupBlocked && (
