@@ -5,6 +5,7 @@ import { db, auth, handleFirestoreError, OperationType, triggerSystemSignal } fr
 import { onAuthStateChanged } from 'firebase/auth';
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy } from 'lucide-react';
+import staticCourses from '../../data/courses.json';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Class", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -49,8 +50,19 @@ function TierBadge({ tier }: { tier: string }) {
 }
 
 export default function CoursesAdmin() {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [courses, setCourses] = useState<Course[]>(() => {
+    return (staticCourses as any[]).map(c => {
+      return {
+        id: c.id,
+        ...c,
+        skill: c.skill || (c.category?.toLowerCase().includes('web') ? 'web' : c.category?.toLowerCase().includes('film') ? 'film' : c.category?.toLowerCase().includes('image') ? 'image' : 'web'),
+        tier: c.tier || (c.level?.toLowerCase() === 'beginner' ? 'beginner' : c.level?.toLowerCase() === 'advanced' ? 'advanced' : c.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
+        status: c.status || (c.publish_status === 'Published' ? 'published' : 'draft'),
+        isLocked: c.isLocked || c.locked || false
+      } as Course;
+    });
+  });
+  const [loading, setLoading] = useState(false);
   
   // Filters state
   const [filterSkill, setFilterSkill] = useState<string>('all');
@@ -65,50 +77,49 @@ export default function CoursesAdmin() {
 
   const navigate = useNavigate();
 
-  // Load courses in real-time
+  // Load courses in real-time by subscribing to Firestore overrides and merging with static data
   useEffect(() => {
-    let qUnsubscribe: (() => void) | null = null;
-
-    const authUnsubscribe = onAuthStateChanged(auth, (user) => {
-      if (qUnsubscribe) {
-        qUnsubscribe();
-        qUnsubscribe = null;
-      }
-
-      if (user) {
-        const q = query(collection(db, 'courses'), orderBy('createdAt', 'desc'));
-        qUnsubscribe = onSnapshot(q, (snapshot) => {
-          const data = snapshot.docs.map(doc => {
-            const d = doc.data();
-            return {
-              id: doc.id,
-              ...d,
-              // Compatibility map
-              skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
-              tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
-              status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
-              isLocked: d.isLocked || d.locked || false
-            } as Course;
-          });
-          setCourses(data);
-          setLoading(false);
-        }, (error) => {
-          console.error(error);
-          handleFirestoreError(error, OperationType.LIST, 'courses');
-          setLoading(false);
+    setLoading(true);
+    const q = query(collection(db, 'courses'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const dbCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      
+      setCourses(prev => {
+        const baseCourses = (staticCourses as any[]).map(c => {
+          const dbMatch = dbCourses.find((dc: any) => dc.id === c.id);
+          return {
+            id: c.id,
+            ...c,
+            skill: c.skill || (c.category?.toLowerCase().includes('web') ? 'web' : c.category?.toLowerCase().includes('film') ? 'film' : c.category?.toLowerCase().includes('image') ? 'image' : 'web'),
+            tier: c.tier || (c.level?.toLowerCase() === 'beginner' ? 'beginner' : c.level?.toLowerCase() === 'advanced' ? 'advanced' : c.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
+            status: dbMatch?.status || c.status || (c.publish_status === 'Published' ? 'published' : 'draft'),
+            isLocked: dbMatch?.isLocked !== undefined ? dbMatch.isLocked : (c.isLocked || c.locked || false),
+            publish_status: dbMatch?.publish_status || c.publish_status || (c.publish_status === 'Published' ? 'Published' : 'Draft'),
+          } as Course;
         });
-      } else {
-        setCourses([]);
-        setLoading(false);
-      }
+
+        // Merging entirely custom new courses added through admin panel
+        dbCourses.forEach((dbc: any) => {
+          if (!baseCourses.some(bc => bc.id === dbc.id)) {
+            baseCourses.push({
+              ...dbc,
+              skill: dbc.skill || 'web',
+              tier: dbc.tier || 'beginner',
+              status: dbc.status || 'draft',
+              isLocked: dbc.isLocked !== undefined ? dbc.isLocked : false
+            } as Course);
+          }
+        });
+
+        return baseCourses;
+      });
+      setLoading(false);
+    }, (error) => {
+      console.warn("Error loading course real-time overrides from DB:", error);
+      setLoading(false);
     });
 
-    return () => {
-      authUnsubscribe();
-      if (qUnsubscribe) {
-        qUnsubscribe();
-      }
-    };
+    return () => unsubscribe();
   }, []);
 
   // Inline DB Actions

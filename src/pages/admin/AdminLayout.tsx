@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Outlet, Navigate, Link, useLocation, useNavigate } from 'react-router';
 import { auth, db, getActiveDatabaseId, setActiveDatabaseId, handleFirestoreError, OperationType } from '../../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { invalidateCache } from '../../lib/supabase-shim/firestore';
 import { Menu, X, Database } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 
@@ -130,6 +131,66 @@ export default function AdminLayout() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Centralized system_signals listener to keep local cache updated only when there is a database change
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubSignals = onSnapshot(doc(db, 'settings', 'system_signals'), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const signalData = snapshot.data() || {};
+
+      // 1. Sync Courses
+      const cachedCoursesTime = localStorage.getItem('ciya_cached_courses_time_admin') || '0';
+      const serverCoursesTime = String(signalData.courses || '0');
+      if (serverCoursesTime !== cachedCoursesTime) {
+        invalidateCache('courses');
+        localStorage.setItem('ciya_cached_courses_time_admin', serverCoursesTime);
+      }
+
+      // 2. Sync Settings
+      const cachedSettingsTime = localStorage.getItem('ciya_cached_settings_time_admin') || '0';
+      const serverSettingsTime = String(signalData.settings || '0');
+      if (serverSettingsTime !== cachedSettingsTime) {
+        invalidateCache('settings');
+        localStorage.setItem('ciya_cached_settings_time_admin', serverSettingsTime);
+      }
+
+      // 3. Sync Blog Articles
+      const cachedBlogTime = localStorage.getItem('ciya_cached_blog_time_admin') || '0';
+      const serverBlogTime = String(signalData.blog || '0');
+      if (serverBlogTime !== cachedBlogTime) {
+        invalidateCache('blog');
+        localStorage.setItem('ciya_cached_blog_time_admin', serverBlogTime);
+      }
+
+      // 4. Sync KYCB
+      const cachedKycbTime = localStorage.getItem('ciya_cached_kycb_time_admin') || '0';
+      const serverKycbTime = String(signalData.kycb_signals || '0');
+      if (serverKycbTime !== cachedKycbTime) {
+        invalidateCache('kycb_questionnaires');
+        localStorage.setItem('ciya_cached_kycb_time_admin', serverKycbTime);
+      }
+
+      // 5. Sync users & assignments (via user_signals timestamp checks)
+      const cachedUserSignalsTime = localStorage.getItem('ciya_cached_user_signals_time_admin') || '0';
+      let maxUserSignalTime = '0';
+      if (signalData.user_signals) {
+        Object.values(signalData.user_signals).forEach((val: any) => {
+          if (String(val) > maxUserSignalTime) {
+            maxUserSignalTime = String(val);
+          }
+        });
+      }
+      if (maxUserSignalTime !== cachedUserSignalsTime) {
+        invalidateCache('users');
+        invalidateCache('assignments');
+        localStorage.setItem('ciya_cached_user_signals_time_admin', maxUserSignalTime);
+      }
+    });
+
+    return () => unsubSignals();
+  }, [user]);
 
   const handleLogout = async () => {
     localStorage.removeItem('ciya_cached_user');

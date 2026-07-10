@@ -4,6 +4,7 @@ import { db, handleFirestoreError, OperationType, triggerSystemSignal } from '..
 import { BookOpen, Plus, Trash2, Edit2, Link as LinkIcon, Image as ImageIcon, Send, RefreshCw, X, Eye, FileText, Bold, Italic, Heading1, Heading2, Heading3, List, ListOrdered, Highlighter, Pilcrow } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { preprocessMarkdown, stripMarkdown } from '../../utils/markdownUtils';
+import staticBlogs from '../../data/blog.json';
 
 interface BlogPost {
   id: string;
@@ -17,8 +18,8 @@ interface BlogPost {
 }
 
 export default function BlogAdmin() {
-  const [posts, setPosts] = useState<BlogPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<BlogPost[]>(() => staticBlogs as BlogPost[]);
+  const [loading, setLoading] = useState(false);
 
   // Form State
   const [isEditing, setIsEditing] = useState(false);
@@ -84,27 +85,8 @@ export default function BlogAdmin() {
   };
 
   useEffect(() => {
-    const blogRef = collection(db, 'blog');
-    const q = query(blogRef, orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snap) => {
-        const list: BlogPost[] = [];
-        snap.forEach((d) => {
-          list.push({ id: d.id, ...d.data() } as BlogPost);
-        });
-        setPosts(list);
-        setLoading(false);
-      },
-      (err) => {
-        handleFirestoreError(err, OperationType.LIST, 'blog');
-        setLoading(false);
-        showToast('error', 'Failed to sync articles list from server.');
-      }
-    );
-
-    return () => unsubscribe();
+    // Loaded statically from blog.json to prevent DB egress costs
+    setLoading(false);
   }, []);
 
   const handleCreateOrUpdate = async (e: React.FormEvent) => {

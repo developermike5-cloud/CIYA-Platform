@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { Mail, Lock, X, Sparkles, ArrowRight, User, Phone, MapPin, ChevronDown } from 'lucide-react';
 import { auth, db } from '../firebase';
+import BrandingLogo from './BrandingLogo';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
@@ -227,8 +228,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       console.error('Google login error:', e);
       if (
         e.code === 'auth/popup-blocked' || 
+        e.code === 'auth/network-request-failed' ||
         e.message?.toLowerCase().includes('popup-blocked') || 
         e.message?.toLowerCase().includes('popup estuvo bloqueado') ||
+        e.message?.toLowerCase().includes('network-request-failed') ||
         e.message?.includes('Pending promise was never set') ||
         e.message?.includes('INTERNAL ASSERTION FAILED')
       ) {
@@ -265,119 +268,37 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </button>
 
               {/* Header */}
-              <div className="text-center mb-6 space-y-1">
-                <div className="w-12 h-12 bg-gradient-to-tr from-teal-500 to-amber-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-2">
-                  <Sparkles className="w-6 h-6 text-teal-950 fill-teal-950" />
-                </div>
+              <div className="text-center mb-6 space-y-1 flex flex-col items-center">
+                <BrandingLogo size="sm" className="mb-2" />
                 <h3 className="text-2xl font-black text-white tracking-tight">CIYA Portal</h3>
                 <p className="text-xs text-teal-300 font-semibold">Join thousands of Nigerian youths learning high-income digital skills.</p>
               </div>
 
-              {/* Tab Selector */}
-              <div className="grid grid-cols-2 p-1 bg-teal-950 border border-teal-900 rounded-2xl mb-6 select-none">
-                <button
-                  type="button"
-                  onClick={() => { setActiveTab('signin'); setError(''); }}
-                  className={`py-2.5 text-xs font-extrabold rounded-xl transition-all border-0 cursor-pointer ${activeTab === 'signin' ? 'bg-amber-500 text-teal-950 shadow-md' : 'text-teal-400 hover:text-teal-200'}`}
-                >
-                  SIGN IN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setActiveTab('signup'); setError(''); }}
-                  className={`py-2.5 text-xs font-extrabold rounded-xl transition-all border-0 cursor-pointer ${activeTab === 'signup' ? 'bg-amber-500 text-teal-950 shadow-md' : 'text-teal-400 hover:text-teal-200'}`}
-                >
-                  CREATE ACCOUNT
-                </button>
-              </div>
-
-              {/* Form Section */}
               {error && (
-                <div className="p-3.5 mb-4 bg-red-950/50 border border-red-800/40 text-red-200 text-xs font-bold rounded-xl text-center">
+                <div className="p-3.5 mb-6 bg-red-950/50 border border-red-800/40 text-red-200 text-xs font-bold rounded-xl text-center">
                   {error}
                 </div>
               )}
 
-              {activeTab === 'signin' ? (
-                /* SIGN IN VIEW */
-                <form onSubmit={handleEmailSignIn} className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-teal-400 mb-1.5">Email Address</label>
-                    <div className="relative">
-                      <Mail className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-teal-600" />
-                      <input
-                        type="email"
-                        required
-                        value={signInEmail}
-                        onChange={(e) => setSignInEmail(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3 rounded-xl border border-teal-900 bg-teal-950/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-sm text-teal-50 placeholder:text-teal-800 font-semibold"
-                        placeholder="you@example.com"
-                        id="login_email_input"
-                      />
-                    </div>
-                  </div>
+              {/* Google Only Login Button */}
+              <div className="space-y-6">
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-xl text-sm transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-3 cursor-pointer border-0 uppercase tracking-wider hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
+                  id="login_google_btn"
+                >
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12 5.04c1.64 0 3.11.56 4.27 1.67l3.19-3.19C17.51 1.7 14.99 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.79 2.94C6.18 7.37 8.86 5.04 12 5.04z" />
+                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.44c-.28 1.48-1.12 2.73-2.38 3.58l3.71 2.88c2.17-2 3.42-4.94 3.42-8.61z" />
+                    <path fill="#FBBC05" d="M5.29 14.83a7.19 7.19 0 0 1 0-4.57L1.5 7.32a11.95 11.95 0 0 0 0 10.37l3.79-2.86z" />
+                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.14 0-5.82-2.33-6.71-5.46L1.5 16.29C3.4 20.15 7.35 23 12 23z" />
+                  </svg>
+                  <span>{loading ? 'Connecting...' : 'Continue with Google'}</span>
+                </button>
 
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-teal-400 mb-1.5">Password</label>
-                    <div className="relative">
-                      <Lock className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-teal-600" />
-                      <input
-                        type="password"
-                        required
-                        value={signInPassword}
-                        onChange={(e) => setSignInPassword(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3 rounded-xl border border-teal-900 bg-teal-950/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-sm text-teal-50 placeholder:text-teal-800 font-semibold"
-                        placeholder="••••••••"
-                        id="login_password_input"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-xl text-sm transition-all shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2 cursor-pointer border-0 uppercase tracking-wider disabled:opacity-60"
-                    id="login_submit_btn"
-                  >
-                    {loading ? (
-                      <svg className="animate-spin h-5 w-5 text-teal-950" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    ) : (
-                      'Sign In to Dashboard'
-                    )}
-                  </button>
-                </form>
-              ) : (
-                /* CREATE ACCOUNT INFO VIEW */
-                <div className="space-y-6 text-center py-4">
-                  <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center mx-auto text-amber-500">
-                    <Sparkles className="w-8 h-8 fill-amber-500 animate-pulse" />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-bold text-white tracking-tight">Guided Onboarding Application</h4>
-                    <p className="text-sm text-teal-300 leading-relaxed max-w-sm mx-auto font-medium">
-                      Direct account registration is disabled. To join CIYA Academy, complete our guided onboarding application, get your registration code, and join the community.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      onClose();
-                      navigate('/waitingonboarding');
-                    }}
-                    className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-xl text-sm transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer border-0 uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98]"
-                    id="login_onboarding_btn"
-                  >
-                    <span>Apply for Admission & Sign Up</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              {/* Alternative Onboarding Path */}
-              {activeTab === 'signin' && (
-                <div className="text-center mt-5">
+                <div className="text-center border-t border-teal-900/40 pt-5">
                   <p className="text-xs text-teal-400 font-semibold">
                     New to CIYA Academy?{' '}
                     <button
@@ -392,7 +313,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     </button>
                   </p>
                 </div>
-              )}
+              </div>
             </motion.div>
           ) : (
             /* Popup Blocked Mode Helper */

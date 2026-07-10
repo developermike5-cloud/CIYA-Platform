@@ -36,9 +36,23 @@ export default function AdminKycbQuestionnaire({
   const qL = (clientText: string, freelancerText: string) => {
     return viewPerspective === 'client' ? clientText : freelancerText;
   };
-  const [savedForms, setSavedForms] = useState<SavedForm[]>([]);
+  const [savedForms, setSavedForms] = useState<SavedForm[]>(() => {
+    try {
+      const cached = localStorage.getItem('ciya_cached_kycb_forms');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [currentId, setCurrentId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = localStorage.getItem('ciya_cached_kycb_forms');
+      return !cached;
+    } catch (e) {
+      return true;
+    }
+  });
   const [saving, setSaving] = useState(false);
 
   // Form Metadata
@@ -625,19 +639,47 @@ export default function AdminKycbQuestionnaire({
   ]);
 
   const fetchForms = async () => {
-    setLoading(true);
+    const cached = localStorage.getItem('ciya_cached_kycb_forms');
+    if (!cached) {
+      setLoading(true);
+    }
     try {
-      const qSnap = await getDocs(query(collection(db, 'kycb_questionnaires'), orderBy('createdAt', 'desc')));
+      let qSnap;
+      if (isAdminMode) {
+        qSnap = await getDocs(collection(db, 'kycb_questionnaires'));
+      } else if (userId) {
+        qSnap = await getDocs(query(collection(db, 'kycb_questionnaires'), where('userId', '==', userId)));
+      } else {
+        setSavedForms([]);
+        setLoading(false);
+        return;
+      }
+
       let list = qSnap.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as SavedForm[];
+
+      // Sort in-memory to avoid requiring composite indexes on Firestore
+      list.sort((a, b) => {
+        const getMills = (fieldVal: any) => {
+          if (!fieldVal) return 0;
+          if (typeof fieldVal.toDate === 'function') {
+            return fieldVal.toDate().getTime();
+          }
+          return new Date(fieldVal).getTime() || 0;
+        };
+        return getMills(b.createdAt) - getMills(a.createdAt);
+      });
       
       if (!isAdminMode) {
         list = list.filter(form => form.userId === userId || form.id === currentId);
       }
       
       setSavedForms(list);
+      try {
+        localStorage.setItem('ciya_cached_kycb_forms', JSON.stringify(list));
+      } catch (e) {}
     } catch (err) {
       handleFirestoreError(err, OperationType.LIST, 'kycb_questionnaires');
     } finally {

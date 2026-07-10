@@ -6,6 +6,7 @@ import { auth, db } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import LoginModal from '../components/LoginModal';
+import BrandingLogo from '../components/BrandingLogo';
 import { safeStorage } from '../utils/safeStorage';
 
 type Pathway = 'A' | 'B' | 'C' | null;
@@ -105,6 +106,35 @@ export default function Onboarding() {
 
   const handleDirectLogin = () => {
     setIsLoginOpen(true);
+  };
+
+  const handleGoogleOnboarding = async () => {
+    setLoading(true);
+    setFormError('');
+    try {
+      const provider = new GoogleAuthProvider();
+      if (provider && typeof (provider as any).setCustomParameters === 'function') {
+        (provider as any).setCustomParameters({ prompt: 'select_account' });
+      }
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      if (user) {
+        setData(d => ({
+          ...d,
+          email: user.email || '',
+          fullName: d.fullName || user.displayName || ''
+        }));
+      }
+    } catch (e: any) {
+      console.error("Google Onboarding Sign Up error:", e);
+      if (e.code === 'auth/popup-blocked' || e.message?.toLowerCase().includes('popup-blocked')) {
+        setShowPopupBlocked(true);
+      } else {
+        setFormError(e.message || 'Google authentication failed.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const selectData = (key: keyof typeof data, value: string | boolean) => {
@@ -491,10 +521,8 @@ export default function Onboarding() {
         <AnimatePresence mode="wait">
           
           {step === 1 && (
-            <motion.div key="1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-2xl text-center space-y-8">
-              <div className="w-20 h-20 bg-gradient-to-tr from-teal-500 via-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/20 mx-auto flex items-center justify-center mb-8">
-                <span className="text-slate-950 font-black tracking-tight text-3xl uppercase">Ciya</span>
-              </div>
+            <motion.div key="1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-2xl text-center space-y-8 flex flex-col items-center">
+              <BrandingLogo size="md" className="mb-2" />
               <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-indigo-400 to-purple-400 leading-tight tracking-tight">
                 Empowering 10,000 African Youths With AI & Digital Skills
               </h1>
@@ -700,6 +728,29 @@ export default function Onboarding() {
                     <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
                     <div>
                       You are logged in as <span className="text-white font-black">{auth.currentUser.email}</span>, but your profile details are incomplete. Fill in your details below to activate your student dashboard.
+                    </div>
+                  </div>
+                )}
+
+                {!auth.currentUser && (
+                  <div className="mb-2">
+                    <button
+                      type="button"
+                      onClick={handleGoogleOnboarding}
+                      className="w-full py-3 px-4 bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 font-extrabold rounded-xl flex items-center justify-center gap-2.5 transition-all text-xs shadow-sm hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                    >
+                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                        <path fill="#EA4335" d="M12 5.04c1.64 0 3.11.56 4.27 1.67l3.19-3.19C17.51 1.7 14.99 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.79 2.94C6.18 7.37 8.86 5.04 12 5.04z" />
+                        <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.44c-.28 1.48-1.12 2.73-2.38 3.58l3.71 2.88c2.17-2 3.42-4.94 3.42-8.61z" />
+                        <path fill="#FBBC05" d="M5.29 14.83a7.19 7.19 0 0 1 0-4.57L1.5 7.32a11.95 11.95 0 0 0 0 10.37l3.79-2.86z" />
+                        <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.14 0-5.82-2.33-6.71-5.46L1.5 16.29C3.4 20.15 7.35 23 12 23z" />
+                      </svg>
+                      <span>Sign Up with Google</span>
+                    </button>
+                    <div className="flex items-center my-4">
+                      <div className="flex-grow border-t border-slate-800"></div>
+                      <span className="px-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">OR REGISTER WITH EMAIL</span>
+                      <div className="flex-grow border-t border-slate-800"></div>
                     </div>
                   </div>
                 )}

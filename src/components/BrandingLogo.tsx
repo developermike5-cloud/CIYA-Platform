@@ -14,24 +14,7 @@ export default function BrandingLogo({ className = '', size = 'md', theme = 'dar
   });
 
   useEffect(() => {
-    const syncLogo = async () => {
-      try {
-        const docSnap = await getDoc(doc(db, 'settings', 'app'));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data && data.logo) {
-            localStorage.setItem('ciya_brand_logo', data.logo);
-            setCustomLogo(data.logo);
-          } else {
-            localStorage.removeItem('ciya_brand_logo');
-            setCustomLogo(null);
-          }
-        }
-      } catch (err) {
-        // ignore silently
-      }
-    };
-    syncLogo();
+    // Rely strictly on local storage and static assets to eliminate anonymous startup Firestore reads.
   }, []);
 
   // Dimensions

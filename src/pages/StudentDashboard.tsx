@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { invalidateCache } from '../lib/supabase-shim/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType } from '../firebase';
 import { ref as dbRef, onValue } from 'firebase/database';
 import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
@@ -16,6 +17,7 @@ import AdminKycbQuestionnaire from './admin/AdminKycbQuestionnaire';
 import { safeStorage } from '../utils/safeStorage';
 import { supabase, getStoragePublicUrl } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
+import staticCourses from '../data/courses.json';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -394,41 +396,12 @@ function isLessonUnlockedUnified(
   checkPassedKeys: string[],
   dbSubmissions: any[] = [],
   isAdmin: boolean = false,
-  isCloned: boolean = false
+  isCloned: boolean = false,
+  userProfile?: any,
+  courseId?: string
 ) {
-  if (isAdmin) return true;
-
-  // Day-level lock check: For Day di (di > 0), preceding Day's (di-1) assignment must be Approved
-  if (di > 0 && !isCloned) {
-    const prevDayIdx = di - 1;
-    const prevDaySubmission = dbSubmissions.find(sub => sub.dayIndex === prevDayIdx);
-    if (!prevDaySubmission || prevDaySubmission.status !== 'Approved') {
-      return false; // Parent Day is locked, so all lessons inside this day are locked!
-    }
-  }
-
-  if (di === 0 && vi === 0) return true;
-  
-  let predDi = di;
-  let predVi = vi - 1;
-  
-  if (vi === 0) {
-    predDi = di - 1;
-    const prevDayVideos = days[predDi]?.videos || [];
-    predVi = prevDayVideos.length - 1;
-  }
-  
-  if (predDi < 0) return true;
-  
-  const precedingKey = `${predDi}-${predVi}`;
-  const isPrecedingVideoWatched = completedKeys.includes(precedingKey);
-  
-  const prevDayVideos = days[predDi]?.videos || [];
-  const precedingVideo = prevDayVideos[predVi];
-  const hasQuiz = precedingVideo && precedingVideo.checkType && precedingVideo.checkType !== 'none';
-  const isQuizPassed = checkPassedKeys.includes(precedingKey);
-  
-  return isPrecedingVideoWatched && (!hasQuiz || isQuizPassed);
+  // Always unlock all lessons and days for everyone without restriction
+  return true;
 }
 
 // Interactive Post-Video Engagement Check popup modal
@@ -848,6 +821,7 @@ interface CourseViewerProps {
   onLogin?: () => void;
   courses: Course[];
   hasCompletedFirstCourse?: boolean;
+  loading?: boolean;
 }
 
 function renderBulletList(text: string, icon: string, textClass: string = "text-sm text-slate-800") {
@@ -869,7 +843,7 @@ function renderBulletList(text: string, icon: string, textClass: string = "text-
   );
 }
 
-function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false }: CourseViewerProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -1016,6 +990,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
   useEffect(() => {
     if (!currentUser || !courseId) return;
+    
     const q = query(
       collection(db, 'assignments'),
       where('userId', '==', currentUser.uid),
@@ -1027,7 +1002,10 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     }, (error) => {
       console.warn("Soft handling error loading specific course submissions:", error);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+    };
   }, [currentUser, courseId]);
 
   const completedKeys: string[] = progressStore.watched || [];
@@ -1250,7 +1228,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     }
 
     if (goingToNextLesson) {
-      const isNextUnlocked = isAdmin || isLessonUnlockedUnified(nextDayIdx, nextVideoIdx, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
+      const isNextUnlocked = isAdmin || isLessonUnlockedUnified(nextDayIdx, nextVideoIdx, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId);
       if (!isNextUnlocked) {
         alert("The next lesson is locked! You must complete the watch requirement and score at least 80% on this lesson's comprehension quiz first.");
         return;
@@ -1336,6 +1314,24 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   };
 
   const sk = SKILLS[course.skill || 'web'];
+
+  if (!course.days || course.days.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        {loading ? (
+          <>
+            <div className="w-12.5 h-12.5 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-slate-600 text-xs font-black uppercase tracking-wider">Loading Syllabus & Lessons...</p>
+          </>
+        ) : (
+          <>
+            <div className="text-3xl mb-4 select-none">📚</div>
+            <p className="text-slate-600 text-sm font-black uppercase tracking-wider">No lessons published for this path yet.</p>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 font-sans pb-16">
@@ -1565,7 +1561,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
             {/* 1. Selected Day card at the top */}
             {days.map((d, di) => {
               if (activeDayIdx !== di) return null;
-              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
+              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId);
               if (!isDayCoveredOrUnlocked) return null;
 
               return (
@@ -1593,7 +1589,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                        const isVidCurrent = activeDayIdx === di && activeVideoIdx === vi && !showAssignment;
                        const isVidWatched = completedKeys.includes(currentKey);
                        const isKeyCheckPassed = checkPassedKeys.includes(currentKey);
-                       const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
+                       const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId);
 
                       return (
                         <div 
@@ -1799,38 +1795,68 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
                     {/* End of day assignment checklist marker */}
                     {d.assignment && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const allVideosPassed = (d.videos || []).every((v, vi) => {
-                            const currentKey = `${di}-${vi}`;
-                            const isVidWatched = completedKeys.includes(currentKey);
-                            const hasQuiz = v.checkType && v.checkType !== 'none' && v.check;
-                            const isQuizPassed = checkPassedKeys.includes(currentKey);
-                            return isVidWatched && (!hasQuiz || isQuizPassed);
-                          });
+                      <div className="space-y-3 mt-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const isDayManuallyUnlocked = userProfile?.manualDayUnlock?.[courseId]?.[di] === true;
+                            const isPrevApproved = di === 0 || dbSubmissions.some(sub => sub.dayIndex === di - 1 && sub.status === 'Approved');
 
-                          if (allVideosPassed) {
-                            updateParams({
-                              day: String(di),
-                              assignment: 'true',
-                              syllabus: 'false'
+                            const allVideosPassed = isDayManuallyUnlocked || isPrevApproved || (d.videos || []).every((v, vi) => {
+                              const currentKey = `${di}-${vi}`;
+                              const isVidWatched = completedKeys.includes(currentKey);
+                              const hasQuiz = v.checkType && v.checkType !== 'none' && v.check;
+                              const isQuizPassed = checkPassedKeys.includes(currentKey);
+                              return isVidWatched && (!hasQuiz || isQuizPassed);
                             });
-                          } else {
-                            alert("Complete all day's lessons and understanding checks first to unlock the end-of-day assignment!");
-                          }
-                        }}
-                        className={`w-full p-3 border rounded-xl cursor-pointer text-left flex items-center justify-between text-xs md:text-sm transition-all tracking-wide ${
-                          showAssignment && activeDayIdx === di
-                            ? 'bg-teal-600 text-white border-teal-600 font-black shadow-md'
-                            : 'text-teal-950 bg-teal-50 border-teal-200 hover:bg-teal-100 font-extrabold'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2 flex-1 font-bold">
-                          <span>{dbSubmissions.find(sub => sub.dayIndex === di)?.status === 'Approved' ? "✅" : "📋"}</span>
-                          <span>Day {di+1} Live Assignment</span>
-                        </span>
-                      </button>
+
+                            if (allVideosPassed) {
+                              updateParams({
+                                day: String(di),
+                                assignment: 'true',
+                                syllabus: 'false'
+                              });
+                            } else {
+                              alert("Complete all day's lessons and understanding checks first to unlock the end-of-day assignment!");
+                            }
+                          }}
+                          className={`w-full p-3 border rounded-xl cursor-pointer text-left flex items-center justify-between text-xs md:text-sm transition-all tracking-wide ${
+                            showAssignment && activeDayIdx === di
+                              ? 'bg-teal-600 text-white border-teal-600 font-black shadow-md'
+                              : 'text-teal-950 bg-teal-50 border-teal-200 hover:bg-teal-100 font-extrabold'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2 flex-1 font-bold">
+                            <span>{dbSubmissions.find(sub => sub.dayIndex === di)?.status === 'Approved' ? "✅" : "📋"}</span>
+                            <span>Day {di+1} Live Assignment Details</span>
+                          </span>
+                        </button>
+
+                        <div className="bg-teal-50/30 border border-teal-100 rounded-2xl p-4.5 space-y-3.5 text-left shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base select-none">📋</span>
+                              <span className="text-xs uppercase font-black text-teal-900 tracking-wider">Day {di+1} End-of-Day Assignment Question</span>
+                            </div>
+                            {d.assignment.dueNote && (
+                              <span className="text-[9px] uppercase font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">{d.assignment.dueNote}</span>
+                            )}
+                          </div>
+                          <div className="text-xs md:text-sm text-slate-800 leading-relaxed font-extrabold whitespace-pre-wrap bg-white border border-slate-100 p-4 rounded-xl shadow-sm">
+                            {renderClickableLinks(d.assignment.prompt || "Execute today's syllabus lessons on your system and log your drafted link inside the Assignments tab.")}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5 pl-1">
+                            <span>💡 Submit this assignment inside your</span>
+                            <button
+                              type="button"
+                              onClick={() => navigate('/dashboard?view=assignments')}
+                              className="text-teal-700 font-black underline hover:text-teal-850 border-0 bg-transparent cursor-pointer p-0 m-0 inline"
+                            >
+                              "My Assignments" Workspace
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1844,7 +1870,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                 <div className="grid grid-cols-1 gap-4">
                   {days.map((d, di) => {
                     if (activeDayIdx === di) return null;
-                    const isDayUnlocked = di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned);
+                    const isDayUnlocked = di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId);
 
                     return (
                       <div
@@ -2144,10 +2170,46 @@ function getYouTubeEmbedUrl(url: string): string {
   return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
 }
 
-function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled }: any) {
+function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled, currentUser, appSettings, onCourseUnlocked }: any) {
   const sk = SKILLS[course.skill || 'web'];
   const totalVideos = course.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
   const [expanded, setExpanded] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncUnlock = async (e: React.MouseEvent, courseItem: any) => {
+    e.stopPropagation();
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      if (appSettings?.lockedSections?.courses) {
+        alert("The admin has locked the entire courses section. Individual course unlock verification is not available until the courses section is unlocked.");
+        setIsSyncing(false);
+        return;
+      }
+
+      const docRef = doc(db, 'courses', courseItem.id);
+      const snap = await getDoc(docRef);
+
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.isLocked === false) {
+          if (onCourseUnlocked) {
+            onCourseUnlocked(courseItem.id);
+          }
+          alert(`🎉 Success! Administrator authorization verified. "${courseItem.title}" has been successfully unlocked for you!`);
+        } else {
+          alert(`🔒 This course is still locked on the administrator's dashboard. Please contact your instructor to request access.`);
+        }
+      } else {
+        alert(`🔒 This course is still locked on the administrator's dashboard. Please contact your instructor to request access.`);
+      }
+    } catch (err) {
+      console.error("Error syncing course unlock:", err);
+      alert("Error contacting database for lock status. Please check your network connection and try again.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const progressStore = userProfile?.progress?.[course.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
   const completedKeys: string[] = progressStore.watched || [];
@@ -2327,9 +2389,30 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled }: any
             </div>
           </div>
           {isLocked ? (
-             <button className="text-[11px] font-black uppercase tracking-wide text-slate-400 bg-slate-100 flex items-center gap-1 px-3 py-1.5 rounded-full cursor-not-allowed border-0">
-               <Lock className="w-3.5 h-3.5" /> Locked
-             </button>
+             <div className="flex items-center gap-2">
+               <button className="text-[11px] font-black uppercase tracking-wide text-slate-400 bg-slate-100 flex items-center gap-1 px-3 py-1.5 rounded-full cursor-not-allowed border-0">
+                 <Lock className="w-3.5 h-3.5" /> Locked
+               </button>
+               {currentUser && (
+                 <button 
+                   onClick={(e) => handleSyncUnlock(e, course)}
+                   disabled={isSyncing}
+                   className={`text-[10.5px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-full border transition-all flex items-center gap-1 cursor-pointer shadow-sm select-none ${
+                     isSyncing 
+                       ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed animate-pulse" 
+                       : "bg-indigo-600 text-white border-indigo-500 hover:bg-indigo-700 hover:shadow-md"
+                   }`}
+                   title="Sync Lock Status with Admin"
+                 >
+                   {isSyncing ? (
+                     <span className="w-2.5 h-2.5 border-2 border-indigo-200 border-t-transparent rounded-full animate-spin inline-block" />
+                   ) : (
+                     "🔄"
+                   )}
+                   <span>{isSyncing ? "Verifying..." : "Sync Unlock"}</span>
+                 </button>
+               )}
+             </div>
            ) : (
              <button className="text-[11px] font-black uppercase tracking-wide text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3.5 py-2 rounded-xl transition-all cursor-pointer">
                Enter →
@@ -2478,15 +2561,65 @@ export default function StudentDashboard() {
   const location = useLocation();
   const [courses, setCourses] = useState<Course[]>(() => {
     try {
-      const cached = safeStorage.getItem('ciya_cached_courses');
-      return cached ? JSON.parse(cached) : [];
+      const parsed = staticCourses as any[];
+      const data = parsed.map(c => {
+        return {
+          ...c,
+          skill: c.skill || (c.category?.toLowerCase().includes('web') ? 'web' : c.category?.toLowerCase().includes('film') ? 'film' : c.category?.toLowerCase().includes('image') ? 'image' : 'web'),
+          tier: c.tier || (c.level?.toLowerCase() === 'beginner' ? 'beginner' : c.level?.toLowerCase() === 'advanced' ? 'advanced' : c.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
+          status: c.status || (c.publish_status === 'Published' ? 'published' : 'draft'),
+          days: (c.days || []).map((day: any, dIdx: number) => ({
+            dayNumber: dIdx + 1,
+            title: day.title || `Day ${dIdx + 1}: Study Module`,
+            description: day.description || '',
+            assignment: day.assignment || { prompt: '', dueNote: '' },
+            videos: (day.videos || []).map((v: any) => ({
+              id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
+              title: v.title || '',
+              video_url: v.video_url || v.url || '',
+              url: v.url || v.video_url || '',
+              duration: v.duration || '10 min',
+              description: v.description || '',
+              resources: v.resources || '',
+              checkType: v.checkType || 'none',
+              check: v.check || null,
+              funFact: v.funFact || null
+            }))
+          }))
+        } as Course;
+      });
+      data.sort((a, b) => {
+        const getMills = (fieldVal: any) => {
+          if (!fieldVal) return 0;
+          if (typeof fieldVal.toDate === 'function') {
+            return fieldVal.toDate().getTime();
+          }
+          return new Date(fieldVal).getTime() || 0;
+        };
+        return getMills(b.createdAt) - getMills(a.createdAt);
+      });
+      return data;
     } catch (e) {
       return [];
     }
   });
   const [coursesViewTab, setCoursesViewTab] = useState<'courses' | 'leaderboard'>('courses');
-  const [leaderboardUsers, setLeaderboardUsers] = useState<any[]>([]);
-  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [leaderboardUsers, setLeaderboardUsers] = useState<any[]>(() => {
+    try {
+      const cached = safeStorage.getItem('ciya_leaderboard_users');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [leaderboardLoading, setLeaderboardLoading] = useState(() => {
+    try {
+      const cached = safeStorage.getItem('ciya_leaderboard_users');
+      return !cached;
+    } catch (e) {
+      return true;
+    }
+  });
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(() => {
     const hasCachedCourses = !!safeStorage.getItem('ciya_cached_courses');
@@ -2531,6 +2664,30 @@ export default function StudentDashboard() {
     }
     return null;
   });
+
+  const [unlockedCourseIds, setUnlockedCourseIds] = useState<string[]>(() => {
+    try {
+      const cachedUser = safeStorage.getItem('ciya_cached_user');
+      const activeUid = cachedUser ? JSON.parse(cachedUser).uid : '';
+      const cached = safeStorage.getItem(`ciya_locally_unlocked_courses_${activeUid}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const handleCourseUnlocked = (courseId: string) => {
+    setUnlockedCourseIds(prev => {
+      const next = [...prev];
+      if (!next.includes(courseId)) {
+        next.push(courseId);
+        const cachedUser = safeStorage.getItem('ciya_cached_user');
+        const activeUid = cachedUser ? JSON.parse(cachedUser).uid : '';
+        safeStorage.setItem(`ciya_locally_unlocked_courses_${activeUid}`, JSON.stringify(next));
+      }
+      return next;
+    });
+  };
 
   const [authChecking, setAuthChecking] = useState(() => {
     return !safeStorage.getItem('ciya_cached_user');
@@ -2649,6 +2806,57 @@ export default function StudentDashboard() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [selectedCourseId, currentView]);
 
+  // Lazy-load full course details (lessons / days) when a course is selected
+  useEffect(() => {
+    if (!selectedCourseId) return;
+
+    const targetCourse = courses.find(c => c.id === selectedCourseId);
+    if (targetCourse && (!targetCourse.days || targetCourse.days.length === 0)) {
+      const loadFullCourse = async () => {
+        try {
+          // Look for the course in local static data first to eliminate database egress
+          const staticMatch = (staticCourses as any[]).find(c => c.id === selectedCourseId);
+          let d = staticMatch;
+          
+          if (!d) {
+            const docSnap = await getDoc(doc(db, 'courses', selectedCourseId));
+            if (docSnap.exists()) {
+              d = docSnap.data();
+            }
+          }
+
+          if (d) {
+            const fullCourseData = {
+              ...d,
+              days: (d.days || []).map((day: any, dIdx: number) => ({
+                dayNumber: dIdx + 1,
+                title: day.title || `Day ${dIdx + 1}: Study Module`,
+                description: day.description || '',
+                assignment: day.assignment || { prompt: '', dueNote: '' },
+                videos: (day.videos || []).map((v: any) => ({
+                  id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
+                  title: v.title || '',
+                  video_url: v.video_url || v.url || '',
+                  url: v.url || v.video_url || '',
+                  duration: v.duration || '10 min',
+                  description: v.description || '',
+                  resources: v.resources || '',
+                  checkType: v.checkType || 'none',
+                  check: v.check || null,
+                  funFact: v.funFact || null
+                }))
+              }))
+            };
+            setCourses(prev => prev.map(c => c.id === selectedCourseId ? { ...c, ...fullCourseData } : c));
+          }
+        } catch (err) {
+          console.warn("Error lazy-loading course details:", err);
+        }
+      };
+      loadFullCourse();
+    }
+  }, [selectedCourseId, courses]);
+
   const [submitDayIndex, setSubmitDayIndex] = useState<number>(0);
   const [submitLink, setSubmitLink] = useState('');
   const [submitText, setSubmitText] = useState('');
@@ -2700,11 +2908,19 @@ export default function StudentDashboard() {
       return {};
     }
   });
-  const [allMySubmissions, setAllMySubmissions] = useState<any[]>([]);
+  const [allMySubmissions, setAllMySubmissions] = useState<any[]>(() => {
+    try {
+      const cached = safeStorage.getItem('ciya_cached_student_assignments');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [selectedAssignCourseId, setSelectedAssignCourseId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!currentUser) return;
+
     const q = query(
       collection(db, 'assignments'),
       where('userId', '==', currentUser.uid)
@@ -2728,10 +2944,16 @@ export default function StudentDashboard() {
         return { id: doc.id, ...data, submittedText, images };
       });
       setAllMySubmissions(list);
+      try {
+        safeStorage.setItem('ciya_cached_student_assignments', JSON.stringify(list));
+      } catch (e) {}
     }, (error) => {
       console.error("Error loading student assignments:", error);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+    };
   }, [currentUser]);
 
   const handleDashboardAssignmentSubmit = async (dayIndex: number, data: any) => {
@@ -2817,6 +3039,11 @@ export default function StudentDashboard() {
     // Reusable direct fetchers
     const fetchAppSettings = async () => {
       try {
+        if (typeof invalidateCache === 'function') {
+          invalidateCache('settings', 'app');
+          invalidateCache('settings', 'full_prompts');
+          invalidateCache('settings', 'modular_prompts');
+        }
         const snap = await getDoc(doc(db, 'settings', 'app'));
         if (snap.exists() && isSubscribed) {
           const data = snap.data();
@@ -2829,68 +3056,17 @@ export default function StudentDashboard() {
     };
 
     const fetchCourses = async (serverCoursesTime = '0') => {
-      try {
-        const q = query(
-          collection(db, 'courses'), 
-          where('publish_status', '==', 'Published')
-        );
-        const courseSnapshot = await getDocs(q);
-        const data = courseSnapshot.docs.map(doc => {
-          const d = doc.data();
-          return {
-            id: doc.id,
-            ...d,
-            skill: d.skill || (d.category?.toLowerCase().includes('web') ? 'web' : d.category?.toLowerCase().includes('film') ? 'film' : d.category?.toLowerCase().includes('image') ? 'image' : 'web'),
-            tier: d.tier || (d.level?.toLowerCase() === 'beginner' ? 'beginner' : d.level?.toLowerCase() === 'advanced' ? 'advanced' : d.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
-            status: d.status || (d.publish_status === 'Published' ? 'published' : 'draft'),
-            days: (d.days || []).map((day: any, dIdx: number) => ({
-              dayNumber: dIdx + 1,
-              title: day.title || `Day ${dIdx + 1}: Study Module`,
-              description: day.description || '',
-              assignment: day.assignment || { prompt: '', dueNote: '' },
-              videos: (day.videos || []).map((v: any) => ({
-                id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
-                title: v.title || '',
-                video_url: v.video_url || v.url || '',
-                url: v.url || v.video_url || '',
-                duration: v.duration || '10 min',
-                description: v.description || '',
-                resources: v.resources || '',
-                checkType: v.checkType || 'none',
-                check: v.check || null,
-                funFact: v.funFact || null
-              }))
-            }))
-          } as Course;
-        });
-        
-        data.sort((a, b) => {
-          const getMills = (fieldVal: any) => {
-            if (!fieldVal) return 0;
-            if (typeof fieldVal.toDate === 'function') {
-              return fieldVal.toDate().getTime();
-            }
-            return new Date(fieldVal).getTime() || 0;
-          };
-          return getMills(b.createdAt) - getMills(a.createdAt);
-        });
-
-        if (isSubscribed) {
-          setCourses(data);
-          safeStorage.setItem('ciya_cached_courses', JSON.stringify(data));
-          safeStorage.setItem('ciya_cached_courses_time', serverCoursesTime);
-        }
-      } catch (err) {
-        console.warn("Error loading courses catalogue:", err);
-      } finally {
-        if (isSubscribed) {
-          setLoading(false);
-        }
+      // Courses catalogue is loaded fully statically from the frontend JSON file to eliminate 100% database egress/API costs
+      if (isSubscribed) {
+        setLoading(false);
       }
     };
 
     const fetchUserProfile = async (serverProfileTime = '0') => {
       try {
+        if (typeof invalidateCache === 'function') {
+          invalidateCache('users', activeUid);
+        }
         const snap = await getDoc(doc(db, 'users', activeUid));
         if (snap.exists() && isSubscribed) {
           const profileData = snap.data();
@@ -2913,144 +3089,76 @@ export default function StudentDashboard() {
     const hasCachedCourses = !!safeStorage.getItem('ciya_cached_courses');
     const hasCachedProfile = !!safeStorage.getItem('ciya_cached_profile');
 
-    if (!hasCachedAppSettings) fetchAppSettings();
+    if (!hasCachedAppSettings) {
+      fetchAppSettings();
+    }
     if (!hasCachedCourses) {
       fetchCourses();
     } else {
       setLoading(false);
     }
-    if (!hasCachedProfile) fetchUserProfile();
+    if (!hasCachedProfile) {
+      fetchUserProfile();
+    }
 
-    // Set up a single, light tracking document listener in Firestore
-    const unsubSignals = onSnapshot(doc(db, 'settings', 'system_signals'), async (snapshot) => {
-      if (!isSubscribed) return;
+    // Completely deactivated system_signals observer to block all non-essential background database reads
+    const unsubSignals = () => {};
 
-      if (!snapshot.exists()) {
-        // Fallback: If signals document does not exist, always ensure initial fetch and set loading to false
-        if (!hasCachedCourses) await fetchCourses();
-        if (!hasCachedProfile) await fetchUserProfile();
-        if (!hasCachedAppSettings) await fetchAppSettings();
-        setLoading(false);
-        return;
-      }
+    // Set up a direct real-time listener on the user's own profile doc with visibility gating!
+    let unsubProfile: (() => void) | null = null;
+    let unsubRtdbProfile: (() => void) | null = null;
+    // Set up a direct real-time listener on the portal locks settings doc!
+    let unsubSettings: (() => void) | null = null;
 
-      const signalData = snapshot.data() || {};
-
-      // 1. Sync App Settings (Portal Locks, etc.)
-      const cachedSettingsTime = safeStorage.getItem('ciya_cached_settings_time') || '0';
-      const serverSettingsTime = String(signalData.settings || '0');
-      if (serverSettingsTime !== cachedSettingsTime || !hasCachedAppSettings) {
-        await fetchAppSettings();
-        safeStorage.setItem('ciya_cached_settings_time', serverSettingsTime);
-      }
-
-      // 2. Sync Course Catalogue
-      const cachedCoursesTime = safeStorage.getItem('ciya_cached_courses_time') || '0';
-      const serverCoursesTime = String(signalData.courses || '0');
-      if (serverCoursesTime !== cachedCoursesTime || !hasCachedCourses) {
-        await fetchCourses(serverCoursesTime);
-      }
-
-      // 3. Sync User Profile & Status changes
-      const cachedProfileTime = safeStorage.getItem('ciya_cached_profile_time') || '0';
-      const serverProfileTime = String(signalData.user_signals?.[activeUid] || '0');
-      if (serverProfileTime !== cachedProfileTime || !hasCachedProfile) {
-        await fetchUserProfile(serverProfileTime);
-      }
-
-    }, async (error) => {
-      console.warn("Soft handling global light-ping system signals observer:", error);
-      // Fail gracefully: fetch directly and stop loading
-      if (!hasCachedCourses) await fetchCourses();
-      if (!hasCachedProfile) await fetchUserProfile();
-      setLoading(false);
-    });
-
-    // Set up a direct real-time listener on the user's own profile doc!
-    const unsubProfile = onSnapshot(doc(db, 'users', activeUid), (snapshot) => {
-      if (!isSubscribed) return;
-      if (snapshot.exists()) {
-        const profileData = snapshot.data();
-        setUserProfile(profileData);
-        safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
-        if (!cleanupPerformedRef.current) {
-          cleanupPerformedRef.current = true;
-          cleanUpOldSubmissionsLocal(activeUid, profileData.progress);
-          cleanUpOldGlobalSubmissions(activeUid);
+    const startSettingsListener = () => {
+      if (unsubSettings) return;
+      // Always use high-performance real-time Firestore listener to ensure absolute reliability
+      unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (snapshot) => {
+        if (!isSubscribed) return;
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setAppSettings(data);
+          safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
         }
-      }
-    }, (error) => {
-      console.warn("Soft handling direct real-time user profile listener error:", error);
-    });
+      }, (error) => {
+        console.warn("Soft handling direct real-time settings app listener error:", error);
+      });
+    };
+
+    const startProfileListener = () => {
+      if (unsubProfile) return;
+      unsubProfile = onSnapshot(doc(db, 'users', activeUid), (snapshot) => {
+        if (!isSubscribed) return;
+        if (snapshot.exists()) {
+          const profileData = snapshot.data();
+          setUserProfile(profileData);
+          safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
+          if (!cleanupPerformedRef.current) {
+            cleanupPerformedRef.current = true;
+            cleanUpOldSubmissionsLocal(activeUid, profileData.progress);
+            cleanUpOldGlobalSubmissions(activeUid);
+          }
+        }
+      }, (error) => {
+        console.warn("Soft handling direct real-time user profile listener error:", error);
+      });
+    };
+
+    startProfileListener();
+    startSettingsListener();
 
     return () => {
       isSubscribed = false;
-      unsubSignals();
-      unsubProfile();
+      if (unsubProfile) unsubProfile();
+      if (unsubRtdbProfile) unsubRtdbProfile();
+      if (unsubSettings) unsubSettings();
     };
   }, [currentUser]);
 
-  // Throttled 12-hour local cached fetcher for leaderboard aggregation to save database egress
+  // Leaderboard loading is deactivated to save database egress per administrator request
   useEffect(() => {
-    if (currentView !== 'courses') return;
-
-    const CACHE_KEY = 'ciya_leaderboard_users';
-    const CACHE_TIME_KEY = 'ciya_leaderboard_time';
-    const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
-
-    const loadLeaderboard = async () => {
-      const now = Date.now();
-      const cachedTimeStr = safeStorage.getItem(CACHE_TIME_KEY);
-      const cachedTime = cachedTimeStr ? parseInt(cachedTimeStr, 10) : 0;
-      const cachedData = safeStorage.getItem(CACHE_KEY);
-
-      if (cachedData && cachedTime && (now - cachedTime < TWELVE_HOURS_MS)) {
-        try {
-          const parsed = JSON.parse(cachedData);
-          setLeaderboardUsers(parsed);
-          setLeaderboardLoading(false);
-          return;
-        } catch (e) {
-          // fallback to fetching if parse fails
-        }
-      }
-
-      setLeaderboardLoading(true);
-      try {
-        const q = query(collection(db, 'users'));
-        const snapshot = await getDocs(q);
-        const list: any[] = [];
-        snapshot.forEach(docSnap => {
-          const d = docSnap.data();
-          const roleLower = String(d.role || '').toLowerCase();
-          const emailLower = String(d.email || '').toLowerCase();
-          const nameLower = String(d.fullName || '').toLowerCase();
-          const isAdminUser = 
-            roleLower.includes('admin') || 
-            emailLower.includes('admin') || 
-            nameLower.includes('admin') ||
-            emailLower === 'developermike5@gmail.com' ||
-            emailLower.includes('ciyacademy.com');
-
-          if (!isAdminUser && (d.fullName || d.email)) {
-            list.push({
-              id: docSnap.id,
-              ...d
-            });
-          }
-        });
-
-        setLeaderboardUsers(list);
-        safeStorage.setItem(CACHE_KEY, JSON.stringify(list));
-        safeStorage.setItem(CACHE_TIME_KEY, String(now));
-      } catch (error) {
-        console.warn("Leaderboard loading error:", error);
-      } finally {
-        setLeaderboardLoading(false);
-      }
-    };
-
-    loadLeaderboard();
+    setLeaderboardUsers([]);
+    setLeaderboardLoading(false);
   }, [currentView]);
 
   const [timeLeft, setTimeLeft] = useState('');
@@ -3076,9 +3184,11 @@ export default function StudentDashboard() {
     if (isAdmin) {
       targets.push('admins_group');
     }
+
     const q = query(
       collection(db, 'notifications'),
-      where('userId', 'in', targets)
+      where('userId', 'in', targets),
+      limit(50)
     );
     const unsubscribe = onSnapshot(q, (snap) => {
       const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -3091,7 +3201,10 @@ export default function StudentDashboard() {
     }, (error) => {
       console.warn("Soft handling error loading db notifications:", error);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+    };
   }, [currentUser, isAdmin]);
 
   const unreadNotificationsCount = dbNotifications.filter(x => !x.isRead).length;
@@ -3233,6 +3346,38 @@ export default function StudentDashboard() {
       alert("No active course path assigned to submit an assignment for.");
       return;
     }
+
+    // Check duplicate submissions check
+    const existingSub = allMySubmissions.find(s => s.courseId === registeredCourse.id && s.dayIndex === submitDayIndex);
+    if (existingSub) {
+      if (existingSub.status !== 'Disapproved') {
+        alert(`You have already submitted an assignment for Day ${submitDayIndex + 1} which is currently in '${existingSub.status}' status. You cannot submit multiple assignments for the same day unless disapproved.`);
+        return;
+      }
+    }
+
+    // Check locking constraint check
+    const daysList = registeredCourse.days || [];
+    const progressStore = userProfile?.progress?.[registeredCourse.id] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+    const completedKeys = progressStore.watched || [];
+    const checkPassedKeys = progressStore.checkPassed || [];
+
+    const lastUnlockedDayIdx = (() => {
+      let lastIdx = 0;
+      for (let idx = 0; idx < daysList.length; idx++) {
+        const isUnlocked = idx === 0 || isLessonUnlockedUnified(idx, 0, daysList, completedKeys, checkPassedKeys, allMySubmissions, isAdmin, !!registeredCourse.isCloned, userProfile, registeredCourse.id);
+        if (isUnlocked) {
+          lastIdx = idx;
+        }
+      }
+      return lastIdx;
+    })();
+
+    if (submitDayIndex > lastUnlockedDayIdx) {
+      alert(`Day ${submitDayIndex + 1} assignment is currently locked. Complete preceding days' lessons and assignments to unlock!`);
+      return;
+    }
+
     const hasImages = uploadedImages.length > 0;
     const hasLink = !!submitLink.trim();
     const hasText = !!submitText.trim();
@@ -3592,24 +3737,7 @@ export default function StudentDashboard() {
     };
   }, [navigate]);
 
-  // Real-time profile synchronization for progress, quiz, and locking states
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const unsubProfile = onSnapshot(doc(db, 'users', currentUser.uid), (snapshot) => {
-      if (snapshot.exists()) {
-        const freshProfile = snapshot.data();
-        setUserProfile(freshProfile);
-        safeStorage.setItem('ciya_cached_profile', JSON.stringify(freshProfile));
-      }
-    }, (error) => {
-      console.warn("Real-time profile sync listener error:", error);
-    });
-
-    return () => {
-      unsubProfile();
-    };
-  }, [currentUser]);
+  // Real-time profile synchronization is fully handled by the main visibility-gated user profile observer above
 
   useEffect(() => {
     if (userProfile && !userProfile.isActivated) {
@@ -3673,57 +3801,6 @@ export default function StudentDashboard() {
       setLoading(true);
     }
   }, [authChecking]);
-
-  const handleProfileSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUser || !userProfile) return;
-    setProfileSaving(true);
-    try {
-      await updateDoc(doc(db, 'users', currentUser.uid), {
-        fullName: userProfile.fullName,
-        whatsapp: userProfile.whatsapp,
-        state: userProfile.state,
-        goal: userProfile.goal,
-        updatedAt: serverTimestamp()
-      });
-      safeStorage.setItem('ciya_cached_profile', JSON.stringify(userProfile));
-      safeStorage.setItem('ciya_cached_profile_time', Date.now().toString());
-      setEditingProfile(false);
-      alert('Profile updated successfully!');
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setProfileSaving(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    safeStorage.removeItem('ciya_cached_user');
-    safeStorage.removeItem('ciya_cached_profile');
-    await signOut(auth);
-    setCurrentUser(null);
-    setUserProfile(null);
-    navigate('/?login=true');
-  };
-
-  const isGuest = !currentUser || !userProfile;
-
-  if (authChecking) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Validating Authorization Credentials...</div>;
-  }
-
-  if (!currentUser) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Redirecting to login...</div>;
-  }
-
-  if (!userProfile) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Retrieving Student Profile...</div>;
-  }
-
-  const approvalStatus = userProfile?.approvalStatus || 'Pending';
-  const isApproved = approvalStatus === 'Approved';
-  const isPending = approvalStatus === 'Pending';
-  const isDisapproved = approvalStatus === 'Disapproved';
 
   const isProfileRegisteredForCourse = (profile: any, course: any): boolean => {
     if (!profile || !course) return false;
@@ -3899,6 +3976,45 @@ export default function StudentDashboard() {
     return true;
   });
 
+  const handleProfileSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !userProfile) return;
+    setProfileSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        fullName: userProfile.fullName,
+        whatsapp: userProfile.whatsapp,
+        state: userProfile.state,
+        goal: userProfile.goal,
+        updatedAt: serverTimestamp()
+      });
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(userProfile));
+      safeStorage.setItem('ciya_cached_profile_time', Date.now().toString());
+      setEditingProfile(false);
+      alert('Profile updated successfully!');
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    safeStorage.removeItem('ciya_cached_user');
+    safeStorage.removeItem('ciya_cached_profile');
+    await signOut(auth);
+    setCurrentUser(null);
+    setUserProfile(null);
+    navigate('/?login=true');
+  };
+
+  const isGuest = !currentUser || !userProfile;
+
+  const approvalStatus = userProfile?.approvalStatus || 'Pending';
+  const isApproved = approvalStatus === 'Approved';
+  const isPending = approvalStatus === 'Pending';
+  const isDisapproved = approvalStatus === 'Disapproved';
+
   const filteredRegisteredCourses = enrolledCourses.filter(c => {
     if (activeSkillFilter !== 'all' && c.skill !== activeSkillFilter) return false;
     return true;
@@ -3928,6 +4044,18 @@ export default function StudentDashboard() {
       }
     }
   }, [currentUser, userProfile, courses, registeredCoursesList, isAdmin]);
+
+  if (authChecking) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Validating Authorization Credentials...</div>;
+  }
+
+  if (!currentUser) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Redirecting to login...</div>;
+  }
+
+  if (!userProfile) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Retrieving Student Profile...</div>;
+  }
 
   const handleDismissCompletionCongrats = async (courseId: string) => {
     try {
@@ -4727,6 +4855,23 @@ export default function StudentDashboard() {
                   const daysList = registeredCourse.days || [];
                   const matchedSubForSelectedDay = allMySubmissions.find(s => s.courseId === registeredCourse.id && s.dayIndex === submitDayIndex);
 
+                  const progressStore = userProfile?.progress?.[registeredCourse.id] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+                  const completedKeys = progressStore.watched || [];
+                  const checkPassedKeys = progressStore.checkPassed || [];
+
+                  const lastUnlockedDayIdx = (() => {
+                    let lastIdx = 0;
+                    for (let idx = 0; idx < daysList.length; idx++) {
+                      const isUnlocked = idx === 0 || isLessonUnlockedUnified(idx, 0, daysList, completedKeys, checkPassedKeys, allMySubmissions, isAdmin, !!registeredCourse.isCloned, userProfile, registeredCourse.id);
+                      if (isUnlocked) {
+                        lastIdx = idx;
+                      }
+                    }
+                    return lastIdx;
+                  })();
+
+                  const isDaySelectedLocked = submitDayIndex > lastUnlockedDayIdx;
+
                   return (
                     <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
                       <h4 className="text-sm font-black text-slate-900 border-b pb-3 flex items-center gap-2">
@@ -4748,169 +4893,140 @@ export default function StudentDashboard() {
                         </select>
                       </div>
 
-                      {/* Display Assignment Prompt/Question here if available */}
-                      {daysList[submitDayIndex]?.assignment?.prompt && (
-                        <div className="bg-teal-50/50 border border-teal-100 rounded-2xl p-4 space-y-2 text-xs text-slate-850">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm">📋</span>
-                            <span className="font-black text-teal-900 uppercase tracking-wider">Day {submitDayIndex + 1} Assignment Question:</span>
+                      {isDaySelectedLocked ? (
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center space-y-4">
+                          <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                            <Lock className="w-5 h-5 text-indigo-600" />
                           </div>
-                          <div className="font-semibold text-slate-700 leading-relaxed whitespace-pre-wrap">
-                            {renderClickableLinks(daysList[submitDayIndex].assignment.prompt)}
-                          </div>
+                          <h5 className="font-extrabold text-slate-900 text-sm md:text-base">Day {submitDayIndex + 1} Assignment Locked</h5>
+                          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                            You must fully complete preceding days' curriculum modules and receive coach/admin approval for all preceding assignments to unlock Day {submitDayIndex + 1} assignment details and submission desk.
+                          </p>
                         </div>
-                      )}
-
-                      {/* Day status indicator */}
-                      {matchedSubForSelectedDay && (
-                        <div className={`p-4 rounded-2xl border text-xs font-semibold leading-relaxed ${
-                          matchedSubForSelectedDay.status === 'Approved'
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-205'
-                            : matchedSubForSelectedDay.status === 'Disapproved'
-                              ? 'bg-rose-50 text-rose-800 border-rose-205'
-                              : 'bg-amber-50 text-amber-850 border-amber-205'
-                        }`}>
-                          <div className="flex items-center justify-between font-black uppercase tracking-wider text-[10px] mb-1.5">
-                            <span>Status for Day {submitDayIndex + 1} Assignment:</span>
-                            <span className={
-                              matchedSubForSelectedDay.status === 'Approved' ? 'text-emerald-700' :
-                              matchedSubForSelectedDay.status === 'Disapproved' ? 'text-rose-700' :
-                              'text-amber-700'
-                            }>
-                              ● {matchedSubForSelectedDay.status === 'Approved' ? 'APPROVED ✓' : matchedSubForSelectedDay.status === 'Disapproved' ? 'DISAPPROVED ✗' : 'PENDING REVIEW'}
-                            </span>
-                          </div>
-                          {(() => {
-                            let displayText = matchedSubForSelectedDay.submittedText || '';
-                            let displayImages: string[] = matchedSubForSelectedDay.images || [];
-                            if (displayText.includes('---IMAGES_JSON---')) {
-                              const parts = displayText.split('---IMAGES_JSON---');
-                              displayText = parts[0].trim();
-                              try {
-                                displayImages = JSON.parse(parts[1].trim());
-                              } catch (e) {}
-                            }
-                            return (
-                              <div className="space-y-3">
-                                {displayText && (
-                                  <p className="font-bold text-xs text-slate-700 whitespace-pre-wrap">
-                                    <span className="text-slate-400 font-extrabold uppercase tracking-wider text-[9px] block">Description / Summary</span>
-                                    {displayText}
-                                  </p>
-                                )}
-                                {displayImages && displayImages.length > 0 && (
-                                  <div className="space-y-1.5">
-                                    <span className="text-slate-400 font-extrabold uppercase tracking-wider text-[9px] block">Workspace Screenshots</span>
-                                    <div className="flex gap-2 flex-wrap">
-                                      {displayImages.map((src, i) => (
-                                        <a href={src} target="_blank" rel="noreferrer" key={i} className="relative block w-16 h-16 rounded-xl border border-slate-200 overflow-hidden bg-slate-100 hover:border-indigo-400 cursor-zoom-in transition-all">
-                                          <img src={src} className="w-full h-full object-cover" alt="Screenshot" referrerPolicy="no-referrer" />
-                                        </a>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
+                      ) : (
+                        <>
+                          {/* Display Assignment Prompt/Question here if available */}
+                          {daysList[submitDayIndex]?.assignment?.prompt && (
+                            <div className="bg-teal-50/50 border border-teal-100 rounded-2xl p-4 space-y-2 text-xs text-slate-850">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm">📋</span>
+                                <span className="font-black text-teal-900 uppercase tracking-wider">Day {submitDayIndex + 1} Assignment Question:</span>
                               </div>
-                            );
-                          })()}
-                          {matchedSubForSelectedDay.fileUrl && (
-                            <p className="font-mono text-indigo-600 mt-1">
-                              🔗 Link: <a href={matchedSubForSelectedDay.fileUrl} target="_blank" rel="noreferrer" className="underline">{matchedSubForSelectedDay.fileUrl}</a>
-                            </p>
-                          )}
-                          {matchedSubForSelectedDay.adminReason && (
-                            <div className="mt-3 pt-2.5 border-t border-dashed border-slate-200">
-                              <strong className="text-slate-800 font-black block mb-0.5">ℹ️ Feedback:</strong>
-                              {matchedSubForSelectedDay.adminReason}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {(!matchedSubForSelectedDay || matchedSubForSelectedDay.status === 'Disapproved') ? (
-                        <div className="space-y-5">
-                          {matchedSubForSelectedDay?.status === 'Disapproved' && (
-                            <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl text-xs font-semibold text-rose-800 leading-relaxed">
-                              Your previous submission was disapproved. Please update the details and resubmit below.
+                              <div className="font-semibold text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                {renderClickableLinks(daysList[submitDayIndex].assignment.prompt)}
+                              </div>
                             </div>
                           )}
 
-                          {/* Link to paste */}
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Paste Assignment Link (Optional)</label>
-                            <input
-                              type="url"
-                              value={submitLink}
-                              onChange={(e) => setSubmitLink(e.target.value)}
-                              placeholder="https://your-deployment-link.com or Google Drive url"
-                              className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-bold rounded-2xl py-3 px-4 text-xs focus:border-indigo-500 outline-none transition-all shadow-inner"
-                            />
-                          </div>
-
-                          {/* Copied text */}
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Copied Text / Workspace Summary (Optional)</label>
-                            <textarea
-                              value={submitText}
-                              onChange={(e) => setSubmitText(e.target.value)}
-                              rows={4}
-                              placeholder="Describe your workspace, findings, or paste your completed script copy answers here..."
-                              className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-bold rounded-2xl py-3.5 px-4 text-xs focus:border-indigo-500 outline-none transition-all shadow-inner resize-none"
-                            />
-                          </div>
-
-                          {/* 2 or 3 Image uploading area */}
-                          <div className="space-y-2">
-                            <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider block">
-                              Screenshot Uploads <span className="text-indigo-600 font-extrabold">(Optional, up to 3 screenshot images)</span>
-                            </label>
-
-                            <div 
-                              onDragOver={(e) => { e.preventDefault(); }}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                const files = (Array.from(e.dataTransfer.files) as File[]).filter(f => f.type.startsWith('image/'));
-                                const slots = 3 - uploadedImages.length;
-                                if (slots <= 0) {
-                                  alert("Maximum limit of 3 uploaded screenshot images reached!");
-                                  return;
-                                }
-                                files.slice(0, slots).forEach(async (file) => {
-                                  setUploadingImage(true);
-                                  showToast(`Uploading ${file.name} to backend storage...`);
+                          {/* Day status indicator */}
+                          {matchedSubForSelectedDay && (
+                            <div className={`p-4 rounded-2xl border text-xs font-semibold leading-relaxed ${
+                              matchedSubForSelectedDay.status === 'Approved'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-205'
+                                : matchedSubForSelectedDay.status === 'Disapproved'
+                                  ? 'bg-rose-50 text-rose-800 border-rose-205'
+                                  : 'bg-amber-50 text-amber-850 border-amber-205'
+                            }`}>
+                              <div className="flex items-center justify-between font-black uppercase tracking-wider text-[10px] mb-1.5">
+                                <span>Status for Day {submitDayIndex + 1} Assignment:</span>
+                                <span className={
+                                  matchedSubForSelectedDay.status === 'Approved' ? 'text-emerald-700' :
+                                  matchedSubForSelectedDay.status === 'Disapproved' ? 'text-rose-700' :
+                                  'text-amber-700'
+                                }>
+                                  ● {matchedSubForSelectedDay.status === 'Approved' ? 'APPROVED ✓' : matchedSubForSelectedDay.status === 'Disapproved' ? 'DISAPPROVED ✗' : 'PENDING REVIEW'}
+                                </span>
+                              </div>
+                              {(() => {
+                                let displayText = matchedSubForSelectedDay.submittedText || '';
+                                let displayImages: string[] = matchedSubForSelectedDay.images || [];
+                                if (displayText.includes('---IMAGES_JSON---')) {
+                                  const parts = displayText.split('---IMAGES_JSON---');
+                                  displayText = parts[0].trim();
                                   try {
-                                    const publicUrl = await uploadToSupabaseStorage(file, 'assignments');
-                                    setUploadedImages(prev => [...prev, publicUrl]);
-                                    showToast(`Successfully uploaded ${file.name}!`);
-                                  } catch (err) {
-                                    console.warn("Supabase Storage upload failed, falling back to base64:", err);
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => {
-                                      if (typeof reader.result === 'string') {
-                                        setUploadedImages(prev => [...prev, reader.result as string]);
-                                      }
-                                    };
-                                    reader.readAsDataURL(file);
-                                  } finally {
-                                    setUploadingImage(false);
-                                  }
-                                });
-                              }}
-                              onClick={() => document.getElementById('assignment-images-upload-input')?.click()}
-                              className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
-                                uploadingImage 
-                                  ? 'border-indigo-400 bg-indigo-50/20 animate-pulse' 
-                                  : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
-                              }`}
-                            >
-                              <input
-                                id="assignment-images-upload-input"
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                onChange={(e) => {
-                                  if (e.target.files) {
-                                    const files = Array.from(e.target.files) as File[];
+                                    displayImages = JSON.parse(parts[1].trim());
+                                  } catch (e) {}
+                                }
+                                return (
+                                  <div className="space-y-3">
+                                    {displayText && (
+                                      <p className="font-bold text-xs text-slate-700 whitespace-pre-wrap">
+                                        <span className="text-slate-400 font-extrabold uppercase tracking-wider text-[9px] block">Description / Summary</span>
+                                        {displayText}
+                                      </p>
+                                    )}
+                                    {displayImages && displayImages.length > 0 && (
+                                      <div className="space-y-1.5">
+                                        <span className="text-slate-400 font-extrabold uppercase tracking-wider text-[9px] block">Workspace Screenshots</span>
+                                        <div className="flex gap-2 flex-wrap">
+                                          {displayImages.map((src, i) => (
+                                            <a href={src} target="_blank" rel="noreferrer" key={i} className="relative block w-16 h-16 rounded-xl border border-slate-200 overflow-hidden bg-slate-100 hover:border-indigo-400 cursor-zoom-in transition-all">
+                                              <img src={src} className="w-full h-full object-cover" alt="Screenshot" referrerPolicy="no-referrer" />
+                                            </a>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                              {matchedSubForSelectedDay.fileUrl && (
+                                <p className="font-mono text-indigo-600 mt-1">
+                                  🔗 Link: <a href={matchedSubForSelectedDay.fileUrl} target="_blank" rel="noreferrer" className="underline">{matchedSubForSelectedDay.fileUrl}</a>
+                                </p>
+                              )}
+                              {matchedSubForSelectedDay.adminReason && (
+                                <div className="mt-3 pt-2.5 border-t border-dashed border-slate-200">
+                                  <strong className="text-slate-800 font-black block mb-0.5">ℹ️ Feedback:</strong>
+                                  {matchedSubForSelectedDay.adminReason}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {(!matchedSubForSelectedDay || matchedSubForSelectedDay.status === 'Disapproved') ? (
+                            <div className="space-y-5">
+                              {matchedSubForSelectedDay?.status === 'Disapproved' && (
+                                <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl text-xs font-semibold text-rose-800 leading-relaxed">
+                                  Your previous submission was disapproved. Please update the details and resubmit below.
+                                </div>
+                              )}
+
+                              {/* Link to paste */}
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Paste Assignment Link (Optional)</label>
+                                <input
+                                  type="url"
+                                  value={submitLink}
+                                  onChange={(e) => setSubmitLink(e.target.value)}
+                                  placeholder="https://your-deployment-link.com or Google Drive url"
+                                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-bold rounded-2xl py-3 px-4 text-xs focus:border-indigo-500 outline-none transition-all shadow-inner"
+                                />
+                              </div>
+
+                              {/* Copied text */}
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Copied Text / Workspace Summary (Optional)</label>
+                                <textarea
+                                  value={submitText}
+                                  onChange={(e) => setSubmitText(e.target.value)}
+                                  rows={4}
+                                  placeholder="Describe your workspace, findings, or paste your completed script copy answers here..."
+                                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-bold rounded-2xl py-3.5 px-4 text-xs focus:border-indigo-500 outline-none transition-all shadow-inner resize-none"
+                                />
+                              </div>
+
+                              {/* 2 or 3 Image uploading area */}
+                              <div className="space-y-2">
+                                <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider block">
+                                  Screenshot Uploads <span className="text-indigo-600 font-extrabold">(Optional, up to 3 screenshot images)</span>
+                                </label>
+
+                                <div 
+                                  onDragOver={(e) => { e.preventDefault(); }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    const files = (Array.from(e.dataTransfer.files) as File[]).filter(f => f.type.startsWith('image/'));
                                     const slots = 3 - uploadedImages.length;
                                     if (slots <= 0) {
                                       alert("Maximum limit of 3 uploaded screenshot images reached!");
@@ -4936,54 +5052,97 @@ export default function StudentDashboard() {
                                         setUploadingImage(false);
                                       }
                                     });
-                                  }
-                                }}
-                                className="hidden"
-                              />
-                              <span className="text-2xl block mb-2 select-none">{uploadingImage ? "⏳" : "📸"}</span>
-                              <p className="text-xs font-bold text-slate-800">
-                                {uploadingImage ? "Uploading to Supabase Cloud Storage..." : "Drag & Drop images or click to browse"}
-                              </p>
-                              <p className="text-[10px] text-slate-400 mt-1">Upload up to 3 screenshots confirming your active workspace outputs, or leave blank if providing text/links.</p>
-                            </div>
+                                  }}
+                                  onClick={() => document.getElementById('assignment-images-upload-input')?.click()}
+                                  className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
+                                    uploadingImage 
+                                      ? 'border-indigo-400 bg-indigo-50/20 animate-pulse' 
+                                      : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <input
+                                    id="assignment-images-upload-input"
+                                    type="file"
+                                    multiple
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      if (e.target.files) {
+                                        const files = Array.from(e.target.files) as File[];
+                                        const slots = 3 - uploadedImages.length;
+                                        if (slots <= 0) {
+                                          alert("Maximum limit of 3 uploaded screenshot images reached!");
+                                          return;
+                                        }
+                                        files.slice(0, slots).forEach(async (file) => {
+                                          setUploadingImage(true);
+                                          showToast(`Uploading ${file.name} to backend storage...`);
+                                          try {
+                                            const publicUrl = await uploadToSupabaseStorage(file, 'assignments');
+                                            setUploadedImages(prev => [...prev, publicUrl]);
+                                            showToast(`Successfully uploaded ${file.name}!`);
+                                          } catch (err) {
+                                            console.warn("Supabase Storage upload failed, falling back to base64:", err);
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                              if (typeof reader.result === 'string') {
+                                                setUploadedImages(prev => [...prev, reader.result as string]);
+                                              }
+                                            };
+                                            reader.readAsDataURL(file);
+                                          } finally {
+                                            setUploadingImage(false);
+                                          }
+                                        });
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                  <span className="text-2xl block mb-2 select-none">{uploadingImage ? "⏳" : "📸"}</span>
+                                  <p className="text-xs font-bold text-slate-800">
+                                    {uploadingImage ? "Uploading to Cloudinary Cloud Storage..." : "Drag & Drop images or click to browse"}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 mt-1">Upload up to 3 screenshots confirming your active workspace outputs, or leave blank if providing text/links.</p>
+                                </div>
 
-                            {uploadedImages.length > 0 && (
-                              <div className="grid grid-cols-3 gap-3 pt-2">
-                                {uploadedImages.map((imgBase64, imgIdx) => (
-                                  <div key={imgIdx} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video">
-                                    <img src={imgBase64} alt={`Upload preview ${imgIdx + 1}`} className="w-full h-full object-cover" />
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setUploadedImages(prev => prev.filter((_, i) => i !== imgIdx));
-                                      }}
-                                      className="absolute top-1 right-1 bg-rose-600 text-white p-1 rounded-full text-[9px] font-black w-4.5 h-4.5 flex items-center justify-center hover:bg-rose-700 transition-colors border-0 cursor-pointer animate-none"
-                                    >
-                                      ✕
-                                    </button>
+                                {uploadedImages.length > 0 && (
+                                  <div className="grid grid-cols-3 gap-3 pt-2">
+                                    {uploadedImages.map((imgBase64, imgIdx) => (
+                                      <div key={imgIdx} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video">
+                                        <img src={imgBase64} alt={`Upload preview ${imgIdx + 1}`} className="w-full h-full object-cover" />
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setUploadedImages(prev => prev.filter((_, i) => i !== imgIdx));
+                                          }}
+                                          className="absolute top-1 right-1 bg-rose-600 text-white p-1 rounded-full text-[9px] font-black w-4.5 h-4.5 flex items-center justify-center hover:bg-rose-700 transition-colors border-0 cursor-pointer animate-none"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
+                                )}
                               </div>
-                            )}
-                          </div>
 
-                          {/* Submit button */}
-                          <div className="pt-4">
-                            <button
-                              type="button"
-                              onClick={handleCustomAssignmentSubmit}
-                              disabled={submittingAssignment}
-                              className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer rounded-2xl shadow-md transform hover:-translate-y-0.5 active:translate-y-0 transition-all border-0"
-                            >
-                              {submittingAssignment ? 'Disbursing to Coach & Admin...' : 'Submit Assignment Proof 🚀'}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-5 text-center text-xs font-bold text-emerald-805">
-                          🎉 Your Day {submitDayIndex + 1} Assignment has been successfully approved! Clean slate accomplished.
-                        </div>
+                              {/* Submit button */}
+                              <div className="pt-4">
+                                <button
+                                  type="button"
+                                  onClick={handleCustomAssignmentSubmit}
+                                  disabled={submittingAssignment}
+                                  className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer rounded-2xl shadow-md transform hover:-translate-y-0.5 active:translate-y-0 transition-all border-0"
+                                >
+                                  {submittingAssignment ? 'Disbursing to Coach & Admin...' : 'Submit Assignment Proof 🚀'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-5 text-center text-xs font-bold text-emerald-805">
+                              🎉 Your Day {submitDayIndex + 1} Assignment has been successfully approved! Clean slate accomplished.
+                            </div>
+                          )}
+                        </>
                       )}
 
                       {/* Display Submission History List */}
@@ -5037,6 +5196,7 @@ export default function StudentDashboard() {
                   onLogin={handleLogin}
                   courses={courses}
                   hasCompletedFirstCourse={hasCompletedFirstCourse}
+                  loading={loading}
                 />
               ) : (
                 <div className="space-y-8">
@@ -5120,7 +5280,7 @@ export default function StudentDashboard() {
                       </div>
                     </div>
 
-                    {(loading || (!isAdmin && !liveCheckComplete)) ? (
+                    {(loading && filteredCourses.length === 0) ? (
                       <div className="flex items-center justify-center py-20 bg-white rounded-3xl border">
                         <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                       </div>
@@ -5139,225 +5299,42 @@ export default function StudentDashboard() {
                               <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2">
                                 <span>🎓</span> My Registered Course
                               </h3>
-                              
-                              {/* Live Leaderboard Switch Button */}
-                              <div className="flex bg-slate-100 p-1 rounded-2xl self-start sm:self-auto shadow-inner border border-slate-200">
-                                <button
-                                  type="button"
-                                  onClick={() => setCoursesViewTab('courses')}
-                                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border-0 cursor-pointer ${
-                                    coursesViewTab === 'courses'
-                                      ? 'bg-white text-indigo-700 shadow-sm'
-                                      : 'text-slate-500 bg-transparent hover:text-slate-800'
-                                  }`}
-                                >
-                                  📚 Course Paths
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setCoursesViewTab('leaderboard')}
-                                  className={`px-3 py-1 rounded-xl text-xs font-black transition-all border-0 cursor-pointer flex items-center gap-1.5 ${
-                                    coursesViewTab === 'leaderboard'
-                                      ? 'bg-white text-amber-700 shadow-sm font-black'
-                                      : 'text-slate-500 bg-transparent hover:text-slate-800'
-                                  }`}
-                                >
-                                  🏆 Live Leaderboard
-                                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                                </button>
-                              </div>
                             </div>
-
-                            {coursesViewTab === 'leaderboard' ? (
-                              /* Live Leaderboard Table View */
-                              <div className="space-y-6">
-                                {/* Sparkly header info card */}
-                                <div className="bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-teal-500/10 border border-amber-500/20 rounded-2xl p-4 text-left shadow-sm">
-                                  <div className="flex items-start gap-3">
-                                    <span className="text-2xl select-none mt-0.5">🏆</span>
-                                    <div>
-                                      <h4 className="text-sm font-black text-amber-900 leading-tight">CIYA Daily Scholar Leaderboard</h4>
-                                      <p className="text-xs text-slate-600 mt-1 font-semibold leading-relaxed">
-                                        Real-time aggregated points computed solely from <span className="text-indigo-700 font-extrabold underline">first-attempt scores</span> on daily lesson comprehension checks! Consistent high performance gets rewarded with valuable discounts, certifications, cloud lab credits, and direct employment support sponsored by CIYA's network of tech partners.
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {leaderboardLoading ? (
-                                  <div className="flex flex-col items-center justify-center py-12 bg-white rounded-3xl border border-slate-100">
-                                    <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-2" />
-                                    <span className="text-xs text-slate-400 font-bold">Synchronizing real-time scores...</span>
-                                  </div>
-                                ) : (
-                                  (() => {
-                                    const leaderboardData = leaderboardUsers.map(user => {
-                                      let totalPoints = 0;
-                                      let quizCount = 0;
-                                      let sumScore = 0;
-                                      
-                                      if (user.progress) {
-                                        Object.keys(user.progress).forEach(courseId => {
-                                          const courseProg = user.progress[courseId];
-                                          if (courseProg && courseProg.quizScores) {
-                                            Object.keys(courseProg.quizScores).forEach(quizKey => {
-                                              const record = courseProg.quizScores[quizKey];
-                                              if (record && typeof record.score === 'number') {
-                                                totalPoints += record.score;
-                                                sumScore += record.score;
-                                                quizCount++;
-                                              }
-                                            });
-                                          }
-                                        });
-                                      }
-                                      
-                                      const avgAccuracy = quizCount > 0 ? Math.round(sumScore / quizCount) : 0;
-                                      
-                                      return {
-                                        id: user.id,
-                                        fullName: user.fullName || user.email?.split('@')[0] || "Anonymous Scholar",
-                                        email: user.email,
-                                        cohort: user.cohort || "Cohort 1",
-                                        quizzesAttempted: quizCount,
-                                        avgAccuracy,
-                                        totalPoints,
-                                      };
-                                    })
-                                    .filter(u => u.totalPoints > 0)
-                                    .sort((a, b) => {
-                                      if (b.totalPoints !== a.totalPoints) {
-                                        return b.totalPoints - a.totalPoints;
-                                      }
-                                      return b.avgAccuracy - a.avgAccuracy;
-                                    });
-
-                                    if (leaderboardData.length === 0) {
-                                      return (
-                                        <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
-                                          No scores recorded on the leaderboard yet. Start answering comprehension quizzes to claim the lead!
-                                        </div>
-                                      );
-                                    }
-
-                                    return (
-                                      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-                                        <div className="overflow-x-auto">
-                                          <table className="w-full text-xs text-left border-collapse">
-                                            <thead>
-                                              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-black uppercase text-[10px] tracking-wider">
-                                                <th className="px-4 py-3 text-center w-16">Rank</th>
-                                                <th className="px-4 py-3">Scholar</th>
-                                                <th className="px-4 py-3">Cohort</th>
-                                                <th className="px-4 py-3 text-center w-28">Quizzes Cleared</th>
-                                                <th className="px-4 py-3 text-center w-28">Avg Accuracy</th>
-                                                <th className="px-4 py-3 text-right pr-6 w-32">Total Score</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100 font-semibold">
-                                              {leaderboardData.map((u, index) => {
-                                                const rank = index + 1;
-                                                const isCurrentUser = u.id === currentUser?.uid;
-                                                
-                                                let rankBadge = <span className="font-bold text-slate-500 font-mono">#{rank}</span>;
-                                                let rowBg = "bg-white";
-                                                if (rank === 1) {
-                                                  rankBadge = <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-black shadow-sm ring-1 ring-amber-300">🥇</span>;
-                                                  rowBg = "bg-amber-50/10";
-                                                } else if (rank === 2) {
-                                                  rankBadge = <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-700 text-xs font-black shadow-sm ring-1 ring-slate-300">🥈</span>;
-                                                } else if (rank === 3) {
-                                                  rankBadge = <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-100 text-orange-700 text-xs font-black shadow-sm ring-1 ring-orange-300">🥉</span>;
-                                                }
-
-                                                return (
-                                                  <tr 
-                                                    key={u.id} 
-                                                    className={`hover:bg-slate-50 transition-all ${rowBg} ${isCurrentUser ? 'bg-indigo-50/30 font-black border-y border-indigo-100' : ''}`}
-                                                  >
-                                                    <td className="px-4 py-3.5 text-center">{rankBadge}</td>
-                                                    <td className="px-4 py-3.5">
-                                                      <div className="flex items-center gap-2.5">
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ring-2 shrink-0 ${
-                                                          rank === 1 ? 'bg-amber-500 text-white ring-amber-300' :
-                                                          rank === 2 ? 'bg-slate-400 text-white ring-slate-200' :
-                                                          rank === 3 ? 'bg-orange-400 text-white ring-orange-200' :
-                                                          'bg-teal-600 text-white ring-teal-100'
-                                                        }`}>
-                                                          {u.fullName.slice(0, 2).toUpperCase()}
-                                                        </div>
-                                                        <div className="text-left">
-                                                          <div className="flex items-center gap-1.5">
-                                                            <span className="text-slate-900 font-extrabold text-xs">{u.fullName}</span>
-                                                            {isCurrentUser && (
-                                                              <span className="bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full">YOU</span>
-                                                            )}
-                                                          </div>
-                                                          <span className="text-[10px] text-slate-400 font-bold block mt-0.5">{u.email}</span>
-                                                        </div>
-                                                      </div>
-                                                    </td>
-                                                    <td className="px-4 py-3.5">
-                                                      <span className="text-slate-600 text-xs font-extrabold">{u.cohort}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-center">
-                                                      <span className="text-slate-700 font-mono text-xs">{u.quizzesAttempted}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-center">
-                                                      <div className="flex flex-col items-center">
-                                                        <span className="text-slate-800 font-mono font-extrabold text-xs">{u.avgAccuracy}%</span>
-                                                        <div className="w-12 bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
-                                                          <div className="bg-teal-500 h-full rounded-full" style={{ width: `${u.avgAccuracy}%` }} />
-                                                        </div>
-                                                      </div>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-right pr-6">
-                                                      <span className="text-teal-700 font-mono font-black text-xs md:text-sm">{u.totalPoints.toLocaleString()} pts</span>
-                                                    </td>
-                                                  </tr>
-                                                );
-                                              })}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </div>
-                                    );
-                                  })()
-                                )}
+ 
+                            {filteredRegisteredCourses.length === 0 ? (
+                              <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                                No enrolled courses in this track.
                               </div>
                             ) : (
-                              /* Course Paths view */
-                              filteredRegisteredCourses.length === 0 ? (
-                                <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
-                                  No enrolled courses in this track.
-                                </div>
-                              ) : (
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                                  {filteredRegisteredCourses.map(course => (
-                                    <CourseCard 
-                                      key={course.id} 
-                                      course={course} 
-                                      userProfile={userProfile}
-                                      isEnrolled={true}
-                                      isLocked={isAdmin ? false : (isGuest || appSettings?.lockedSections?.courses || course.isLocked)} 
-                                      onSelect={() => {
-                                        if (isAdmin) {
-                                          handleSelectCourseId(course.id || null);
-                                        } else if (isGuest) {
-                                          alert("This premium course is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
-                                          handleLogin();
-                                        } else if (!isAdmin && appSettings?.lockedSections?.courses) {
-                                          alert("The main courses and learning arena are temporarily locked by the course administrators. Please contact your instructor to unlock access.");
-                                        } else if (course.isLocked) {
-                                          alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
-                                        } else {
-                                          handleSelectCourseId(course.id || null);
-                                        }
-                                      }} 
-                                    />
-                                  ))}
-                                </div>
-                              )
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                                {filteredRegisteredCourses.map(course => (
+                                  <CourseCard 
+                                    key={course.id} 
+                                    course={course} 
+                                    userProfile={userProfile}
+                                    isEnrolled={true}
+                                    isLocked={isAdmin ? false : (isGuest || appSettings?.lockedSections?.courses || (unlockedCourseIds.includes(course.id) ? false : course.isLocked))} 
+                                    onSelect={() => {
+                                      const cardLocked = isAdmin ? false : (isGuest || appSettings?.lockedSections?.courses || (unlockedCourseIds.includes(course.id) ? false : course.isLocked));
+                                      if (isAdmin) {
+                                        handleSelectCourseId(course.id || null);
+                                      } else if (isGuest) {
+                                        alert("This premium course is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
+                                        handleLogin();
+                                      } else if (!isAdmin && appSettings?.lockedSections?.courses) {
+                                        alert("The main courses and learning arena are temporarily locked by the course administrators. Please contact your instructor to unlock access.");
+                                      } else if (cardLocked) {
+                                        alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
+                                      } else {
+                                        handleSelectCourseId(course.id || null);
+                                      }
+                                    }} 
+                                    currentUser={currentUser}
+                                    appSettings={appSettings}
+                                    onCourseUnlocked={handleCourseUnlocked}
+                                  />
+                                ))}
+                              </div>
                             )}
                           </div>
                         ) : (
@@ -5383,6 +5360,9 @@ export default function StudentDashboard() {
                                       alert("Please Sign In with Google to unlock full access to mini-videos, daily study materials, quizzes, live assignments and certificate tracking!");
                                       handleLogin();
                                     }} 
+                                    currentUser={currentUser}
+                                    appSettings={appSettings}
+                                    onCourseUnlocked={handleCourseUnlocked}
                                   />
                                 ))}
                               </div>
@@ -5408,10 +5388,18 @@ export default function StudentDashboard() {
                                     course={course} 
                                     userProfile={userProfile}
                                     isEnrolled={false}
-                                    isLocked={!hasCompletedFirstCourse} 
+                                    isLocked={isAdmin ? false : (!hasCompletedFirstCourse ? true : (unlockedCourseIds.includes(course.id) ? false : course.isLocked))} 
                                     onSelect={() => {
-                                      handleSelectCourseId(course.id || null);
+                                      const cardLocked = isAdmin ? false : (!hasCompletedFirstCourse ? true : (unlockedCourseIds.includes(course.id) ? false : course.isLocked));
+                                      if (cardLocked) {
+                                        alert("You must complete your current registered course or request unlock of this course first!");
+                                      } else {
+                                        handleSelectCourseId(course.id || null);
+                                      }
                                     }} 
+                                    currentUser={currentUser}
+                                    appSettings={appSettings}
+                                    onCourseUnlocked={handleCourseUnlocked}
                                   />
                                 ))}
                               </div>

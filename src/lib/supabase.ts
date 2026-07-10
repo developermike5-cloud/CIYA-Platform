@@ -60,9 +60,9 @@ console.log('[Supabase Config] Initializing client with:', {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
   }
 });
 
@@ -71,6 +71,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
  * If a custom storage URL or S3 public endpoint is configured, we'll map it.
  */
 export function getStoragePublicUrl(bucket: string, filePath: string): string {
+  if (!filePath) return '';
+  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+    return filePath;
+  }
   const customStorageUrl = import.meta.env.VITE_SUPABASE_STORAGE_URL || import.meta.env.VITE_SUPABASE_S3_ENDPOINT;
   if (customStorageUrl) {
     let baseUrl = String(customStorageUrl).trim();
@@ -98,8 +102,8 @@ export function getStoragePublicUrl(bucket: string, filePath: string): string {
     }
   }
 
-  // Fallback to standard Supabase getPublicUrl
-  const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-  return data.publicUrl;
+  // Fallback: build the expected public URL structure offline without calling active API routes that fail on suspended projects
+  const cleanBaseUrl = supabaseUrl.replace(/\/$/, '');
+  return `${cleanBaseUrl}/storage/v1/object/public/${bucket}/${filePath}`;
 }
 

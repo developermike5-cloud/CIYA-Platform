@@ -3,6 +3,7 @@ import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverT
 import { db, auth, triggerSystemSignal } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { CheckCircle2, XCircle, Clock, Search, FileText, Download, Check, RefreshCw } from 'lucide-react';
+import { safeStorage } from '../../utils/safeStorage';
 
 interface Submission {
   id: string;
@@ -23,8 +24,22 @@ interface Submission {
 }
 
 export default function AssignmentsAdmin() {
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [submissions, setSubmissions] = useState<Submission[]>(() => {
+    try {
+      const cached = safeStorage.getItem('ciya_cached_admin_assignments');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = safeStorage.getItem('ciya_cached_admin_assignments');
+      return !cached;
+    } catch (e) {
+      return true;
+    }
+  });
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Disapproved'>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
@@ -79,6 +94,9 @@ export default function AssignmentsAdmin() {
             } as Submission);
           });
           setSubmissions(list);
+          try {
+            safeStorage.setItem('ciya_cached_admin_assignments', JSON.stringify(list));
+          } catch (e) {}
           setLoading(false);
         }, (error) => {
           console.error("Error fetching assignments:", error);

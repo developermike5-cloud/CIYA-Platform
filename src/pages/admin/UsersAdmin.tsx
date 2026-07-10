@@ -7,6 +7,7 @@ import BrandingLogo from '../../components/BrandingLogo';
 import { Course } from '../../types';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
 import { uploadToCloudinary } from '../../utils/cloudinary';
+import staticCourses from '../../data/courses.json';
 
 function getFirestoreTime(timestamp: any): number {
   if (!timestamp) return 0;
@@ -75,6 +76,11 @@ interface UserProfile {
   learningTool?: string;
   cohort?: string;
   completedCoursesOverride?: string[];
+  manualDayUnlock?: {
+    [courseId: string]: {
+      [dayIndex: number]: boolean;
+    };
+  };
 }
 
 export default function UsersAdmin() {
@@ -399,12 +405,12 @@ export default function UsersAdmin() {
 
   const fetchUsers = async (targetCohort: string, forceRefresh = false) => {
     let hasUsedCache = false;
+    const cacheKey = `ciya_admin_cached_users_list_${targetCohort}`;
 
     if (forceRefresh) {
       setIsRefreshing(true);
     } else {
       // Stale-while-revalidate: Load from cache instantly, namespaced by cohort, then fetch fresh in background
-      const cacheKey = `ciya_admin_cached_users_list_All`;
       const cachedUsersStr = localStorage.getItem(cacheKey);
       const cachedAdminsStr = localStorage.getItem('ciya_admin_cached_admins_list');
       const cachedAdminsDataStr = localStorage.getItem('ciya_admin_cached_admins_data');
@@ -428,8 +434,10 @@ export default function UsersAdmin() {
     }
 
     try {
-      // Fresh Firestore fetch (Fetch all users to ensure legacy users without explicit cohort are loaded and correctly categorized in-memory)
-      const q = query(collection(db, 'users'));
+      // Fresh Firestore fetch (Only query the target cohort to prevent massive read spikes)
+      const q = targetCohort === 'All'
+        ? query(collection(db, 'users'))
+        : query(collection(db, 'users'), where('cohort', '==', targetCohort));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile));
       
@@ -446,8 +454,7 @@ export default function UsersAdmin() {
       });
       setUsers(data);
 
-      const coursesSnapshot = await getDocs(collection(db, 'courses'));
-      const coursesData = coursesSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Course));
+      const coursesData = (staticCourses as any[]).map(c => ({ id: c.id, ...c } as Course));
       setAllCourses(coursesData);
 
       const adminSnapshot = await getDocs(collection(db, 'admins'));
@@ -461,9 +468,8 @@ export default function UsersAdmin() {
       setAdminsData(adminMap);
 
       // Save to local cache namespaced by cohort
-      const cacheKey = `ciya_admin_cached_users_list_All`;
       localStorage.setItem(cacheKey, JSON.stringify(data));
-      localStorage.setItem('ciya_admin_cached_users_time', Date.now().toString());
+      localStorage.setItem(`ciya_admin_cached_users_time_${targetCohort}`, Date.now().toString());
       localStorage.setItem('ciya_admin_cached_admins_list', JSON.stringify(adminIds));
       localStorage.setItem('ciya_admin_cached_admins_data', JSON.stringify(adminMap));
 
@@ -514,6 +520,14 @@ export default function UsersAdmin() {
     }
   }, [filterCohort]);
 
+  // Keep admin local cache perfectly in-sync with users state updates instantly
+  useEffect(() => {
+    if (users && users.length > 0) {
+      localStorage.setItem('ciya_admin_cached_users_list_All', JSON.stringify(users));
+      localStorage.setItem('ciya_admin_cached_users_time', Date.now().toString());
+    }
+  }, [users]);
+
   const uniqueStates = Array.from(new Set(users.map(u => u.state).filter(Boolean))).sort() as string[];
   const uniqueCourses = Array.from(new Set(users.map(u => u.courseType || u.pathwaySelection).filter(Boolean))).sort() as string[];
 
@@ -528,6 +542,14 @@ export default function UsersAdmin() {
         adminCode: generatedCode,
         isDashboardUnlocked: true
       });
+      if (rtdb) {
+        dbSet(dbRef(rtdb, `users/${userId}`), {
+          approvalStatus: 'Approved',
+          adminCode: generatedCode,
+          isDashboardUnlocked: true,
+          updatedAt: Date.now()
+        }).catch(err => console.warn("RTDB sync failed:", err));
+      }
       await triggerSystemSignal('user_signals', userId);
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Approved', adminCode: generatedCode, isDashboardUnlocked: true } : u));
     } catch (error) {
@@ -544,6 +566,13 @@ export default function UsersAdmin() {
         approvalStatus: 'Disapproved',
         isDashboardUnlocked: false
       });
+      if (rtdb) {
+        dbSet(dbRef(rtdb, `users/${userId}`), {
+          approvalStatus: 'Disapproved',
+          isDashboardUnlocked: false,
+          updatedAt: Date.now()
+        }).catch(err => console.warn("RTDB sync failed:", err));
+      }
       await triggerSystemSignal('user_signals', userId);
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Disapproved', isDashboardUnlocked: false } : u));
     } catch (error) {
@@ -558,6 +587,10 @@ export default function UsersAdmin() {
       const codeToSet = newCode.trim().toUpperCase();
       if (!codeToSet) return;
       await updateDoc(doc(db, 'users', userId), { adminCode: codeToSet });
+      if (rtdb) {
+        dbSet(dbRef(rtdb, `users/${userId}/adminCode`), codeToSet)
+          .catch(err => console.warn("RTDB sync failed:", err));
+      }
       await triggerSystemSignal('user_signals', userId);
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, adminCode: codeToSet } : u));
       setCodeSuccessId(userId);
@@ -571,6 +604,10 @@ export default function UsersAdmin() {
     try {
       const newStatus = !currentUnlocked;
       await updateDoc(doc(db, 'users', userId), { isDashboardUnlocked: newStatus });
+      if (rtdb) {
+        dbSet(dbRef(rtdb, `users/${userId}/isDashboardUnlocked`), newStatus)
+          .catch(err => console.warn("RTDB sync failed:", err));
+      }
       await triggerSystemSignal('user_signals', userId);
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, isDashboardUnlocked: newStatus } : u));
     } catch (error) {
@@ -596,6 +633,112 @@ export default function UsersAdmin() {
       console.error("Error deleting user application:", error);
     } finally {
       setActionLoading(prev => ({ ...prev, [userId]: null }));
+    }
+  };
+
+  const getUserRegisteredCourses = (u: any) => {
+    if (!allCourses || allCourses.length === 0) return [];
+    return allCourses.filter(course => {
+      if (course.isCloned || course.durationMode === 'express') return false;
+      
+      // Check progress
+      if (u.progress && u.progress[course.id]) {
+        return true;
+      }
+      
+      // Or if they have progress for its cloned express version
+      const expressClone = allCourses.find(c => c.clonedFromId === course.id && c.isCloned && c.durationMode === 'express');
+      if (expressClone && u.progress && (u.progress[expressClone.id] || u.progress[course.id]?.durationMode === 'express')) {
+        return true;
+      }
+
+      // Fuzzy matching
+      const courseTitle = (course.title || '').toLowerCase();
+      const courseSkillPath = (course.skillPath || '').toLowerCase();
+      const courseCategory = (course.category || '').toLowerCase();
+
+      const recPath = (u.recommendedPath || '').toLowerCase();
+      const courseType = (u.courseType || '').toLowerCase();
+      const pathwaySel = (u.pathwaySelection || '').toLowerCase();
+
+      // Portfolio Path
+      const isCoursePortfolio = courseTitle.includes('portfolio') || courseSkillPath.includes('portfolio') || courseCategory.includes('portfolio');
+      const isProfilePortfolio = recPath.includes('portfolio') || courseType.includes('portfolio') || pathwaySel.includes('portfolio');
+      if (isCoursePortfolio && isProfilePortfolio) {
+        return true;
+      }
+
+      // Landing Page Path
+      const isCourseLanding = courseTitle.includes('landing') || courseSkillPath.includes('landing') || courseCategory.includes('landing') || courseTitle.includes('conversion');
+      const isProfileLanding = recPath.includes('landing') || courseType.includes('landing') || pathwaySel.includes('landing') || recPath.includes('conversion') || recPath.includes('funnel') || pathwaySel.includes('funnel');
+      if (isCourseLanding && isProfileLanding) {
+        return true;
+      }
+
+      // E-Commerce Path
+      const isCourseEcommerce = courseTitle.includes('e-commerce') || courseTitle.includes('ecommerce') || courseSkillPath.includes('e-commerce') || courseSkillPath.includes('ecommerce') || courseTitle.includes('store') || courseCategory.includes('e-commerce') || courseCategory.includes('ecommerce');
+      const isProfileEcommerce = recPath.includes('e-commerce') || recPath.includes('ecommerce') || courseType.includes('e-commerce') || courseType.includes('ecommerce') || pathwaySel.includes('e-commerce') || pathwaySel.includes('ecommerce') || recPath.includes('store') || pathwaySel.includes('store');
+      if (isCourseEcommerce && isProfileEcommerce) {
+        return true;
+      }
+
+      // Fallback: Direct exact or fuzzy match
+      const courseTitleClean = courseTitle.trim();
+      const profileRecommendedPathClean = recPath.trim();
+
+      if (profileRecommendedPathClean && (
+        courseTitleClean === profileRecommendedPathClean ||
+        courseTitleClean.includes(profileRecommendedPathClean) ||
+        profileRecommendedPathClean.includes(courseTitleClean)
+      )) {
+        return true;
+      }
+
+      return false;
+    });
+  };
+
+  const handleToggleDayUnlock = async (userId: string, courseId: string, dayIndex: number, currentUnlocked: boolean) => {
+    try {
+      const userDoc = users.find(usr => usr.id === userId);
+      if (!userDoc) return;
+
+      const currentManualUnlock = userDoc.manualDayUnlock || {};
+      const courseUnlock = currentManualUnlock[courseId] || {};
+      const nextStatus = !currentUnlocked;
+
+      const updatedCourseUnlock = {
+        ...courseUnlock,
+        [dayIndex]: nextStatus
+      };
+
+      const updatedManualUnlock = {
+        ...currentManualUnlock,
+        [courseId]: updatedCourseUnlock
+      };
+
+      // Update Firestore
+      await updateDoc(doc(db, 'users', userId), {
+        [`manualDayUnlock.${courseId}.${dayIndex}`]: nextStatus,
+        updatedAt: serverTimestamp()
+      });
+
+      if (rtdb) {
+        dbSet(dbRef(rtdb, `users/${userId}/manualDayUnlock/${courseId}/${dayIndex}`), nextStatus)
+          .catch(err => console.warn("RTDB sync failed:", err));
+      }
+
+      await triggerSystemSignal('user_signals', userId);
+
+      // Update state
+      setUsers(prev => prev.map(usr => usr.id === userId ? {
+        ...usr,
+        manualDayUnlock: updatedManualUnlock
+      } : usr));
+
+    } catch (err) {
+      console.error("Error toggling day unlock status:", err);
+      alert("Failed to update day unlock. Please try again.");
     }
   };
 
@@ -1034,6 +1177,17 @@ export default function UsersAdmin() {
                         <td className="px-4 py-3">
                           <div className="font-bold text-slate-900 leading-tight mb-1">{u.fullName || '-'}</div>
                           <div className="text-slate-500 text-xs">{u.gender ? `${u.gender} • ` : ''}{u.state || '-'}</div>
+                          
+                          <div className="mt-2.5">
+                            <button
+                              onClick={() => setExpandedUserId(isUserExpanded ? null : u.id)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 hover:border-indigo-300 rounded-lg cursor-pointer transition-all shadow-sm"
+                            >
+                              {isUserExpanded ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              <span>{isUserExpanded ? 'Hide Details' : 'Show Full Details'}</span>
+                            </button>
+                          </div>
+
                           {u.adminCode && (
                             <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                               <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/60 rounded font-mono font-black text-xs select-all shadow-sm">
@@ -1441,6 +1595,65 @@ export default function UsersAdmin() {
 
                                 </div>
                               </div>
+                            </div>
+
+                            {/* Registered Courses & Manual Lesson Unlock Override Section */}
+                            <div className="mt-6 pt-6 border-t border-slate-200">
+                              <h4 className="font-extrabold uppercase text-[10px] text-indigo-700 tracking-wider flex items-center gap-1.5 mb-3 bg-indigo-50 px-2.5 py-1 rounded-md inline-flex select-none">
+                                <span>📚</span> Registered Courses & Manual Lesson Unlock Override
+                              </h4>
+                              <p className="text-xs text-slate-500 mb-4 font-semibold leading-relaxed">
+                                Click on any Day (D1 - D5) to manually approve and unlock that day's lessons and assignments for this student, bypassing quiz checks and prerequisite watch requirements.
+                              </p>
+                              
+                              {getUserRegisteredCourses(u).length === 0 ? (
+                                <div className="bg-white border rounded-xl p-4 text-center text-xs text-slate-400 font-bold uppercase tracking-wider">
+                                  No registered courses found matching student's onboarding pathway.
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {getUserRegisteredCourses(u).map(course => {
+                                    const days = course.days || [];
+                                    return (
+                                      <div key={course.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 transition-colors">
+                                        <div className="space-y-0.5">
+                                          <span className="text-[9px] font-black uppercase text-indigo-600 tracking-wider">Course Pathway</span>
+                                          <h5 className="font-extrabold text-slate-900 text-xs truncate max-w-[200px]" title={course.title}>{course.title}</h5>
+                                          <p className="text-[10px] text-slate-400 font-semibold">ID: {course.id} • {days.length} days total</p>
+                                        </div>
+                                        
+                                        <div className="flex flex-wrap gap-1.5 items-center">
+                                          {[0, 1, 2, 3, 4].map((dayIdx) => {
+                                            const dayNumber = dayIdx + 1;
+                                            const isUnlocked = u.manualDayUnlock?.[course.id || '']?.[dayIdx] === true;
+                                            
+                                            return (
+                                              <button
+                                                key={dayIdx}
+                                                type="button"
+                                                onClick={() => handleToggleDayUnlock(u.id, course.id || '', dayIdx, isUnlocked)}
+                                                className={`h-8 px-2.5 text-xs font-black rounded-lg border flex items-center gap-1 transition-all shadow-sm cursor-pointer select-none ${
+                                                  isUnlocked
+                                                    ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+                                                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                                                }`}
+                                                title={`Toggle Day ${dayNumber} Manual Unlock Override`}
+                                              >
+                                                <span>D{dayNumber}</span>
+                                                {isUnlocked ? (
+                                                  <span className="text-[9px] font-bold">✓</span>
+                                                ) : (
+                                                  <span className="text-slate-400 text-[9px] font-bold">🔒</span>
+                                                )}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>

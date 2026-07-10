@@ -5,6 +5,8 @@ import { BookOpen, Calendar, User, ArrowLeft, Loader2, Sparkles } from 'lucide-r
 import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { preprocessMarkdown, stripMarkdown } from '../utils/markdownUtils';
+import { safeStorage } from '../utils/safeStorage';
+import staticBlogs from '../data/blog.json';
 
 interface BlogPost {
   id: string;
@@ -22,9 +24,11 @@ interface StudentBlogProps {
 }
 
 export const StudentBlog: React.FC<StudentBlogProps> = ({ isLocked = false }) => {
-  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [posts, setPosts] = useState<BlogPost[]>(() => {
+    return staticBlogs as BlogPost[];
+  });
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const getDisplayDate = (post: BlogPost) => {
     if (post.publishedDate) {
@@ -46,31 +50,7 @@ export const StudentBlog: React.FC<StudentBlogProps> = ({ isLocked = false }) =>
   };
 
   useEffect(() => {
-    if (isLocked) {
-      setLoading(false);
-      return;
-    }
-
-    const blogRef = collection(db, 'blog');
-    const q = query(blogRef, orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const list: BlogPost[] = [];
-        snapshot.forEach((doc) => {
-          list.push({ id: doc.id, ...doc.data() } as BlogPost);
-        });
-        setPosts(list);
-        setLoading(false);
-      },
-      (error) => {
-        handleFirestoreError(error, OperationType.LIST, 'blog');
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
+    setLoading(false);
   }, [isLocked]);
 
   if (isLocked) {

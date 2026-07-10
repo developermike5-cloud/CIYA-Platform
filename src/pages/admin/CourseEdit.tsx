@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, getDocs } 
 import { db, handleFirestoreError, OperationType, triggerSystemSignal } from '../../firebase';
 import { Course, CourseDay, CourseVideo } from '../../types';
 import { ArrowLeft, Save, Sparkles, AlertCircle, Plus, Trash2, HelpCircle } from 'lucide-react';
+import staticCourses from '../../data/courses.json';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string, defaultSubskills: string[], defaultSkillPaths: string[] }> = {
   web: {
@@ -690,19 +691,7 @@ export default function CourseEdit() {
   const [importSelectedLessonIdx, setImportSelectedLessonIdx] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    const fetchCoursesList = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'courses'));
-        const list: Course[] = [];
-        snap.forEach((doc) => {
-          list.push({ id: doc.id, ...doc.data() } as Course);
-        });
-        setCoursesList(list);
-      } catch (err) {
-        console.error("Error loading courses for import:", err);
-      }
-    };
-    fetchCoursesList();
+    setCoursesList(staticCourses as Course[]);
   }, []);
 
   const handleDoImportLesson = (targetVideoIdx: number) => {

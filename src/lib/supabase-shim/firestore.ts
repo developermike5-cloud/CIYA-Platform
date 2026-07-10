@@ -1,4 +1,32 @@
 import { supabase } from '../supabase';
+import { safeStorage } from '../../utils/safeStorage';
+import staticCourses from '../../data/courses.json';
+import staticBlogs from '../../data/blog.json';
+import staticFullPrompts from '../../data/full_prompts.json';
+import staticModularPrompts from '../../data/modular_prompts.json';
+import staticAppSettings from '../../data/app_settings.json';
+
+// Cache invalidation helper
+export function invalidateCache(table: string, id?: string) {
+  try {
+    if (typeof window !== 'undefined') {
+      const keysToClear: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key) {
+          if (key.startsWith(`ciya_cache_docs_${table}_`) || 
+              (id && key === `ciya_cache_doc_${table}_${id}`) ||
+              (!id && key.startsWith(`ciya_cache_doc_${table}_`))) {
+            keysToClear.push(key);
+          }
+        }
+      }
+      keysToClear.forEach(key => window.localStorage.removeItem(key));
+    }
+  } catch (e) {
+    console.warn("Error invalidating cache:", e);
+  }
+}
 
 // Helper functions to bridge PostgreSQL snake_case columns with Firestore camelCase properties
 export function camelToSnake(str: string): string {
@@ -108,21 +136,58 @@ export async function getDoc(docRef: any): Promise<DocumentSnapshot> {
     const id = docRef.id;
     const table = getTableName(rawTable);
 
-    if (table === 'settings') {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error || !data) {
-        return new DocumentSnapshot(false, null, id);
+    if (table === 'courses') {
+      const found = (staticCourses as any[]).find(c => c.id === id);
+      if (found) {
+        return new DocumentSnapshot(true, found, id);
       }
-      return new DocumentSnapshot(true, data.data || {}, id);
+    }
+    if (table === 'blog') {
+      const found = (staticBlogs as any[]).find(p => p.id === id);
+      if (found) {
+        return new DocumentSnapshot(true, found, id);
+      }
+    }
+    if (table === 'settings') {
+      if (id === 'full_prompts') {
+        return new DocumentSnapshot(true, staticFullPrompts, id);
+      }
+      if (id === 'modular_prompts') {
+        return new DocumentSnapshot(true, staticModularPrompts, id);
+      }
+      if (id === 'app_settings') {
+        return new DocumentSnapshot(true, staticAppSettings, id);
+      }
     }
 
+    const cacheKey = `ciya_cache_doc_${table}_${id}`;
+
+    // Read from cache if available
+    let cachedDataStr = null;
+    try {
+      cachedDataStr = safeStorage.getItem(cacheKey);
+    } catch (e) {}
+
+    if (cachedDataStr) {
+      const cachedDoc = JSON.parse(cachedDataStr);
+      return new DocumentSnapshot(true, cachedDoc, id);
+    }
+
+    return await fetchAndCacheDoc(docRef, cacheKey);
+  } catch (err) {
+    console.warn("Supabase shim getDoc error handled gracefully:", err);
+    return new DocumentSnapshot(false, null, docRef?.id || '');
+  }
+}
+
+async function fetchAndCacheDoc(docRef: any, cacheKey: string): Promise<DocumentSnapshot> {
+  const rawTable = docRef.path;
+  const id = docRef.id;
+  const table = getTableName(rawTable);
+
+  if (table === 'settings') {
     const { data, error } = await supabase
-      .from(table)
+      .from('settings')
       .select('*')
       .eq('id', id)
       .single();
@@ -130,12 +195,63 @@ export async function getDoc(docRef: any): Promise<DocumentSnapshot> {
     if (error || !data) {
       return new DocumentSnapshot(false, null, id);
     }
+    const finalData = data.data || {};
+    try {
+      safeStorage.setItem(cacheKey, JSON.stringify(finalData));
+    } catch (e) {}
+    return new DocumentSnapshot(true, finalData, id);
+  }
 
-    const camelData = keysToCamel(data);
-    return new DocumentSnapshot(true, camelData, id);
-  } catch (err) {
-    console.warn("Supabase shim getDoc error handled gracefully:", err);
-    return new DocumentSnapshot(false, null, docRef?.id || '');
+  const { data, error } = await supabase
+    .from(table)
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) {
+    return new DocumentSnapshot(false, null, id);
+  }
+
+  const camelData = keysToCamel(data);
+  try {
+    safeStorage.setItem(cacheKey, JSON.stringify(camelData));
+  } catch (e) {}
+  return new DocumentSnapshot(true, camelData, id);
+}
+
+async function refreshDocBackground(docRef: any, cacheKey: string) {
+  const rawTable = docRef.path;
+  const id = docRef.id;
+  const table = getTableName(rawTable);
+
+  let freshData: any = null;
+
+  if (table === 'settings') {
+    const { data, error } = await supabase
+      .from('settings')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) return;
+    freshData = data.data || {};
+  } else {
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) return;
+    freshData = keysToCamel(data);
+  }
+
+  const oldCached = safeStorage.getItem(cacheKey);
+  const freshStr = JSON.stringify(freshData);
+
+  if (oldCached !== freshStr) {
+    safeStorage.setItem(cacheKey, freshStr);
+    triggerListenersForPath(rawTable, id);
   }
 }
 
@@ -143,54 +259,180 @@ export async function getDocs(queryRef: any) {
   try {
     const rawTable = queryRef.path;
     const table = getTableName(rawTable);
-    let q = supabase.from(table).select('*');
 
-    const constraints = queryRef.constraints || [];
-    for (const c of constraints) {
-      if (c.type === 'where') {
-        const snakeField = camelToSnake(c.field);
-        if (c.op === '==') {
-          q = q.eq(snakeField, c.val);
-        } else if (c.op === '>=') {
-          q = q.gte(snakeField, c.val);
-        } else if (c.op === '<=') {
-          q = q.lte(snakeField, c.val);
-        } else if (c.op === 'in') {
-          q = q.in(snakeField, c.val);
+    if (table === 'courses') {
+      const docs = (staticCourses as any[]).map(c => {
+        return new DocumentSnapshot(true, c, c.id);
+      });
+      return {
+        docs,
+        forEach(callback: (doc: any) => void) {
+          docs.forEach(callback);
+        },
+        get empty() {
+          return docs.length === 0;
+        },
+        get size() {
+          return docs.length;
         }
-      } else if (c.type === 'orderBy') {
-        const snakeField = camelToSnake(c.field);
-        q = q.order(snakeField, { ascending: c.dir === 'asc' });
-      } else if (c.type === 'limit') {
-        q = q.limit(c.value);
-      }
+      };
+    }
+    if (table === 'blog') {
+      const docs = (staticBlogs as any[]).map(p => {
+        return new DocumentSnapshot(true, p, p.id);
+      });
+      return {
+        docs,
+        forEach(callback: (doc: any) => void) {
+          docs.forEach(callback);
+        },
+        get empty() {
+          return docs.length === 0;
+        },
+        get size() {
+          return docs.length;
+        }
+      };
     }
 
-    const { data, error } = await q;
-    if (error || !data) {
-      return createEmptyDocsResult();
+    const cacheKey = `ciya_cache_docs_${table}_${JSON.stringify(queryRef.constraints || [])}`;
+
+    // Read from cache if available
+    let cachedDataStr = null;
+    try {
+      cachedDataStr = safeStorage.getItem(cacheKey);
+    } catch (e) {}
+
+    if (cachedDataStr) {
+      const cachedDocs = JSON.parse(cachedDataStr);
+      const docs = cachedDocs.map((row: any) => {
+        return new DocumentSnapshot(true, row.data, row.id);
+      });
+
+      return {
+        docs,
+        forEach(callback: (doc: any) => void) {
+          docs.forEach(callback);
+        },
+        get empty() {
+          return docs.length === 0;
+        },
+        get size() {
+          return docs.length;
+        }
+      };
     }
 
-    const docs = data.map((row: any) => {
-      const camelData = keysToCamel(row);
-      return new DocumentSnapshot(true, camelData, row.id);
-    });
-
-    return {
-      docs,
-      forEach(callback: (doc: any) => void) {
-        docs.forEach(callback);
-      },
-      get empty() {
-        return docs.length === 0;
-      },
-      get size() {
-        return docs.length;
-      }
-    };
+    return await fetchAndCacheDocs(queryRef, cacheKey);
   } catch (err) {
     console.warn("Supabase shim getDocs error handled gracefully:", err);
     return createEmptyDocsResult();
+  }
+}
+
+async function fetchAndCacheDocs(queryRef: any, cacheKey: string) {
+  const rawTable = queryRef.path;
+  const table = getTableName(rawTable);
+  
+  let selectCols = '*';
+
+  let q = supabase.from(table).select(selectCols);
+
+  const constraints = queryRef.constraints || [];
+  for (const c of constraints) {
+    if (c.type === 'where') {
+      const snakeField = camelToSnake(c.field);
+      if (c.op === '==') {
+        q = q.eq(snakeField, c.val);
+      } else if (c.op === '>=') {
+        q = q.gte(snakeField, c.val);
+      } else if (c.op === '<=') {
+        q = q.lte(snakeField, c.val);
+      } else if (c.op === 'in') {
+        q = q.in(snakeField, c.val);
+      }
+    } else if (c.type === 'orderBy') {
+      const snakeField = camelToSnake(c.field);
+      q = q.order(snakeField, { ascending: c.dir === 'asc' });
+    } else if (c.type === 'limit') {
+      q = q.limit(c.value);
+    }
+  }
+
+  const { data, error } = await q;
+  if (error || !data) {
+    return createEmptyDocsResult();
+  }
+
+  const serialized = data.map((row: any) => ({
+    id: row.id,
+    data: keysToCamel(row)
+  }));
+  try {
+    safeStorage.setItem(cacheKey, JSON.stringify(serialized));
+  } catch (e) {}
+
+  const docs = serialized.map((row: any) => {
+    return new DocumentSnapshot(true, row.data, row.id);
+  });
+
+  return {
+    docs,
+    forEach(callback: (doc: any) => void) {
+      docs.forEach(callback);
+    },
+    get empty() {
+      return docs.length === 0;
+    },
+    get size() {
+      return docs.length;
+    }
+  };
+}
+
+async function refreshDocsBackground(queryRef: any, cacheKey: string) {
+  const rawTable = queryRef.path;
+  const table = getTableName(rawTable);
+  
+  let selectCols = '*';
+
+  let q = supabase.from(table).select(selectCols);
+
+  const constraints = queryRef.constraints || [];
+  for (const c of constraints) {
+    if (c.type === 'where') {
+      const snakeField = camelToSnake(c.field);
+      if (c.op === '==') {
+        q = q.eq(snakeField, c.val);
+      } else if (c.op === '>=') {
+        q = q.gte(snakeField, c.val);
+      } else if (c.op === '<=') {
+        q = q.lte(snakeField, c.val);
+      } else if (c.op === 'in') {
+        q = q.in(snakeField, c.val);
+      }
+    } else if (c.type === 'orderBy') {
+      const snakeField = camelToSnake(c.field);
+      q = q.order(snakeField, { ascending: c.dir === 'asc' });
+    } else if (c.type === 'limit') {
+      q = q.limit(c.value);
+    }
+  }
+
+  const { data, error } = await q;
+  if (error || !data) return;
+
+  const serialized = data.map((row: any) => ({
+    id: row.id,
+    data: keysToCamel(row)
+  }));
+
+  const oldCached = safeStorage.getItem(cacheKey);
+  const newSerializedStr = JSON.stringify(serialized);
+
+  if (oldCached !== newSerializedStr) {
+    safeStorage.setItem(cacheKey, newSerializedStr);
+    triggerListenersForPath(rawTable);
   }
 }
 
@@ -261,6 +503,7 @@ function registerListener(ref: any, fetchAndCallback: () => Promise<void>, isUns
 
 export function triggerListenersForPath(path: string, docId?: string) {
   const table = getTableName(path);
+  invalidateCache(table, docId);
   // Clean up stale listeners
   for (let i = activeListeners.length - 1; i >= 0; i--) {
     if (activeListeners[i].isUnsubscribed()) {
@@ -525,7 +768,12 @@ export function onSnapshot(ref: any, callback: (snap: any) => void) {
         table: table,
         filter: `id=eq.${ref.id}`
       }, () => {
-        if (!unsubscribed) fetchAndCallback();
+        if (!unsubscribed) {
+          try {
+            safeStorage.removeItem(`ciya_cache_doc_${table}_${ref.id}`);
+          } catch (e) {}
+          fetchAndCallback();
+        }
       })
       .subscribe();
 
@@ -556,7 +804,12 @@ export function onSnapshot(ref: any, callback: (snap: any) => void) {
         schema: 'public',
         table: table
       }, () => {
-        if (!unsubscribed) fetchAndCallback();
+        if (!unsubscribed) {
+          try {
+            invalidateCache(table);
+          } catch (e) {}
+          fetchAndCallback();
+        }
       })
       .subscribe();
 

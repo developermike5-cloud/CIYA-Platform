@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { safeStorage } from '../utils/safeStorage';
+import staticFullPrompts from '../data/full_prompts.json';
+import staticModularPrompts from '../data/modular_prompts.json';
 import { 
   Play, 
   Pause,
@@ -41,9 +44,95 @@ interface PromptGeneratorProps {
 }
 
 export default function PromptGenerator({ isLocked = false }: PromptGeneratorProps) {
-  const [templates, setTemplates] = useState<TemplateItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateItem | null>(null);
+  const [templates, setTemplates] = useState<TemplateItem[]>(() => {
+    const merged: TemplateItem[] = [];
+    try {
+      const fullData = staticFullPrompts as any;
+      if (fullData && Array.isArray(fullData.templates)) {
+        fullData.templates.forEach((t: any) => {
+          merged.push({
+            id: t.id || `landing_${Date.now()}_${Math.random()}`,
+            name: t.name,
+            template: t.template,
+            category: (t.category || 'Landing Page').trim(),
+            industry: t.industry || 'General',
+            imageUrl: t.imageUrl,
+            videoUrl: t.videoUrl,
+            link1: t.link1,
+            link2: t.link2,
+            description: t.description || (
+              (t.category?.toLowerCase().includes('commerce') || t.category?.toLowerCase().includes('retail') || t.industry?.toLowerCase().includes('retail'))
+                ? 'Full prompt blueprint targeting online retail niches.'
+                : `Full prompt blueprint targeting ${t.industry || 'General'} niches.`
+            ),
+            type: 'full'
+          });
+        });
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+
+    try {
+      const modData = staticModularPrompts as any;
+      if (modData && Array.isArray(modData.templates)) {
+        modData.templates.forEach((t: any) => {
+          merged.push({
+            id: t.id || `mod_${Date.now()}_${Math.random()}`,
+            name: t.name,
+            template: t.template,
+            category: (t.category || 'Landing Page').trim(),
+            industry: t.industry || 'Universal',
+            imageUrl: t.imageUrl,
+            videoUrl: t.videoUrl,
+            link1: t.link1,
+            link2: t.link2,
+            description: t.description || 'Focused modular segment layout blueprint.',
+            type: 'modular'
+          });
+        });
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+
+    if (merged.length === 0) {
+      // Return premium fallback templates if none found in json
+      return [
+        {
+          id: 'default_full_1',
+          name: 'High-Converting SaaS Landing Page',
+          category: 'Landing Page',
+          industry: 'SaaS / Technology',
+          template: `Act as a senior frontend engineer and conversion rate optimization (CRO) expert. Write a fully modular, highly responsive tailwind CSS code for a premium SaaS landing page targeting modern developers.
+
+Ensure that you implement a glossy glassmorphism hero banner with clean visual rhythm, an elegant interactive logo-cloud showcase, a fluid bento-grid feature layout, and a frictionless pricing section.`,
+          description: 'Master full-page layout structure optimized for high-conversion software products.',
+          type: 'full'
+        },
+        {
+          id: 'default_full_2',
+          name: 'Elegant Minimalist Fashion eCommerce',
+          category: 'eCommerce',
+          industry: 'Fashion / Retail',
+          template: `Act as an expert UX researcher and eCommerce developer. Generate a beautiful Tailwind CSS single page eCommerce layout for a modern luxury fashion brand.
+
+Include a stunning asymmetric image grid showcase, fine typographic pairings, micro-animation interactive hover states for product cards, and a sticky fast-checkout cart slide drawer.`,
+          description: 'An elegant display focused template optimized for luxury consumer products.',
+          type: 'full'
+        }
+      ];
+    }
+    return merged;
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateItem | null>(() => {
+    const fulls = templates.filter(x => x.type === 'full');
+    if (fulls.length > 0) return fulls[0];
+    if (templates.length > 0) return templates[0];
+    return null;
+  });
   
   // Student dashboard active tab for full blueprints or modular suggestions
   const [activeTab, setActiveTab] = useState<'full' | 'modular'>('full');
@@ -59,149 +148,9 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Fetch templates saved by admin in settings/full_prompts and settings/modular_prompts
   useEffect(() => {
-    async function loadTemplates() {
-      try {
-        setLoading(true);
-        const merged: TemplateItem[] = [];
-
-        // 1. Fetch full prompts
-        try {
-          const fullDocRef = doc(db, 'settings', 'full_prompts');
-          const fullSnap = await getDoc(fullDocRef);
-          if (fullSnap.exists()) {
-            const data = fullSnap.data();
-            if (Array.isArray(data.templates)) {
-              data.templates.forEach((t: any) => {
-                merged.push({
-                  id: t.id || `landing_${Date.now()}_${Math.random()}`,
-                  name: t.name,
-                  template: t.template,
-                  category: (t.category || 'Landing Page').trim(),
-                  industry: t.industry || 'General',
-                  imageUrl: t.imageUrl,
-                  videoUrl: t.videoUrl,
-                  link1: t.link1,
-                  link2: t.link2,
-                  description: t.description || (
-                    (t.category?.toLowerCase().includes('commerce') || t.category?.toLowerCase().includes('retail') || t.industry?.toLowerCase().includes('retail'))
-                      ? 'Full prompt blueprint targeting online retail niches.'
-                      : `Full prompt blueprint targeting ${t.industry || 'General'} niches.`
-                  ),
-                  type: 'full'
-                });
-              });
-            }
-          }
-        } catch (fullErr) {
-          console.warn("Failed to fetch full prompts from db:", fullErr);
-        }
-
-        // 2. Fetch modular prompts
-        try {
-          const modDocRef = doc(db, 'settings', 'modular_prompts');
-          const modSnap = await getDoc(modDocRef);
-          if (modSnap.exists()) {
-            const data = modSnap.data();
-            if (Array.isArray(data.templates)) {
-              data.templates.forEach((t: any) => {
-                merged.push({
-                  id: t.id || `mod_${Date.now()}_${Math.random()}`,
-                  name: t.name,
-                  template: t.template,
-                  category: (t.category || 'Landing Page').trim(),
-                  industry: t.industry || 'Universal',
-                  imageUrl: t.imageUrl,
-                  videoUrl: t.videoUrl,
-                  link1: t.link1,
-                  link2: t.link2,
-                  description: t.description || 'Focused modular segment layout blueprint.',
-                  type: 'modular'
-                });
-              });
-            }
-          }
-        } catch (modErr) {
-          console.warn("Failed to fetch modular prompts from db:", modErr);
-        }
-
-        // If the database has zero prompts, pre-populate with premium fallback blueprints & modular prompts
-        if (merged.length === 0) {
-          console.log("No templates found in database. Populating gorgeous preloaded defaults...");
-          const DEFAULT_TEMPLATES: TemplateItem[] = [
-            {
-              id: 'default_full_1',
-              name: 'High-Converting SaaS Landing Page',
-              category: 'Landing Page',
-              industry: 'SaaS / Technology',
-              template: `Act as a senior frontend engineer and conversion rate optimization (CRO) expert. Write a fully modular, highly responsive tailwind CSS code for a premium SaaS landing page targeting modern developers.
-
-Ensure that you implement a glossy glassmorphism hero banner with clean visual rhythm, an elegant interactive logo-cloud showcase, a fluid bento-grid feature layout, and a frictionless pricing section.`,
-              description: 'Master full-page layout structure optimized for high-conversion software products.',
-              type: 'full'
-            },
-            {
-              id: 'default_full_2',
-              name: 'Elegant Minimalist Fashion eCommerce',
-              category: 'eCommerce',
-              industry: 'Fashion / Retail',
-              template: `Act as an expert UX researcher and eCommerce developer. Generate a beautiful Tailwind CSS single page eCommerce layout for a modern luxury fashion brand.
-
-Include a stunning asymmetric image grid showcase, fine typographic pairings, micro-animation interactive hover states for product cards, and a sticky fast-checkout cart slide drawer.`,
-              description: 'An elegant display focused template optimized for luxury consumer products.',
-              type: 'full'
-            },
-            {
-              id: 'default_full_3',
-              name: 'Creative Agency Interactive Portfolio',
-              category: 'Portfolio Website',
-              industry: 'Creative / Agency',
-              template: `Act as an award-winning creative technologist. Construct a stunning single-page interactive portfolio website for a multidisciplinary creative design studio.
-
-Feature a bold brutalist hero display heading, an interactive staggered filterable work showcase, coach reference slide decks, and a custom interactive contact modal.`,
-              description: 'A striking display layout for showcasing visual and technical work creatively.',
-              type: 'full'
-            },
-            {
-              id: 'default_mod_1',
-              name: 'Glassmorphism Hero Section',
-              category: 'Hero Sections',
-              industry: 'Universal',
-              template: `Create an ultra-premium hero section using tailwind and glassmorphism styling. Make sure to use bold Space Grotesk display typography with an organic gradient text spotlight effect.`,
-              description: 'Refined above-the-fold visual entrance module with modern glowing backdrop blur elements.',
-              type: 'modular'
-            },
-            {
-              id: 'default_mod_2',
-              name: 'Interactive FAQ Grid',
-              category: 'Interactive Modules',
-              industry: 'Universal',
-              template: `Write an elegant, fully responsive FAQ grid with micro-transitions using React state or pure CSS peer-checked state. Ensure clean layout alignment and subtle hover shadows.`,
-              description: 'A frictionless Accordion layout module to answer critical customer questions.',
-              type: 'modular'
-            }
-          ];
-          merged.push(...DEFAULT_TEMPLATES);
-        }
-
-        setTemplates(merged);
-        
-        // Find default selection
-        const fulls = merged.filter(x => x.type === 'full');
-        if (fulls.length > 0) {
-          setSelectedTemplate(fulls[0]);
-        } else if (merged.length > 0) {
-          setSelectedTemplate(merged[0]);
-        }
-      } catch (err) {
-        console.error("Error loading prompt templates:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadTemplates();
+    // Already populated statically to prevent any database egress
+    setLoading(false);
   }, []);
 
   // Filter templates list based on type (activeTab)
