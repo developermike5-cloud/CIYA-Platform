@@ -49,6 +49,17 @@ export const enableNetwork = realEnableNetwork;
 // 6 Hours in milliseconds
 const CACHE_EXPIRATION_MS = 6 * 60 * 60 * 1000;
 
+export function isNetworkDisabled(): boolean {
+  if (typeof window !== 'undefined') {
+    try {
+      return window.localStorage.getItem('ciya_db_connection_disabled') === 'true';
+    } catch (e) {
+      // ignore
+    }
+  }
+  return false;
+}
+
 // Critical paths that require live, real-time responses and bypass cache completely
 function isBypassCachePath(path: string): boolean {
   if (!path) return false;
@@ -352,55 +363,140 @@ function resolveLocalQuery(ref: any): any[] {
   return [];
 }
 
-// Overridden getDoc function to run 100% locally on the frontend
+// Overridden getDoc function to run 100% locally when offline, or use live Firestore when online
 export async function getDoc(docRef: any): Promise<CachedDocumentSnapshot> {
   const path = docRef.path;
-  const { exists, data } = resolveLocalDoc(path);
-  return new CachedDocumentSnapshot(docRef.id, exists, data, docRef);
+  if (isNetworkDisabled()) {
+    const { exists, data } = resolveLocalDoc(path);
+    return new CachedDocumentSnapshot(docRef.id, exists, data, docRef);
+  } else {
+    try {
+      const liveSnap = await realGetDoc(docRef);
+      const serialized = {
+        id: liveSnap.id,
+        exists: liveSnap.exists(),
+        data: liveSnap.exists() ? liveSnap.data() : null
+      };
+      const cacheKey = `ciya_fs_doc_${path.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+      safeStorage.setItem(`${cacheKey}_data`, JSON.stringify(serialized));
+      safeStorage.setItem(`${cacheKey}_time`, String(Date.now()));
+      return new CachedDocumentSnapshot(liveSnap.id, liveSnap.exists(), liveSnap.data(), docRef);
+    } catch (error) {
+      console.warn(`getDoc live fetch failed for path ${path} (falling back to local cache):`, error);
+      const { exists, data } = resolveLocalDoc(path);
+      return new CachedDocumentSnapshot(docRef.id, exists, data, docRef);
+    }
+  }
 }
 
-// Overridden getDocs function to run 100% locally on the frontend
+// Overridden getDocs function to run 100% locally when offline, or use live Firestore when online
 export async function getDocs(queryRef: any): Promise<CachedQuerySnapshot> {
-  const results = resolveLocalQuery(queryRef);
-  const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data, queryRef));
-  return new CachedQuerySnapshot(docs);
+  if (isNetworkDisabled()) {
+    const results = resolveLocalQuery(queryRef);
+    const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data, queryRef));
+    return new CachedQuerySnapshot(docs);
+  } else {
+    try {
+      const liveSnap = await realGetDocs(queryRef);
+      const serialized: any[] = [];
+      liveSnap.forEach((docSnap: any) => {
+        serialized.push({
+          id: docSnap.id,
+          exists: docSnap.exists(),
+          data: docSnap.exists() ? docSnap.data() : null
+        });
+      });
+      const queryKey = getQueryCacheKey(queryRef);
+      const cacheKey = `ciya_fs_query_${queryKey}`;
+      const dataKey = `${cacheKey}_data`;
+      const timeKey = `${cacheKey}_time`;
+      safeStorage.setItem(dataKey, JSON.stringify(serialized));
+      safeStorage.setItem(timeKey, String(Date.now()));
+
+      const docs = liveSnap.docs.map((docSnap: any) => 
+        new CachedDocumentSnapshot(docSnap.id, docSnap.exists(), docSnap.data(), docSnap.ref)
+      );
+      return new CachedQuerySnapshot(docs);
+    } catch (error) {
+      console.warn(`getDocs live fetch failed (falling back to local cache):`, error);
+      const results = resolveLocalQuery(queryRef);
+      const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data, queryRef));
+      return new CachedQuerySnapshot(docs);
+    }
+  }
 }
 
-// Overridden onSnapshot to implement local real-time callback simulation with ZERO network listening
+// Overridden onSnapshot to implement local real-time simulation when offline, or real live sync when online
 export function onSnapshot(
   ref: any,
   onNext: (snapshot: any) => void,
   onError?: (error: any) => void
 ): () => void {
-  let path = ref?.path || '';
-  if (!path && ref._query && ref._query.path) {
-    path = ref._query.path.toString();
-  }
-  if (!path && ref.type === 'collection') {
-    path = ref.path;
-  }
+  if (isNetworkDisabled()) {
+    let path = ref?.path || '';
+    if (!path && ref._query && ref._query.path) {
+      path = ref._query.path.toString();
+    }
+    if (!path && ref.type === 'collection') {
+      path = ref.path;
+    }
 
-  const isDoc = typeof path === 'string' && path.split('/').length % 2 === 0;
+    const isDoc = typeof path === 'string' && path.split('/').length % 2 === 0;
 
-  // Run asynchronously to mimic the real SDK and avoid React state updates during render
-  const timer = setTimeout(() => {
-    try {
+    // Run asynchronously to mimic the real SDK and avoid React state updates during render
+    const timer = setTimeout(() => {
+      try {
+        if (isDoc) {
+          const { exists, data } = resolveLocalDoc(path);
+          onNext(new CachedDocumentSnapshot(path.split('/').pop() || '', exists, data, ref));
+        } else {
+          const results = resolveLocalQuery(ref);
+          const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data));
+          onNext(new CachedQuerySnapshot(docs));
+        }
+      } catch (err) {
+        if (onError) onError(err);
+      }
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  } else {
+    // Online mode: set up real-time listener from live Firestore
+    return realOnSnapshot(ref, (liveSnap: any) => {
+      const isDoc = typeof liveSnap.exists === 'function';
       if (isDoc) {
-        const { exists, data } = resolveLocalDoc(path);
-        onNext(new CachedDocumentSnapshot(path.split('/').pop() || '', exists, data, ref));
+        const path = ref?.path || '';
+        if (liveSnap.exists()) {
+          updateLocalDocCache(path, true, liveSnap.data());
+        } else {
+          updateLocalDocCache(path, false, null);
+        }
+        onNext(new CachedDocumentSnapshot(liveSnap.id, liveSnap.exists(), liveSnap.data(), liveSnap.ref));
       } else {
-        const results = resolveLocalQuery(ref);
-        const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data));
+        // It's a query snapshot (collection or query)
+        const docs = liveSnap.docs.map((docSnap: any) =>
+          new CachedDocumentSnapshot(docSnap.id, docSnap.exists(), docSnap.data(), docSnap.ref)
+        );
+        
+        // Save to cache so it's ready when going offline
+        const queryKey = getQueryCacheKey(ref);
+        const cacheKey = `ciya_fs_query_${queryKey}`;
+        const dataKey = `${cacheKey}_data`;
+        const timeKey = `${cacheKey}_time`;
+        const serialized = liveSnap.docs.map((docSnap: any) => ({
+          id: docSnap.id,
+          exists: docSnap.exists(),
+          data: docSnap.exists() ? docSnap.data() : null
+        }));
+        safeStorage.setItem(dataKey, JSON.stringify(serialized));
+        safeStorage.setItem(timeKey, String(Date.now()));
+
         onNext(new CachedQuerySnapshot(docs));
       }
-    } catch (err) {
-      if (onError) onError(err);
-    }
-  }, 0);
-
-  return () => {
-    clearTimeout(timer);
-  };
+    }, onError);
+  }
 }
 
 // Helper to write a single document to local storage to keep user changes responsive

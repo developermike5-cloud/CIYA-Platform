@@ -266,6 +266,9 @@ export async function setGlobalDbConnectionDisabled(disabled: boolean) {
         // ignore
       }
       await setFirestoreNetworkState(!disabled);
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     } catch (err) {
       console.error("Failed to push global db_connection_disabled state to RTDB:", err);
     }
@@ -276,6 +279,9 @@ export async function setGlobalDbConnectionDisabled(disabled: boolean) {
       // ignore
     }
     await setFirestoreNetworkState(!disabled);
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
   }
 }
 
