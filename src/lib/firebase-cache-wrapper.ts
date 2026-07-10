@@ -24,6 +24,10 @@ import {
 } from '@firebase/firestore';
 
 import { safeStorage } from '../utils/safeStorage';
+import staticCourses from '../data/courses.json';
+import staticBlog from '../data/blog.json';
+import staticFullPrompts from '../data/full_prompts.json';
+import staticModularPrompts from '../data/modular_prompts.json';
 
 // Re-export standard helpers unmodified
 export const collection = realCollection;
@@ -177,106 +181,226 @@ function invalidateQueryCaches(collectionPath: string) {
   }
 }
 
-// Overridden getDoc function to always fetch from the live backend, avoiding stale caching
+// Local resolver for single getDoc / doc onSnapshot
+function resolveLocalDoc(path: string): { exists: boolean; data: any } {
+  if (!path) return { exists: false, data: null };
+
+  // 1. Check custom user/assignments/etc. local caches first (as updated by writes)
+  const cacheKey = `ciya_fs_doc_${path.replace(/[^a-zA-Z0-9_]/g, '_')}_data`;
+  const cachedStr = safeStorage.getItem(cacheKey);
+  if (cachedStr) {
+    try {
+      const parsed = JSON.parse(cachedStr);
+      return { exists: parsed.exists, data: parsed.data };
+    } catch (e) {}
+  }
+
+  // Fallback check for user profile cache in other standard keys
+  if (path.startsWith('users/')) {
+    const cachedProfile = safeStorage.getItem('ciya_cached_profile');
+    if (cachedProfile) {
+      try {
+        const parsed = JSON.parse(cachedProfile);
+        return { exists: true, data: parsed };
+      } catch (e) {}
+    }
+    // Return a default skeleton profile instead of crashing or querying the live DB
+    return {
+      exists: true,
+      data: {
+        fullName: "Invited Student",
+        progress: {},
+        quizScores: {},
+        completedKeys: [],
+        manualDayUnlock: {}
+      }
+    };
+  }
+
+  // 2. Fallbacks for static paths
+  if (path === 'settings/app') {
+    const cachedSettings = safeStorage.getItem('ciya_cached_app_settings');
+    if (cachedSettings) {
+      try {
+        return { exists: true, data: JSON.parse(cachedSettings) };
+      } catch (e) {}
+    }
+    return { exists: true, data: { lockedSections: {} } };
+  }
+  if (path === 'settings/system_signals') {
+    return { exists: true, data: { status: 'offline' } };
+  }
+  if (path === 'settings/full_prompts') {
+    return { exists: true, data: staticFullPrompts };
+  }
+  if (path === 'settings/modular_prompts') {
+    return { exists: true, data: staticModularPrompts };
+  }
+
+  // If we are looking for a specific course document (e.g. "courses/xyz")
+  if (path.startsWith('courses/')) {
+    const courseId = path.split('/').pop();
+    const course = (staticCourses as any[]).find(c => c.id === courseId);
+    if (course) {
+      return { exists: true, data: course };
+    }
+  }
+
+  // If we are looking for a specific blog document (e.g. "blog/xyz")
+  if (path.startsWith('blog/')) {
+    const blogId = path.split('/').pop();
+    const post = (staticBlog as any[]).find(b => b.id === blogId);
+    if (post) {
+      return { exists: true, data: post };
+    }
+  }
+
+  return { exists: false, data: null };
+}
+
+// Local resolver for getDocs / collection/query onSnapshot
+function resolveLocalQuery(ref: any): any[] {
+  if (!ref) return [];
+  
+  // Resolve path safely (could be collection ref or query ref)
+  let path = ref.path || '';
+  if (!path && ref._query && ref._query.path) {
+    path = ref._query.path.toString();
+  }
+  if (!path && ref.type === 'collection') {
+    path = ref.path;
+  }
+  
+  const queryKey = getQueryCacheKey(ref);
+  const cacheKey = `ciya_fs_query_${queryKey}_data`;
+
+  // 1. If we have local cached results for this query (e.g., user-submitted assignments or user lists)
+  const cachedStr = safeStorage.getItem(cacheKey);
+  if (cachedStr) {
+    try {
+      const parsed = JSON.parse(cachedStr);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch (e) {}
+  }
+
+  // 2. Static fallbacks
+  if (path === 'courses') {
+    return (staticCourses as any[]).map(c => ({
+      id: c.id,
+      exists: true,
+      data: c
+    }));
+  }
+  if (path === 'blog') {
+    return (staticBlog as any[]).map(b => ({
+      id: b.id,
+      exists: true,
+      data: b
+    }));
+  }
+
+  // If we are looking for assignments
+  if (path === 'assignments') {
+    // Attempt to aggregate assignments from local doc caches
+    const list: any[] = [];
+    try {
+      if (typeof window !== 'undefined') {
+        const prefix = 'ciya_fs_doc_assignments_';
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith(prefix) && key.endsWith('_data')) {
+            const val = window.localStorage.getItem(key);
+            if (val) {
+              const parsed = JSON.parse(val);
+              if (parsed.exists && parsed.data) {
+                list.push({
+                  id: parsed.id || key.substring(prefix.length, key.length - 5),
+                  exists: true,
+                  data: parsed.data
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+    
+    // Also merge from standard cached student assignments if any
+    const cachedStudentAssignments = safeStorage.getItem('ciya_cached_student_assignments');
+    if (cachedStudentAssignments) {
+      try {
+        const parsed = JSON.parse(cachedStudentAssignments);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((item: any) => {
+            if (!list.some(existing => existing.id === item.id)) {
+              list.push({
+                id: item.id,
+                exists: true,
+                data: item
+              });
+            }
+          });
+        }
+      } catch (e) {}
+    }
+    
+    return list;
+  }
+
+  return [];
+}
+
+// Overridden getDoc function to run 100% locally on the frontend
 export async function getDoc(docRef: any): Promise<CachedDocumentSnapshot> {
   const path = docRef.path;
-
-  // Fetch from the live backend
-  try {
-    const liveSnap = await realGetDoc(docRef);
-    const serialized = {
-      id: liveSnap.id,
-      exists: liveSnap.exists(),
-      data: liveSnap.exists() ? liveSnap.data() : null
-    };
-    const cacheKey = `ciya_fs_doc_${path.replace(/[^a-zA-Z0-9_]/g, '_')}`;
-    safeStorage.setItem(`${cacheKey}_data`, JSON.stringify(serialized));
-    safeStorage.setItem(`${cacheKey}_time`, String(Date.now()));
-    return new CachedDocumentSnapshot(liveSnap.id, liveSnap.exists(), liveSnap.data(), docRef);
-  } catch (error) {
-    console.error(`getDoc live fetch failed for path ${path}:`, error);
-    // Graceful fallback to cached storage if offline/error occurs
-    const cacheKey = `ciya_fs_doc_${path.replace(/[^a-zA-Z0-9_]/g, '_')}`;
-    const cachedDataStr = safeStorage.getItem(`${cacheKey}_data`);
-    if (cachedDataStr) {
-      try {
-        const parsed = JSON.parse(cachedDataStr);
-        return new CachedDocumentSnapshot(docRef.id, parsed.exists, parsed.data, docRef);
-      } catch (err) {
-        // ignore
-      }
-    }
-    throw error;
-  }
+  const { exists, data } = resolveLocalDoc(path);
+  return new CachedDocumentSnapshot(docRef.id, exists, data, docRef);
 }
 
-// Overridden getDocs function to always fetch from the live backend
+// Overridden getDocs function to run 100% locally on the frontend
 export async function getDocs(queryRef: any): Promise<CachedQuerySnapshot> {
-  const queryKey = getQueryCacheKey(queryRef);
-  const cacheKey = `ciya_fs_query_${queryKey}`;
-  const dataKey = `${cacheKey}_data`;
-  const timeKey = `${cacheKey}_time`;
-
-  // Fetch from the live backend
-  try {
-    const liveSnap = await realGetDocs(queryRef);
-    const serialized: any[] = [];
-    liveSnap.forEach((docSnap: any) => {
-      serialized.push({
-        id: docSnap.id,
-        exists: docSnap.exists(),
-        data: docSnap.exists() ? docSnap.data() : null
-      });
-    });
-    safeStorage.setItem(dataKey, JSON.stringify(serialized));
-    safeStorage.setItem(timeKey, String(Date.now()));
-
-    const docs = liveSnap.docs.map((docSnap: any) => 
-      new CachedDocumentSnapshot(docSnap.id, docSnap.exists(), docSnap.data(), docSnap.ref)
-    );
-    return new CachedQuerySnapshot(docs);
-  } catch (error) {
-    console.error(`getDocs live fetch failed for query:`, error);
-    // Graceful fallback to cached storage if offline/error occurs
-    const cachedDataStr = safeStorage.getItem(dataKey);
-    if (cachedDataStr) {
-      try {
-        const parsedArray = JSON.parse(cachedDataStr);
-        const docs = parsedArray.map((d: any) => new CachedDocumentSnapshot(d.id, d.exists, d.data));
-        return new CachedQuerySnapshot(docs);
-      } catch (err) {
-        // ignore
-      }
-    }
-    throw error;
-  }
+  const results = resolveLocalQuery(queryRef);
+  const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data, queryRef));
+  return new CachedQuerySnapshot(docs);
 }
 
-// Overridden onSnapshot to implement real-time live synchronization for all paths
+// Overridden onSnapshot to implement local real-time callback simulation with ZERO network listening
 export function onSnapshot(
   ref: any,
   onNext: (snapshot: any) => void,
   onError?: (error: any) => void
 ): () => void {
-  // Always establish the real Firebase SDK onSnapshot real-time listener
-  return realOnSnapshot(ref, (liveSnap: any) => {
-    const isDoc = typeof liveSnap.exists === 'function';
-    if (isDoc) {
-      const path = ref?.path || '';
-      if (liveSnap.exists()) {
-        updateLocalDocCache(path, true, liveSnap.data());
+  let path = ref?.path || '';
+  if (!path && ref._query && ref._query.path) {
+    path = ref._query.path.toString();
+  }
+  if (!path && ref.type === 'collection') {
+    path = ref.path;
+  }
+
+  const isDoc = typeof path === 'string' && path.split('/').length % 2 === 0;
+
+  // Run asynchronously to mimic the real SDK and avoid React state updates during render
+  const timer = setTimeout(() => {
+    try {
+      if (isDoc) {
+        const { exists, data } = resolveLocalDoc(path);
+        onNext(new CachedDocumentSnapshot(path.split('/').pop() || '', exists, data, ref));
       } else {
-        updateLocalDocCache(path, false, null);
+        const results = resolveLocalQuery(ref);
+        const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data));
+        onNext(new CachedQuerySnapshot(docs));
       }
-      onNext(new CachedDocumentSnapshot(liveSnap.id, liveSnap.exists(), liveSnap.data(), liveSnap.ref));
-    } else {
-      // It's a query snapshot (collection or query)
-      const docs = liveSnap.docs.map((docSnap: any) =>
-        new CachedDocumentSnapshot(docSnap.id, docSnap.exists(), docSnap.data(), docSnap.ref)
-      );
-      onNext(new CachedQuerySnapshot(docs));
+    } catch (err) {
+      if (onError) onError(err);
     }
-  }, onError);
+  }, 0);
+
+  return () => {
+    clearTimeout(timer);
+  };
 }
 
 // Helper to write a single document to local storage to keep user changes responsive
@@ -287,6 +411,11 @@ function updateLocalDocCache(path: string, exists: boolean, data: any) {
   const serialized = { id: path.split('/').pop() || '', exists, data };
   safeStorage.setItem(dataKey, JSON.stringify(serialized));
   safeStorage.setItem(timeKey, String(Date.now()));
+
+  // Special synchronization: update general user profile cache if users table is written
+  if (path.startsWith('users/')) {
+    safeStorage.setItem('ciya_cached_profile', JSON.stringify(data));
+  }
 }
 
 // Set nested properties supporting dot-notation correctly (e.g. "manualDayUnlock.pathway_A.2")

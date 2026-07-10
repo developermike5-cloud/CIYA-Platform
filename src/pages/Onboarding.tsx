@@ -178,24 +178,13 @@ export default function Onboarding() {
     'I want to become an expert/master'
   ];
 
-  const validateForm = (isGoogle: boolean = false) => {
+  const validateForm = () => {
     setFormError('');
     if (!data.fullName.trim()) { setFormError('Full Name is required.'); return false; }
     if (!data.gender) { setFormError('Gender is required.'); return false; }
     if (!data.ageRange) { setFormError('Age Range is required.'); return false; }
     if (!data.whatsapp.trim()) { setFormError('WhatsApp Number is required.'); return false; }
     if (!data.state) { setFormError('State is required.'); return false; }
-    
-    if (!isGoogle) {
-      if (!data.email.trim() || !data.email.includes('@')) {
-        setFormError('A valid Email Address is required.');
-        return false;
-      }
-      if (!data.password || data.password.length < 6) {
-        setFormError('Password must be at least 6 characters long.');
-        return false;
-      }
-    }
     return true;
   };
 
@@ -355,29 +344,32 @@ export default function Onboarding() {
   };
 
   const doAuthAndSave = async () => {
-    const isAlreadyLoggedIn = !!auth.currentUser;
-    if (!validateForm(isAlreadyLoggedIn)) return;
+    if (!validateForm()) return;
     if (globalOnboardingSignInActive) return;
     setLoading(true);
     try {
       globalOnboardingSignInActive = true;
       let user = auth.currentUser;
       if (!user) {
-        const result = await createUserWithEmailAndPassword(auth, data.email, data.password);
-        user = result.user;
-        try {
-          await updateProfile(user, { displayName: data.fullName });
-        } catch (profileErr) {
-          console.warn("Could not update display name:", profileErr);
+        const provider = new GoogleAuthProvider();
+        if (provider && typeof (provider as any).setCustomParameters === 'function') {
+          (provider as any).setCustomParameters({ prompt: 'select_account' });
         }
+        const result = await signInWithPopup(auth, provider);
+        user = result.user;
+      }
+      
+      if (!user) {
+        throw new Error('Google authentication failed. Please try again.');
       }
       
       await handleRegisterSuccess(user);
     } catch (e: any) {
       console.error(e);
       let errMsg = e.message || 'An error occurred during sign up.';
-      if (e.message?.toLowerCase().includes('email already in use') || e.message?.toLowerCase().includes('already registered')) {
-        errMsg = 'This email is already registered. Try logging in instead!';
+      if (e.code === 'auth/popup-blocked' || e.message?.toLowerCase().includes('popup-blocked')) {
+        setShowPopupBlocked(true);
+        errMsg = 'Sign-up popup was blocked by your browser. Please enable popups and try again.';
       } else if (e.message?.includes('offline')) {
         errMsg = 'Network error. Please check your internet connection.';
       }
@@ -732,28 +724,6 @@ export default function Onboarding() {
                   </div>
                 )}
 
-                {!auth.currentUser && (
-                  <div className="mb-2">
-                    <button
-                      type="button"
-                      onClick={handleGoogleOnboarding}
-                      className="w-full py-3 px-4 bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 font-extrabold rounded-xl flex items-center justify-center gap-2.5 transition-all text-xs shadow-sm hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-                    >
-                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                        <path fill="#EA4335" d="M12 5.04c1.64 0 3.11.56 4.27 1.67l3.19-3.19C17.51 1.7 14.99 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.79 2.94C6.18 7.37 8.86 5.04 12 5.04z" />
-                        <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.44c-.28 1.48-1.12 2.73-2.38 3.58l3.71 2.88c2.17-2 3.42-4.94 3.42-8.61z" />
-                        <path fill="#FBBC05" d="M5.29 14.83a7.19 7.19 0 0 1 0-4.57L1.5 7.32a11.95 11.95 0 0 0 0 10.37l3.79-2.86z" />
-                        <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.14 0-5.82-2.33-6.71-5.46L1.5 16.29C3.4 20.15 7.35 23 12 23z" />
-                      </svg>
-                      <span>Sign Up with Google</span>
-                    </button>
-                    <div className="flex items-center my-4">
-                      <div className="flex-grow border-t border-slate-800"></div>
-                      <span className="px-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">OR REGISTER WITH EMAIL</span>
-                      <div className="flex-grow border-t border-slate-800"></div>
-                    </div>
-                  </div>
-                )}
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Full Name *</label>
                   <div className="relative">
@@ -804,33 +774,6 @@ export default function Onboarding() {
                     </select>
                   </div>
                 </div>
-                
-                {/* Email Address */}
-                <div>
-                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Email Address *</label>
-                  <div className="relative">
-                    <Mail className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input 
-                      type="email" 
-                      value={data.email} 
-                      onChange={e => selectData('email', e.target.value)} 
-                      disabled={!!auth.currentUser}
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold disabled:opacity-60" 
-                      placeholder="your@email.com" 
-                    />
-                  </div>
-                </div>
-
-                {/* Password */}
-                {!auth.currentUser && (
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Password *</label>
-                    <div className="relative">
-                      <Lock className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                      <input type="password" value={data.password} onChange={e => selectData('password', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold" placeholder="Min. 6 characters" />
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="mt-6 space-y-4">
@@ -848,7 +791,7 @@ export default function Onboarding() {
                     </div>
                   ) : (
                     <>
-                      Register Student Profile
+                      Sign Up
                     </>
                   )}
                 </button>

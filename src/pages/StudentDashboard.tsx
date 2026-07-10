@@ -397,26 +397,8 @@ function isDayUnlockedUnified(
   userProfile?: any,
   courseId?: string
 ) {
-  if (di === 0) return true;
-  
-  // 1. Manual day unlock check
-  const isDayManuallyUnlocked = userProfile?.manualDayUnlock?.[courseId || '']?.[di] === true;
-  if (isDayManuallyUnlocked) return true;
-
-  // 2. Clone course versus standard course rules
-  if (isCloned) {
-    // Cloned course: all videos/lessons of the previous day must be completed/watched
-    const prevDay = days[di - 1];
-    if (!prevDay) return false;
-    const prevDayVideos = prevDay.videos || [];
-    return prevDayVideos.every((_: any, vi: number) => {
-      const key = `${di - 1}-${vi}`;
-      return completedKeys.includes(key);
-    });
-  } else {
-    // Standard course: previous day's assignment must be approved
-    return dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
-  }
+  // Always allow access to every day module under all circumstances (no pending assignment/approval or completion locks)
+  return true;
 }
 
 // Unified lesson lock validator helper function
@@ -438,26 +420,24 @@ function isLessonUnlockedUnified(
   const isDayUnlocked = isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, isCloned, userProfile, courseId);
   if (!isDayUnlocked) return false;
 
-  // 2. Enforce that for every preceding lesson in the course (across all days),
-  // if that preceding lesson has a quiz, it MUST have been passed with >= 80% check mark.
-  for (let d = 0; d <= di; d++) {
-    const dayItem = days[d];
-    if (!dayItem) continue;
-    const videosList = dayItem.videos || [];
-    
-    // For day d, we only check lessons up to vi (if d === di) or all lessons (if d < di)
-    const maxV = d === di ? vi : videosList.length;
-    for (let v = 0; v < maxV; v++) {
-      const vItem = videosList[v];
-      if (!vItem) continue;
+  // 2. The first lesson of every day should remain unlocked
+  if (vi === 0) return true;
 
-      const hasQuiz = vItem.checkType && vItem.checkType !== 'none' && vItem.check;
-      if (hasQuiz) {
-        const key = `${d}-${v}`;
-        const isPassed = checkPassedKeys.includes(key);
-        if (!isPassed) {
-          return false;
-        }
+  // 3. For any subsequent lesson (vi > 0), they must pass quizzes for preceding lessons on that same day
+  const dayItem = days[di];
+  if (!dayItem) return true;
+  const videosList = dayItem.videos || [];
+  
+  for (let v = 0; v < vi; v++) {
+    const vItem = videosList[v];
+    if (!vItem) continue;
+
+    const hasQuiz = vItem.checkType && vItem.checkType !== 'none' && vItem.check;
+    if (hasQuiz) {
+      const key = `${di}-${v}`;
+      const isPassed = checkPassedKeys.includes(key);
+      if (!isPassed) {
+        return false;
       }
     }
   }
@@ -5419,21 +5399,9 @@ export default function StudentDashboard() {
                                     course={course} 
                                     userProfile={userProfile}
                                     isEnrolled={true}
-                                    isLocked={isAdmin ? false : (isGuest || appSettings?.lockedSections?.courses || (unlockedCourseIds.includes(course.id) ? false : course.isLocked))} 
+                                    isLocked={false} 
                                     onSelect={() => {
-                                      const cardLocked = isAdmin ? false : (isGuest || appSettings?.lockedSections?.courses || (unlockedCourseIds.includes(course.id) ? false : course.isLocked));
-                                      if (isAdmin) {
-                                        handleSelectCourseId(course.id || null);
-                                      } else if (isGuest) {
-                                        alert("This premium course is locked! Please Sign In with Google to unlock access to mini-videos, study materials, live assignments and certificate tracking.");
-                                        handleLogin();
-                                      } else if (!isAdmin && appSettings?.lockedSections?.courses) {
-                                        alert("The main courses and learning arena are temporarily locked by the course administrators. Please contact your instructor to unlock access.");
-                                      } else if (cardLocked) {
-                                        alert("This course is currently locked by the administrator. Please contact your instructor to unlock it.");
-                                      } else {
-                                        handleSelectCourseId(course.id || null);
-                                      }
+                                      handleSelectCourseId(course.id || null);
                                     }} 
                                     currentUser={currentUser}
                                     appSettings={appSettings}
@@ -5494,14 +5462,9 @@ export default function StudentDashboard() {
                                     course={course} 
                                     userProfile={userProfile}
                                     isEnrolled={false}
-                                    isLocked={isAdmin ? false : (!hasCompletedFirstCourse ? true : (unlockedCourseIds.includes(course.id) ? false : course.isLocked))} 
+                                    isLocked={false} 
                                     onSelect={() => {
-                                      const cardLocked = isAdmin ? false : (!hasCompletedFirstCourse ? true : (unlockedCourseIds.includes(course.id) ? false : course.isLocked));
-                                      if (cardLocked) {
-                                        alert("You must complete your current registered course or request unlock of this course first!");
-                                      } else {
-                                        handleSelectCourseId(course.id || null);
-                                      }
+                                      handleSelectCourseId(course.id || null);
                                     }} 
                                     currentUser={currentUser}
                                     appSettings={appSettings}
