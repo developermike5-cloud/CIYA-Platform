@@ -19,6 +19,8 @@ import {
   persistentMultipleTabManager as realPersistentMultipleTabManager,
   memoryLocalCache as realMemoryLocalCache,
   getFirestore as realGetFirestore,
+  disableNetwork as realDisableNetwork,
+  enableNetwork as realEnableNetwork,
 } from '@firebase/firestore';
 
 import { safeStorage } from '../utils/safeStorage';
@@ -37,6 +39,8 @@ export const persistentMultipleTabManager = realPersistentMultipleTabManager;
 export const memoryLocalCache = realMemoryLocalCache;
 export const getFirestore = realGetFirestore;
 export const writeBatch = realWriteBatch;
+export const disableNetwork = realDisableNetwork;
+export const enableNetwork = realEnableNetwork;
 
 // 6 Hours in milliseconds
 const CACHE_EXPIRATION_MS = 6 * 60 * 60 * 1000;

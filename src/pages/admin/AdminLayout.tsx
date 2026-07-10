@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Outlet, Navigate, Link, useLocation, useNavigate } from 'react-router';
-import { auth, db, getActiveDatabaseId, setActiveDatabaseId, handleFirestoreError, OperationType } from '../../firebase';
+import { auth, db, getActiveDatabaseId, setActiveDatabaseId, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, setGlobalDbConnectionDisabled, safeGetItem, safeSetItem, safeRemoveItem } from '../../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { invalidateCache } from '../../lib/supabase-shim/firestore';
-import { Menu, X, Database } from 'lucide-react';
+import { Menu, X, Database, Wifi, WifiOff } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 
 export default function AdminLayout() {
   const [user, setUser] = useState<any>(() => {
-    const cached = localStorage.getItem('ciya_cached_user');
+    const cached = safeGetItem('ciya_cached_user');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
@@ -24,6 +24,24 @@ export default function AdminLayout() {
   });
 
   const [loading, setLoading] = useState(true);
+
+  const [dbNetworkEnabled, setDbNetworkEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return safeGetItem('ciya_db_connection_disabled') !== 'true';
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleStatusChange = (e: any) => {
+      setDbNetworkEnabled(e.detail.enabled);
+    };
+    window.addEventListener('firestore-network-status' as any, handleStatusChange);
+    return () => {
+      window.removeEventListener('firestore-network-status' as any, handleStatusChange);
+    };
+  }, []);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
@@ -40,7 +58,7 @@ export default function AdminLayout() {
             permissions: ['manage_courses', 'manage_students', 'manage_branding'],
             adminRole: 'Super Admin'
           };
-          localStorage.setItem('ciya_cached_user', JSON.stringify(userData));
+          safeSetItem('ciya_cached_user', JSON.stringify(userData));
           setUser(userData);
           setLoading(false);
 
@@ -82,10 +100,10 @@ export default function AdminLayout() {
                 permissions: data?.permissions || [],
                 adminRole: data?.role || 'CIYA Admin'
               };
-              localStorage.setItem('ciya_cached_user', JSON.stringify(userData));
+              safeSetItem('ciya_cached_user', JSON.stringify(userData));
               setUser(userData);
             } else {
-              localStorage.removeItem('ciya_cached_user');
+              safeRemoveItem('ciya_cached_user');
               setUser(null);
             }
           } catch (err: any) {
@@ -95,13 +113,13 @@ export default function AdminLayout() {
             if (errMsg.toLowerCase().includes('offline') || !navigator.onLine) {
               console.warn("Offline during admin verification, relying on cached user state:", errMsg);
               // Do NOT wipe cached user if they already exist, so they stay logged in offline
-              const cached = localStorage.getItem('ciya_cached_user');
+              const cached = safeGetItem('ciya_cached_user');
               if (!cached) {
                 setUser(null);
               }
             } else {
               console.error("Error verifying admin details from DB:", err);
-              localStorage.removeItem('ciya_cached_user');
+              safeRemoveItem('ciya_cached_user');
               setUser(null);
             }
           } finally {
@@ -109,18 +127,18 @@ export default function AdminLayout() {
           }
         }
       } else {
-        const cached = localStorage.getItem('ciya_cached_user');
+        const cached = safeGetItem('ciya_cached_user');
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
             if (parsed && (parsed.email?.toLowerCase() === 'developermike5@gmail.com' || parsed.role === 'admin')) {
               setUser(parsed);
             } else {
-              localStorage.removeItem('ciya_cached_user');
+              safeRemoveItem('ciya_cached_user');
               setUser(null);
             }
           } catch (e) {
-            localStorage.removeItem('ciya_cached_user');
+            safeRemoveItem('ciya_cached_user');
             setUser(null);
           }
         } else {
@@ -141,39 +159,39 @@ export default function AdminLayout() {
       const signalData = snapshot.data() || {};
 
       // 1. Sync Courses
-      const cachedCoursesTime = localStorage.getItem('ciya_cached_courses_time_admin') || '0';
+      const cachedCoursesTime = safeGetItem('ciya_cached_courses_time_admin') || '0';
       const serverCoursesTime = String(signalData.courses || '0');
       if (serverCoursesTime !== cachedCoursesTime) {
         invalidateCache('courses');
-        localStorage.setItem('ciya_cached_courses_time_admin', serverCoursesTime);
+        safeSetItem('ciya_cached_courses_time_admin', serverCoursesTime);
       }
 
       // 2. Sync Settings
-      const cachedSettingsTime = localStorage.getItem('ciya_cached_settings_time_admin') || '0';
+      const cachedSettingsTime = safeGetItem('ciya_cached_settings_time_admin') || '0';
       const serverSettingsTime = String(signalData.settings || '0');
       if (serverSettingsTime !== cachedSettingsTime) {
         invalidateCache('settings');
-        localStorage.setItem('ciya_cached_settings_time_admin', serverSettingsTime);
+        safeSetItem('ciya_cached_settings_time_admin', serverSettingsTime);
       }
 
       // 3. Sync Blog Articles
-      const cachedBlogTime = localStorage.getItem('ciya_cached_blog_time_admin') || '0';
+      const cachedBlogTime = safeGetItem('ciya_cached_blog_time_admin') || '0';
       const serverBlogTime = String(signalData.blog || '0');
       if (serverBlogTime !== cachedBlogTime) {
         invalidateCache('blog');
-        localStorage.setItem('ciya_cached_blog_time_admin', serverBlogTime);
+        safeSetItem('ciya_cached_blog_time_admin', serverBlogTime);
       }
 
       // 4. Sync KYCB
-      const cachedKycbTime = localStorage.getItem('ciya_cached_kycb_time_admin') || '0';
+      const cachedKycbTime = safeGetItem('ciya_cached_kycb_time_admin') || '0';
       const serverKycbTime = String(signalData.kycb_signals || '0');
       if (serverKycbTime !== cachedKycbTime) {
         invalidateCache('kycb_questionnaires');
-        localStorage.setItem('ciya_cached_kycb_time_admin', serverKycbTime);
+        safeSetItem('ciya_cached_kycb_time_admin', serverKycbTime);
       }
 
       // 5. Sync users & assignments (via user_signals timestamp checks)
-      const cachedUserSignalsTime = localStorage.getItem('ciya_cached_user_signals_time_admin') || '0';
+      const cachedUserSignalsTime = safeGetItem('ciya_cached_user_signals_time_admin') || '0';
       let maxUserSignalTime = '0';
       if (signalData.user_signals) {
         Object.values(signalData.user_signals).forEach((val: any) => {
@@ -185,7 +203,7 @@ export default function AdminLayout() {
       if (maxUserSignalTime !== cachedUserSignalsTime) {
         invalidateCache('users');
         invalidateCache('assignments');
-        localStorage.setItem('ciya_cached_user_signals_time_admin', maxUserSignalTime);
+        safeSetItem('ciya_cached_user_signals_time_admin', maxUserSignalTime);
       }
     });
 
@@ -193,7 +211,7 @@ export default function AdminLayout() {
   }, [user]);
 
   const handleLogout = async () => {
-    localStorage.removeItem('ciya_cached_user');
+    safeRemoveItem('ciya_cached_user');
     await signOut(auth);
     navigate('/?login=true');
   };
@@ -269,8 +287,43 @@ export default function AdminLayout() {
       {/* Sidebar */}
       <aside className={`w-64 bg-slate-900 text-white flex flex-col fixed md:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-6 flex flex-col gap-1 relative border-b border-slate-800">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2">
             <BrandingLogo size="sm" />
+            
+            {/* Database Cloud Sync Toggle Switch */}
+            <div className="relative group">
+              <button
+                type="button"
+                onClick={async () => {
+                  const newState = !dbNetworkEnabled;
+                  await setGlobalDbConnectionDisabled(!newState);
+                }}
+                className={`flex items-center justify-center p-2 rounded-xl transition-all duration-300 border focus:outline-none cursor-pointer ${
+                  dbNetworkEnabled 
+                    ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/25 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.05)]' 
+                    : 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/25 text-amber-400 animate-pulse'
+                }`}
+                aria-label="Toggle Database Cloud Connection"
+              >
+                {dbNetworkEnabled ? (
+                  <Wifi className="w-4 h-4" />
+                ) : (
+                  <WifiOff className="w-4 h-4" />
+                )}
+              </button>
+              
+              {/* Tooltip */}
+              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-48 bg-slate-950 text-[10px] text-slate-200 p-2.5 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 z-50 border border-slate-800 leading-normal font-semibold text-center">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 border-4 border-transparent border-b-slate-950"></div>
+                <div className="font-bold mb-0.5 text-white uppercase tracking-wider flex items-center justify-center gap-1">
+                  <span className={`w-1.5 h-1.5 rounded-full ${dbNetworkEnabled ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`}></span>
+                  Firestore Status: {dbNetworkEnabled ? 'Online' : 'Offline Mode'}
+                </div>
+                {dbNetworkEnabled 
+                  ? 'Click to stop cloud sync and write purely to browser cache.' 
+                  : 'Click to re-enable cloud sync and push local work.'}
+              </div>
+            </div>
           </div>
           <div className="mt-1 pl-3 flex items-center gap-1.5">
             <span className="text-[10px] bg-indigo-600 text-white font-black px-2 py-0.5 rounded uppercase tracking-wider">{activeRole}</span>
@@ -397,15 +450,23 @@ export default function AdminLayout() {
 
           <div className="flex items-center gap-3">
             {/* Active Database Badge */}
-            <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-1.5 shadow-sm text-slate-700">
-              <Database className="w-4 h-4 text-indigo-600 shrink-0" />
+            <div className={`flex items-center gap-2 border rounded-xl px-3.5 py-1.5 shadow-sm transition-all duration-300 ${
+              dbNetworkEnabled 
+                ? 'bg-emerald-50/50 border-emerald-200/60 text-emerald-800' 
+                : 'bg-amber-50/50 border-amber-200/60 text-amber-800 animate-pulse'
+            }`}>
+              {dbNetworkEnabled ? (
+                <Wifi className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-amber-600 shrink-0" />
+              )}
               <div className="flex items-center gap-1.5">
                 <span className="flex h-2 w-2 relative shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dbNetworkEnabled ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${dbNetworkEnabled ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
                 </span>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">Database:</span>
-                <span className="text-xs font-semibold text-slate-700">Connected</span>
+                <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Database:</span>
+                <span className="text-xs font-extrabold">{dbNetworkEnabled ? 'Connected (Cloud)' : 'Offline (Local Cache)'}</span>
               </div>
             </div>
           </div>

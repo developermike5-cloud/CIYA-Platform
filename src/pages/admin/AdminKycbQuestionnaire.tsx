@@ -4,12 +4,13 @@ import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp
 import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download } from 'lucide-react';
 import LpQuestionnaireForm from '../../components/LpQuestionnaireForm';
 import EcQuestionnaireForm from '../../components/EcQuestionnaireForm';
+import PortfolioQuestionnaireForm from '../../components/PortfolioQuestionnaireForm';
 
 interface SavedForm {
   id: string;
   clientName: string;
   dateCompleted: string;
-  type: 'lp' | 'ec';
+  type: 'lp' | 'ec' | 'portfolio';
   businessName: string;
   createdAt: any;
   data: any;
@@ -30,7 +31,7 @@ export default function AdminKycbQuestionnaire({
   userEmail = '',
   defaultClientName = ''
 }: AdminKycbQuestionnaireProps = {}) {
-  const [activeTab, setActiveTab] = useState<'lp' | 'ec'>('lp');
+  const [activeTab, setActiveTab] = useState<'lp' | 'ec' | 'portfolio'>('lp');
 
   // Perspective helper function
   const qL = (clientText: string, freelancerText: string) => {
@@ -167,6 +168,80 @@ export default function AdminKycbQuestionnaire({
   // Local drafts states
   const [lpDraft, setLpDraft] = useState<any>(null);
   const [ecDraft, setEcDraft] = useState<any>(null);
+  const [portfolioDraft, setPortfolioDraft] = useState<any>(null);
+
+  // Portfolio Specific States
+  const [portfolioProfession, setPortfolioProfession] = useState<string>('');
+  const [portfolioProfessionOther, setPortfolioProfessionOther] = useState<string>('');
+  const [portfolioTools, setPortfolioTools] = useState<string[]>([]);
+  const [portfolioToolsOther, setPortfolioToolsOther] = useState<string>('');
+  const [portfolioYearsExperience, setPortfolioYearsExperience] = useState<string>('');
+  const [portfolioStrengths, setPortfolioStrengths] = useState<string>('');
+
+  const [portfolioPurposes, setPortfolioPurposes] = useState<string[]>([]);
+  const [portfolioVisitorActions, setPortfolioVisitorActions] = useState<string[]>([]);
+  const [portfolioTargetVisitors, setPortfolioTargetVisitors] = useState<string[]>([]);
+  const [portfolioTargetIndustries, setPortfolioTargetIndustries] = useState<string[]>([]);
+
+  const [portfolioFeaturedCount, setPortfolioFeaturedCount] = useState<string>('3-4');
+  const [portfolioPresentationStyles, setPortfolioPresentationStyles] = useState<string[]>([]);
+  const [portfolioProjects, setPortfolioProjects] = useState<Array<{ title: string; company: string; desc: string; year: string; category: string; link: string; tools: string }>>([
+    { title: '', company: '', desc: '', year: '', category: '', link: '', tools: '' }
+  ]);
+  const [portfolioHasImages, setPortfolioHasImages] = useState<string>('no');
+
+  const [portfolioBio, setPortfolioBio] = useState<string>('');
+  const [portfolioDifferentiators, setPortfolioDifferentiators] = useState<string[]>([]);
+  const [portfolioDifferentiatorDetail, setPortfolioDifferentiatorDetail] = useState<string>('');
+  const [portfolioHasPhoto, setPortfolioHasPhoto] = useState<string>('no');
+  const [portfolioShowEducation, setPortfolioShowEducation] = useState<string>('no');
+  const [portfolioEducationDetails, setPortfolioEducationDetails] = useState<string>('');
+  const [portfolioShowExperience, setPortfolioShowExperience] = useState<string>('no');
+  const [portfolioExperienceDetails, setPortfolioExperienceDetails] = useState<string>('');
+
+  const [portfolioShowServices, setPortfolioShowServices] = useState<string>('no');
+  const [portfolioServicesOffered, setPortfolioServicesOffered] = useState<string[]>([]);
+  const [portfolioServicesOther, setPortfolioServicesOther] = useState<string>('');
+  const [portfolioShowPricing, setPortfolioShowPricing] = useState<string>('no');
+  const [portfolioPricingDetails, setPortfolioPricingDetails] = useState<string>('');
+  const [portfolioTypicalProcess, setPortfolioTypicalProcess] = useState<string[]>([]);
+
+  const [portfolioHasTestimonials, setPortfolioHasTestimonials] = useState<string>('no');
+  const [portfolioTestimonialsList, setPortfolioTestimonialsList] = useState<Array<{ quote: string; name: string; titleCompany: string }>>([
+    { quote: '', name: '', titleCompany: '' }
+  ]);
+  const [portfolioNotableBrands, setPortfolioNotableBrands] = useState<string>('');
+  const [portfolioHasAwards, setPortfolioHasAwards] = useState<string>('no');
+  const [portfolioAwardsDetails, setPortfolioAwardsDetails] = useState<string>('');
+
+  const [portfolioHasLogo, setPortfolioHasLogo] = useState<string>('no');
+  const [portfolioLogoDesign, setPortfolioLogoDesign] = useState<string>('no');
+  const [portfolioHasBrandColors, setPortfolioHasBrandColors] = useState<string>('no');
+  const [portfolioColorsCount, setPortfolioColorsCount] = useState<number>(1);
+  const [portfolioBrandColors, setPortfolioBrandColors] = useState<string[]>(['#1A3C6E', '#D4A017', '#FFFFFF']);
+  const [portfolioVisualPersonalities, setPortfolioVisualPersonalities] = useState<string[]>([]);
+  const [portfolioInspirations, setPortfolioInspirations] = useState<string[]>(['']);
+  const [portfolioInspirationDetail, setPortfolioInspirationDetail] = useState<string>('');
+
+  const [portfolioPagesNeeded, setPortfolioPagesNeeded] = useState<string[]>([]);
+  const [portfolioPreferredStructure, setPortfolioPreferredStructure] = useState<string>('hybrid');
+  const [portfolioHasBlog, setPortfolioHasBlog] = useState<string>('no');
+  const [portfolioBlogTopics, setPortfolioBlogTopics] = useState<string>('');
+  const [portfolioHasCV, setPortfolioHasCV] = useState<string>('no');
+
+  const [portfolioFeaturesNeeded, setPortfolioFeaturesNeeded] = useState<string[]>([]);
+  const [portfolioContactPreferences, setPortfolioContactPreferences] = useState<string[]>([]);
+  const [portfolioAnimationLevel, setPortfolioAnimationLevel] = useState<string>('moderate');
+  const [portfolioHasNDA, setPortfolioHasNDA] = useState<string>('no');
+
+  const [portfolioTrafficSources, setPortfolioTrafficSources] = useState<string[]>([]);
+  const [portfolioWantsSEO, setPortfolioWantsSEO] = useState<string>('no');
+  const [portfolioCustomDomain, setPortfolioCustomDomain] = useState<string>('');
+
+  const [portfolioDeadline, setPortfolioDeadline] = useState<string>('');
+  const [portfolioBudget, setPortfolioBudget] = useState<string>('');
+  const [portfolioDrivingEvent, setPortfolioDrivingEvent] = useState<string[]>([]);
+  const [portfolioAdditionalNotes, setPortfolioAdditionalNotes] = useState<string>('');
 
   // Take a full form state snapshot
   const getFormSnapshot = () => ({
@@ -190,7 +265,24 @@ export default function AdminKycbQuestionnaire({
     ecProductDiff, ecProductDiffDetail, ecWebsiteStyle, ecPages, ecMarketingHelp,
     // Landing Page specific 12 sections states
     lpOfferType, lpOfferMain, lpOfferServices, lpOfferServicesDetail,
-    lpOfferPromo, lpOfferPromoDetail, lpWhyChoose, lpWhatMakesSpecial, lpWhatMakesSpecialDetail
+    lpOfferPromo, lpOfferPromoDetail, lpWhyChoose, lpWhatMakesSpecial, lpWhatMakesSpecialDetail,
+    // Portfolio specific states
+    portfolioProfession, portfolioProfessionOther, portfolioTools, portfolioToolsOther,
+    portfolioYearsExperience, portfolioStrengths, portfolioPurposes, portfolioVisitorActions,
+    portfolioTargetVisitors, portfolioTargetIndustries, portfolioFeaturedCount,
+    portfolioPresentationStyles, portfolioProjects, portfolioHasImages, portfolioBio,
+    portfolioDifferentiators, portfolioDifferentiatorDetail, portfolioHasPhoto,
+    portfolioShowEducation, portfolioEducationDetails, portfolioShowExperience,
+    portfolioExperienceDetails, portfolioShowServices, portfolioServicesOffered,
+    portfolioServicesOther, portfolioShowPricing, portfolioPricingDetails,
+    portfolioTypicalProcess, portfolioHasTestimonials, portfolioTestimonialsList,
+    portfolioNotableBrands, portfolioHasAwards, portfolioAwardsDetails, portfolioHasLogo,
+    portfolioLogoDesign, portfolioHasBrandColors, portfolioColorsCount, portfolioBrandColors,
+    portfolioVisualPersonalities, portfolioInspirations, portfolioInspirationDetail,
+    portfolioPagesNeeded, portfolioPreferredStructure, portfolioHasBlog, portfolioBlogTopics,
+    portfolioHasCV, portfolioFeaturesNeeded, portfolioContactPreferences, portfolioAnimationLevel,
+    portfolioHasNDA, portfolioTrafficSources, portfolioWantsSEO, portfolioCustomDomain,
+    portfolioDeadline, portfolioBudget, portfolioDrivingEvent, portfolioAdditionalNotes
   });
 
   // Load snapshot back into active state
@@ -295,6 +387,65 @@ export default function AdminKycbQuestionnaire({
     setLpWhyChoose(snap.lpWhyChoose ?? []);
     setLpWhatMakesSpecial(snap.lpWhatMakesSpecial ?? []);
     setLpWhatMakesSpecialDetail(snap.lpWhatMakesSpecialDetail ?? '');
+
+    // restore Portfolio specific states
+    setPortfolioProfession(snap.portfolioProfession ?? '');
+    setPortfolioProfessionOther(snap.portfolioProfessionOther ?? '');
+    setPortfolioTools(snap.portfolioTools ?? []);
+    setPortfolioToolsOther(snap.portfolioToolsOther ?? '');
+    setPortfolioYearsExperience(snap.portfolioYearsExperience ?? '');
+    setPortfolioStrengths(snap.portfolioStrengths ?? '');
+    setPortfolioPurposes(snap.portfolioPurposes ?? []);
+    setPortfolioVisitorActions(snap.portfolioVisitorActions ?? []);
+    setPortfolioTargetVisitors(snap.portfolioTargetVisitors ?? []);
+    setPortfolioTargetIndustries(snap.portfolioTargetIndustries ?? []);
+    setPortfolioFeaturedCount(snap.portfolioFeaturedCount ?? '3-4');
+    setPortfolioPresentationStyles(snap.portfolioPresentationStyles ?? []);
+    setPortfolioProjects(snap.portfolioProjects ?? [{ title: '', company: '', desc: '', year: '', category: '', link: '', tools: '' }]);
+    setPortfolioHasImages(snap.portfolioHasImages ?? 'no');
+    setPortfolioBio(snap.portfolioBio ?? '');
+    setPortfolioDifferentiators(snap.portfolioDifferentiators ?? []);
+    setPortfolioDifferentiatorDetail(snap.portfolioDifferentiatorDetail ?? '');
+    setPortfolioHasPhoto(snap.portfolioHasPhoto ?? 'no');
+    setPortfolioShowEducation(snap.portfolioShowEducation ?? 'no');
+    setPortfolioEducationDetails(snap.portfolioEducationDetails ?? '');
+    setPortfolioShowExperience(snap.portfolioShowExperience ?? 'no');
+    setPortfolioExperienceDetails(snap.portfolioExperienceDetails ?? '');
+    setPortfolioShowServices(snap.portfolioShowServices ?? 'no');
+    setPortfolioServicesOffered(snap.portfolioServicesOffered ?? []);
+    setPortfolioServicesOther(snap.portfolioServicesOther ?? '');
+    setPortfolioShowPricing(snap.portfolioShowPricing ?? 'no');
+    setPortfolioPricingDetails(snap.portfolioPricingDetails ?? '');
+    setPortfolioTypicalProcess(snap.portfolioTypicalProcess ?? []);
+    setPortfolioHasTestimonials(snap.portfolioHasTestimonials ?? 'no');
+    setPortfolioTestimonialsList(snap.portfolioTestimonialsList ?? [{ quote: '', name: '', titleCompany: '' }]);
+    setPortfolioNotableBrands(snap.portfolioNotableBrands ?? '');
+    setPortfolioHasAwards(snap.portfolioHasAwards ?? 'no');
+    setPortfolioAwardsDetails(snap.portfolioAwardsDetails ?? '');
+    setPortfolioHasLogo(snap.portfolioHasLogo ?? 'no');
+    setPortfolioLogoDesign(snap.portfolioLogoDesign ?? 'no');
+    setPortfolioHasBrandColors(snap.portfolioHasBrandColors ?? 'no');
+    setPortfolioColorsCount(snap.portfolioColorsCount ?? 1);
+    setPortfolioBrandColors(snap.portfolioBrandColors ?? ['#1A3C6E', '#D4A017', '#FFFFFF']);
+    setPortfolioVisualPersonalities(snap.portfolioVisualPersonalities ?? []);
+    setPortfolioInspirations(snap.portfolioInspirations ?? ['']);
+    setPortfolioInspirationDetail(snap.portfolioInspirationDetail ?? '');
+    setPortfolioPagesNeeded(snap.portfolioPagesNeeded ?? []);
+    setPortfolioPreferredStructure(snap.portfolioPreferredStructure ?? 'hybrid');
+    setPortfolioHasBlog(snap.portfolioHasBlog ?? 'no');
+    setPortfolioBlogTopics(snap.portfolioBlogTopics ?? '');
+    setPortfolioHasCV(snap.portfolioHasCV ?? 'no');
+    setPortfolioFeaturesNeeded(snap.portfolioFeaturesNeeded ?? []);
+    setPortfolioContactPreferences(snap.portfolioContactPreferences ?? []);
+    setPortfolioAnimationLevel(snap.portfolioAnimationLevel ?? 'moderate');
+    setPortfolioHasNDA(snap.portfolioHasNDA ?? 'no');
+    setPortfolioTrafficSources(snap.portfolioTrafficSources ?? []);
+    setPortfolioWantsSEO(snap.portfolioWantsSEO ?? 'no');
+    setPortfolioCustomDomain(snap.portfolioCustomDomain ?? '');
+    setPortfolioDeadline(snap.portfolioDeadline ?? '');
+    setPortfolioBudget(snap.portfolioBudget ?? '');
+    setPortfolioDrivingEvent(snap.portfolioDrivingEvent ?? []);
+    setPortfolioAdditionalNotes(snap.portfolioAdditionalNotes ?? '');
   };
 
   const [copied, setCopied] = useState(false);
@@ -307,7 +458,7 @@ export default function AdminKycbQuestionnaire({
     text += `[METADATA]\n`;
     text += `- Client Name: ${clientName || 'Not specified'}\n`;
     text += `- Date Completed: ${dateCompleted || 'Not specified'}\n`;
-    text += `- Target Profile: ${activeTab === 'lp' ? 'LANDING PAGE' : 'ECOMMERCE WEBSITE'}\n`;
+    text += `- Target Profile: ${activeTab === 'lp' ? 'LANDING PAGE' : (activeTab === 'ec' ? 'ECOMMERCE WEBSITE' : 'PORTFOLIO WEBSITE')}\n`;
     text += `- Business Name: ${businessName || 'Not specified'}\n`;
     text += `- Industry / Niche: ${industry || 'Not specified'}\n`;
     text += `- Phone Number: ${phone || 'Not specified'}\n`;
@@ -372,7 +523,7 @@ export default function AdminKycbQuestionnaire({
       text += `- Target Launch Deadline: ${deadline || 'Not specified'}\n`;
       text += `- Stated Budget Limit Range: ${budgetRange || 'Not specified'}\n`;
       text += `- Consulting General Notes: ${additionalNotes || 'None'}\n`;
-    } else {
+    } else if (activeTab === 'ec') {
       text += `[SECTION 2: ECOMMERCE STORE BUSINESS MODEL]\n`;
       text += `- E-commerce Sub-Type: ${ecommerceType.join(', ') || 'None'}\n`;
       text += `- On-hand Inventory Details: ${hasInventory === 'yes' ? `Yes, stored at: ${inventoryLocation}` : 'No'}\n\n`;
@@ -457,6 +608,98 @@ export default function AdminKycbQuestionnaire({
       text += `- Target Launch Deadline: ${deadline || 'Not specified'}\n`;
       text += `- Target Budget Limits: ${budgetRange || 'Not specified'}\n`;
       text += `- Consultative General Notes: ${additionalNotes || 'None'}\n`;
+    } else if (activeTab === 'portfolio') {
+      text += `[SECTION 1: PERSONAL & PROFESSION DETAILS]\n`;
+      text += `- Professional Job Title: ${portfolioProfession === 'Other' ? portfolioProfessionOther : (portfolioProfession || 'Not specified')}\n`;
+      text += `- Tools & Technologies: ${portfolioTools.join(', ') || 'None'}\n`;
+      if (portfolioTools.includes('Other')) {
+        text += `  * Other Tools: ${portfolioToolsOther}\n`;
+      }
+      text += `- Years of Experience: ${portfolioYearsExperience || 'Not specified'}\n`;
+      text += `- Core Strengths: ${portfolioStrengths || 'None'}\n\n`;
+
+      text += `[SECTION 2: PORTFOLIO PURPOSE & ACTIONS]\n`;
+      text += `- Primary Purpose: ${portfolioPurposes.join(', ') || 'None'}\n`;
+      text += `- Desired Visitor Actions: ${portfolioVisitorActions.join(', ') || 'None'}\n`;
+      text += `- Target Audience & Demographics: ${portfolioTargetVisitors.join(', ') || 'None'}\n`;
+      text += `- Industries of Interest: ${portfolioTargetIndustries.join(', ') || 'None'}\n\n`;
+
+      text += `[SECTION 3: WORK SAMPLES & PROJECT ARCHIVE]\n`;
+      text += `- Curator Projected Count: ${portfolioFeaturedCount}\n`;
+      text += `- Presentation Styles Selected: ${portfolioPresentationStyles.join(', ') || 'None'}\n`;
+      text += `- Curated Project Cards:\n`;
+      portfolioProjects.forEach((proj, idx) => {
+        text += `  * Project #${idx + 1}: ${proj.title || '(unnamed)'}\n`;
+        text += `    - Client/Company: ${proj.company || 'N/A'}\n`;
+        text += `    - Summary Work Done: ${proj.desc || 'N/A'}\n`;
+        text += `    - Completed Year: ${proj.year || 'N/A'}\n`;
+        text += `    - Category: ${proj.category || 'N/A'}\n`;
+        text += `    - Tools Used: ${proj.tools || 'N/A'}\n`;
+        text += `    - Target Link: ${proj.link || 'N/A'}\n`;
+      });
+      text += `- Project Images Provided: ${portfolioHasImages === 'yes' ? 'Yes' : (portfolioHasImages === 'some' ? 'Some' : 'No (use placeholders)')}\n\n`;
+
+      text += `[SECTION 4: BIO & DIFFERENTIATORS]\n`;
+      text += `- Professional Bio Narrative: ${portfolioBio || 'None'}\n`;
+      text += `- Key Differentiator Elements: ${portfolioDifferentiators.join(', ') || 'None'}\n`;
+      text += `- Differentiator Custom Statement: ${portfolioDifferentiatorDetail || 'None'}\n`;
+      text += `- Include Professional Photo: ${portfolioHasPhoto === 'yes' ? 'Yes' : 'No'}\n`;
+      text += `- Education Timeline: ${portfolioShowEducation === 'yes' ? `Yes; Details: ${portfolioEducationDetails}` : 'No'}\n`;
+      text += `- Experience Timeline: ${portfolioShowExperience === 'yes' ? `Yes; Details: ${portfolioExperienceDetails}` : 'No'}\n\n`;
+
+      text += `[SECTION 5: SERVICES & OFFERINGS]\n`;
+      text += `- Show Services Offered: ${portfolioShowServices === 'yes' ? 'Yes' : 'No'}\n`;
+      if (portfolioShowServices === 'yes') {
+        text += `  * Services: ${portfolioServicesOffered.join(', ') || 'None'}\n`;
+        if (portfolioServicesOffered.includes('Other')) {
+          text += `  * Other Services Detail: ${portfolioServicesOther}\n`;
+        }
+      }
+      text += `- Show Pricing Rates: ${portfolioShowPricing === 'yes' ? `Yes; Details: ${portfolioPricingDetails}` : 'No (Enquiry only)'}\n`;
+      text += `- Standard Milestone Process: ${portfolioTypicalProcess.join(', ') || 'None'}\n\n`;
+
+      text += `[SECTION 6: TESTIMONIALS & RECOGNITIONS]\n`;
+      text += `- Has Client Testimonials: ${portfolioHasTestimonials === 'yes' ? 'Yes' : 'No (use placeholders)'}\n`;
+      if (portfolioHasTestimonials === 'yes') {
+        portfolioTestimonialsList.forEach((test, idx) => {
+          text += `  * Testimonial #${idx + 1}:\n`;
+          text += `    - Quote: ${test.quote || 'N/A'}\n`;
+          text += `    - Author: ${test.name || 'Anonymous'}\n`;
+          text += `    - Role/Company: ${test.titleCompany || 'N/A'}\n`;
+        });
+      }
+      text += `- Brands Worked With: ${portfolioNotableBrands || 'None'}\n`;
+      text += `- Awards & Recognitions: ${portfolioHasAwards === 'yes' ? `Yes; Details: ${portfolioAwardsDetails}` : 'No'}\n\n`;
+
+      text += `[SECTION 7: BRANDING & VISUAL STYLE]\n`;
+      text += `- Logo Status: ${portfolioHasLogo === 'yes' ? 'Client will provide' : (portfolioLogoDesign === 'yes' ? 'Needs logo designed' : 'No logo needed')}\n`;
+      text += `- Color Scheme Preference: ${portfolioHasBrandColors === 'yes' ? `Custom colours: ${portfolioBrandColors.slice(0, portfolioColorsCount).join(', ')}` : 'Let freelancer decide'}\n`;
+      text += `- Visual Personalities Selected: ${portfolioVisualPersonalities.join(', ') || 'None'}\n`;
+      text += `- Admiration Inspirations: ${portfolioInspirations.filter(Boolean).join(', ') || 'None'}\n`;
+      text += `- Inspiration Custom Details: ${portfolioInspirationDetail || 'None'}\n\n`;
+
+      text += `[SECTION 8: PAGES & ARCHITECTURE]\n`;
+      text += `- Pages/Sections Needed: ${portfolioPagesNeeded.join(', ') || 'None'}\n`;
+      text += `- Preferred Layout Structure: ${portfolioPreferredStructure}\n`;
+      text += `- Has Blog / Articles: ${portfolioHasBlog === 'yes' ? `Yes; Topics: ${portfolioBlogTopics}` : 'No'}\n`;
+      text += `- Include CV/Resume Button: ${portfolioHasCV === 'yes' ? 'Yes (will provide file)' : (portfolioHasCV === 'placeholder' ? 'Yes (use placeholder)' : 'No')}\n\n`;
+
+      text += `[SECTION 9: FUNCTIONAL SPECIFICATIONS]\n`;
+      text += `- Features Required: ${portfolioFeaturesNeeded.join(', ') || 'None'}\n`;
+      text += `- Contact Preference Channels: ${portfolioContactPreferences.join(', ') || 'None'}\n`;
+      text += `- Animation Level Preference: ${portfolioAnimationLevel}\n`;
+      text += `- NDA Password-Locked Work Required: ${portfolioHasNDA === 'yes' ? 'Yes' : 'No'}\n\n`;
+
+      text += `[SECTION 10: TRAFFIC STRATEGY]\n`;
+      text += `- Project Discovery Sources: ${portfolioTrafficSources.join(', ') || 'None'}\n`;
+      text += `- Optimize Search Visibility (SEO): ${portfolioWantsSEO === 'yes' ? 'Yes' : 'No'}\n`;
+      text += `- Custom Domain Preference: ${portfolioCustomDomain || 'None (or not specified)'}\n\n`;
+
+      text += `[SECTION 11: LAUNCH TIMELINE & FINANCE]\n`;
+      text += `- Launch Target Deadline: ${portfolioDeadline || 'Not specified'}\n`;
+      text += `- Financial Budget Limits: ${portfolioBudget || 'Not specified'}\n`;
+      text += `- Motivating Driver Events: ${portfolioDrivingEvent.join(', ') || 'None'}\n`;
+      text += `- Special Instructions & Notes: ${portfolioAdditionalNotes || 'None'}\n`;
     }
 
     text += `\n========================================================================\n`;
@@ -573,6 +816,65 @@ export default function AdminKycbQuestionnaire({
     setLpWhyChoose([]);
     setLpWhatMakesSpecial([]);
     setLpWhatMakesSpecialDetail('');
+
+    // reset Portfolio specific states
+    setPortfolioProfession('');
+    setPortfolioProfessionOther('');
+    setPortfolioTools([]);
+    setPortfolioToolsOther('');
+    setPortfolioYearsExperience('');
+    setPortfolioStrengths('');
+    setPortfolioPurposes([]);
+    setPortfolioVisitorActions([]);
+    setPortfolioTargetVisitors([]);
+    setPortfolioTargetIndustries([]);
+    setPortfolioFeaturedCount('3-4');
+    setPortfolioPresentationStyles([]);
+    setPortfolioProjects([{ title: '', company: '', desc: '', year: '', category: '', link: '', tools: '' }]);
+    setPortfolioHasImages('no');
+    setPortfolioBio('');
+    setPortfolioDifferentiators([]);
+    setPortfolioDifferentiatorDetail('');
+    setPortfolioHasPhoto('no');
+    setPortfolioShowEducation('no');
+    setPortfolioEducationDetails('');
+    setPortfolioShowExperience('no');
+    setPortfolioExperienceDetails('');
+    setPortfolioShowServices('no');
+    setPortfolioServicesOffered([]);
+    setPortfolioServicesOther('');
+    setPortfolioShowPricing('no');
+    setPortfolioPricingDetails('');
+    setPortfolioTypicalProcess([]);
+    setPortfolioHasTestimonials('no');
+    setPortfolioTestimonialsList([{ quote: '', name: '', titleCompany: '' }]);
+    setPortfolioNotableBrands('');
+    setPortfolioHasAwards('no');
+    setPortfolioAwardsDetails('');
+    setPortfolioHasLogo('no');
+    setPortfolioLogoDesign('no');
+    setPortfolioHasBrandColors('no');
+    setPortfolioColorsCount(1);
+    setPortfolioBrandColors(['#1A3C6E', '#D4A017', '#FFFFFF']);
+    setPortfolioVisualPersonalities([]);
+    setPortfolioInspirations(['']);
+    setPortfolioInspirationDetail('');
+    setPortfolioPagesNeeded([]);
+    setPortfolioPreferredStructure('hybrid');
+    setPortfolioHasBlog('no');
+    setPortfolioBlogTopics('');
+    setPortfolioHasCV('no');
+    setPortfolioFeaturesNeeded([]);
+    setPortfolioContactPreferences([]);
+    setPortfolioAnimationLevel('moderate');
+    setPortfolioHasNDA('no');
+    setPortfolioTrafficSources([]);
+    setPortfolioWantsSEO('no');
+    setPortfolioCustomDomain('');
+    setPortfolioDeadline('');
+    setPortfolioBudget('');
+    setPortfolioDrivingEvent([]);
+    setPortfolioAdditionalNotes('');
   };
 
   useEffect(() => {
@@ -609,6 +911,18 @@ export default function AdminKycbQuestionnaire({
         console.error("Failed loading EC draft", e);
       }
     }
+    const portfolioRaw = localStorage.getItem('kycb_draft_portfolio');
+    if (portfolioRaw) {
+      try {
+        const portfolioParsed = JSON.parse(portfolioRaw);
+        setPortfolioDraft(portfolioParsed);
+        if (activeTab === 'portfolio') {
+          loadFormSnapshot(portfolioParsed);
+        }
+      } catch (e) {
+        console.error("Failed loading Portfolio draft", e);
+      }
+    }
   }, [isAdminMode, userId]);
 
   // Autosave current draft whenever typing (with currentId === null)
@@ -618,8 +932,10 @@ export default function AdminKycbQuestionnaire({
     const snapshot = getFormSnapshot();
     if (activeTab === 'lp') {
       localStorage.setItem('kycb_draft_lp', JSON.stringify(snapshot));
-    } else {
+    } else if (activeTab === 'ec') {
       localStorage.setItem('kycb_draft_ec', JSON.stringify(snapshot));
+    } else if (activeTab === 'portfolio') {
+      localStorage.setItem('kycb_draft_portfolio', JSON.stringify(snapshot));
     }
   }, [
     clientName, dateCompleted, businessName, industry, phone, email, address,
@@ -635,7 +951,25 @@ export default function AdminKycbQuestionnaire({
     deliveryStates, deliveryOptions, chargeDelivery, deliveryFee, logisticsPartner,
     notificationMethods, autoConf, activeTab, hasSocialMediaAsked, hasCustomIndustryOption,
     viewPerspective, ecSpecialOffers, ecSpecialOffersDetail, ecWhyBuy,
-    ecProductDiff, ecProductDiffDetail, ecWebsiteStyle, ecPages, ecMarketingHelp
+    ecProductDiff, ecProductDiffDetail, ecWebsiteStyle, ecPages, ecMarketingHelp,
+    
+    // portfolio dependency triggers
+    portfolioProfession, portfolioProfessionOther, portfolioTools, portfolioToolsOther,
+    portfolioYearsExperience, portfolioStrengths, portfolioPurposes, portfolioVisitorActions,
+    portfolioTargetVisitors, portfolioTargetIndustries, portfolioFeaturedCount,
+    portfolioPresentationStyles, portfolioProjects, portfolioHasImages, portfolioBio,
+    portfolioDifferentiators, portfolioDifferentiatorDetail, portfolioHasPhoto,
+    portfolioShowEducation, portfolioEducationDetails, portfolioShowExperience,
+    portfolioExperienceDetails, portfolioShowServices, portfolioServicesOffered,
+    portfolioServicesOther, portfolioShowPricing, portfolioPricingDetails,
+    portfolioTypicalProcess, portfolioHasTestimonials, portfolioTestimonialsList,
+    portfolioNotableBrands, portfolioHasAwards, portfolioAwardsDetails, portfolioHasLogo,
+    portfolioLogoDesign, portfolioHasBrandColors, portfolioColorsCount, portfolioBrandColors,
+    portfolioVisualPersonalities, portfolioInspirations, portfolioInspirationDetail,
+    portfolioPagesNeeded, portfolioPreferredStructure, portfolioHasBlog, portfolioBlogTopics,
+    portfolioHasCV, portfolioFeaturesNeeded, portfolioContactPreferences, portfolioAnimationLevel,
+    portfolioHasNDA, portfolioTrafficSources, portfolioWantsSEO, portfolioCustomDomain,
+    portfolioDeadline, portfolioBudget, portfolioDrivingEvent, portfolioAdditionalNotes
   ]);
 
   const fetchForms = async () => {
@@ -738,7 +1072,65 @@ export default function AdminKycbQuestionnaire({
         lpOfferPromoDetail,
         lpWhyChoose,
         lpWhatMakesSpecial,
-        lpWhatMakesSpecialDetail
+        lpWhatMakesSpecialDetail,
+        // Portfolio specific states
+        portfolioProfession,
+        portfolioProfessionOther,
+        portfolioTools,
+        portfolioToolsOther,
+        portfolioYearsExperience,
+        portfolioStrengths,
+        portfolioPurposes,
+        portfolioVisitorActions,
+        portfolioTargetVisitors,
+        portfolioTargetIndustries,
+        portfolioFeaturedCount,
+        portfolioPresentationStyles,
+        portfolioProjects,
+        portfolioHasImages,
+        portfolioBio,
+        portfolioDifferentiators,
+        portfolioDifferentiatorDetail,
+        portfolioHasPhoto,
+        portfolioShowEducation,
+        portfolioEducationDetails,
+        portfolioShowExperience,
+        portfolioExperienceDetails,
+        portfolioShowServices,
+        portfolioServicesOffered,
+        portfolioServicesOther,
+        portfolioShowPricing,
+        portfolioPricingDetails,
+        portfolioTypicalProcess,
+        portfolioHasTestimonials,
+        portfolioTestimonialsList,
+        portfolioNotableBrands,
+        portfolioHasAwards,
+        portfolioAwardsDetails,
+        portfolioHasLogo,
+        portfolioLogoDesign,
+        portfolioHasBrandColors,
+        portfolioColorsCount,
+        portfolioBrandColors,
+        portfolioVisualPersonalities,
+        portfolioInspirations,
+        portfolioInspirationDetail,
+        portfolioPagesNeeded,
+        portfolioPreferredStructure,
+        portfolioHasBlog,
+        portfolioBlogTopics,
+        portfolioHasCV,
+        portfolioFeaturesNeeded,
+        portfolioContactPreferences,
+        portfolioAnimationLevel,
+        portfolioHasNDA,
+        portfolioTrafficSources,
+        portfolioWantsSEO,
+        portfolioCustomDomain,
+        portfolioDeadline,
+        portfolioBudget,
+        portfolioDrivingEvent,
+        portfolioAdditionalNotes
       }
     };
 
@@ -751,9 +1143,12 @@ export default function AdminKycbQuestionnaire({
         if (activeTab === 'lp') {
           localStorage.removeItem('kycb_draft_lp');
           setLpDraft(null);
-        } else {
+        } else if (activeTab === 'ec') {
           localStorage.removeItem('kycb_draft_ec');
           setEcDraft(null);
+        } else if (activeTab === 'portfolio') {
+          localStorage.removeItem('kycb_draft_portfolio');
+          setPortfolioDraft(null);
         }
       }
       alert("Questionnaire saved successfully!");
@@ -866,6 +1261,65 @@ export default function AdminKycbQuestionnaire({
     setLpWhyChoose(d.lpWhyChoose || []);
     setLpWhatMakesSpecial(d.lpWhatMakesSpecial || []);
     setLpWhatMakesSpecialDetail(d.lpWhatMakesSpecialDetail || '');
+
+    // Portfolio specific states hydration
+    setPortfolioProfession(d.portfolioProfession ?? '');
+    setPortfolioProfessionOther(d.portfolioProfessionOther ?? '');
+    setPortfolioTools(d.portfolioTools ?? []);
+    setPortfolioToolsOther(d.portfolioToolsOther ?? '');
+    setPortfolioYearsExperience(d.portfolioYearsExperience ?? '');
+    setPortfolioStrengths(d.portfolioStrengths ?? '');
+    setPortfolioPurposes(d.portfolioPurposes ?? []);
+    setPortfolioVisitorActions(d.portfolioVisitorActions ?? []);
+    setPortfolioTargetVisitors(d.portfolioTargetVisitors ?? []);
+    setPortfolioTargetIndustries(d.portfolioTargetIndustries ?? []);
+    setPortfolioFeaturedCount(d.portfolioFeaturedCount ?? '3-4');
+    setPortfolioPresentationStyles(d.portfolioPresentationStyles ?? []);
+    setPortfolioProjects(d.portfolioProjects ?? [{ title: '', company: '', desc: '', year: '', category: '', link: '', tools: '' }]);
+    setPortfolioHasImages(d.portfolioHasImages ?? 'no');
+    setPortfolioBio(d.portfolioBio ?? '');
+    setPortfolioDifferentiators(d.portfolioDifferentiators ?? []);
+    setPortfolioDifferentiatorDetail(d.portfolioDifferentiatorDetail ?? '');
+    setPortfolioHasPhoto(d.portfolioHasPhoto ?? 'no');
+    setPortfolioShowEducation(d.portfolioShowEducation ?? 'no');
+    setPortfolioEducationDetails(d.portfolioEducationDetails ?? '');
+    setPortfolioShowExperience(d.portfolioShowExperience ?? 'no');
+    setPortfolioExperienceDetails(d.portfolioExperienceDetails ?? '');
+    setPortfolioShowServices(d.portfolioShowServices ?? 'no');
+    setPortfolioServicesOffered(d.portfolioServicesOffered ?? []);
+    setPortfolioServicesOther(d.portfolioServicesOther ?? '');
+    setPortfolioShowPricing(d.portfolioShowPricing ?? 'no');
+    setPortfolioPricingDetails(d.portfolioPricingDetails ?? '');
+    setPortfolioTypicalProcess(d.portfolioTypicalProcess ?? []);
+    setPortfolioHasTestimonials(d.portfolioHasTestimonials ?? 'no');
+    setPortfolioTestimonialsList(d.portfolioTestimonialsList ?? [{ quote: '', name: '', titleCompany: '' }]);
+    setPortfolioNotableBrands(d.portfolioNotableBrands ?? '');
+    setPortfolioHasAwards(d.portfolioHasAwards ?? 'no');
+    setPortfolioAwardsDetails(d.portfolioAwardsDetails ?? '');
+    setPortfolioHasLogo(d.portfolioHasLogo ?? 'no');
+    setPortfolioLogoDesign(d.portfolioLogoDesign ?? 'no');
+    setPortfolioHasBrandColors(d.portfolioHasBrandColors ?? 'no');
+    setPortfolioColorsCount(d.portfolioColorsCount ?? 1);
+    setPortfolioBrandColors(d.portfolioBrandColors ?? ['#1A3C6E', '#D4A017', '#FFFFFF']);
+    setPortfolioVisualPersonalities(d.portfolioVisualPersonalities ?? []);
+    setPortfolioInspirations(d.portfolioInspirations ?? ['']);
+    setPortfolioInspirationDetail(d.portfolioInspirationDetail ?? '');
+    setPortfolioPagesNeeded(d.portfolioPagesNeeded ?? []);
+    setPortfolioPreferredStructure(d.portfolioPreferredStructure ?? 'hybrid');
+    setPortfolioHasBlog(d.portfolioHasBlog ?? 'no');
+    setPortfolioBlogTopics(d.portfolioBlogTopics ?? '');
+    setPortfolioHasCV(d.portfolioHasCV ?? 'no');
+    setPortfolioFeaturesNeeded(d.portfolioFeaturesNeeded ?? []);
+    setPortfolioContactPreferences(d.portfolioContactPreferences ?? []);
+    setPortfolioAnimationLevel(d.portfolioAnimationLevel ?? 'moderate');
+    setPortfolioHasNDA(d.portfolioHasNDA ?? 'no');
+    setPortfolioTrafficSources(d.portfolioTrafficSources ?? []);
+    setPortfolioWantsSEO(d.portfolioWantsSEO ?? 'no');
+    setPortfolioCustomDomain(d.portfolioCustomDomain ?? '');
+    setPortfolioDeadline(d.portfolioDeadline ?? '');
+    setPortfolioBudget(d.portfolioBudget ?? '');
+    setPortfolioDrivingEvent(d.portfolioDrivingEvent ?? []);
+    setPortfolioAdditionalNotes(d.portfolioAdditionalNotes ?? '');
   };
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -883,7 +1337,7 @@ export default function AdminKycbQuestionnaire({
     }
   };
 
-  const handleTabToggle = (nextTab: 'lp' | 'ec') => {
+  const handleTabToggle = (nextTab: 'lp' | 'ec' | 'portfolio') => {
     if (currentId) {
       setActiveTab(nextTab);
       return;
@@ -894,16 +1348,19 @@ export default function AdminKycbQuestionnaire({
     if (activeTab === 'lp') {
       setLpDraft(currentSnapshot);
       localStorage.setItem('kycb_draft_lp', JSON.stringify(currentSnapshot));
-    } else {
+    } else if (activeTab === 'ec') {
       setEcDraft(currentSnapshot);
       localStorage.setItem('kycb_draft_ec', JSON.stringify(currentSnapshot));
+    } else if (activeTab === 'portfolio') {
+      setPortfolioDraft(currentSnapshot);
+      localStorage.setItem('kycb_draft_portfolio', JSON.stringify(currentSnapshot));
     }
 
     // Switch tab
     setActiveTab(nextTab);
 
     // Restore next tab's draft
-    let targetDraft = nextTab === 'lp' ? lpDraft : ecDraft;
+    let targetDraft = nextTab === 'lp' ? lpDraft : (nextTab === 'ec' ? ecDraft : portfolioDraft);
     if (!targetDraft) {
       const raw = localStorage.getItem(`kycb_draft_${nextTab}`);
       if (raw) {
@@ -981,7 +1438,7 @@ export default function AdminKycbQuestionnaire({
               >
                 <div className="space-y-1">
                   <span className="text-[11px] uppercase tracking-wider font-extrabold text-[#D4A017] flex items-center gap-1">
-                    {form.type === 'lp' ? '✏️ LANDING PAGE' : '🛒 ECOMMERCE'}
+                    {form.type === 'lp' ? '✏️ LANDING PAGE' : (form.type === 'ec' ? '🛒 ECOMMERCE' : '💼 PORTFOLIO')}
                   </span>
                   <div className="font-extrabold text-[#1A3C6E] text-xs truncate max-w-[150px]">{form.clientName}</div>
                   <div className="text-[10px] text-slate-400 font-bold truncate max-w-[150px]">{form.businessName}</div>
@@ -1003,7 +1460,9 @@ export default function AdminKycbQuestionnaire({
       <div className={`flex-1 rounded-3xl border p-4 md:p-8 shadow-sm transition-all duration-300 ${
         activeTab === 'lp' 
           ? 'bg-[#FCFDFF] border-slate-200' 
-          : 'bg-[#FCFAF3] border-amber-200/50 shadow-amber-900/[0.01]'
+          : activeTab === 'ec'
+            ? 'bg-[#FCFAF3] border-amber-200/50 shadow-amber-900/[0.01]'
+            : 'bg-[#FAFDFD] border-teal-200/40 shadow-teal-950/[0.01]'
       }`}>
         <div className="text-center md:text-left border-b border-slate-100 pb-5 mb-6">
           <h1 className="text-xl md:text-2xl font-black text-[#1A3C6E] tracking-tight flex items-center justify-center md:justify-start gap-2">
@@ -1070,7 +1529,7 @@ export default function AdminKycbQuestionnaire({
           </div>
         </div>
 
-        {/* Dual Tab Controls */}
+        {/* Triple Tab Controls */}
         <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-6">
           <button
             type="button"
@@ -1079,7 +1538,7 @@ export default function AdminKycbQuestionnaire({
               activeTab === 'lp' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
             }`}
           >
-            ✏️ Landing Page Sections
+            ✏️ Landing Page
           </button>
           <button
             type="button"
@@ -1089,6 +1548,15 @@ export default function AdminKycbQuestionnaire({
             }`}
           >
             🛒 eCommerce Specifics
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabToggle('portfolio')}
+            className={`flex-1 py-3 px-3 text-center rounded-lg text-xs font-black transition-all cursor-pointer ${
+              activeTab === 'portfolio' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
+            }`}
+          >
+            💼 Portfolio Questionnaire
           </button>
         </div>
 
@@ -1208,7 +1676,7 @@ export default function AdminKycbQuestionnaire({
               removeArrayItem={removeArrayItem}
               addArrayItem={addArrayItem}
             />
-          ) : (
+          ) : activeTab === 'ec' ? (
             <EcQuestionnaireForm
               viewPerspective={viewPerspective || 'client'}
               hasSite={hasSite}
@@ -1339,6 +1807,144 @@ export default function AdminKycbQuestionnaire({
               setBudgetRange={setBudgetRange}
               additionalNotes={additionalNotes}
               setAdditionalNotes={setAdditionalNotes}
+              toggleMultiSelect={toggleMultiSelect}
+              updateArrayItem={updateArrayItem}
+              removeArrayItem={removeArrayItem}
+              addArrayItem={addArrayItem}
+            />
+          ) : (
+            <PortfolioQuestionnaireForm
+              viewPerspective={viewPerspective || 'client'}
+              hasSite={hasSite}
+              setHasSite={setHasSite}
+              siteUrl={siteUrl}
+              setSiteUrl={setSiteUrl}
+              businessName={businessName}
+              setBusinessName={setBusinessName}
+              phone={phone}
+              setPhone={setPhone}
+              email={email}
+              setEmail={setEmail}
+              address={address}
+              setAddress={setAddress}
+              hasSocialMediaAsked={hasSocialMediaAsked}
+              setHasSocialMediaAsked={setHasSocialMediaAsked}
+              socialLinks={socialLinks}
+              setSocialLinks={setSocialLinks}
+              portfolioProfession={portfolioProfession}
+              setPortfolioProfession={setPortfolioProfession}
+              portfolioProfessionOther={portfolioProfessionOther}
+              setPortfolioProfessionOther={setPortfolioProfessionOther}
+              portfolioTools={portfolioTools}
+              setPortfolioTools={setPortfolioTools}
+              portfolioToolsOther={portfolioToolsOther}
+              setPortfolioToolsOther={setPortfolioToolsOther}
+              portfolioYearsExperience={portfolioYearsExperience}
+              setPortfolioYearsExperience={setPortfolioYearsExperience}
+              portfolioStrengths={portfolioStrengths}
+              setPortfolioStrengths={setPortfolioStrengths}
+              portfolioPurposes={portfolioPurposes}
+              setPortfolioPurposes={setPortfolioPurposes}
+              portfolioVisitorActions={portfolioVisitorActions}
+              setPortfolioVisitorActions={setPortfolioVisitorActions}
+              portfolioTargetVisitors={portfolioTargetVisitors}
+              setPortfolioTargetVisitors={setPortfolioTargetVisitors}
+              portfolioTargetIndustries={portfolioTargetIndustries}
+              setPortfolioTargetIndustries={setPortfolioTargetIndustries}
+              portfolioFeaturedCount={portfolioFeaturedCount}
+              setPortfolioFeaturedCount={setPortfolioFeaturedCount}
+              portfolioPresentationStyles={portfolioPresentationStyles}
+              setPortfolioPresentationStyles={setPortfolioPresentationStyles}
+              portfolioProjects={portfolioProjects}
+              setPortfolioProjects={setPortfolioProjects}
+              portfolioHasImages={portfolioHasImages}
+              setPortfolioHasImages={setPortfolioHasImages}
+              portfolioBio={portfolioBio}
+              setPortfolioBio={setPortfolioBio}
+              portfolioDifferentiators={portfolioDifferentiators}
+              setPortfolioDifferentiators={setPortfolioDifferentiators}
+              portfolioDifferentiatorDetail={portfolioDifferentiatorDetail}
+              setPortfolioDifferentiatorDetail={setPortfolioDifferentiatorDetail}
+              portfolioHasPhoto={portfolioHasPhoto}
+              setPortfolioHasPhoto={setPortfolioHasPhoto}
+              portfolioShowEducation={portfolioShowEducation}
+              setPortfolioShowEducation={setPortfolioShowEducation}
+              portfolioEducationDetails={portfolioEducationDetails}
+              setPortfolioEducationDetails={setPortfolioEducationDetails}
+              portfolioShowExperience={portfolioShowExperience}
+              setPortfolioShowExperience={setPortfolioShowExperience}
+              portfolioExperienceDetails={portfolioExperienceDetails}
+              setPortfolioExperienceDetails={setPortfolioExperienceDetails}
+              portfolioShowServices={portfolioShowServices}
+              setPortfolioShowServices={setPortfolioShowServices}
+              portfolioServicesOffered={portfolioServicesOffered}
+              setPortfolioServicesOffered={setPortfolioServicesOffered}
+              portfolioServicesOther={portfolioServicesOther}
+              setPortfolioServicesOther={setPortfolioServicesOther}
+              portfolioShowPricing={portfolioShowPricing}
+              setPortfolioShowPricing={setPortfolioShowPricing}
+              portfolioPricingDetails={portfolioPricingDetails}
+              setPortfolioPricingDetails={setPortfolioPricingDetails}
+              portfolioTypicalProcess={portfolioTypicalProcess}
+              setPortfolioTypicalProcess={setPortfolioTypicalProcess}
+              portfolioHasTestimonials={portfolioHasTestimonials}
+              setPortfolioHasTestimonials={setPortfolioHasTestimonials}
+              portfolioTestimonialsList={portfolioTestimonialsList}
+              setPortfolioTestimonialsList={setPortfolioTestimonialsList}
+              portfolioNotableBrands={portfolioNotableBrands}
+              setPortfolioNotableBrands={setPortfolioNotableBrands}
+              portfolioHasAwards={portfolioHasAwards}
+              setPortfolioHasAwards={setPortfolioHasAwards}
+              portfolioAwardsDetails={portfolioAwardsDetails}
+              setPortfolioAwardsDetails={setPortfolioAwardsDetails}
+              portfolioHasLogo={portfolioHasLogo}
+              setPortfolioHasLogo={setPortfolioHasLogo}
+              portfolioLogoDesign={portfolioLogoDesign}
+              setPortfolioLogoDesign={setPortfolioLogoDesign}
+              portfolioHasBrandColors={portfolioHasBrandColors}
+              setPortfolioHasBrandColors={setPortfolioHasBrandColors}
+              portfolioColorsCount={portfolioColorsCount}
+              setPortfolioColorsCount={setPortfolioColorsCount}
+              portfolioBrandColors={portfolioBrandColors}
+              setPortfolioBrandColors={setPortfolioBrandColors}
+              portfolioVisualPersonalities={portfolioVisualPersonalities}
+              setPortfolioVisualPersonalities={setPortfolioVisualPersonalities}
+              portfolioInspirations={portfolioInspirations}
+              setPortfolioInspirations={setPortfolioInspirations}
+              portfolioInspirationDetail={portfolioInspirationDetail}
+              setPortfolioInspirationDetail={setPortfolioInspirationDetail}
+              portfolioPagesNeeded={portfolioPagesNeeded}
+              setPortfolioPagesNeeded={setPortfolioPagesNeeded}
+              portfolioPreferredStructure={portfolioPreferredStructure}
+              setPortfolioPreferredStructure={setPortfolioPreferredStructure}
+              portfolioHasBlog={portfolioHasBlog}
+              setPortfolioHasBlog={setPortfolioHasBlog}
+              portfolioBlogTopics={portfolioBlogTopics}
+              setPortfolioBlogTopics={setPortfolioBlogTopics}
+              portfolioHasCV={portfolioHasCV}
+              setPortfolioHasCV={setPortfolioHasCV}
+              portfolioFeaturesNeeded={portfolioFeaturesNeeded}
+              setPortfolioFeaturesNeeded={setPortfolioFeaturesNeeded}
+              portfolioContactPreferences={portfolioContactPreferences}
+              setPortfolioContactPreferences={setPortfolioContactPreferences}
+              portfolioAnimationLevel={portfolioAnimationLevel}
+              setPortfolioAnimationLevel={setPortfolioAnimationLevel}
+              portfolioHasNDA={portfolioHasNDA}
+              setPortfolioHasNDA={setPortfolioHasNDA}
+              portfolioTrafficSources={portfolioTrafficSources}
+              setPortfolioTrafficSources={setPortfolioTrafficSources}
+              portfolioWantsSEO={portfolioWantsSEO}
+              setPortfolioWantsSEO={setPortfolioWantsSEO}
+              portfolioCustomDomain={portfolioCustomDomain}
+              setPortfolioCustomDomain={setPortfolioCustomDomain}
+              portfolioDeadline={portfolioDeadline}
+              setPortfolioDeadline={setPortfolioDeadline}
+              portfolioBudget={portfolioBudget}
+              setPortfolioBudget={setPortfolioBudget}
+              portfolioDrivingEvent={portfolioDrivingEvent}
+              setPortfolioDrivingEvent={setPortfolioDrivingEvent}
+              portfolioAdditionalNotes={portfolioAdditionalNotes}
+              setPortfolioAdditionalNotes={setPortfolioAdditionalNotes}
               toggleMultiSelect={toggleMultiSelect}
               updateArrayItem={updateArrayItem}
               removeArrayItem={removeArrayItem}

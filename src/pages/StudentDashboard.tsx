@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { invalidateCache } from '../lib/supabase-shim/firestore';
-import { db, auth, rtdb, handleFirestoreError, OperationType } from '../firebase';
+import { db, auth, rtdb, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, safeGetItem } from '../firebase';
 import { ref as dbRef, onValue } from 'firebase/database';
 import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link, useLocation } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../types';
-import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText } from 'lucide-react';
+import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText, Wifi, WifiOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 import LoginModal from '../components/LoginModal';
@@ -387,6 +387,38 @@ function formatWalkthroughDescription(descText: string) {
   );
 }
 
+// Unified day level lock validator helper function
+function isDayUnlockedUnified(
+  di: number,
+  days: any[],
+  completedKeys: string[],
+  dbSubmissions: any[] = [],
+  isCloned: boolean = false,
+  userProfile?: any,
+  courseId?: string
+) {
+  if (di === 0) return true;
+  
+  // 1. Manual day unlock check
+  const isDayManuallyUnlocked = userProfile?.manualDayUnlock?.[courseId || '']?.[di] === true;
+  if (isDayManuallyUnlocked) return true;
+
+  // 2. Clone course versus standard course rules
+  if (isCloned) {
+    // Cloned course: all videos/lessons of the previous day must be completed/watched
+    const prevDay = days[di - 1];
+    if (!prevDay) return false;
+    const prevDayVideos = prevDay.videos || [];
+    return prevDayVideos.every((_: any, vi: number) => {
+      const key = `${di - 1}-${vi}`;
+      return completedKeys.includes(key);
+    });
+  } else {
+    // Standard course: previous day's assignment must be approved
+    return dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
+  }
+}
+
 // Unified lesson lock validator helper function
 function isLessonUnlockedUnified(
   di: number, 
@@ -400,7 +432,36 @@ function isLessonUnlockedUnified(
   userProfile?: any,
   courseId?: string
 ) {
-  // Always unlock all lessons and days for everyone without restriction
+  if (isAdmin) return true;
+
+  // 1. Check if the day di is unlocked on a day-level
+  const isDayUnlocked = isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, isCloned, userProfile, courseId);
+  if (!isDayUnlocked) return false;
+
+  // 2. Enforce that for every preceding lesson in the course (across all days),
+  // if that preceding lesson has a quiz, it MUST have been passed with >= 80% check mark.
+  for (let d = 0; d <= di; d++) {
+    const dayItem = days[d];
+    if (!dayItem) continue;
+    const videosList = dayItem.videos || [];
+    
+    // For day d, we only check lessons up to vi (if d === di) or all lessons (if d < di)
+    const maxV = d === di ? vi : videosList.length;
+    for (let v = 0; v < maxV; v++) {
+      const vItem = videosList[v];
+      if (!vItem) continue;
+
+      const hasQuiz = vItem.checkType && vItem.checkType !== 'none' && vItem.check;
+      if (hasQuiz) {
+        const key = `${d}-${v}`;
+        const isPassed = checkPassedKeys.includes(key);
+        if (!isPassed) {
+          return false;
+        }
+      }
+    }
+  }
+
   return true;
 }
 
@@ -501,26 +562,35 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
         safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
       }
 
-      const userRef = doc(db, 'users', currentUser.uid);
+      try {
+        const userRef = doc(db, 'users', currentUser.uid);
 
-      if (!existingScoreRecord) {
-        await updateDoc(userRef, {
-          [`progress.${courseId}.quizScores.${checkKey}`]: {
-            score: finalPct,
-            passed: passesQuiz,
-            answeredAt: new Date().toLocaleString(),
-            firstAttemptRecorded: true
-          },
-          updatedAt: serverTimestamp()
-        });
-        showToast(`First Attempt recorded: ${finalPct}%! 🎉`);
-      } else {
-        if (passesQuiz && !existingScoreRecord.passed) {
+        if (!existingScoreRecord) {
           await updateDoc(userRef, {
-            [`progress.${courseId}.quizScores.${checkKey}.passed`]: true,
+            [`progress.${courseId}.quizScores.${checkKey}`]: {
+              score: finalPct,
+              passed: passesQuiz,
+              answeredAt: new Date().toLocaleString(),
+              firstAttemptRecorded: true
+            },
             updatedAt: serverTimestamp()
           });
-          showToast(`Module updated as passed!`);
+          showToast(`First Attempt recorded: ${finalPct}%! 🎉`);
+        } else {
+          if (passesQuiz && !existingScoreRecord.passed) {
+            await updateDoc(userRef, {
+              [`progress.${courseId}.quizScores.${checkKey}.passed`]: true,
+              updatedAt: serverTimestamp()
+            });
+            showToast(`Module updated as passed!`);
+          }
+        }
+      } catch (dbErr) {
+        console.warn("Database sync deferred (offline/disabled), progress saved to local cache:", dbErr);
+        if (!existingScoreRecord) {
+          showToast(`First Attempt recorded: ${finalPct}%! 🎉 (Cached Offline)`);
+        } else if (passesQuiz && !existingScoreRecord.passed) {
+          showToast(`Module updated as passed! (Cached Offline)`);
         }
       }
 
@@ -1151,12 +1221,17 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         setUserProfile(updatedProfile);
         safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
-        const userRef = doc(db, 'users', currentUser.uid);
-        await updateDoc(userRef, {
-          [`progress.${courseId}.watched`]: updatedWatched,
-          updatedAt: serverTimestamp()
-        });
-        showToast("Lesson marked as completed! ✓");
+        try {
+          const userRef = doc(db, 'users', currentUser.uid);
+          await updateDoc(userRef, {
+            [`progress.${courseId}.watched`]: updatedWatched,
+            updatedAt: serverTimestamp()
+          });
+          showToast("Lesson marked as completed! ✓");
+        } catch (dbErr) {
+          console.warn("Database sync deferred (offline/disabled), progress saved to local cache:", dbErr);
+          showToast("Lesson marked as completed! ✓ (Cached Offline)");
+        }
       } catch (e) {
         console.error("Error updating completed lessons list:", e);
       }
@@ -1199,17 +1274,24 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       setUserProfile(updatedProfile);
       safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
-      const userRef = doc(db, 'users', currentUser.uid);
-      await updateDoc(userRef, {
-        [`progress.${courseId}.watched`]: updatedWatched,
-        [`progress.${courseId}.checkPassed`]: updatedPassed,
-        updatedAt: serverTimestamp()
-      });
+      try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, {
+          [`progress.${courseId}.watched`]: updatedWatched,
+          [`progress.${courseId}.checkPassed`]: updatedPassed,
+          updatedAt: serverTimestamp()
+        });
+        showToast("Comprehension check passed! Lesson unlocked! 🎉");
+      } catch (dbErr) {
+        console.warn("Database sync deferred (offline/disabled), progress saved to local cache:", dbErr);
+        showToast("Comprehension check passed! Lesson unlocked! 🎉 (Cached Offline)");
+      }
 
       setShowQuizModal(false);
-      showToast("Comprehension check passed! Lesson unlocked! 🎉");
     } catch (e) {
       console.error("Error verification passing state:", e);
+      // Fallback close the modal anyway so student is not locked out of navigation
+      setShowQuizModal(false);
     }
   };
 
@@ -1561,7 +1643,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
             {/* 1. Selected Day card at the top */}
             {days.map((d, di) => {
               if (activeDayIdx !== di) return null;
-              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId);
+              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId);
               if (!isDayCoveredOrUnlocked) return null;
 
               return (
@@ -1870,7 +1952,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                 <div className="grid grid-cols-1 gap-4">
                   {days.map((d, di) => {
                     if (activeDayIdx === di) return null;
-                    const isDayUnlocked = di === 0 || isLessonUnlockedUnified(di, 0, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId);
+                    const isDayUnlocked = di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId);
 
                     return (
                       <div
@@ -2559,6 +2641,24 @@ function TrainingCountdown({ targetDateStr }: { targetDateStr: string }) {
 
 export default function StudentDashboard() {
   const location = useLocation();
+  const [dbNetworkEnabled, setDbNetworkEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return safeGetItem('ciya_db_connection_disabled') !== 'true';
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleStatusChange = (e: any) => {
+      setDbNetworkEnabled(e.detail.enabled);
+    };
+    window.addEventListener('firestore-network-status' as any, handleStatusChange);
+    return () => {
+      window.removeEventListener('firestore-network-status' as any, handleStatusChange);
+    };
+  }, []);
+
   const [courses, setCourses] = useState<Course[]>(() => {
     try {
       const parsed = staticCourses as any[];
@@ -3365,7 +3465,7 @@ export default function StudentDashboard() {
     const lastUnlockedDayIdx = (() => {
       let lastIdx = 0;
       for (let idx = 0; idx < daysList.length; idx++) {
-        const isUnlocked = idx === 0 || isLessonUnlockedUnified(idx, 0, daysList, completedKeys, checkPassedKeys, allMySubmissions, isAdmin, !!registeredCourse.isCloned, userProfile, registeredCourse.id);
+        const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id);
         if (isUnlocked) {
           lastIdx = idx;
         }
@@ -4453,6 +4553,12 @@ export default function StudentDashboard() {
             </h2>
           </div>
           <div className="flex items-center gap-4">
+            {!dbNetworkEnabled && (
+              <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-1 text-amber-700 animate-pulse" title="Database Offline (All changes are kept in local storage)">
+                <WifiOff className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-[9px] font-black tracking-wider uppercase hidden sm:inline">Cache Mode</span>
+              </div>
+            )}
             {!isGuest && (
               <button 
                 onClick={() => handleViewChange('notifications')}
@@ -4862,7 +4968,7 @@ export default function StudentDashboard() {
                   const lastUnlockedDayIdx = (() => {
                     let lastIdx = 0;
                     for (let idx = 0; idx < daysList.length; idx++) {
-                      const isUnlocked = idx === 0 || isLessonUnlockedUnified(idx, 0, daysList, completedKeys, checkPassedKeys, allMySubmissions, isAdmin, !!registeredCourse.isCloned, userProfile, registeredCourse.id);
+                      const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id);
                       if (isUnlocked) {
                         lastIdx = idx;
                       }

@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, initializeAuth, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { getDatabase, ref, set } from 'firebase/database';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, doc, setDoc, updateDoc, disableNetwork, enableNetwork } from 'firebase/firestore';
+import { getDatabase, ref, set, onValue } from 'firebase/database';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Dynamically use the custom Netlify domain if running in production on Netlify,
@@ -22,7 +22,7 @@ const activeFirebaseConfig = {
 };
 
 // Safe localStorage wrapper to prevent crash in sandboxed iframes
-function safeGetItem(key: string): string | null {
+export function safeGetItem(key: string): string | null {
   if (typeof window === 'undefined') return null;
   try {
     return window.localStorage.getItem(key);
@@ -31,7 +31,7 @@ function safeGetItem(key: string): string | null {
   }
 }
 
-function safeSetItem(key: string, val: string) {
+export function safeSetItem(key: string, val: string) {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(key, val);
@@ -40,7 +40,7 @@ function safeSetItem(key: string, val: string) {
   }
 }
 
-function safeRemoveItem(key: string) {
+export function safeRemoveItem(key: string) {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.removeItem(key);
@@ -113,6 +113,56 @@ if (useMemoryCache) {
 }
 export const db = firestoreDb;
 
+// --- FIRESTORE DISCONNECT / TOGGLE SYSTEM ---
+let initialNetworkDisabled = false;
+if (typeof window !== 'undefined') {
+  try {
+    initialNetworkDisabled = window.localStorage.getItem('ciya_db_connection_disabled') === 'true';
+  } catch (e) {
+    // ignore
+  }
+}
+
+let dbNetworkEnabled = !initialNetworkDisabled;
+
+// Instantly freeze Firestore network on boot if stored as offline
+if (initialNetworkDisabled && firestoreDb) {
+  disableNetwork(firestoreDb).catch(err => {
+    console.warn("Failed to set initial offline state for Firestore on startup:", err);
+  });
+}
+
+export async function setFirestoreNetworkState(enabled: boolean) {
+  if (enabled === dbNetworkEnabled) return;
+  try {
+    if (enabled) {
+      console.log("Firestore: Activating online cloud synchronizer...");
+      if (firestoreDb) {
+        await enableNetwork(firestoreDb);
+      }
+      dbNetworkEnabled = true;
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-network-status', { detail: { enabled: true } }));
+      }
+    } else {
+      console.log("Firestore: Freezing network. Operating purely on browser cache...");
+      if (firestoreDb) {
+        await disableNetwork(firestoreDb);
+      }
+      dbNetworkEnabled = false;
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-network-status', { detail: { enabled: false } }));
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to switch Firestore network state:", err);
+  }
+}
+
+export function isFirestoreNetworkEnabled(): boolean {
+  return dbNetworkEnabled;
+}
+
 export function getActiveDatabaseId(): string {
   return firebaseConfig.firestoreDatabaseId || 'ai-studio-1aaee609-a922-43e7-9568-0b675490ff78';
 }
@@ -182,6 +232,52 @@ try {
 }
 
 export const rtdb = rtdbInstance;
+
+// Set up global synchronization hook via Realtime Database
+if (typeof window !== 'undefined' && rtdbInstance) {
+  try {
+    const dbToggleRef = ref(rtdbInstance, 'settings/db_connection_disabled');
+    onValue(dbToggleRef, (snapshot) => {
+      const isDisabled = !!snapshot.val();
+      const shouldBeEnabled = !isDisabled;
+      
+      try {
+        window.localStorage.setItem('ciya_db_connection_disabled', isDisabled ? 'true' : 'false');
+      } catch (e) {
+        // ignore
+      }
+
+      setFirestoreNetworkState(shouldBeEnabled);
+    }, (error) => {
+      console.warn("Failed to retrieve db_connection_disabled toggle value from RTDB:", error);
+    });
+  } catch (err) {
+    console.warn("Failed to set up RTDB database sync trigger:", err);
+  }
+}
+
+export async function setGlobalDbConnectionDisabled(disabled: boolean) {
+  if (rtdbInstance) {
+    try {
+      await set(ref(rtdbInstance, 'settings/db_connection_disabled'), disabled);
+      try {
+        window.localStorage.setItem('ciya_db_connection_disabled', disabled ? 'true' : 'false');
+      } catch (e) {
+        // ignore
+      }
+      await setFirestoreNetworkState(!disabled);
+    } catch (err) {
+      console.error("Failed to push global db_connection_disabled state to RTDB:", err);
+    }
+  } else {
+    try {
+      window.localStorage.setItem('ciya_db_connection_disabled', disabled ? 'true' : 'false');
+    } catch (e) {
+      // ignore
+    }
+    await setFirestoreNetworkState(!disabled);
+  }
+}
 
 export enum OperationType {
   CREATE = 'create',
