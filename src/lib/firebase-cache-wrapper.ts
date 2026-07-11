@@ -365,32 +365,42 @@ function resolveLocalQuery(ref: any): any[] {
 
 // Overridden getDoc function to run 100% locally when offline, or use live Firestore when online
 export async function getDoc(docRef: any): Promise<CachedDocumentSnapshot> {
-  const path = docRef.path;
+  if (!docRef) {
+    return new CachedDocumentSnapshot('', false, null);
+  }
+  const path = docRef.path || '';
   if (isNetworkDisabled()) {
     const { exists, data } = resolveLocalDoc(path);
-    return new CachedDocumentSnapshot(docRef.id, exists, data, docRef);
+    return new CachedDocumentSnapshot(docRef.id || '', exists, data, docRef);
   } else {
     try {
       const liveSnap = await realGetDoc(docRef);
+      if (!liveSnap) {
+        const { exists, data } = resolveLocalDoc(path);
+        return new CachedDocumentSnapshot(docRef.id || '', exists, data, docRef);
+      }
       const serialized = {
         id: liveSnap.id,
-        exists: liveSnap.exists(),
-        data: liveSnap.exists() ? liveSnap.data() : null
+        exists: typeof liveSnap.exists === 'function' ? liveSnap.exists() : false,
+        data: (typeof liveSnap.exists === 'function' && liveSnap.exists() && typeof liveSnap.data === 'function') ? liveSnap.data() : null
       };
       const cacheKey = `ciya_fs_doc_${path.replace(/[^a-zA-Z0-9_]/g, '_')}`;
       safeStorage.setItem(`${cacheKey}_data`, JSON.stringify(serialized));
       safeStorage.setItem(`${cacheKey}_time`, String(Date.now()));
-      return new CachedDocumentSnapshot(liveSnap.id, liveSnap.exists(), liveSnap.data(), docRef);
+      return new CachedDocumentSnapshot(liveSnap.id, serialized.exists, serialized.data, docRef);
     } catch (error) {
       console.warn(`getDoc live fetch failed for path ${path} (falling back to local cache):`, error);
       const { exists, data } = resolveLocalDoc(path);
-      return new CachedDocumentSnapshot(docRef.id, exists, data, docRef);
+      return new CachedDocumentSnapshot(docRef.id || '', exists, data, docRef);
     }
   }
 }
 
 // Overridden getDocs function to run 100% locally when offline, or use live Firestore when online
 export async function getDocs(queryRef: any): Promise<CachedQuerySnapshot> {
+  if (!queryRef) {
+    return new CachedQuerySnapshot([]);
+  }
   if (isNetworkDisabled()) {
     const results = resolveLocalQuery(queryRef);
     const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data, queryRef));
@@ -398,13 +408,20 @@ export async function getDocs(queryRef: any): Promise<CachedQuerySnapshot> {
   } else {
     try {
       const liveSnap = await realGetDocs(queryRef);
+      if (!liveSnap || !liveSnap.docs) {
+        const results = resolveLocalQuery(queryRef);
+        const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data, queryRef));
+        return new CachedQuerySnapshot(docs);
+      }
       const serialized: any[] = [];
       liveSnap.forEach((docSnap: any) => {
-        serialized.push({
-          id: docSnap.id,
-          exists: docSnap.exists(),
-          data: docSnap.exists() ? docSnap.data() : null
-        });
+        if (docSnap) {
+          serialized.push({
+            id: docSnap.id,
+            exists: typeof docSnap.exists === 'function' ? docSnap.exists() : false,
+            data: (typeof docSnap.exists === 'function' && docSnap.exists() && typeof docSnap.data === 'function') ? docSnap.data() : null
+          });
+        }
       });
       const queryKey = getQueryCacheKey(queryRef);
       const cacheKey = `ciya_fs_query_${queryKey}`;
@@ -414,7 +431,12 @@ export async function getDocs(queryRef: any): Promise<CachedQuerySnapshot> {
       safeStorage.setItem(timeKey, String(Date.now()));
 
       const docs = liveSnap.docs.map((docSnap: any) => 
-        new CachedDocumentSnapshot(docSnap.id, docSnap.exists(), docSnap.data(), docSnap.ref)
+        new CachedDocumentSnapshot(
+          docSnap?.id || '',
+          typeof docSnap?.exists === 'function' ? docSnap.exists() : false,
+          typeof docSnap?.data === 'function' ? docSnap.data() : null,
+          docSnap?.ref
+        )
       );
       return new CachedQuerySnapshot(docs);
     } catch (error) {
@@ -432,12 +454,23 @@ export function onSnapshot(
   onNext: (snapshot: any) => void,
   onError?: (error: any) => void
 ): () => void {
+  if (!ref) {
+    const timer = setTimeout(() => {
+      try {
+        onNext(new CachedQuerySnapshot([]));
+      } catch (err) {
+        if (onError) onError(err);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }
+
   if (isNetworkDisabled()) {
     let path = ref?.path || '';
-    if (!path && ref._query && ref._query.path) {
+    if (!path && ref?._query && ref?._query.path) {
       path = ref._query.path.toString();
     }
-    if (!path && ref.type === 'collection') {
+    if (!path && ref?.type === 'collection') {
       path = ref.path;
     }
 
@@ -464,38 +497,88 @@ export function onSnapshot(
     };
   } else {
     // Online mode: set up real-time listener from live Firestore
-    return realOnSnapshot(ref, (liveSnap: any) => {
-      const isDoc = typeof liveSnap.exists === 'function';
-      if (isDoc) {
-        const path = ref?.path || '';
-        if (liveSnap.exists()) {
-          updateLocalDocCache(path, true, liveSnap.data());
-        } else {
-          updateLocalDocCache(path, false, null);
-        }
-        onNext(new CachedDocumentSnapshot(liveSnap.id, liveSnap.exists(), liveSnap.data(), liveSnap.ref));
-      } else {
-        // It's a query snapshot (collection or query)
-        const docs = liveSnap.docs.map((docSnap: any) =>
-          new CachedDocumentSnapshot(docSnap.id, docSnap.exists(), docSnap.data(), docSnap.ref)
-        );
-        
-        // Save to cache so it's ready when going offline
-        const queryKey = getQueryCacheKey(ref);
-        const cacheKey = `ciya_fs_query_${queryKey}`;
-        const dataKey = `${cacheKey}_data`;
-        const timeKey = `${cacheKey}_time`;
-        const serialized = liveSnap.docs.map((docSnap: any) => ({
-          id: docSnap.id,
-          exists: docSnap.exists(),
-          data: docSnap.exists() ? docSnap.data() : null
-        }));
-        safeStorage.setItem(dataKey, JSON.stringify(serialized));
-        safeStorage.setItem(timeKey, String(Date.now()));
+    try {
+      return realOnSnapshot(ref, (liveSnap: any) => {
+        try {
+          if (!liveSnap) {
+            onNext(new CachedQuerySnapshot([]));
+            return;
+          }
+          const isDoc = typeof liveSnap?.exists === 'function';
+          if (isDoc) {
+            const path = ref?.path || '';
+            if (liveSnap.exists()) {
+              updateLocalDocCache(path, true, liveSnap.data());
+            } else {
+              updateLocalDocCache(path, false, null);
+            }
+            onNext(new CachedDocumentSnapshot(liveSnap.id, liveSnap.exists(), liveSnap.data(), liveSnap.ref));
+          } else {
+            // It's a query snapshot (collection or query)
+            const docs = (liveSnap.docs || []).map((docSnap: any) =>
+              new CachedDocumentSnapshot(
+                docSnap?.id || '',
+                typeof docSnap?.exists === 'function' ? docSnap.exists() : false,
+                typeof docSnap?.data === 'function' ? docSnap.data() : null,
+                docSnap?.ref
+              )
+            );
+            
+            // Save to cache so it's ready when going offline
+            const queryKey = getQueryCacheKey(ref);
+            const cacheKey = `ciya_fs_query_${queryKey}`;
+            const dataKey = `${cacheKey}_data`;
+            const timeKey = `${cacheKey}_time`;
+            const serialized = (liveSnap.docs || []).map((docSnap: any) => ({
+              id: docSnap?.id || '',
+              exists: typeof docSnap?.exists === 'function' ? docSnap.exists() : false,
+              data: typeof docSnap?.data === 'function' ? docSnap.data() : null
+            }));
+            safeStorage.setItem(dataKey, JSON.stringify(serialized));
+            safeStorage.setItem(timeKey, String(Date.now()));
 
-        onNext(new CachedQuerySnapshot(docs));
+            onNext(new CachedQuerySnapshot(docs));
+          }
+        } catch (callbackErr) {
+          console.error("onSnapshot callback internal error:", callbackErr);
+        }
+      }, (error: any) => {
+        if (onError) {
+          try {
+            onError(error);
+          } catch (err) {
+            console.error("onSnapshot onError handler error:", err);
+          }
+        } else {
+          console.warn("onSnapshot observer error:", error);
+        }
+      });
+    } catch (setupErr) {
+      console.warn("realOnSnapshot setup failed (falling back to offline listener):", setupErr);
+      let path = ref?.path || '';
+      if (!path && ref?._query && ref?._query.path) {
+        path = ref._query.path.toString();
       }
-    }, onError);
+      if (!path && ref?.type === 'collection') {
+        path = ref.path;
+      }
+      const isDoc = typeof path === 'string' && path.split('/').length % 2 === 0;
+      const timer = setTimeout(() => {
+        try {
+          if (isDoc) {
+            const { exists, data } = resolveLocalDoc(path);
+            onNext(new CachedDocumentSnapshot(path.split('/').pop() || '', exists, data, ref));
+          } else {
+            const results = resolveLocalQuery(ref);
+            const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data));
+            onNext(new CachedQuerySnapshot(docs));
+          }
+        } catch (err) {
+          if (onError) onError(err);
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
   }
 }
 
@@ -530,11 +613,16 @@ function setNestedProperty(obj: any, pathStr: string, value: any) {
 
 // Overridden setDoc to write live and immediately synchronize local cache
 export async function setDoc(docRef: any, data: any, options?: any): Promise<void> {
-  const path = docRef.path;
+  if (!docRef) return;
+  const path = docRef.path || '';
   const colPath = getCollectionPathFromDocPath(path);
 
-  // Perform live write
-  await realSetDoc(docRef, data, options);
+  try {
+    // Perform live write
+    await realSetDoc(docRef, data, options);
+  } catch (error) {
+    console.warn(`setDoc live write failed for path ${path} (saving locally only):`, error);
+  }
 
   // Synchronize local doc cache immediately so UI matches the written data
   let finalData = data;
@@ -559,11 +647,16 @@ export async function setDoc(docRef: any, data: any, options?: any): Promise<voi
 
 // Overridden updateDoc to write live and immediately synchronize local cache
 export async function updateDoc(docRef: any, data: any): Promise<void> {
-  const path = docRef.path;
+  if (!docRef) return;
+  const path = docRef.path || '';
   const colPath = getCollectionPathFromDocPath(path);
 
-  // Perform live write
-  await realUpdateDoc(docRef, data);
+  try {
+    // Perform live write
+    await realUpdateDoc(docRef, data);
+  } catch (error) {
+    console.warn(`updateDoc live write failed for path ${path} (saving locally only):`, error);
+  }
 
   // Synchronize local doc cache immediately
   let finalData = {};
@@ -589,13 +682,28 @@ export async function updateDoc(docRef: any, data: any): Promise<void> {
 
 // Overridden addDoc to write live and immediately synchronize local cache
 export async function addDoc(collectionRef: any, data: any): Promise<any> {
-  const colPath = collectionRef.path;
+  if (!collectionRef) {
+    throw new Error("Invalid collection reference in addDoc");
+  }
+  const colPath = collectionRef.path || '';
 
-  // Perform live write
-  const liveRef = await realAddDoc(collectionRef, data);
+  let liveRef: any = null;
+  try {
+    // Perform live write
+    liveRef = await realAddDoc(collectionRef, data);
+  } catch (error) {
+    console.warn(`addDoc live write failed for collection ${colPath} (saving locally only):`, error);
+    const randomId = 'local_' + Math.random().toString(36).substring(2, 11);
+    liveRef = {
+      id: randomId,
+      path: colPath ? `${colPath}/${randomId}` : `unknown/${randomId}`
+    };
+  }
 
   // Synchronize local doc cache immediately
-  updateLocalDocCache(liveRef.path, true, data);
+  if (liveRef && liveRef.path) {
+    updateLocalDocCache(liveRef.path, true, data);
+  }
   invalidateQueryCaches(colPath);
 
   return liveRef;
@@ -603,11 +711,16 @@ export async function addDoc(collectionRef: any, data: any): Promise<any> {
 
 // Overridden deleteDoc to write live and immediately synchronize local cache
 export async function deleteDoc(docRef: any): Promise<void> {
-  const path = docRef.path;
+  if (!docRef) return;
+  const path = docRef.path || '';
   const colPath = getCollectionPathFromDocPath(path);
 
-  // Perform live write
-  await realDeleteDoc(docRef);
+  try {
+    // Perform live write
+    await realDeleteDoc(docRef);
+  } catch (error) {
+    console.warn(`deleteDoc live write failed for path ${path} (saving locally only):`, error);
+  }
 
   // Synchronize local cache immediately
   updateLocalDocCache(path, false, null);

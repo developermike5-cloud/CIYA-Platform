@@ -8,6 +8,7 @@ import { Course } from '../../types';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
 import { uploadToCloudinary } from '../../utils/cloudinary';
 import staticCourses from '../../data/courses.json';
+import { safeStorage } from '../../utils/safeStorage';
 
 function getFirestoreTime(timestamp: any): number {
   if (!timestamp) return 0;
@@ -181,7 +182,7 @@ export default function UsersAdmin() {
   const [savingAdminId, setSavingAdminId] = useState<string | null>(null);
   const isSuperAdmin = auth.currentUser?.email?.toLowerCase() === 'developermike5@gmail.com';
 
-  const cachedUserStr = localStorage.getItem('ciya_cached_user');
+  const cachedUserStr = safeStorage.getItem('ciya_cached_user');
   let userDetails: any = null;
   try {
     if (cachedUserStr) {
@@ -195,7 +196,7 @@ export default function UsersAdmin() {
   // Logo upload state
   const [logoUploading, setLogoUploading] = useState(false);
   const [currentLogo, setCurrentLogo] = useState<string | null>(() => {
-    return localStorage.getItem('ciya_brand_logo');
+    return safeStorage.getItem('ciya_brand_logo');
   });
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -216,7 +217,7 @@ export default function UsersAdmin() {
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      localStorage.setItem('ciya_brand_logo', publicUrl);
+      safeStorage.setItem('ciya_brand_logo', publicUrl);
       setCurrentLogo(publicUrl);
       alert("Website branding logo updated and synchronized successfully via Cloudinary! 🎉");
     } catch (err: any) {
@@ -230,7 +231,7 @@ export default function UsersAdmin() {
             updatedAt: serverTimestamp()
           }, { merge: true });
 
-          localStorage.setItem('ciya_brand_logo', base64String);
+          safeStorage.setItem('ciya_brand_logo', base64String);
           setCurrentLogo(base64String);
           alert("Website branding logo synchronized successfully (Local Fallback)! 🎉");
         } catch (subErr) {
@@ -252,7 +253,7 @@ export default function UsersAdmin() {
         logo: null,
         updatedAt: serverTimestamp()
       }, { merge: true });
-      localStorage.removeItem('ciya_brand_logo');
+      safeStorage.removeItem('ciya_brand_logo');
       setCurrentLogo(null);
       alert("Website logo reset to default.");
     } catch (err) {
@@ -381,13 +382,13 @@ export default function UsersAdmin() {
 
       // 4. Update corresponding cached user session if they are the currently logged in admin user
       if (auth.currentUser?.uid === userId) {
-        const currentCache = localStorage.getItem('ciya_cached_user');
+        const currentCache = safeStorage.getItem('ciya_cached_user');
         if (currentCache) {
           try {
             const parsed = JSON.parse(currentCache);
             parsed.permissions = permissions;
             parsed.adminRole = role;
-            localStorage.setItem('ciya_cached_user', JSON.stringify(parsed));
+            safeStorage.setItem('ciya_cached_user', JSON.stringify(parsed));
           } catch (e) {}
         }
       }
@@ -405,15 +406,15 @@ export default function UsersAdmin() {
 
   const fetchUsers = async (targetCohort: string, forceRefresh = false) => {
     let hasUsedCache = false;
-    const cacheKey = `ciya_admin_cached_users_list_${targetCohort}`;
+    const cacheKey = 'ciya_admin_cached_users_list_All';
 
     if (forceRefresh) {
       setIsRefreshing(true);
     } else {
-      // Stale-while-revalidate: Load from cache instantly, namespaced by cohort, then fetch fresh in background
-      const cachedUsersStr = localStorage.getItem(cacheKey);
-      const cachedAdminsStr = localStorage.getItem('ciya_admin_cached_admins_list');
-      const cachedAdminsDataStr = localStorage.getItem('ciya_admin_cached_admins_data');
+      // Stale-while-revalidate: Load from cache instantly, using consolidated 'All' list
+      const cachedUsersStr = safeStorage.getItem(cacheKey) || safeStorage.getItem(`ciya_admin_cached_users_list_${targetCohort}`);
+      const cachedAdminsStr = safeStorage.getItem('ciya_admin_cached_admins_list');
+      const cachedAdminsDataStr = safeStorage.getItem('ciya_admin_cached_admins_data');
 
       if (cachedUsersStr && cachedAdminsStr && cachedAdminsDataStr) {
         try {
@@ -434,10 +435,8 @@ export default function UsersAdmin() {
     }
 
     try {
-      // Fresh Firestore fetch (Only query the target cohort to prevent massive read spikes)
-      const q = targetCohort === 'All'
-        ? query(collection(db, 'users'))
-        : query(collection(db, 'users'), where('cohort', '==', targetCohort));
+      // Fresh Firestore fetch: load all users to ensure legacy users without a cohort are default-grouped correctly in-memory
+      const q = query(collection(db, 'users'));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile));
       
@@ -467,11 +466,11 @@ export default function UsersAdmin() {
       setAdmins(adminIds);
       setAdminsData(adminMap);
 
-      // Save to local cache namespaced by cohort
-      localStorage.setItem(cacheKey, JSON.stringify(data));
-      localStorage.setItem(`ciya_admin_cached_users_time_${targetCohort}`, Date.now().toString());
-      localStorage.setItem('ciya_admin_cached_admins_list', JSON.stringify(adminIds));
-      localStorage.setItem('ciya_admin_cached_admins_data', JSON.stringify(adminMap));
+      // Save to local cache
+      safeStorage.setItem(cacheKey, JSON.stringify(data));
+      safeStorage.setItem('ciya_admin_cached_users_time_All', Date.now().toString());
+      safeStorage.setItem('ciya_admin_cached_admins_list', JSON.stringify(adminIds));
+      safeStorage.setItem('ciya_admin_cached_admins_data', JSON.stringify(adminMap));
 
     } catch (error) {
       if (!hasUsedCache || forceRefresh) {
@@ -523,8 +522,8 @@ export default function UsersAdmin() {
   // Keep admin local cache perfectly in-sync with users state updates instantly
   useEffect(() => {
     if (users && users.length > 0) {
-      localStorage.setItem('ciya_admin_cached_users_list_All', JSON.stringify(users));
-      localStorage.setItem('ciya_admin_cached_users_time', Date.now().toString());
+      safeStorage.setItem('ciya_admin_cached_users_list_All', JSON.stringify(users));
+      safeStorage.setItem('ciya_admin_cached_users_time', Date.now().toString());
     }
   }, [users]);
 
@@ -703,8 +702,8 @@ export default function UsersAdmin() {
       const userDoc = users.find(usr => usr.id === userId);
       if (!userDoc) return;
 
-      const currentManualUnlock = userDoc.manualDayUnlock || {};
-      const courseUnlock = currentManualUnlock[courseId] || {};
+      const currentManualUnlock = (userDoc.manualDayUnlock && typeof userDoc.manualDayUnlock === 'object') ? userDoc.manualDayUnlock : {};
+      const courseUnlock = (currentManualUnlock[courseId] && typeof currentManualUnlock[courseId] === 'object') ? currentManualUnlock[courseId] : {};
       const nextStatus = !currentUnlocked;
 
       const updatedCourseUnlock = {
@@ -742,10 +741,31 @@ export default function UsersAdmin() {
     }
   };
 
+  // Dynamically compute all unique cohorts that exist in the database or are configured in settings
+  const allAvailableCohorts = useMemo(() => {
+    const fromSettings = cohortsConfig.cohortsList || ['Cohort 1'];
+    const fromUsers = users.map(u => u.cohort).filter(Boolean) as string[];
+    const combined = Array.from(new Set([...fromSettings, ...fromUsers]));
+    return combined.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [cohortsConfig.cohortsList, users]);
+
   const cohortFilteredUsers = useMemo(() => {
     return users.filter(u => {
       const uCohort = u.cohort || 'Cohort 1';
-      return filterCohort === 'All' ? true : uCohort === filterCohort;
+      
+      let matchesCohort = false;
+      if (filterCohort === 'All') {
+        matchesCohort = true;
+      } else if (uCohort === filterCohort) {
+        matchesCohort = true;
+      } else if (
+        (filterCohort.toLowerCase().replace(/\s+/g, '') === 'cohort2' && uCohort.toLowerCase().replace(/\s+/g, '').includes('cohort2')) ||
+        (uCohort.toLowerCase().replace(/\s+/g, '') === 'cohort2' && filterCohort.toLowerCase().replace(/\s+/g, '').includes('cohort2'))
+      ) {
+        matchesCohort = true;
+      }
+      
+      return matchesCohort;
     });
   }, [users, filterCohort]);
 
@@ -967,7 +987,7 @@ export default function UsersAdmin() {
             className="text-sm border border-indigo-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-700 font-bold bg-white"
           >
             <option value="All" className="text-slate-800">All Cohorts (Aggregated)</option>
-            {cohortsConfig.cohortsList.map(cohort => (
+            {allAvailableCohorts.map(cohort => (
               <option key={cohort} value={cohort} className="text-slate-800">
                 {cohort} {cohortsConfig.activeCohort === cohort ? "(Active)" : ""}
               </option>
@@ -1373,7 +1393,7 @@ export default function UsersAdmin() {
                                       }}
                                       className="mt-1 bg-slate-50 border border-slate-300 rounded px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500 w-full outline-none"
                                     >
-                                      {cohortsConfig.cohortsList.map(cohort => (
+                                      {allAvailableCohorts.map(cohort => (
                                         <option key={cohort} value={cohort}>{cohort}</option>
                                       ))}
                                     </select>
@@ -1386,7 +1406,7 @@ export default function UsersAdmin() {
                                     ) : (
                                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                         {allCourses.map(course => {
-                                          const isCompleted = u.completedCoursesOverride?.includes(course.id || '') || false;
+                                          const isCompleted = (Array.isArray(u.completedCoursesOverride) && u.completedCoursesOverride.includes(course.id || '')) || false;
                                           return (
                                             <div key={course.id} className="flex items-center justify-between bg-slate-50/50 p-2 rounded-xl border border-slate-200 text-xs">
                                               <span className="font-extrabold text-slate-800 truncate pr-2" title={course.title}>
@@ -1396,7 +1416,7 @@ export default function UsersAdmin() {
                                                 type="button"
                                                 onClick={async () => {
                                                   try {
-                                                    const currentCompleted = u.completedCoursesOverride || [];
+                                                    const currentCompleted = Array.isArray(u.completedCoursesOverride) ? u.completedCoursesOverride : [];
                                                     let nextCompleted: string[];
                                                     if (isCompleted) {
                                                       nextCompleted = currentCompleted.filter(id => id !== course.id);

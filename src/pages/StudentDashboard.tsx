@@ -445,6 +445,46 @@ function isLessonUnlockedUnified(
   return true;
 }
 
+// Helper to check if student has completed a course (either 100% video progress or passed all quizzes)
+function isCourseCompleted(profile: any, course: any): boolean {
+  if (!profile || !course) return false;
+  const progressStore = profile.progress?.[course.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+  
+  // 1. Check video watched count progress ratio
+  const completedKeys: string[] = progressStore.watched || [];
+  const totalVideos = course.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
+  const progressRatio = totalVideos > 0 ? Math.round((completedKeys.length / totalVideos) * 100) : 0;
+  if (progressRatio === 100 && totalVideos > 0) {
+    return true;
+  }
+
+  // 2. Check if they have passed all quizzes from Day 1 to Day 5 (which means they passed all quizzes from one to five)
+  let passedAllQuizzes = true;
+  let hasQuizzes = false;
+  const cScores = progressStore.quizScores || {};
+  const checkPassedKeys: string[] = progressStore.checkPassed || [];
+
+  (course.days || []).forEach((day: any, di: number) => {
+    (day.videos || []).forEach((v: any, vi: number) => {
+      const hasQuiz = v.checkType && v.checkType !== 'none';
+      if (hasQuiz) {
+        hasQuizzes = true;
+        const checkKey = `${di}-${vi}`;
+        const isPassed = checkPassedKeys.includes(checkKey) || !!(cScores[checkKey] && cScores[checkKey].passed);
+        if (!isPassed) {
+          passedAllQuizzes = false;
+        }
+      }
+    });
+  });
+
+  if (hasQuizzes && passedAllQuizzes) {
+    return true;
+  }
+
+  return false;
+}
+
 // Interactive Post-Video Engagement Check popup modal
 interface QuizModalProps {
   check: any;
@@ -972,27 +1012,47 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     try {
       if (!currentUser) return;
 
+      const expressClone = courses.find(c => c.clonedFromId === courseId && c.isCloned && c.durationMode === 'express');
+      
+      const progressUpdates: Record<string, any> = {};
+      progressUpdates[courseId] = {
+        ...(userProfile?.progress?.[courseId] || {}),
+        durationMode: track,
+        createdAt: new Date().toISOString()
+      };
+
+      if (track === 'express' && expressClone) {
+        progressUpdates[expressClone.id] = {
+          ...(userProfile?.progress?.[expressClone.id] || {}),
+          durationMode: 'express',
+          createdAt: new Date().toISOString()
+        };
+      }
+
       // Optimistic local update to state and cache to ensure instant enrollment in the UI
       const updatedProfile = {
         ...userProfile,
         progress: {
           ...(userProfile?.progress || {}),
-          [courseId]: {
-            ...(userProfile?.progress?.[courseId] || {}),
-            durationMode: track,
-            createdAt: new Date().toISOString()
-          }
+          ...progressUpdates
         }
       };
       setUserProfile(updatedProfile);
       safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
       const userRef = doc(db, 'users', currentUser.uid);
-      await updateDoc(userRef, {
+      const dbUpdates: Record<string, any> = {
         [`progress.${courseId}.durationMode`]: track,
         [`progress.${courseId}.createdAt`]: serverTimestamp(),
         updatedAt: serverTimestamp()
-      });
+      };
+
+      if (track === 'express' && expressClone) {
+        dbUpdates[`progress.${expressClone.id}.durationMode`] = 'express';
+        dbUpdates[`progress.${expressClone.id}.createdAt`] = serverTimestamp();
+      }
+
+      await updateDoc(userRef, dbUpdates);
       showToast(`Successfully enrolled in ${track === 'express' ? 'Express Track (3 Days)' : 'Standard Track (5 Days)'}! 🚀`);
       setShowTrackSelectionModal(false);
       updateParams({ syllabus: 'false', assignment: 'false' });
@@ -1539,10 +1599,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                     if (!p) return false;
                     const matchingCourse = courses.find(item => item.id === cId);
                     if (!matchingCourse) return false;
-                    const totalVids = matchingCourse.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
-                    const progressRatio = totalVids > 0 ? Math.round(((p.watched || []).length / totalVids) * 100) : 0;
-                    const isCompleted = progressRatio === 100 && totalVids > 0;
-                    return !isCompleted;
+                    return !isCourseCompleted(userProfile, matchingCourse);
                   });
 
                   if (runningCourseId) {
@@ -1856,7 +1913,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                     })}
 
                     {/* End of day assignment checklist marker */}
-                    {d.assignment && (
+                    {d.assignment && d.assignment.prompt && (
                       <div className="space-y-3 mt-3">
                         <button
                           type="button"
@@ -3021,8 +3078,16 @@ export default function StudentDashboard() {
           }
         }
 
-        return { id: doc.id, ...data, submittedText, images };
+        return { id: doc.id, ...data, submittedText, images } as any;
       });
+
+      // Sort list by createdAt descending so that the most recent submission is always first
+      list.sort((a, b) => {
+        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        return timeB - timeA;
+      });
+
       setAllMySubmissions(list);
       try {
         safeStorage.setItem('ciya_cached_student_assignments', JSON.stringify(list));
@@ -3421,10 +3486,21 @@ export default function StudentDashboard() {
 
   const handleCustomAssignmentSubmit = async () => {
     if (!currentUser) return;
-    const registeredCourse = registeredCoursesList[0];
+    let registeredCourse = registeredCoursesList[0];
     if (!registeredCourse) {
       alert("No active course path assigned to submit an assignment for.");
       return;
+    }
+
+    // Auto-switch to express clone if student is on express track
+    if (!isAdmin && registeredCourse) {
+      const enrolledExpress = courses.find(c => c.clonedFromId === registeredCourse.id && c.isCloned && c.durationMode === 'express' && (
+        (userProfile?.progress && userProfile.progress[c.id]) ||
+        (userProfile?.progress?.[registeredCourse.id]?.durationMode === 'express')
+      ));
+      if (enrolledExpress) {
+        registeredCourse = enrolledExpress;
+      }
     }
 
     // Check duplicate submissions check
@@ -3478,20 +3554,37 @@ export default function StudentDashboard() {
         ? submitText + "\n\n---IMAGES_JSON---\n" + JSON.stringify(uploadedImages)
         : submitText;
 
-      // 1. Submit to assignments collection
-      await addDoc(collection(db, 'assignments'), {
-        userId: currentUser.uid,
-        userEmail: currentUser.email || userProfile?.email || 'student@ciya.com',
-        userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
-        courseId: registeredCourse.id,
-        dayIndex: submitDayIndex,
-        submittedText: combinedSubmittedText,
-        fileUrl: submitLink,
-        images: uploadedImages,
-        fileName: 'Live URL Link',
-        status: 'Pending',
-        createdAt: serverTimestamp()
-      });
+      const cohort = userProfile?.cohort || 'Cohort 1';
+
+      if (existingSub) {
+        // Update existing disapproved assignment document to 'Pending' status
+        const subRef = doc(db, 'assignments', existingSub.id);
+        await updateDoc(subRef, {
+          submittedText: combinedSubmittedText,
+          fileUrl: submitLink,
+          images: uploadedImages,
+          status: 'Pending',
+          cohort: cohort,
+          adminReason: "", // Clear old disapproval reason
+          createdAt: serverTimestamp() // Set new timestamp so it moves to top of admin inbox
+        });
+      } else {
+        // 1. Submit to assignments collection
+        await addDoc(collection(db, 'assignments'), {
+          userId: currentUser.uid,
+          userEmail: currentUser.email || userProfile?.email || 'student@ciya.com',
+          userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
+          courseId: registeredCourse.id,
+          dayIndex: submitDayIndex,
+          submittedText: combinedSubmittedText,
+          fileUrl: submitLink,
+          images: uploadedImages,
+          fileName: 'Live URL Link',
+          status: 'Pending',
+          cohort: cohort,
+          createdAt: serverTimestamp()
+        });
+      }
 
       // 2. Submit to student progress in users doc
       const updatedProfile = {
@@ -4001,14 +4094,10 @@ export default function StudentDashboard() {
     if (isAdmin) return true;
     if (!userProfile || !courses || courses.length === 0) return false;
     
-    // Check if there is at least one registered course that the user has completed (progress = 100%)
+    // Check if there is at least one registered course that the user has completed (progress = 100% or all quizzes passed)
     const registeredOnboarded = courses.filter(c => !c.isCloned && isProfileRegisteredForCourse(userProfile, c));
     for (const r of registeredOnboarded) {
-      const progressStore = userProfile.progress?.[r.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
-      const completedKeys: string[] = progressStore.watched || [];
-      const totalVideos = r.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
-      const progressRatio = totalVideos > 0 ? Math.round((completedKeys.length / totalVideos) * 100) : 0;
-      if (progressRatio === 100 && totalVideos > 0) {
+      if (isCourseCompleted(userProfile, r)) {
         return true;
       }
     }
@@ -4929,7 +5018,17 @@ export default function StudentDashboard() {
                 {/* Main Form Fields */}
                 {(() => {
                   // Find registered course
-                  const registeredCourse = registeredCoursesList[0];
+                  let registeredCourse = registeredCoursesList[0];
+                  if (registeredCourse && !isAdmin) {
+                    const enrolledExpress = courses.find(c => c.clonedFromId === registeredCourse.id && c.isCloned && c.durationMode === 'express' && (
+                      (userProfile?.progress && userProfile.progress[c.id]) ||
+                      (userProfile?.progress?.[registeredCourse.id]?.durationMode === 'express')
+                    ));
+                    if (enrolledExpress) {
+                      registeredCourse = enrolledExpress;
+                    }
+                  }
+
                   if (!registeredCourse) {
                     return (
                       <div className="bg-white border text-center p-8 rounded-3xl text-xs font-black text-slate-400 uppercase">

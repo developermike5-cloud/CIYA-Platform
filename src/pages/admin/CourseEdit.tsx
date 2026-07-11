@@ -684,6 +684,7 @@ export default function CourseEdit() {
 
   const [form, setForm] = useState<Course>(defaultInitialForm());
   const [activeDayIdx, setActiveDayIdx] = useState(0);
+  const [confirmDeleteDayIndex, setConfirmDeleteDayIndex] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState<'info' | 'curriculum' | 'settings'>('info');
 
   const [coursesList, setCoursesList] = useState<Course[]>([]);
@@ -843,7 +844,10 @@ export default function CourseEdit() {
         dayNumber: dIdx + 1,
         title: day.title || `Day ${dIdx + 1}`,
         description: day.description || '',
-        assignment: day.assignment || { prompt: '', dueNote: '' },
+        assignment: day.assignment && (day.assignment.prompt || day.assignment.dueNote) ? {
+          prompt: day.assignment.prompt || '',
+          dueNote: day.assignment.dueNote || ''
+        } : null,
         videos: (day.videos || []).map((v) => ({
           id: v.id || Math.random().toString(36).substring(2, 9),
           title: v.title || '',
@@ -955,13 +959,20 @@ export default function CourseEdit() {
             publish_status: raw.publish_status || (raw.status === 'published' ? 'Published' : 'Draft'),
             status: raw.status || (raw.publish_status === 'Published' ? 'published' : 'draft'),
             isLocked: !!raw.isLocked,
-            days: DAYS_RANGE.map((dayNum, idx) => {
-              const existingDay = raw.days?.find((d: any) => d.dayNumber === dayNum);
+            days: (raw.days && Array.isArray(raw.days) && raw.days.length > 0
+              ? raw.days.map((d: any, idx: number) => ({ dayNumber: d.dayNumber || (idx + 1), ...d }))
+              : DAYS_RANGE.map((dayNum) => ({ dayNumber: dayNum }))
+            ).map((dayObj: any, idx: number) => {
+              const dayNum = dayObj.dayNumber || (idx + 1);
+              const existingDay = dayObj;
               return {
                 dayNumber: dayNum,
                 title: existingDay?.title || `Day ${dayNum}: Continuous Study`,
                 description: existingDay?.description || '',
-                assignment: existingDay?.assignment || { prompt: '', dueNote: '' },
+                assignment: existingDay?.assignment && (existingDay.assignment.prompt || existingDay.assignment.dueNote) ? {
+                  prompt: existingDay.assignment.prompt || '',
+                  dueNote: existingDay.assignment.dueNote || ''
+                } : undefined,
                 videos: (existingDay?.videos || []).map((v: any) => ({
                   id: v.id || Math.random().toString(36).substring(2, 9),
                   title: v.title || v.name || '',
@@ -1008,10 +1019,34 @@ export default function CourseEdit() {
     });
   };
 
+  const toggleAssignmentSection = (dayIdx: number) => {
+    setForm(prev => {
+      const updatedDays = [...(prev.days || DAYS_RANGE.map(d => emptyDay(d)))];
+      const hasAss = !!updatedDays[dayIdx]?.assignment;
+      if (hasAss) {
+        // Remove it!
+        updatedDays[dayIdx] = {
+          ...updatedDays[dayIdx],
+          assignment: undefined
+        };
+      } else {
+        // Add it!
+        updatedDays[dayIdx] = {
+          ...updatedDays[dayIdx],
+          assignment: {
+            prompt: "Please write your assignment answers or paste your project demo link here...",
+            dueNote: "Submit before midnight to stay eligible for direct coaching verification."
+          }
+        };
+      }
+      return { ...prev, days: updatedDays };
+    });
+  };
+
   const handleAssignmentChange = (dayIdx: number, subField: 'prompt' | 'dueNote', value: string) => {
     setForm(prev => {
       const updatedDays = [...(prev.days || DAYS_RANGE.map(d => emptyDay(d)))];
-      const currentAss = updatedDays[dayIdx].assignment || { prompt: '', dueNote: '' };
+      const currentAss = updatedDays[dayIdx]?.assignment || { prompt: '', dueNote: '' };
       updatedDays[dayIdx] = {
         ...updatedDays[dayIdx],
         assignment: {
@@ -1104,7 +1139,10 @@ export default function CourseEdit() {
         dayNumber: idx + 1,
         title: day.title || `Day ${idx + 1}`,
         description: day.description || '',
-        assignment: day.assignment || { prompt: '', dueNote: '' },
+        assignment: day.assignment && (day.assignment.prompt || day.assignment.dueNote) ? {
+          prompt: day.assignment.prompt || '',
+          dueNote: day.assignment.dueNote || ''
+        } : null,
         videos: (day.videos || []).map((v) => ({
           id: v.id || Math.random().toString(36).substring(2, 9),
           title: v.title || '',
@@ -1473,13 +1511,96 @@ export default function CourseEdit() {
         </div>
       )}
 
-      {/* TAB 2: 5-DAY CURRICULUM & CHECKS BUILDER */}
+      {/* TAB 2: CURRICULUM & CHECKS BUILDER */}
       {activeSection === "curriculum" && (
         <div className="space-y-6">
+          {/* Day customization tools */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="space-y-1">
+              <span className="text-xs font-black uppercase text-indigo-700 block">📅 Customize Course Duration</span>
+              <span className="text-xs text-slate-500 font-bold block">
+                Current duration: <strong className="text-slate-800 font-extrabold">{(form.days || []).length} Days</strong>
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setForm(prev => {
+                    const currentDays = prev.days || [];
+                    const nextDayNum = currentDays.length + 1;
+                    const newDay = emptyDay(nextDayNum);
+                    return {
+                      ...prev,
+                      days: [...currentDays, newDay]
+                    };
+                  });
+                  setTimeout(() => {
+                    setForm(prev => {
+                      const len = prev.days?.length || 1;
+                      setActiveDayIdx(len - 1);
+                      return prev;
+                    });
+                  }, 50);
+                }}
+                className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-black px-4 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                ➕ Add Day
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const currentDays = form.days || [];
+                  if (currentDays.length <= 1) {
+                    setError("A course must have at least 1 day.");
+                    return;
+                  }
+                  if (confirmDeleteDayIndex === activeDayIdx) {
+                    setForm(prev => {
+                      const updated = (prev.days || [])
+                        .filter((_, idx) => idx !== activeDayIdx)
+                        .map((day, idx) => ({
+                          ...day,
+                          dayNumber: idx + 1
+                        }));
+                      return {
+                        ...prev,
+                        days: updated
+                      };
+                    });
+                    setActiveDayIdx(prev => {
+                      const newLen = currentDays.length - 1;
+                      if (prev >= newLen) {
+                        return Math.max(0, newLen - 1);
+                      }
+                      return prev;
+                    });
+                    setConfirmDeleteDayIndex(null);
+                  } else {
+                    setConfirmDeleteDayIndex(activeDayIdx);
+                    setTimeout(() => {
+                      setConfirmDeleteDayIndex(null);
+                    }, 4000);
+                  }
+                }}
+                className={`text-xs font-black px-4 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm border ${
+                  confirmDeleteDayIndex === activeDayIdx
+                    ? "bg-rose-600 hover:bg-rose-700 text-white border-rose-700 animate-pulse"
+                    : "bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700"
+                }`}
+              >
+                {confirmDeleteDayIndex === activeDayIdx
+                  ? `⚠️ Confirm Delete Day ${activeDayIdx + 1}!`
+                  : `❌ Remove Day ${activeDayIdx + 1}`}
+              </button>
+            </div>
+          </div>
+
           {/* Day Selector Accordion Buttons */}
           <div className="flex gap-2 p-1.5 border rounded-2xl bg-slate-100 overflow-x-auto">
-            {DAYS_RANGE.map((dayNum, i) => {
-              const currentDayObj = (form.days || [])[i] || emptyDay(dayNum);
+            {(form.days || []).map((dayObj, i) => {
+              const dayNum = dayObj.dayNumber || (i + 1);
+              const currentDayObj = dayObj || emptyDay(dayNum);
               return (
                 <button
                   type="button"
@@ -1826,33 +1947,84 @@ export default function CourseEdit() {
 
           {/* End of day submissions Assignment configuration */}
           <div className="bg-white rounded-3xl p-6 border-2 border-dashed border-teal-600 shadow-sm space-y-4">
-            <h3 className="text-xs font-black uppercase text-teal-700 tracking-wider flex items-center justify-between">
-              <span>📋 Day {activeDayIdx + 1} End-of-Day Assignment</span>
-              <span className="bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase">Day submission</span>
-            </h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Assignment Prompt *</label>
-                <textarea
-                  rows={5}
-                  className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-teal-500 outline-none text-sm"
-                  value={(form.days || DAYS_RANGE.map(d => emptyDay(d)))[activeDayIdx]?.assignment?.prompt || ""}
-                  onChange={e => handleAssignmentChange(activeDayIdx, 'prompt', e.target.value)}
-                  placeholder={`Apply today's learnings into a draft portfolio canvas and copy/pasted submission link inside the field below...`}
-                />
+            <div className="flex items-center justify-between border-b pb-3.5">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📋</span>
+                <div>
+                  <h3 className="text-sm font-black uppercase text-slate-850 tracking-wider">
+                    Day {activeDayIdx + 1} End-of-Day Assignment Section
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-bold">
+                    Decide whether students must submit an assignment response for today
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Deadline or submission note note</label>
-                <input
-                  type="text"
-                  className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-teal-500 outline-none text-sm"
-                  value={(form.days || DAYS_RANGE.map(d => emptyDay(d)))[activeDayIdx]?.assignment?.dueNote || ""}
-                  onChange={e => handleAssignmentChange(activeDayIdx, 'dueNote', e.target.value)}
-                  placeholder="e.g., Submit before midnight to stay eligible for direct coaching verification."
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => toggleAssignmentSection(activeDayIdx)}
+                className={`text-xs font-black px-4.5 py-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 shadow-sm ${
+                  (form.days || [])[activeDayIdx]?.assignment
+                    ? "bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700"
+                    : "bg-teal-50 hover:bg-teal-100 border-teal-200 text-teal-700"
+                }`}
+              >
+                {(form.days || [])[activeDayIdx]?.assignment
+                  ? "❌ Remove Assignment Section"
+                  : "➕ Add Assignment Section"}
+              </button>
             </div>
+
+            {(form.days || [])[activeDayIdx]?.assignment ? (
+              <div className="space-y-4 pt-2">
+                <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl flex items-start gap-2">
+                  <span className="text-xs">✓</span>
+                  <div>
+                    <span className="text-[10px] uppercase font-black text-emerald-800">
+                      Assignment section is active
+                    </span>
+                    <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                      Students will see this prompt and be required to submit answers under the "My Assignments" workspace to unlock successive days.
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Assignment Prompt *</label>
+                  <textarea
+                    rows={5}
+                    className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-teal-500 outline-none text-sm font-semibold"
+                    value={(form.days || [])[activeDayIdx]?.assignment?.prompt || ""}
+                    onChange={e => handleAssignmentChange(activeDayIdx, 'prompt', e.target.value)}
+                    placeholder={`Apply today's learnings into a draft portfolio canvas and copy/pasted submission link inside the field below...`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Deadline or submission note</label>
+                  <input
+                    type="text"
+                    className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-teal-500 outline-none text-sm font-bold"
+                    value={(form.days || [])[activeDayIdx]?.assignment?.dueNote || ""}
+                    onChange={e => handleAssignmentChange(activeDayIdx, 'dueNote', e.target.value)}
+                    placeholder="e.g., Submit before midnight to stay eligible for direct coaching verification."
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-50/50 text-center py-8 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-xs text-slate-500 font-bold">
+                  No end-of-day assignment is set for Day {activeDayIdx + 1}.
+                </p>
+                <p className="text-[10px] text-slate-400 mt-1 font-semibold max-w-sm mx-auto">
+                  Students will complete today's lesson videos and proceed without submitting a project response.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => toggleAssignmentSection(activeDayIdx)}
+                  className="mt-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-black px-4 py-2 rounded-xl transition cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
+                >
+                  ➕ Enable Assignment Section
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1882,8 +2054,8 @@ export default function CourseEdit() {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-3 border-t border-dashed">
-                {DAYS_RANGE.map((dayNum, i) => {
-                  const dayObj = (form.days || [])[i] || emptyDay(dayNum);
+                {(form.days || []).map((dayObj, i) => {
+                  const dayNum = dayObj.dayNumber || (i + 1);
                   const isChecked = (dayObj.videos || []).filter(v => v.checkType && v.checkType !== "none").length;
                   return (
                     <div key={dayNum} className="bg-white border text-[10px] rounded-xl p-3 shadow-sm border-slate-200">

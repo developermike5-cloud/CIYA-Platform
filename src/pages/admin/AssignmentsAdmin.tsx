@@ -41,6 +41,7 @@ export default function AssignmentsAdmin() {
     }
   });
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Disapproved'>('All');
+  const [cohortFilter, setCohortFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -64,9 +65,7 @@ export default function AssignmentsAdmin() {
 
       if (user) {
         const q = query(
-          collection(db, 'assignments'),
-          orderBy('createdAt', 'desc'),
-          limit(100)
+          collection(db, 'assignments')
         );
 
         qUnsubscribe = onSnapshot(q, (snapshot) => {
@@ -93,6 +92,14 @@ export default function AssignmentsAdmin() {
               images
             } as Submission);
           });
+
+          // Sort submissions by createdAt descending client-side
+          list.sort((a, b) => {
+            const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+            const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+            return timeB - timeA;
+          });
+
           setSubmissions(list);
           try {
             safeStorage.setItem('ciya_cached_admin_assignments', JSON.stringify(list));
@@ -182,13 +189,21 @@ export default function AssignmentsAdmin() {
     }
   };
 
+  // Extract unique cohorts from submissions list (excluding falsy values and 'All')
+  const uniqueCohorts = Array.from(new Set(
+    submissions
+      .map(s => (s as any).cohort)
+      .filter((c): c is string => typeof c === 'string' && !!c && c !== 'All')
+  )).sort();
+
   const filteredSubmissions = submissions.filter((sub) => {
     const matchesStatus = statusFilter === 'All' || sub.status === statusFilter;
+    const matchesCohort = cohortFilter === 'All' || (sub as any).cohort === cohortFilter || (!cohortFilter && (sub as any).cohort === 'Cohort 1');
     const matchesSearch = 
       sub.userEmail?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sub.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sub.id.includes(searchQuery);
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesCohort && matchesSearch;
   });
 
   return (
@@ -241,16 +256,32 @@ export default function AssignmentsAdmin() {
             </div>
           </div>
 
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by student email, name, or submission ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2.5 outline-none rounded-xl text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
-            />
+          {/* Search bar and Cohort Filter */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by student email, name, or submission ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2.5 outline-none rounded-xl text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+              />
+            </div>
+            {/* Cohort Filter Dropdown */}
+            <select
+              value={cohortFilter}
+              onChange={(e) => setCohortFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm shrink-0"
+            >
+              <option value="All">All Cohorts</option>
+              {uniqueCohorts.map(cohort => (
+                <option key={cohort} value={cohort}>{cohort}</option>
+              ))}
+              {/* Ensure default cohorts exist as options */}
+              {!uniqueCohorts.includes('Cohort 1') && <option value="Cohort 1">Cohort 1</option>}
+              {!uniqueCohorts.includes('Cohort 2') && <option value="Cohort 2">Cohort 2</option>}
+            </select>
           </div>
 
           {/* Table list view */}
@@ -289,6 +320,7 @@ export default function AssignmentsAdmin() {
                       <td className="p-3">
                         <div className="font-extrabold text-slate-900">{sub.userName || "CIYA Cadet"}</div>
                         <div className="text-slate-400 text-[10px] select-all">{sub.userEmail}</div>
+                        <div className="mt-0.5"><span className="text-[9px] bg-indigo-50 border border-indigo-100 text-indigo-700 font-black px-1.5 py-0.5 rounded-full uppercase">{(sub as any).cohort || 'Cohort 1'}</span></div>
                       </td>
                       <td className="p-3">
                         <span className="bg-slate-100 text-slate-800 border font-mono px-2 py-0.5 rounded-md font-bold">
