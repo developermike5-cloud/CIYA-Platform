@@ -17,7 +17,7 @@ import AdminKycbQuestionnaire from './admin/AdminKycbQuestionnaire';
 import { safeStorage } from '../utils/safeStorage';
 import { supabase, getStoragePublicUrl } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
-import staticCourses from '../data/courses.json';
+import { coursesStore } from '../utils/coursesStore';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -2306,12 +2306,10 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled, curre
         return;
       }
 
-      const docRef = doc(db, 'courses', courseItem.id);
-      const snap = await getDoc(docRef);
+      const found = coursesStore.getCourses().find(c => c.id === courseItem.id);
 
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.isLocked === false) {
+      if (found) {
+        if (found.isLocked === false) {
           if (onCourseUnlocked) {
             onCourseUnlocked(courseItem.id);
           }
@@ -2324,7 +2322,7 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled, curre
       }
     } catch (err) {
       console.error("Error syncing course unlock:", err);
-      alert("Error contacting database for lock status. Please check your network connection and try again.");
+      alert("Error checking course lock status. Please try again.");
     } finally {
       setIsSyncing(false);
     }
@@ -2698,39 +2696,10 @@ export default function StudentDashboard() {
 
   const [courses, setCourses] = useState<Course[]>(() => {
     try {
-      const parsed = staticCourses as any[];
-      const data = parsed.map(c => {
-        return {
-          ...c,
-          skill: c.skill || (c.category?.toLowerCase().includes('web') ? 'web' : c.category?.toLowerCase().includes('film') ? 'film' : c.category?.toLowerCase().includes('image') ? 'image' : 'web'),
-          tier: c.tier || (c.level?.toLowerCase() === 'beginner' ? 'beginner' : c.level?.toLowerCase() === 'advanced' ? 'advanced' : c.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
-          status: c.status || (c.publish_status === 'Published' ? 'published' : 'draft'),
-          days: (c.days || []).map((day: any, dIdx: number) => ({
-            dayNumber: dIdx + 1,
-            title: day.title || `Day ${dIdx + 1}: Study Module`,
-            description: day.description || '',
-            assignment: day.assignment || { prompt: '', dueNote: '' },
-            videos: (day.videos || []).map((v: any) => ({
-              id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
-              title: v.title || '',
-              video_url: v.video_url || v.url || '',
-              url: v.url || v.video_url || '',
-              duration: v.duration || '10 min',
-              description: v.description || '',
-              resources: v.resources || '',
-              checkType: v.checkType || 'none',
-              check: v.check || null,
-              funFact: v.funFact || null
-            }))
-          }))
-        } as Course;
-      });
+      const data = coursesStore.getCourses();
       data.sort((a, b) => {
         const getMills = (fieldVal: any) => {
           if (!fieldVal) return 0;
-          if (typeof fieldVal.toDate === 'function') {
-            return fieldVal.toDate().getTime();
-          }
           return new Date(fieldVal).getTime() || 0;
         };
         return getMills(b.createdAt) - getMills(a.createdAt);
@@ -2740,6 +2709,13 @@ export default function StudentDashboard() {
       return [];
     }
   });
+
+  useEffect(() => {
+    const unsubscribe = coursesStore.subscribe((updatedCourses) => {
+      setCourses(updatedCourses);
+    });
+    return () => unsubscribe();
+  }, []);
   const [coursesViewTab, setCoursesViewTab] = useState<'courses' | 'leaderboard'>('courses');
   const [leaderboardUsers, setLeaderboardUsers] = useState<any[]>(() => {
     try {
@@ -2759,7 +2735,7 @@ export default function StudentDashboard() {
   });
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(() => {
-    const hasCachedCourses = !!safeStorage.getItem('ciya_cached_courses');
+    const hasCachedCourses = coursesStore.getCourses().length > 0;
     const hasCachedProfile = !!safeStorage.getItem('ciya_cached_profile');
     return !(hasCachedCourses && hasCachedProfile);
   });
@@ -2949,42 +2925,11 @@ export default function StudentDashboard() {
 
     const targetCourse = courses.find(c => c.id === selectedCourseId);
     if (targetCourse && (!targetCourse.days || targetCourse.days.length === 0)) {
-      const loadFullCourse = async () => {
+      const loadFullCourse = () => {
         try {
-          // Look for the course in local static data first to eliminate database egress
-          const staticMatch = (staticCourses as any[]).find(c => c.id === selectedCourseId);
-          let d = staticMatch;
-          
-          if (!d) {
-            const docSnap = await getDoc(doc(db, 'courses', selectedCourseId));
-            if (docSnap.exists()) {
-              d = docSnap.data();
-            }
-          }
-
-          if (d) {
-            const fullCourseData = {
-              ...d,
-              days: (d.days || []).map((day: any, dIdx: number) => ({
-                dayNumber: dIdx + 1,
-                title: day.title || `Day ${dIdx + 1}: Study Module`,
-                description: day.description || '',
-                assignment: day.assignment || { prompt: '', dueNote: '' },
-                videos: (day.videos || []).map((v: any) => ({
-                  id: v.id || `${dIdx}-${Math.random().toString(36).substring(2,6)}`,
-                  title: v.title || '',
-                  video_url: v.video_url || v.url || '',
-                  url: v.url || v.video_url || '',
-                  duration: v.duration || '10 min',
-                  description: v.description || '',
-                  resources: v.resources || '',
-                  checkType: v.checkType || 'none',
-                  check: v.check || null,
-                  funFact: v.funFact || null
-                }))
-              }))
-            };
-            setCourses(prev => prev.map(c => c.id === selectedCourseId ? { ...c, ...fullCourseData } : c));
+          const found = coursesStore.getCourses().find(c => c.id === selectedCourseId);
+          if (found) {
+            setCourses(prev => prev.map(c => c.id === selectedCourseId ? found : c));
           }
         } catch (err) {
           console.warn("Error lazy-loading course details:", err);
@@ -3231,7 +3176,7 @@ export default function StudentDashboard() {
 
     // First load from cache if available, or fetch directly if cache is missing
     const hasCachedAppSettings = !!safeStorage.getItem('ciya_cached_app_settings');
-    const hasCachedCourses = !!safeStorage.getItem('ciya_cached_courses');
+    const hasCachedCourses = coursesStore.getCourses().length > 0;
     const hasCachedProfile = !!safeStorage.getItem('ciya_cached_profile');
 
     if (!hasCachedAppSettings) {
@@ -3962,14 +3907,10 @@ export default function StudentDashboard() {
     if (authChecking) return;
     
     // Load courses instantly from cache
-    const cached = safeStorage.getItem('ciya_cached_courses');
-    if (cached) {
-      try {
-        setCourses(JSON.parse(cached));
-        setLoading(false);
-      } catch (e) {
-        console.error("Error parsing cached courses:", e);
-      }
+    const cached = coursesStore.getCourses();
+    if (cached && cached.length > 0) {
+      setCourses(cached);
+      setLoading(false);
     } else {
       setLoading(true);
     }

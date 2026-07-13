@@ -7,7 +7,7 @@ import BrandingLogo from '../../components/BrandingLogo';
 import { Course } from '../../types';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
 import { uploadToCloudinary } from '../../utils/cloudinary';
-import staticCourses from '../../data/courses.json';
+import { coursesStore } from '../../utils/coursesStore';
 import { safeStorage } from '../../utils/safeStorage';
 
 function getFirestoreTime(timestamp: any): number {
@@ -453,7 +453,7 @@ export default function UsersAdmin() {
       });
       setUsers(data);
 
-      const coursesData = (staticCourses as any[]).map(c => ({ id: c.id, ...c } as Course));
+      const coursesData = coursesStore.getCourses();
       setAllCourses(coursesData);
 
       const adminSnapshot = await getDocs(collection(db, 'admins'));

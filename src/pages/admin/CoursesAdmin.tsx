@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, addDoc } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType, triggerSystemSignal } from '../../firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy } from 'lucide-react';
-import staticCourses from '../../data/courses.json';
+import { coursesStore } from '../../utils/coursesStore';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Class", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -16,12 +13,6 @@ const SKILLS: Record<string, { label: string, icon: string, color: string, bg: s
 function formatFirestoreDate(timestamp: any): string {
   if (!timestamp) return '-';
   try {
-    if (typeof timestamp.toDate === 'function') {
-      return timestamp.toDate().toLocaleDateString();
-    }
-    if (timestamp.seconds !== undefined) {
-      return new Date(timestamp.seconds * 1000).toLocaleDateString();
-    }
     const d = new Date(timestamp);
     if (!isNaN(d.getTime())) {
       return d.toLocaleDateString();
@@ -50,18 +41,7 @@ function TierBadge({ tier }: { tier: string }) {
 }
 
 export default function CoursesAdmin() {
-  const [courses, setCourses] = useState<Course[]>(() => {
-    return (staticCourses as any[]).map(c => {
-      return {
-        id: c.id,
-        ...c,
-        skill: c.skill || (c.category?.toLowerCase().includes('web') ? 'web' : c.category?.toLowerCase().includes('film') ? 'film' : c.category?.toLowerCase().includes('image') ? 'image' : 'web'),
-        tier: c.tier || (c.level?.toLowerCase() === 'beginner' ? 'beginner' : c.level?.toLowerCase() === 'advanced' ? 'advanced' : c.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
-        status: c.status || (c.publish_status === 'Published' ? 'published' : 'draft'),
-        isLocked: c.isLocked || c.locked || false
-      } as Course;
-    });
-  });
+  const [courses, setCourses] = useState<Course[]>(() => coursesStore.getCourses());
   const [loading, setLoading] = useState(false);
   
   // Filters state
@@ -77,93 +57,42 @@ export default function CoursesAdmin() {
 
   const navigate = useNavigate();
 
-  // Load courses in real-time by subscribing to Firestore overrides and merging with static data
+  // Load courses in real-time by subscribing to coursesStore updates
   useEffect(() => {
-    setLoading(true);
-    const q = query(collection(db, 'courses'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const dbCourses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-      
-      setCourses(prev => {
-        const baseCourses = (staticCourses as any[]).map(c => {
-          const dbMatch = dbCourses.find((dc: any) => dc.id === c.id);
-          return {
-            id: c.id,
-            ...c,
-            skill: c.skill || (c.category?.toLowerCase().includes('web') ? 'web' : c.category?.toLowerCase().includes('film') ? 'film' : c.category?.toLowerCase().includes('image') ? 'image' : 'web'),
-            tier: c.tier || (c.level?.toLowerCase() === 'beginner' ? 'beginner' : c.level?.toLowerCase() === 'advanced' ? 'advanced' : c.level?.toLowerCase() === 'masterclass' ? 'masterclass' : 'beginner'),
-            status: dbMatch?.status || c.status || (c.publish_status === 'Published' ? 'published' : 'draft'),
-            isLocked: dbMatch?.isLocked !== undefined ? dbMatch.isLocked : (c.isLocked || c.locked || false),
-            publish_status: dbMatch?.publish_status || c.publish_status || (c.publish_status === 'Published' ? 'Published' : 'Draft'),
-          } as Course;
-        });
-
-        // Merging entirely custom new courses added through admin panel
-        dbCourses.forEach((dbc: any) => {
-          if (!baseCourses.some(bc => bc.id === dbc.id)) {
-            baseCourses.push({
-              ...dbc,
-              skill: dbc.skill || 'web',
-              tier: dbc.tier || 'beginner',
-              status: dbc.status || 'draft',
-              isLocked: dbc.isLocked !== undefined ? dbc.isLocked : false
-            } as Course);
-          }
-        });
-
-        return baseCourses;
-      });
-      setLoading(false);
-    }, (error) => {
-      console.warn("Error loading course real-time overrides from DB:", error);
-      setLoading(false);
+    const unsubscribe = coursesStore.subscribe((updatedCourses) => {
+      setCourses(updatedCourses);
     });
-
+    // Set initial list just in case
+    setCourses(coursesStore.getCourses());
     return () => unsubscribe();
   }, []);
 
-  // Inline DB Actions
-  const handleTogglePublish = async (courseId: string, isCurrentlyPublished: boolean) => {
+  // Inline DB Actions replaced with frontend local actions
+  const handleTogglePublish = (courseId: string, isCurrentlyPublished: boolean) => {
     const nextStatus = isCurrentlyPublished ? 'draft' : 'published';
     const nextPublishStatus = nextStatus === 'published' ? 'Published' : 'Draft';
     
-    // Optimistic update
-    setCourses(prev => prev.map(c => c.id === courseId ? { ...c, status: nextStatus, publish_status: nextPublishStatus } : c));
-
-    try {
-      const docRef = doc(db, 'courses', courseId);
-      await updateDoc(docRef, {
-        status: nextStatus,
-        publish_status: nextPublishStatus,
-        updatedAt: serverTimestamp()
-      });
-      await triggerSystemSignal('courses');
-    } catch (e) {
-      console.error(e);
-      // Revert on failure
-      setCourses(prev => prev.map(c => c.id === courseId ? { ...c, status: isCurrentlyPublished ? 'published' : 'draft', publish_status: isCurrentlyPublished ? 'Published' : 'Draft' } : c));
-      alert('Error updating course status. Make sure your Admin account is correctly synchronized with the database.');
+    const target = courses.find(c => c.id === courseId);
+    if (target) {
+      const updated = {
+        ...target,
+        status: nextStatus as any,
+        publish_status: nextPublishStatus as any
+      };
+      coursesStore.saveCourse(updated);
     }
   };
 
-  const handleToggleLock = async (courseId: string, currentLocked: boolean) => {
+  const handleToggleLock = (courseId: string, currentLocked: boolean) => {
     const nextLocked = !currentLocked;
     
-    // Optimistic update
-    setCourses(prev => prev.map(c => c.id === courseId ? { ...c, isLocked: nextLocked } : c));
-
-    try {
-      const docRef = doc(db, 'courses', courseId);
-      await updateDoc(docRef, {
-        isLocked: nextLocked,
-        updatedAt: serverTimestamp()
-      });
-      await triggerSystemSignal('courses');
-    } catch (e) {
-      console.error(e);
-      // Revert on failure
-      setCourses(prev => prev.map(c => c.id === courseId ? { ...c, isLocked: currentLocked } : c));
-      alert('Error updating course lock status.');
+    const target = courses.find(c => c.id === courseId);
+    if (target) {
+      const updated = {
+        ...target,
+        isLocked: nextLocked
+      };
+      coursesStore.saveCourse(updated);
     }
   };
 
@@ -171,9 +100,7 @@ export default function CoursesAdmin() {
     if (!deleteDialogCourse?.id) return;
     setIsPerformingAction(true);
     try {
-      const docRef = doc(db, 'courses', deleteDialogCourse.id);
-      await deleteDoc(docRef);
-      await triggerSystemSignal('courses');
+      await coursesStore.deleteCourse(deleteDialogCourse.id);
       setDeleteDialogCourse(null);
     } catch (e) {
       console.error(e);
@@ -189,68 +116,7 @@ export default function CoursesAdmin() {
     setIsPerformingAction(true);
 
     try {
-      // Map and clean Days to ensure no undefined fields and full deep cloning of quizzes, videos, assignments
-      const clonedDays = (cloneDialogCourse.days || []).map((day, dIdx) => ({
-        dayNumber: day.dayNumber || (dIdx + 1),
-        title: day.title || `Day ${dIdx + 1}`,
-        description: day.description || '',
-        assignment: day.assignment ? {
-          prompt: day.assignment.prompt || '',
-          dueNote: day.assignment.dueNote || ''
-        } : { prompt: '', dueNote: '' },
-        videos: (day.videos || []).map((v) => ({
-          id: Math.random().toString(36).substring(2, 9),
-          title: v.title || '',
-          video_url: v.video_url || v.url || '',
-          url: v.video_url || v.url || '',
-          duration: v.duration || '10 min',
-          description: v.description || '',
-          resources: v.resources || '',
-          checkType: v.checkType || 'none',
-          check: v.check ? JSON.parse(JSON.stringify(v.check)) : null,
-          funFact: v.funFact ? { ...v.funFact } : null
-        }))
-      }));
-
-      // Explicitly construct cloned payload to strictly conform to firestore rules
-      const payload: Record<string, any> = {
-        title: clonedTitle,
-        subtitle: cloneDialogCourse.tagline || cloneDialogCourse.subtitle || '',
-        tagline: cloneDialogCourse.tagline || cloneDialogCourse.subtitle || '',
-        thumbnail: cloneDialogCourse.thumbnail || '',
-        description: cloneDialogCourse.overview || cloneDialogCourse.description || '',
-        overview: cloneDialogCourse.overview || cloneDialogCourse.description || '',
-        category: cloneDialogCourse.category || 'AI Website Class',
-        skill: cloneDialogCourse.skill || 'web',
-        subskill: cloneDialogCourse.subskill || '',
-        skillPath: cloneDialogCourse.skillPath || '',
-        durationMode: 'express',
-        clonedFromId: cloneDialogCourse.id || '',
-        level: cloneDialogCourse.level || 'Beginner',
-        tier: cloneDialogCourse.tier || 'beginner',
-        price: Number(cloneDialogCourse.price) || 0,
-        instructor: cloneDialogCourse.instructor || 'CIYA Team',
-        outcomes: cloneDialogCourse.outcomes || '',
-        requirements: cloneDialogCourse.requirements || '',
-        publish_status: 'Draft',
-        status: 'draft',
-        isLocked: !!cloneDialogCourse.isLocked,
-        isCloned: true,
-        days: clonedDays,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-
-      // Sanitize fields to ensure absolutely NO undefined values are passed to Firestore
-      const cleanedPayload: Record<string, any> = {};
-      Object.entries(payload).forEach(([k, v]) => {
-        if (v !== undefined) {
-          cleanedPayload[k] = v;
-        }
-      });
-
-      await addDoc(collection(db, 'courses'), cleanedPayload);
-      await triggerSystemSignal('courses');
+      await coursesStore.cloneCourse(cloneDialogCourse, clonedTitle);
       setCloneDialogCourse(null);
       alert(`Course cloned successfully! Saved as Draft: "${clonedTitle}".`);
     } catch (err: any) {
@@ -263,6 +129,7 @@ export default function CoursesAdmin() {
 
   // Stats summary calculation
   const totalCourses = courses.length;
+
   const publishedCoursesCount = courses.filter(c => c.status === 'published' || c.publish_status === 'Published').length;
   const totalVideosCount = courses.reduce((acc, c) => acc + (c.days?.reduce((sum, d) => sum + (d.videos?.length || 0), 0) || 0), 0);
   const totalChecksCount = courses.reduce((acc, c) => acc + (c.days?.reduce((sum, d) => sum + (d.videos?.filter(v => v.checkType && v.checkType !== 'none').length || 0), 0) || 0), 0);

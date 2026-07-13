@@ -201,30 +201,8 @@ service cloud.firestore {
     }
 
     match /courses/{courseId} {
-      allow get: if true; // Public can get individual courses
-      allow list: if 
-        // Public can list published courses, but we only permit the query if we filter properly?
-        // Wait, for public reading:
-        (resource.data.publish_status == 'Published' || isAdmin());
-        
-      allow create: if isAdmin() 
-                    && isValidId(courseId)
-                    && isValidCourse(incoming())
-                    && incoming().createdAt == request.time
-                    && incoming().updatedAt == request.time;
-      
-      allow update: if isAdmin()
-                    && isValidCourse(incoming())
-                    && (!existing().keys().hasAll(['createdAt']) || incoming().createdAt == existing().createdAt)
-                    && (incoming().updatedAt == request.time || !incoming().keys().hasAll(['updatedAt']))
-                    && incoming().diff(existing()).affectedKeys().hasOnly([
-                      'title', 'subtitle', 'tagline', 'slug', 'thumbnail', 'description', 
-                      'overview', 'category', 'skill', 'subskill', 'skillPath', 'durationMode', 'youtube_link', 
-                      'level', 'tier', 'price', 'instructor', 'outcomes', 
-                      'requirements', 'publish_status', 'status', 'isLocked', 'isCloned', 'days', 'updatedAt', 'createdAt'
-                    ]);
-                    
-      allow delete: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /kycb_questionnaires/{questionnaireId} {

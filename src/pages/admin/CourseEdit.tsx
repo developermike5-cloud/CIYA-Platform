@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, triggerSystemSignal } from '../../firebase';
 import { Course, CourseDay, CourseVideo } from '../../types';
 import { ArrowLeft, Save, Sparkles, AlertCircle, Plus, Trash2, HelpCircle } from 'lucide-react';
-import staticCourses from '../../data/courses.json';
+import { coursesStore } from '../../utils/coursesStore';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string, defaultSubskills: string[], defaultSkillPaths: string[] }> = {
   web: {
@@ -692,7 +690,7 @@ export default function CourseEdit() {
   const [importSelectedLessonIdx, setImportSelectedLessonIdx] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    setCoursesList(staticCourses as Course[]);
+    setCoursesList(coursesStore.getCourses());
   }, []);
 
   const handleDoImportLesson = (targetVideoIdx: number) => {
@@ -884,7 +882,7 @@ export default function CourseEdit() {
         status: statusVal,
         isLocked: !!form.isLocked,
         days: cleanedDays,
-        updatedAt: serverTimestamp()
+        updatedAt: new Date().toISOString()
       };
 
       // Sanitize fields to make sure no undefined properties go to Firestore
@@ -895,19 +893,21 @@ export default function CourseEdit() {
         }
       });
 
-      const generatedId = Math.random().toString(36).substring(2, 11);
-      const id = isNew ? (form.id || generatedId) : (courseId as string);
-      const docRef = doc(db, 'courses', id);
+      const generatedId = form.id || Math.random().toString(36).substring(2, 11);
+      const id = isNew ? generatedId : (courseId as string);
+
+      const updatedCourse = {
+        ...cleanedPayload,
+        id,
+        createdAt: isNew ? new Date().toISOString() : (form.createdAt || new Date().toISOString()),
+        updatedAt: new Date().toISOString()
+      } as Course;
+
+      await coursesStore.saveCourse(updatedCourse);
 
       if (isNew) {
-        cleanedPayload.createdAt = serverTimestamp();
-        await setDoc(docRef, cleanedPayload);
-        await triggerSystemSignal('courses');
-        setForm(prev => ({ ...prev, id }));
+        setForm(prev => ({ ...prev, id, createdAt: updatedCourse.createdAt }));
         navigate(`/admin/courses/${id}`, { replace: true });
-      } else {
-        await updateDoc(docRef, cleanedPayload);
-        await triggerSystemSignal('courses');
       }
 
       setLessonSavedId(vidId);
@@ -916,29 +916,28 @@ export default function CourseEdit() {
       }, 3000);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'An error occurred while saving the lesson to Firestore.');
+      setError(err.message || 'An error occurred while saving the lesson.');
     } finally {
       setLessonSavingId(null);
     }
   };
 
-  // Load and map course from Firestore
+  // Load and map course from coursesStore
   useEffect(() => {
     if (isNew) {
       setLoading(false);
       return;
     }
-    const fetchCourse = async () => {
+    const fetchCourse = () => {
       try {
-        const docRef = doc(db, 'courses', courseId as string);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const raw = docSnap.data();
+        const found = coursesStore.getCourses().find(c => c.id === courseId);
+        if (found) {
+          const raw = found;
           
           // Bidirectional mapper load
           const mapped: Course = {
             ...raw,
-            id: docSnap.id,
+            id: raw.id,
             title: raw.title || '',
             subtitle: raw.subtitle || raw.tagline || '',
             tagline: raw.tagline || raw.subtitle || '',
@@ -991,7 +990,7 @@ export default function CourseEdit() {
 
           setForm(mapped);
         } else {
-          setError('The requested course does not exist in the collection.');
+          setError('The requested course does not exist.');
         }
       } catch (err) {
         console.error(err);
@@ -1179,7 +1178,7 @@ export default function CourseEdit() {
         status: statusVal,
         isLocked: !!form.isLocked,
         days: cleanedDays,
-        updatedAt: serverTimestamp()
+        updatedAt: new Date().toISOString()
       };
 
       // Sanitize fields to make sure no undefined properties go to Firestore
@@ -1191,26 +1190,20 @@ export default function CourseEdit() {
       });
 
       const id = isNew ? Math.random().toString(36).substring(2, 11) : (courseId as string);
-      const docRef = doc(db, 'courses', id);
 
-      if (isNew) {
-        cleanedPayload.createdAt = serverTimestamp();
-        await setDoc(docRef, cleanedPayload);
-        await triggerSystemSignal('courses');
-      } else {
-        await updateDoc(docRef, cleanedPayload);
-        await triggerSystemSignal('courses');
-      }
+      const updatedCourse = {
+        ...cleanedPayload,
+        id,
+        createdAt: isNew ? new Date().toISOString() : (form.createdAt || new Date().toISOString()),
+        updatedAt: new Date().toISOString()
+      } as Course;
+
+      await coursesStore.saveCourse(updatedCourse);
 
       navigate('/admin');
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'An error occurred while saving the course to Firestore.');
-      try {
-        handleFirestoreError(err, isNew ? OperationType.CREATE : OperationType.UPDATE, 'courses');
-      } catch (logErr) {
-        console.warn('Logging captured:', logErr);
-      }
+      setError(err.message || 'An error occurred while saving the course.');
     } finally {
       setSaving(false);
     }
@@ -1244,18 +1237,18 @@ export default function CourseEdit() {
             type="button"
             disabled={saving}
             onClick={() => handleSaveFirestore("draft")}
-            className="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 transition-all cursor-pointer"
+            className="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50"
           >
-            Save Draft
+            {saving ? 'Saving Draft...' : 'Save Draft'}
           </button>
           <button
             type="button"
             disabled={saving}
             onClick={() => handleSaveFirestore("published")}
-            className="px-5 py-2 text-xs font-black text-white bg-teal-600 hover:bg-teal-700 rounded-lg shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+            className="px-5 py-2 text-xs font-black text-white bg-teal-600 hover:bg-teal-700 rounded-lg shadow-md transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
           >
             <Sparkles className="w-3.5 h-3.5 fill-white" />
-            {saving ? 'Saving...' : 'Publish Course'}
+            {saving ? 'Publishing...' : 'Publish Course'}
           </button>
         </div>
       </div>
@@ -2105,17 +2098,19 @@ export default function CourseEdit() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
                 type="button"
+                disabled={saving}
                 onClick={() => handleSaveFirestore("draft")}
-                className="w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs cursor-pointer shadow-sm transition-all border-0"
+                className="w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs cursor-pointer shadow-sm transition-all border-0 disabled:opacity-50"
               >
-                💾 Save as Closed Draft
+                {saving ? '💾 Saving Draft...' : '💾 Save as Closed Draft'}
               </button>
               <button
                 type="button"
+                disabled={saving}
                 onClick={() => handleSaveFirestore("published")}
-                className="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-teal-600/10 transition-all cursor-pointer border-0"
+                className="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-teal-600/10 transition-all cursor-pointer border-0 disabled:opacity-50"
               >
-                🚀 Publish Directly to Students
+                {saving ? '🚀 Publishing...' : '🚀 Publish Directly to Students'}
               </button>
             </div>
           </div>
@@ -2126,13 +2121,14 @@ export default function CourseEdit() {
       <div className="flex justify-end gap-3 mt-6 border-t pt-4">
         <Link
           to="/admin"
-          className="px-6 py-2.5 bg-slate-50 border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 rounded-xl text-xs transition-all shadow-sm"
+          className={`px-6 py-2.5 bg-slate-50 border border-slate-200 text-slate-700 font-bold hover:bg-slate-100 rounded-xl text-xs transition-all shadow-sm ${saving ? 'pointer-events-none opacity-50' : ''}`}
         >
           Cancel
         </Link>
         <button
+          disabled={saving}
           onClick={() => handleSaveFirestore(form.status === "published" ? "published" : "draft")}
-          className="px-6 py-2.5 bg-indigo-600 text-white font-black hover:bg-indigo-700 rounded-xl text-xs transition-all cursor-pointer border-0 shadow-lg shadow-indigo-500/15"
+          className="px-6 py-2.5 bg-indigo-600 text-white font-black hover:bg-indigo-700 rounded-xl text-xs transition-all cursor-pointer border-0 shadow-lg shadow-indigo-500/15 disabled:opacity-50"
         >
           {saving ? 'Saving Course...' : 'Save Updates'}
         </button>

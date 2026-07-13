@@ -1,7 +1,18 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import crypto from "crypto";
+import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
+
+// Safe directory name resolution for ESM / CommonJS hybrid environment
+const currentDir = (() => {
+  try {
+    return __dirname;
+  } catch {
+    return path.dirname(fileURLToPath(import.meta.url));
+  }
+})();
 import { GoogleGenAI, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({
@@ -63,6 +74,59 @@ async function startServer() {
   // Add API routes here
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  const getCoursesFilePath = () => {
+    const possiblePaths = [
+      path.resolve(process.cwd(), "src", "data", "courses.json"),
+      path.resolve(process.cwd(), "dist", "courses.json"),
+      path.resolve(currentDir, "src", "data", "courses.json"),
+      path.resolve(currentDir, "..", "src", "data", "courses.json"),
+      path.resolve(currentDir, "courses.json")
+    ];
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+    return possiblePaths[0];
+  };
+
+  app.get("/api/courses", (req, res) => {
+    try {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      const filePath = getCoursesFilePath();
+      if (fs.existsSync(filePath)) {
+        const fileData = fs.readFileSync(filePath, "utf-8");
+        res.json(JSON.parse(fileData));
+      } else {
+        res.json([]);
+      }
+    } catch (err: any) {
+      console.error("Failed to read courses.json:", err);
+      res.status(500).json({ error: err.message || "Failed to read courses." });
+    }
+  });
+
+  app.post("/api/courses/save", (req, res) => {
+    try {
+      const { courses } = req.body;
+      if (!Array.isArray(courses)) {
+        return res.status(400).json({ error: "Invalid courses data. Expected an array." });
+      }
+      const filePath = getCoursesFilePath();
+      const dirPath = path.dirname(filePath);
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+      fs.writeFileSync(filePath, JSON.stringify(courses, null, 2), "utf-8");
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Failed to write to courses.json:", err);
+      res.status(500).json({ error: err.message || "Failed to save courses to files." });
+    }
   });
 
   app.post("/api/ai/youtube-lesson-gen", async (req, res) => {

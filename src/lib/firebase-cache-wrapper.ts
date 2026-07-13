@@ -24,6 +24,7 @@ import {
 } from '@firebase/firestore';
 
 import { safeStorage } from '../utils/safeStorage';
+import { coursesStore } from '../utils/coursesStore';
 import staticCourses from '../data/courses.json';
 import staticBlog from '../data/blog.json';
 import staticFullPrompts from '../data/full_prompts.json';
@@ -196,6 +197,15 @@ function invalidateQueryCaches(collectionPath: string) {
 function resolveLocalDoc(path: string): { exists: boolean; data: any } {
   if (!path) return { exists: false, data: null };
 
+  // If we are looking for a specific course document (e.g. "courses/xyz")
+  if (path.startsWith('courses/')) {
+    const courseId = path.split('/').pop();
+    const course = coursesStore.getCourses().find(c => c.id === courseId);
+    if (course) {
+      return { exists: true, data: course };
+    }
+  }
+
   // 1. Check custom user/assignments/etc. local caches first (as updated by writes)
   const cacheKey = `ciya_fs_doc_${path.replace(/[^a-zA-Z0-9_]/g, '_')}_data`;
   const cachedStr = safeStorage.getItem(cacheKey);
@@ -248,15 +258,6 @@ function resolveLocalDoc(path: string): { exists: boolean; data: any } {
     return { exists: true, data: staticModularPrompts };
   }
 
-  // If we are looking for a specific course document (e.g. "courses/xyz")
-  if (path.startsWith('courses/')) {
-    const courseId = path.split('/').pop();
-    const course = (staticCourses as any[]).find(c => c.id === courseId);
-    if (course) {
-      return { exists: true, data: course };
-    }
-  }
-
   // If we are looking for a specific blog document (e.g. "blog/xyz")
   if (path.startsWith('blog/')) {
     const blogId = path.split('/').pop();
@@ -281,6 +282,22 @@ function resolveLocalQuery(ref: any): any[] {
   if (!path && ref.type === 'collection') {
     path = ref.path;
   }
+
+  // Bypass cache completely for course lists and blog posts to guarantee dynamic reflecting
+  if (path === 'courses') {
+    return coursesStore.getCourses().map(c => ({
+      id: c.id,
+      exists: true,
+      data: c
+    }));
+  }
+  if (path === 'blog') {
+    return (staticBlog as any[]).map(b => ({
+      id: b.id,
+      exists: true,
+      data: b
+    }));
+  }
   
   const queryKey = getQueryCacheKey(ref);
   const cacheKey = `ciya_fs_query_${queryKey}_data`;
@@ -296,21 +313,7 @@ function resolveLocalQuery(ref: any): any[] {
     } catch (e) {}
   }
 
-  // 2. Static fallbacks
-  if (path === 'courses') {
-    return (staticCourses as any[]).map(c => ({
-      id: c.id,
-      exists: true,
-      data: c
-    }));
-  }
-  if (path === 'blog') {
-    return (staticBlog as any[]).map(b => ({
-      id: b.id,
-      exists: true,
-      data: b
-    }));
-  }
+  // 2. Static fallbacks (Only other fallbacks continue here if not matched above)
 
   // If we are looking for assignments
   if (path === 'assignments') {

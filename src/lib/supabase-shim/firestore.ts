@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { safeStorage } from '../../utils/safeStorage';
+import { coursesStore } from '../../utils/coursesStore';
 import staticCourses from '../../data/courses.json';
 import staticBlogs from '../../data/blog.json';
 import staticFullPrompts from '../../data/full_prompts.json';
@@ -137,7 +138,7 @@ export async function getDoc(docRef: any): Promise<DocumentSnapshot> {
     const table = getTableName(rawTable);
 
     if (table === 'courses') {
-      const found = (staticCourses as any[]).find(c => c.id === id);
+      const found = coursesStore.getCourses().find(c => c.id === id);
       if (found) {
         return new DocumentSnapshot(true, found, id);
       }
@@ -261,7 +262,7 @@ export async function getDocs(queryRef: any) {
     const table = getTableName(rawTable);
 
     if (table === 'courses') {
-      const docs = (staticCourses as any[]).map(c => {
+      const docs = coursesStore.getCourses().map(c => {
         return new DocumentSnapshot(true, c, c.id);
       });
       return {
