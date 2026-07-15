@@ -77,6 +77,7 @@ interface UserProfile {
   learningTool?: string;
   cohort?: string;
   completedCoursesOverride?: string[];
+  progress?: any;
   manualDayUnlock?: {
     [courseId: string]: {
       [dayIndex: number]: boolean;
@@ -170,6 +171,11 @@ export default function UsersAdmin() {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, 'approve' | 'disapprove' | 'delete' | null>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // States for controlled admin course switching
+  const [selectedCourses, setSelectedCourses] = useState<Record<string, string>>({});
+  const [clearProgressMap, setClearProgressMap] = useState<Record<string, boolean>>({});
+  const [courseSwitchConfirmId, setCourseSwitchConfirmId] = useState<string | null>(null);
 
   // Local states for activation code controls
   const [editingCodes, setEditingCodes] = useState<Record<string, string>>({});
@@ -431,6 +437,18 @@ export default function UsersAdmin() {
 
       if (!hasUsedCache) {
         setLoading(true);
+      }
+    }
+
+    if (hasUsedCache && !forceRefresh) {
+      const lastFetchStr = safeStorage.getItem('ciya_admin_cached_users_time_All');
+      if (lastFetchStr) {
+        const lastFetch = parseInt(lastFetchStr, 10);
+        if (!isNaN(lastFetch) && Date.now() - lastFetch < 3600000) {
+          setIsRefreshing(false);
+          setLoading(false);
+          return;
+        }
       }
     }
 
@@ -738,6 +756,72 @@ export default function UsersAdmin() {
     } catch (err) {
       console.error("Error toggling day unlock status:", err);
       alert("Failed to update day unlock. Please try again.");
+    }
+  };
+
+  const handleSwitchCourse = async (userId: string, targetCourseId: string, clearProgress: boolean) => {
+    try {
+      const targetCourse = allCourses.find(c => c.id === targetCourseId);
+      if (!targetCourse) {
+        alert("Selected course not found.");
+        return;
+      }
+
+      const userDoc = users.find(u => u.id === userId);
+      if (!userDoc) return;
+
+      const updatedFields: Record<string, any> = {
+        recommendedPath: targetCourse.title,
+        courseType: targetCourse.title,
+        pathwaySelection: targetCourse.title,
+        updatedAt: serverTimestamp()
+      };
+
+      let nextProgress: any = {};
+      if (clearProgress) {
+        // Enforce strict single active course by starting clean progress
+        nextProgress = {
+          [targetCourseId]: { watched: [], checkPassed: [], submissions: {}, quizScores: {} }
+        };
+      } else {
+        // Retain existing progress but ensure new course has progress entry
+        const existingProgress = userDoc.progress || {};
+        nextProgress = {
+          ...existingProgress,
+          [targetCourseId]: existingProgress[targetCourseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} }
+        };
+      }
+
+      updatedFields.progress = nextProgress;
+
+      // Update Firestore
+      await updateDoc(doc(db, 'users', userId), updatedFields);
+
+      // Update RTDB for instant synchronizations if active
+      if (rtdb) {
+        dbSet(dbRef(rtdb, `users/${userId}/recommendedPath`), targetCourse.title).catch(() => {});
+        dbSet(dbRef(rtdb, `users/${userId}/courseType`), targetCourse.title).catch(() => {});
+        dbSet(dbRef(rtdb, `users/${userId}/pathwaySelection`), targetCourse.title).catch(() => {});
+        dbSet(dbRef(rtdb, `users/${userId}/progress`), nextProgress).catch(() => {});
+      }
+
+      // Signal update for student
+      await triggerSystemSignal('user_signals', userId);
+
+      // Update local state in the admin dashboard so it reflects immediately
+      setUsers(prev => prev.map(u => u.id === userId ? {
+        ...u,
+        recommendedPath: targetCourse.title,
+        courseType: targetCourse.title,
+        pathwaySelection: targetCourse.title,
+        progress: nextProgress
+      } : u));
+
+      alert(`Successfully switched student's course path to "${targetCourse.title}" immediately! 🎉`);
+
+    } catch (err: any) {
+      console.error("Error switching student course path:", err);
+      alert("Failed to switch course path: " + err.message);
     }
   };
 
@@ -1613,6 +1697,84 @@ export default function UsersAdmin() {
                                     </div>
                                   </div>
 
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Course Switcher Section */}
+                            <div className="mt-6 pt-6 border-t border-slate-200">
+                              <h4 className="font-extrabold uppercase text-[10px] text-indigo-700 tracking-wider flex items-center gap-1.5 mb-3 bg-indigo-50 px-2.5 py-1 rounded-md inline-flex select-none">
+                                <span>🎓</span> Administrative Course Switcher (Change Active Pathway)
+                              </h4>
+                              <p className="text-xs text-slate-500 mb-4 font-semibold leading-relaxed">
+                                Use this panel to immediately re-route the student's assigned learning curriculum. This will update the student's homepage, milestones, and active lessons instantly.
+                              </p>
+
+                              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center gap-4">
+                                <div className="flex-1">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Select New Target Course Path</label>
+                                  <select
+                                    id={`course-select-${u.id}`}
+                                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={selectedCourses[u.id] !== undefined ? selectedCourses[u.id] : (getUserRegisteredCourses(u)[0]?.id || "")}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setSelectedCourses(prev => ({ ...prev, [u.id]: val }));
+                                      if (courseSwitchConfirmId === u.id) {
+                                        setCourseSwitchConfirmId(null);
+                                      }
+                                    }}
+                                  >
+                                    <option value="" disabled>-- Choose a course pathway --</option>
+                                    {allCourses.filter(c => !c.isCloned).map(course => (
+                                      <option key={course.id} value={course.id}>
+                                        {course.title}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="flex flex-col gap-2 shrink-0 md:pt-4">
+                                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700 font-semibold">
+                                    <input
+                                      type="checkbox"
+                                      id={`clear-progress-chk-${u.id}`}
+                                      checked={clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : true}
+                                      onChange={(e) => {
+                                        setClearProgressMap(prev => ({ ...prev, [u.id]: e.target.checked }));
+                                      }}
+                                      className="accent-indigo-600 rounded bg-white w-4 h-4"
+                                    />
+                                    <span>Reset/Clear other course progress (Highly Recommended)</span>
+                                  </label>
+                                  <button
+                                    type="button"
+                                    id={`btn-course-switch-${u.id}`}
+                                    onClick={() => {
+                                      const selectedId = selectedCourses[u.id] !== undefined ? selectedCourses[u.id] : (getUserRegisteredCourses(u)[0]?.id || "");
+                                      const clearProgress = clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : true;
+
+                                      if (!selectedId) {
+                                        alert("Please select a target course first.");
+                                        return;
+                                      }
+
+                                      if (courseSwitchConfirmId !== u.id) {
+                                        setCourseSwitchConfirmId(u.id);
+                                        return;
+                                      }
+
+                                      setCourseSwitchConfirmId(null);
+                                      handleSwitchCourse(u.id, selectedId, clearProgress);
+                                    }}
+                                    className={`px-4 py-2 font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-md transition-all duration-200 border-0 cursor-pointer text-center ${
+                                      courseSwitchConfirmId === u.id
+                                        ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
+                                        : 'bg-indigo-600 hover:bg-indigo-750 text-white'
+                                    }`}
+                                  >
+                                    {courseSwitchConfirmId === u.id ? '⚠️ Click again to CONFIRM! ⚠️' : 'Change Course Path Now'}
+                                  </button>
                                 </div>
                               </div>
                             </div>

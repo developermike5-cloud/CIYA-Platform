@@ -325,9 +325,20 @@ export default function PromptsAdmin() {
   // Scrolling Refs for Add/Edit Template Modals to guarantee they scroll to the top fully when opened
   const fullModalOverlayRef = useRef<HTMLDivElement>(null);
   const modModalOverlayRef = useRef<HTMLDivElement>(null);
+  const prevFullOpenRef = useRef(false);
+  const prevModOpenRef = useRef(false);
 
   useEffect(() => {
-    if (editingFullTemplate || editingModTemplate) {
+    const isFullOpen = !!editingFullTemplate;
+    const isModOpen = !!editingModTemplate;
+
+    const fullOpened = isFullOpen && !prevFullOpenRef.current;
+    const modOpened = isModOpen && !prevModOpenRef.current;
+
+    prevFullOpenRef.current = isFullOpen;
+    prevModOpenRef.current = isModOpen;
+
+    if (fullOpened || modOpened) {
       // Smoothly scroll the window to the top
       window.scrollTo({ top: 0, behavior: 'smooth' });
       
@@ -439,8 +450,9 @@ export default function PromptsAdmin() {
       }, { merge: true });
       await triggerSystemSignal('settings');
       showToast("Full blueprint templates updated in the cloud successfully!");
-    } catch (error) {
+    } catch (error: any) {
       handleFirestoreError(error, OperationType.WRITE, path);
+      showToast(`Error: ${error?.message || String(error)}`);
     } finally {
       setSaving(false);
     }
@@ -457,8 +469,9 @@ export default function PromptsAdmin() {
       }, { merge: true });
       await triggerSystemSignal('settings');
       showToast("Modular prompt templates saved successfully!");
-    } catch (error) {
+    } catch (error: any) {
       handleFirestoreError(error, OperationType.WRITE, path);
+      showToast(`Error: ${error?.message || String(error)}`);
     } finally {
       setSaving(false);
     }
@@ -753,8 +766,16 @@ export default function PromptsAdmin() {
       
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed top-20 right-8 z-[100] bg-slate-900 border border-slate-700 text-white rounded-2xl shadow-xl px-5 py-3.5 flex items-center gap-3 transition-all duration-300 transform translate-y-0 text-xs font-bold font-sans">
-          <Check className="w-4 h-4 text-emerald-400" />
+        <div className={`fixed top-20 right-8 z-[100] border text-white rounded-2xl shadow-xl px-5 py-3.5 flex items-center gap-3 transition-all duration-300 transform translate-y-0 text-xs font-bold font-sans ${
+          toastMessage.toLowerCase().includes('error') || toastMessage.toLowerCase().includes('failed')
+            ? 'bg-rose-950 border-rose-800'
+            : 'bg-slate-900 border-slate-700'
+        }`}>
+          {toastMessage.toLowerCase().includes('error') || toastMessage.toLowerCase().includes('failed') ? (
+            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+          ) : (
+            <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          )}
           <span>{toastMessage}</span>
         </div>
       )}

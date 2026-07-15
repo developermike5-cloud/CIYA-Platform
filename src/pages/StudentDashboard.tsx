@@ -397,7 +397,7 @@ function isDayUnlockedUnified(
   userProfile?: any,
   courseId?: string
 ) {
-  // Always allow access to every day module under all circumstances (no pending assignment/approval or completion locks)
+  // All course days are unlocked for now (without assignment submission requirements)
   return true;
 }
 
@@ -450,6 +450,11 @@ function isCourseCompleted(profile: any, course: any): boolean {
   if (!profile || !course) return false;
   const progressStore = profile.progress?.[course.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
   
+  // Durable completion check
+  if (progressStore.completedAt) {
+    return true;
+  }
+
   // 1. Check video watched count progress ratio
   const completedKeys: string[] = progressStore.watched || [];
   const totalVideos = course.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
@@ -466,7 +471,7 @@ function isCourseCompleted(profile: any, course: any): boolean {
 
   (course.days || []).forEach((day: any, di: number) => {
     (day.videos || []).forEach((v: any, vi: number) => {
-      const hasQuiz = v.checkType && v.checkType !== 'none';
+      const hasQuiz = v.checkType && v.checkType !== 'none' && v.check;
       if (hasQuiz) {
         hasQuizzes = true;
         const checkKey = `${di}-${vi}`;
@@ -483,6 +488,79 @@ function isCourseCompleted(profile: any, course: any): boolean {
   }
 
   return false;
+}
+
+// Helper to update a course's completedAt timestamp when they first complete it
+function checkAndMarkCourseCompleted(profile: any, course: any, currentUser: any, userProfileSetter: any, showToastFn?: any) {
+  if (!profile || !course || !currentUser) return profile;
+  const courseId = course.id;
+  const progressStore = profile.progress?.[courseId];
+  if (!progressStore) return profile;
+
+  if (progressStore.completedAt) return profile;
+
+  const isNowCompleted = (() => {
+    const completedKeys: string[] = progressStore.watched || [];
+    const totalVideos = course.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
+    const progressRatio = totalVideos > 0 ? Math.round((completedKeys.length / totalVideos) * 100) : 0;
+    if (progressRatio === 100 && totalVideos > 0) {
+      return true;
+    }
+
+    let passedAllQuizzes = true;
+    let hasQuizzes = false;
+    const cScores = progressStore.quizScores || {};
+    const checkPassedKeys: string[] = progressStore.checkPassed || [];
+
+    (course.days || []).forEach((day: any, di: number) => {
+      (day.videos || []).forEach((v: any, vi: number) => {
+        const hasQuiz = v.checkType && v.checkType !== 'none' && v.check;
+        if (hasQuiz) {
+          hasQuizzes = true;
+          const checkKey = `${di}-${vi}`;
+          const isPassed = checkPassedKeys.includes(checkKey) || !!(cScores[checkKey] && cScores[checkKey].passed);
+          if (!isPassed) {
+            passedAllQuizzes = false;
+          }
+        }
+      });
+    });
+
+    return hasQuizzes && passedAllQuizzes;
+  })();
+
+  if (isNowCompleted) {
+    const completedTime = new Date().toISOString();
+    const finalProfile = {
+      ...profile,
+      progress: {
+        ...profile.progress,
+        [courseId]: {
+          ...progressStore,
+          completedAt: completedTime
+        }
+      }
+    };
+    
+    userProfileSetter(finalProfile);
+    safeStorage.setItem('ciya_cached_profile', JSON.stringify(finalProfile));
+
+    const userRef = doc(db, 'users', currentUser.uid);
+    updateDoc(userRef, {
+      [`progress.${courseId}.completedAt`]: completedTime,
+      updatedAt: serverTimestamp()
+    }).then(() => {
+      if (showToastFn) {
+        showToastFn("Congratulations! You have completed the course! 🎉");
+      }
+    }).catch(e => {
+      console.warn("Error updating course completedAt in DB:", e);
+    });
+
+    return finalProfile;
+  }
+
+  return profile;
 }
 
 // Interactive Post-Video Engagement Check popup modal
@@ -912,6 +990,7 @@ interface CourseViewerProps {
   courses: Course[];
   hasCompletedFirstCourse?: boolean;
   loading?: boolean;
+  allMySubmissions?: any[];
 }
 
 function renderBulletList(text: string, icon: string, textClass: string = "text-sm text-slate-800") {
@@ -933,7 +1012,7 @@ function renderBulletList(text: string, icon: string, textClass: string = "text-
   );
 }
 
-function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false, allMySubmissions = [] }: CourseViewerProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -1096,27 +1175,10 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       }
     : dbProgressStore;
   
-  const [dbSubmissions, setDbSubmissions] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!currentUser || !courseId) return;
-    
-    const q = query(
-      collection(db, 'assignments'),
-      where('userId', '==', currentUser.uid),
-      where('courseId', '==', courseId)
-    );
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setDbSubmissions(list);
-    }, (error) => {
-      console.warn("Soft handling error loading specific course submissions:", error);
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [currentUser, courseId]);
+  const dbSubmissions = useMemo(() => {
+    if (!allMySubmissions) return [];
+    return allMySubmissions.filter((s: any) => s.courseId === courseId);
+  }, [allMySubmissions, courseId]);
 
   const completedKeys: string[] = progressStore.watched || [];
   const checkPassedKeys: string[] = progressStore.checkPassed || [];
@@ -1272,6 +1334,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
           console.warn("Database sync deferred (offline/disabled), progress saved to local cache:", dbErr);
           showToast("Lesson marked as completed! ✓ (Cached Offline)");
         }
+
+        // Dynamically check for course completion
+        checkAndMarkCourseCompleted(updatedProfile, course, currentUser, setUserProfile, showToast);
       } catch (e) {
         console.error("Error updating completed lessons list:", e);
       }
@@ -1328,6 +1393,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       }
 
       setShowQuizModal(false);
+
+      // Dynamically check for course completion
+      checkAndMarkCourseCompleted(updatedProfile, course, currentUser, setUserProfile, showToast);
     } catch (e) {
       console.error("Error verification passing state:", e);
       // Fallback close the modal anyway so student is not locked out of navigation
@@ -1597,6 +1665,13 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                   const runningCourseId = Object.keys(userProfile?.progress || {}).find(cId => {
                     const p = userProfile?.progress?.[cId];
                     if (!p) return false;
+
+                    // If course was reset and there is no active re-engagement progress, skip it
+                    if (p.resetAt) {
+                      const hasReengaged = (p.watched && p.watched.length > 0) || (p.checkPassed && p.checkPassed.length > 0);
+                      if (!hasReengaged) return false;
+                    }
+
                     const matchingCourse = courses.find(item => item.id === cId);
                     if (!matchingCourse) return false;
                     return !isCourseCompleted(userProfile, matchingCourse);
@@ -1918,10 +1993,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                         <button
                           type="button"
                           onClick={() => {
-                            const isDayManuallyUnlocked = userProfile?.manualDayUnlock?.[courseId]?.[di] === true;
-                            const isPrevApproved = di === 0 || dbSubmissions.some(sub => sub.dayIndex === di - 1 && sub.status === 'Approved');
+                            const isDayUnlocked = di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId);
 
-                            const allVideosPassed = isDayManuallyUnlocked || isPrevApproved || (d.videos || []).every((v, vi) => {
+                            const allVideosPassed = isDayUnlocked || (d.videos || []).every((v, vi) => {
                               const currentKey = `${di}-${vi}`;
                               const isVidWatched = completedKeys.includes(currentKey);
                               const hasQuiz = v.checkType && v.checkType !== 'none' && v.check;
@@ -2850,6 +2924,18 @@ export default function StudentDashboard() {
 
   const cleanUpOldGlobalSubmissions = async (uid: string) => {
     try {
+      // Gate behind a 24-hour cooldown keyed by uid to prevent massive redundant reads on every page visit
+      const lastRunKey = `ciya_cleanup_last_run_${uid}`;
+      const lastRun = safeStorage.getItem(lastRunKey);
+      if (lastRun) {
+        const age = Date.now() - Number(lastRun);
+        if (age < 24 * 60 * 60 * 1000) {
+          console.log(`[Cleanup skipped] Global assignments cleanup ran ${Math.round(age / 60000)} minutes ago (cooldown active)`);
+          return;
+        }
+      }
+
+      console.log(`[Cleanup starting] Querying assignments for user ${uid} to clean up heavy resources...`);
       const q = query(
         collection(db, 'assignments'),
         where('userId', '==', uid)
@@ -2858,10 +2944,12 @@ export default function StudentDashboard() {
       const threeDaysAgo = new Date();
       threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
+      let updatedCount = 0;
       snap.forEach(async (dDoc) => {
         const data = dDoc.data();
         const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : null);
         if (createdAt && createdAt < threeDaysAgo && data.images && data.images.length > 0) {
+          updatedCount++;
           const docRef = doc(db, 'assignments', dDoc.id);
           await updateDoc(docRef, {
             images: [], // strip heavy base64 images
@@ -2870,6 +2958,9 @@ export default function StudentDashboard() {
           });
         }
       });
+      
+      safeStorage.setItem(lastRunKey, String(Date.now()));
+      console.log(`[Cleanup complete] Checked ${snap.size} documents, cleaned up ${updatedCount} old submissions.`);
     } catch (e) {
       console.warn("Soft clean up old global submissions error:", e);
     }
@@ -3126,70 +3217,8 @@ export default function StudentDashboard() {
 
     let isSubscribed = true;
 
-    // Reusable direct fetchers
-    const fetchAppSettings = async () => {
-      try {
-        if (typeof invalidateCache === 'function') {
-          invalidateCache('settings', 'app');
-          invalidateCache('settings', 'full_prompts');
-          invalidateCache('settings', 'modular_prompts');
-        }
-        const snap = await getDoc(doc(db, 'settings', 'app'));
-        if (snap.exists() && isSubscribed) {
-          const data = snap.data();
-          setAppSettings(data);
-          safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
-        }
-      } catch (err) {
-        console.warn("Error loading app settings:", err);
-      }
-    };
-
-    const fetchCourses = async (serverCoursesTime = '0') => {
-      // Courses catalogue is loaded fully statically from the frontend JSON file to eliminate 100% database egress/API costs
-      if (isSubscribed) {
-        setLoading(false);
-      }
-    };
-
-    const fetchUserProfile = async (serverProfileTime = '0') => {
-      try {
-        if (typeof invalidateCache === 'function') {
-          invalidateCache('users', activeUid);
-        }
-        const snap = await getDoc(doc(db, 'users', activeUid));
-        if (snap.exists() && isSubscribed) {
-          const profileData = snap.data();
-          setUserProfile(profileData);
-          if (!cleanupPerformedRef.current) {
-            cleanupPerformedRef.current = true;
-            cleanUpOldSubmissionsLocal(activeUid, profileData.progress);
-            cleanUpOldGlobalSubmissions(activeUid);
-          }
-          safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
-          safeStorage.setItem('ciya_cached_profile_time', serverProfileTime);
-        }
-      } catch (err) {
-        console.warn("Error loading profile:", err);
-      }
-    };
-
-    // First load from cache if available, or fetch directly if cache is missing
-    const hasCachedAppSettings = !!safeStorage.getItem('ciya_cached_app_settings');
-    const hasCachedCourses = coursesStore.getCourses().length > 0;
-    const hasCachedProfile = !!safeStorage.getItem('ciya_cached_profile');
-
-    if (!hasCachedAppSettings) {
-      fetchAppSettings();
-    }
-    if (!hasCachedCourses) {
-      fetchCourses();
-    } else {
-      setLoading(false);
-    }
-    if (!hasCachedProfile) {
-      fetchUserProfile();
-    }
+    // First load from cache if available, otherwise rely on snapshot listeners to load and sync
+    setLoading(false);
 
     // Completely deactivated system_signals observer to block all non-essential background database reads
     const unsubSignals = () => {};
@@ -3227,6 +3256,46 @@ export default function StudentDashboard() {
             cleanupPerformedRef.current = true;
             cleanUpOldSubmissionsLocal(activeUid, profileData.progress);
             cleanUpOldGlobalSubmissions(activeUid);
+          }
+        } else {
+          // Auto-provision profile document if it does not exist
+          if (currentUser && currentUser.uid === activeUid) {
+            if (currentUser.email?.toLowerCase() === 'developermike5@gmail.com') {
+              const mockProfile = {
+                fullName: "Admissions Administrator (Super Admin)",
+                email: currentUser.email,
+                whatsapp: "+00000000000",
+                state: "Admin State",
+                goal: "Previewing Student Dashboard",
+                approvalStatus: "Approved",
+                isActivated: true,
+                isDashboardUnlocked: true,
+                role: "super_admin",
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              };
+              setDoc(doc(db, 'users', activeUid), mockProfile).catch(e => {
+                console.warn("Auto-creation of admin profile document from listener failed:", e);
+              });
+              setUserProfile(mockProfile);
+              safeStorage.setItem('ciya_cached_profile', JSON.stringify(mockProfile));
+            } else {
+              const newProfile = {
+                fullName: currentUser.displayName || currentUser.email?.split('@')[0] || 'CIYA Scholar',
+                email: currentUser.email,
+                approvalStatus: 'Approved',
+                isActivated: true,
+                isDashboardUnlocked: true,
+                cohort: 'Cohort 1',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+              };
+              setDoc(doc(db, 'users', activeUid), newProfile).catch(e => {
+                console.warn("Auto-creation of profile document from listener failed:", e);
+              });
+              setUserProfile(newProfile);
+              safeStorage.setItem('ciya_cached_profile', JSON.stringify(newProfile));
+            }
           }
         }
       }, (error) => {
@@ -3379,6 +3448,7 @@ export default function StudentDashboard() {
     if (!isConfirmed) return;
 
     try {
+      const resetTime = new Date().toISOString();
       const updatedProfile = {
         ...userProfile,
         progress: {
@@ -3395,7 +3465,9 @@ export default function StudentDashboard() {
             submissions: {},
             watchedList: [],
             checkPassed: [],
-            quizScores: {}
+            quizScores: {},
+            resetAt: resetTime,
+            completedAt: null
           }
         }
       };
@@ -3416,7 +3488,9 @@ export default function StudentDashboard() {
           submissions: {},
           watchedList: [],
           checkPassed: [],
-          quizScores: {}
+          quizScores: {},
+          resetAt: resetTime,
+          completedAt: null
         },
         updatedAt: serverTimestamp()
       });
@@ -3687,7 +3761,6 @@ export default function StudentDashboard() {
         setCurrentUser(user);
         
         // Cache-first offline profile loader
-        const docRef = doc(db, 'users', user.uid);
         const loadInitialProfile = async () => {
           // 1. Immediately render cached profile if exists (Stale-While-Revalidate)
           const cachedProfile = safeStorage.getItem('ciya_cached_profile');
@@ -3705,125 +3778,22 @@ export default function StudentDashboard() {
             } catch (e) {
               console.error("Error parsing cached profile on auth change:", e);
             }
-          }
-
-          // 2. Perform a single light GET query to fetch fresh baseline data and populate cache
-          try {
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-              const profileData = docSnap.data();
-              setUserProfile(profileData);
-              if (!cleanupPerformedRef.current) {
-                cleanupPerformedRef.current = true;
-                cleanUpOldSubmissionsLocal(user.uid, profileData.progress);
-                cleanUpOldGlobalSubmissions(user.uid);
-              }
-              const userData = {
-                uid: user.uid,
-                email: user.email,
-                role: isUserAdmin ? 'admin' : 'student'
-              };
-              safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
-              safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
-              // Save the synchronized baseline profile timestamp if available, else standard fallback
-              if (!safeStorage.getItem('ciya_cached_profile_time')) {
-                safeStorage.setItem('ciya_cached_profile_time', Date.now().toString());
-              }
-              setAuthChecking(false);
-              setLiveCheckComplete(true);
-            } else if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
-              const mockProfile = {
-                fullName: "Admissions Administrator (Super Admin)",
-                email: user.email,
-                whatsapp: "+00000000000",
-                state: "Admin State",
-                goal: "Previewing Student Dashboard",
-                approvalStatus: "Approved",
-                isActivated: true,
-                isDashboardUnlocked: true,
-                role: "super_admin",
-                createdAt: serverTimestamp()
-              };
-              setUserProfile(mockProfile);
-              const userData = {
-                uid: user.uid,
-                email: user.email,
-                role: 'super_admin'
-              };
-              safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
-              safeStorage.setItem('ciya_cached_profile', JSON.stringify(mockProfile));
-              setAuthChecking(false);
-              setLiveCheckComplete(true);
-            } else {
-              // Silently auto-create profile doc in firestore so they can use the dashboard immediately without any validation locks!
-              const newProfile = {
-                fullName: user.displayName || user.email?.split('@')[0] || 'CIYA Scholar',
-                email: user.email,
-                approvalStatus: 'Approved',
-                isActivated: true,
-                isDashboardUnlocked: true,
-                cohort: 'Cohort 1',
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-              };
-              try {
-                await setDoc(docRef, newProfile);
-              } catch (e) {
-                console.warn("Auto-creation of profile document failed:", e);
-              }
-              setUserProfile(newProfile);
-              const userData = {
-                uid: user.uid,
-                email: user.email,
-                role: 'student'
-              };
-              safeStorage.setItem('ciya_cached_user', JSON.stringify(userData));
-              safeStorage.setItem('ciya_cached_profile', JSON.stringify(newProfile));
-              setAuthChecking(false);
-              setLiveCheckComplete(true);
-            }
-          } catch (error: any) {
-            console.error("Initial profile load error:", error);
-            if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
-              const mockProfile = {
-                fullName: "Admissions Administrator (Super Admin)",
-                email: user.email,
-                whatsapp: "+00000000000",
-                state: "Admin State",
-                goal: "Previewing Student Dashboard",
-                approvalStatus: "Approved",
-                isActivated: true,
-                isDashboardUnlocked: true,
-                role: "super_admin",
-                createdAt: serverTimestamp()
-              };
-              setUserProfile(mockProfile);
-              setAuthChecking(false);
-              setLiveCheckComplete(true);
-            } else {
-              handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-              const cachedP = safeStorage.getItem('ciya_cached_profile');
-              if (cachedP) {
-                try {
-                  setUserProfile(JSON.parse(cachedP));
-                } catch (e) {
-                  console.error("Error parsing backup profile:", e);
-                }
-              } else {
-                setUserProfile({
-                  fullName: "CIYA Student Candidate",
-                  email: user.email || "student@ciya.com",
-                  whatsapp: "+0000000000",
-                  state: "Global",
-                  goal: "Acquire high-performance development skills",
-                  approvalStatus: "Approved",
-                  isActivated: true,
-                  isDashboardUnlocked: true
-                });
-              }
-              setAuthChecking(false);
-              setLiveCheckComplete(true);
-            }
+          } else {
+            // Setup default profile candidate to show while listener connects
+            const defaultCandidate = {
+              fullName: user.displayName || user.email?.split('@')[0] || "CIYA Scholar",
+              email: user.email || "student@ciya.com",
+              whatsapp: "+0000000000",
+              state: "Global",
+              goal: "Acquire high-performance development skills",
+              approvalStatus: "Approved",
+              isActivated: true,
+              isDashboardUnlocked: true,
+              cohort: 'Cohort 1'
+            };
+            setUserProfile(defaultCandidate);
+            setAuthChecking(false);
+            setLiveCheckComplete(true);
           }
         };
         loadInitialProfile();
@@ -5323,6 +5293,7 @@ export default function StudentDashboard() {
                   courses={courses}
                   hasCompletedFirstCourse={hasCompletedFirstCourse}
                   loading={loading}
+                  allMySubmissions={allMySubmissions}
                 />
               ) : (
                 <div className="space-y-8">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, limit, where } from 'firebase/firestore';
 import { db, auth, triggerSystemSignal } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { CheckCircle2, XCircle, Clock, Search, FileText, Download, Check, RefreshCw } from 'lucide-react';
@@ -40,7 +40,7 @@ export default function AssignmentsAdmin() {
       return true;
     }
   });
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Disapproved'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Disapproved'>('Pending');
   const [cohortFilter, setCohortFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
@@ -64,8 +64,15 @@ export default function AssignmentsAdmin() {
       }
 
       if (user) {
+        const queryConstraints: any[] = [];
+        if (statusFilter !== 'All') {
+          queryConstraints.push(where('status', '==', statusFilter));
+        }
+        queryConstraints.push(limit(500));
+
         const q = query(
-          collection(db, 'assignments')
+          collection(db, 'assignments'),
+          ...queryConstraints
         );
 
         qUnsubscribe = onSnapshot(q, (snapshot) => {
@@ -121,7 +128,7 @@ export default function AssignmentsAdmin() {
         qUnsubscribe();
       }
     };
-  }, []);
+  }, [statusFilter]);
 
   const showToastMsg = (msg: string, type: 'success' | 'refused' = 'success') => {
     setToast({ msg, type });
@@ -233,11 +240,16 @@ export default function AssignmentsAdmin() {
         {/* Submissions List Side */}
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h3 className="font-extrabold text-slate-800 text-base flex items-center gap-2">
+            <h3 className="font-extrabold text-slate-800 text-base flex items-center gap-2 flex-wrap">
               📂 Inbound Task Submissions 
               <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">
                 {filteredSubmissions.length} matches
               </span>
+              {submissions.length >= 500 && (
+                <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-extrabold px-2 py-0.5 rounded-full uppercase">
+                  ⚠️ Capped at 500 items
+                </span>
+              )}
             </h3>
 
             {/* Filter buttons */}

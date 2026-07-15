@@ -93,37 +93,15 @@ export default function NotificationsAdmin() {
           setLoading(false);
         });
 
-        // 3. Fetch User Students list with cache for manual picker dropdown
-        const cachedUsersStr = localStorage.getItem('ciya_admin_cached_users_list');
-        const cachedUsersTimeStr = localStorage.getItem('ciya_admin_cached_users_time');
-        const CACHE_MINS = 10 * 60 * 1000; // 10 minutes cache
-        
-        if (cachedUsersStr && cachedUsersTimeStr && (Date.now() - parseInt(cachedUsersTimeStr, 10) < CACHE_MINS)) {
-          try {
-            const parsed = JSON.parse(cachedUsersStr);
-            const list: UserStudent[] = parsed.map((u: any) => ({
-              id: u.id,
-              email: u.email,
-              fullName: u.fullName
-            }));
-            setStudents(list);
-          } catch (e) {
-            console.warn("Could not parse cached user list for dropdown, reading from database:", e);
-          }
-        } else {
-          getDocs(collection(db, 'users')).then(snap => {
-            const list: UserStudent[] = [];
-            const rawList: any[] = [];
-            snap.forEach(d => {
-              const u = d.data();
-              rawList.push({ id: d.id, ...u });
-              list.push({ id: d.id, email: u.email, fullName: u.fullName });
-            });
-            setStudents(list);
-            localStorage.setItem('ciya_admin_cached_users_list', JSON.stringify(rawList));
-            localStorage.setItem('ciya_admin_cached_users_time', Date.now().toString());
-          }).catch(err => console.error("Error loading student select list:", err));
-        }
+        // 3. Fetch User Students list for manual picker dropdown using plain getDocs with limit 1000
+        getDocs(query(collection(db, 'users'), limit(1000))).then(snap => {
+          const list: UserStudent[] = [];
+          snap.forEach(d => {
+            const u = d.data();
+            list.push({ id: d.id, email: u.email, fullName: u.fullName });
+          });
+          setStudents(list);
+        }).catch(err => console.error("Error loading student select list:", err));
       } else {
         setTemplates([]);
         setHistory([]);

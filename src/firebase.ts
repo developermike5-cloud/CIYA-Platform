@@ -234,12 +234,15 @@ try {
 export const rtdb = rtdbInstance;
 
 // Set up global synchronization hook via Realtime Database
+let isLocalToggleInitiated = false;
+
 if (typeof window !== 'undefined' && rtdbInstance) {
   try {
     const dbToggleRef = ref(rtdbInstance, 'settings/db_connection_disabled');
     onValue(dbToggleRef, (snapshot) => {
       const isDisabled = !!snapshot.val();
       const shouldBeEnabled = !isDisabled;
+      const isChange = shouldBeEnabled !== dbNetworkEnabled;
       
       try {
         window.localStorage.setItem('ciya_db_connection_disabled', isDisabled ? 'true' : 'false');
@@ -247,7 +250,18 @@ if (typeof window !== 'undefined' && rtdbInstance) {
         // ignore
       }
 
-      setFirestoreNetworkState(shouldBeEnabled);
+      if (isChange) {
+        if (isLocalToggleInitiated) {
+          isLocalToggleInitiated = false;
+          setFirestoreNetworkState(shouldBeEnabled);
+        } else {
+          setFirestoreNetworkState(shouldBeEnabled).then(() => {
+            if (typeof window !== 'undefined') {
+              window.location.reload();
+            }
+          });
+        }
+      }
     }, (error) => {
       console.warn("Failed to retrieve db_connection_disabled toggle value from RTDB:", error);
     });
@@ -257,6 +271,7 @@ if (typeof window !== 'undefined' && rtdbInstance) {
 }
 
 export async function setGlobalDbConnectionDisabled(disabled: boolean) {
+  isLocalToggleInitiated = true;
   if (rtdbInstance) {
     try {
       await set(ref(rtdbInstance, 'settings/db_connection_disabled'), disabled);

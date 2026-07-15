@@ -25,10 +25,21 @@ import {
 
 import { safeStorage } from '../utils/safeStorage';
 import { coursesStore } from '../utils/coursesStore';
+import { getAuth } from 'firebase/auth';
 import staticCourses from '../data/courses.json';
 import staticBlog from '../data/blog.json';
 import staticFullPrompts from '../data/full_prompts.json';
 import staticModularPrompts from '../data/modular_prompts.json';
+
+// Get current logged-in user's UID to prevent administrative cache contamination
+function getCurrentUserUid(): string | null {
+  try {
+    const auth = getAuth();
+    return auth.currentUser?.uid || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 // Re-export standard helpers unmodified
 export const collection = realCollection;
@@ -187,6 +198,16 @@ function invalidateQueryCaches(collectionPath: string) {
         window.localStorage.removeItem(key);
         window.localStorage.removeItem(`${key}_time`);
       });
+
+      // Special handling for student assignments collection
+      if (collectionPath === 'assignments') {
+        window.localStorage.removeItem('ciya_cached_student_assignments');
+      }
+
+      // Special handling for app settings collection
+      if (collectionPath === 'settings') {
+        window.localStorage.removeItem('ciya_cached_app_settings');
+      }
     }
   } catch (e) {
     console.warn("Error invalidating query caches:", e);
@@ -376,6 +397,24 @@ export async function getDoc(docRef: any): Promise<CachedDocumentSnapshot> {
     const { exists, data } = resolveLocalDoc(path);
     return new CachedDocumentSnapshot(docRef.id || '', exists, data, docRef);
   } else {
+    if (!isBypassCachePath(path)) {
+      try {
+        const cacheKey = `ciya_fs_doc_${path.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+        const timeStr = safeStorage.getItem(`${cacheKey}_time`);
+        const dataStr = safeStorage.getItem(`${cacheKey}_data`);
+        if (timeStr && dataStr) {
+          const age = Date.now() - Number(timeStr);
+          if (age < CACHE_EXPIRATION_MS) {
+            const parsed = JSON.parse(dataStr);
+            console.log(`[Cache hit] returning cached doc for path: ${path} (age: ${Math.round(age / 1000)}s)`);
+            return new CachedDocumentSnapshot(parsed.id || docRef.id || '', parsed.exists, parsed.data, docRef);
+          }
+        }
+      } catch (cacheErr) {
+        console.warn(`Error reading/parsing getDoc cache for path ${path}:`, cacheErr);
+      }
+    }
+
     try {
       const liveSnap = await realGetDoc(docRef);
       if (!liveSnap) {
@@ -409,6 +448,38 @@ export async function getDocs(queryRef: any): Promise<CachedQuerySnapshot> {
     const docs = results.map((r: any) => new CachedDocumentSnapshot(r.id, r.exists, r.data, queryRef));
     return new CachedQuerySnapshot(docs);
   } else {
+    let path = queryRef.path || '';
+    if (!path && queryRef._query && queryRef._query.path) {
+      path = queryRef._query.path.toString();
+    }
+    if (!path && queryRef.type === 'collection') {
+      path = queryRef.path;
+    }
+
+    if (!isBypassCachePath(path)) {
+      try {
+        const queryKey = getQueryCacheKey(queryRef);
+        const cacheKey = `ciya_fs_query_${queryKey}`;
+        const timeStr = safeStorage.getItem(`${cacheKey}_time`);
+        const dataStr = safeStorage.getItem(`${cacheKey}_data`);
+        if (timeStr && dataStr) {
+          const age = Date.now() - Number(timeStr);
+          if (age < CACHE_EXPIRATION_MS) {
+            const parsedList = JSON.parse(dataStr);
+            if (Array.isArray(parsedList)) {
+              console.log(`[Cache hit] returning cached getDocs for path/key: ${path || queryKey} (age: ${Math.round(age / 1000)}s)`);
+              const docs = parsedList.map((item: any) =>
+                new CachedDocumentSnapshot(item.id || '', item.exists, item.data, queryRef)
+              );
+              return new CachedQuerySnapshot(docs);
+            }
+          }
+        }
+      } catch (cacheErr) {
+        console.warn(`Error reading/parsing getDocs cache:`, cacheErr);
+      }
+    }
+
     try {
       const liveSnap = await realGetDocs(queryRef);
       if (!liveSnap || !liveSnap.docs) {
@@ -451,7 +522,28 @@ export async function getDocs(queryRef: any): Promise<CachedQuerySnapshot> {
   }
 }
 
-// Overridden onSnapshot to implement local real-time simulation when offline, or real live sync when online
+// Key resolver for subscription multiplexing
+function getSubscriptionKey(ref: any): string {
+  if (!ref) return 'unknown';
+  const path = ref.path || (ref._query && ref._query.path && ref._query.path.toString()) || '';
+  const isDoc = typeof path === 'string' && path.split('/').length % 2 === 0;
+  if (isDoc) {
+    return `doc:${path}`;
+  }
+  return `query:${getQueryCacheKey(ref)}`;
+}
+
+interface ActiveSubscription {
+  realUnsubscribe: () => void;
+  callbacks: Set<(snapshot: any) => void>;
+  errorHandlers: Set<(error: any) => void>;
+  lastSnapshot: any | null;
+  refCount: number;
+}
+
+const activeSubscriptions = new Map<string, ActiveSubscription>();
+
+// Overridden onSnapshot to implement local real-time simulation when offline, or reference-counted multiplexed sync when online
 export function onSnapshot(
   ref: any,
   onNext: (snapshot: any) => void,
@@ -499,15 +591,96 @@ export function onSnapshot(
       clearTimeout(timer);
     };
   } else {
-    // Online mode: set up real-time listener from live Firestore
+    const subKey = getSubscriptionKey(ref);
+    let sub = activeSubscriptions.get(subKey);
+
+    if (sub) {
+      // Multiplex existing active listener: increment refCount & add listeners
+      sub.refCount++;
+      sub.callbacks.add(onNext);
+      if (onError) sub.errorHandlers.add(onError);
+
+      // If a snapshot is already loaded, deliver it immediately (async to prevent React render state warnings)
+      if (sub.lastSnapshot) {
+        const cachedSnap = sub.lastSnapshot;
+        const immediateTimer = setTimeout(() => {
+          try {
+            const currentSub = activeSubscriptions.get(subKey);
+            if (currentSub && currentSub.callbacks.has(onNext)) {
+              onNext(cachedSnap);
+            }
+          } catch (err) {
+            console.error("Multiplexed immediate onNext error:", err);
+          }
+        }, 0);
+
+        return () => {
+          clearTimeout(immediateTimer);
+          const currentSub = activeSubscriptions.get(subKey);
+          if (currentSub) {
+            currentSub.callbacks.delete(onNext);
+            if (onError) currentSub.errorHandlers.delete(onError);
+            currentSub.refCount--;
+            if (currentSub.refCount <= 0) {
+              if (typeof currentSub.realUnsubscribe === 'function') {
+                currentSub.realUnsubscribe();
+              }
+              activeSubscriptions.delete(subKey);
+            }
+          }
+        };
+      }
+
+      return () => {
+        const currentSub = activeSubscriptions.get(subKey);
+        if (currentSub) {
+          currentSub.callbacks.delete(onNext);
+          if (onError) currentSub.errorHandlers.delete(onError);
+          currentSub.refCount--;
+          if (currentSub.refCount <= 0) {
+            if (typeof currentSub.realUnsubscribe === 'function') {
+              currentSub.realUnsubscribe();
+            }
+            activeSubscriptions.delete(subKey);
+          }
+        }
+      };
+    }
+
+    // No active listener for this subscription key. Open a brand new one!
+    const callbacks = new Set<(snapshot: any) => void>();
+    const errorHandlers = new Set<(error: any) => void>();
+    callbacks.add(onNext);
+    if (onError) errorHandlers.add(onError);
+
+    const newSub: ActiveSubscription = {
+      realUnsubscribe: () => {}, // assigned below
+      callbacks,
+      errorHandlers,
+      lastSnapshot: null,
+      refCount: 1
+    };
+
+    activeSubscriptions.set(subKey, newSub);
+
+    let realUnsubscribe: () => void = () => {};
+
     try {
-      return realOnSnapshot(ref, (liveSnap: any) => {
+      realUnsubscribe = realOnSnapshot(ref, (liveSnap: any) => {
         try {
           if (!liveSnap) {
-            onNext(new CachedQuerySnapshot([]));
+            const emptySnap = new CachedQuerySnapshot([]);
+            const currentSub = activeSubscriptions.get(subKey);
+            if (currentSub) {
+              currentSub.lastSnapshot = emptySnap;
+              currentSub.callbacks.forEach(cb => cb(emptySnap));
+            }
             return;
           }
+
           const isDoc = typeof liveSnap?.exists === 'function';
+          let snapshotToEmit: any;
+
           if (isDoc) {
             const path = ref?.path || '';
             if (liveSnap.exists()) {
@@ -515,7 +688,7 @@ export function onSnapshot(
             } else {
               updateLocalDocCache(path, false, null);
             }
-            onNext(new CachedDocumentSnapshot(liveSnap.id, liveSnap.exists(), liveSnap.data(), liveSnap.ref));
+            snapshotToEmit = new CachedDocumentSnapshot(liveSnap.id, liveSnap.exists(), liveSnap.data(), liveSnap.ref);
           } else {
             // It's a query snapshot (collection or query)
             const docs = (liveSnap.docs || []).map((docSnap: any) =>
@@ -540,24 +713,45 @@ export function onSnapshot(
             safeStorage.setItem(dataKey, JSON.stringify(serialized));
             safeStorage.setItem(timeKey, String(Date.now()));
 
-            onNext(new CachedQuerySnapshot(docs));
+            snapshotToEmit = new CachedQuerySnapshot(docs);
+          }
+
+          const currentSub = activeSubscriptions.get(subKey);
+          if (currentSub) {
+            currentSub.lastSnapshot = snapshotToEmit;
+            currentSub.callbacks.forEach(cb => {
+              try {
+                cb(snapshotToEmit);
+              } catch (cbErr) {
+                console.error("onSnapshot listener callback error:", cbErr);
+              }
+            });
           }
         } catch (callbackErr) {
           console.error("onSnapshot callback internal error:", callbackErr);
         }
       }, (error: any) => {
-        if (onError) {
-          try {
-            onError(error);
-          } catch (err) {
-            console.error("onSnapshot onError handler error:", err);
+        const currentSub = activeSubscriptions.get(subKey);
+        if (currentSub) {
+          if (currentSub.errorHandlers.size > 0) {
+            currentSub.errorHandlers.forEach(handler => {
+              try {
+                handler(error);
+              } catch (hErr) {
+                console.error("onSnapshot listener error handler error:", hErr);
+              }
+            });
+          } else {
+            console.warn("onSnapshot observer error:", error);
           }
-        } else {
-          console.warn("onSnapshot observer error:", error);
         }
       });
+
+      newSub.realUnsubscribe = realUnsubscribe;
     } catch (setupErr) {
       console.warn("realOnSnapshot setup failed (falling back to offline listener):", setupErr);
+      activeSubscriptions.delete(subKey);
+
       let path = ref?.path || '';
       if (!path && ref?._query && ref?._query.path) {
         path = ref._query.path.toString();
@@ -582,6 +776,21 @@ export function onSnapshot(
       }, 0);
       return () => clearTimeout(timer);
     }
+
+    return () => {
+      const currentSub = activeSubscriptions.get(subKey);
+      if (currentSub) {
+        currentSub.callbacks.delete(onNext);
+        if (onError) currentSub.errorHandlers.delete(onError);
+        currentSub.refCount--;
+        if (currentSub.refCount <= 0) {
+          if (typeof currentSub.realUnsubscribe === 'function') {
+            currentSub.realUnsubscribe();
+          }
+          activeSubscriptions.delete(subKey);
+        }
+      }
+    };
   }
 }
 
@@ -595,8 +804,13 @@ function updateLocalDocCache(path: string, exists: boolean, data: any) {
   safeStorage.setItem(timeKey, String(Date.now()));
 
   // Special synchronization: update general user profile cache if users table is written
+  // and the updated profile matches the currently logged-in student's UID.
   if (path.startsWith('users/')) {
-    safeStorage.setItem('ciya_cached_profile', JSON.stringify(data));
+    const docUid = path.split('/').pop();
+    const currentUid = getCurrentUserUid();
+    if (docUid && currentUid && docUid === currentUid) {
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(data));
+    }
   }
 }
 
@@ -620,13 +834,6 @@ export async function setDoc(docRef: any, data: any, options?: any): Promise<voi
   const path = docRef.path || '';
   const colPath = getCollectionPathFromDocPath(path);
 
-  try {
-    // Perform live write
-    await realSetDoc(docRef, data, options);
-  } catch (error) {
-    console.warn(`setDoc live write failed for path ${path} (saving locally only):`, error);
-  }
-
   // Synchronize local doc cache immediately so UI matches the written data
   let finalData = data;
   if (options && options.merge) {
@@ -646,6 +853,16 @@ export async function setDoc(docRef: any, data: any, options?: any): Promise<voi
   }
   updateLocalDocCache(path, true, finalData);
   invalidateQueryCaches(colPath);
+
+  try {
+    // Perform live write
+    await realSetDoc(docRef, data, options);
+  } catch (error) {
+    console.warn(`setDoc live write failed for path ${path} (saved locally):`, error);
+    if (safeStorage.getItem('ciya_db_connection_disabled') !== 'true') {
+      throw error;
+    }
+  }
 }
 
 // Overridden updateDoc to write live and immediately synchronize local cache
@@ -653,13 +870,6 @@ export async function updateDoc(docRef: any, data: any): Promise<void> {
   if (!docRef) return;
   const path = docRef.path || '';
   const colPath = getCollectionPathFromDocPath(path);
-
-  try {
-    // Perform live write
-    await realUpdateDoc(docRef, data);
-  } catch (error) {
-    console.warn(`updateDoc live write failed for path ${path} (saving locally only):`, error);
-  }
 
   // Synchronize local doc cache immediately
   let finalData = {};
@@ -681,6 +891,16 @@ export async function updateDoc(docRef: any, data: any): Promise<void> {
 
   updateLocalDocCache(path, true, finalData);
   invalidateQueryCaches(colPath);
+
+  try {
+    // Perform live write
+    await realUpdateDoc(docRef, data);
+  } catch (error) {
+    console.warn(`updateDoc live write failed for path ${path} (saved locally):`, error);
+    if (safeStorage.getItem('ciya_db_connection_disabled') !== 'true') {
+      throw error;
+    }
+  }
 }
 
 // Overridden addDoc to write live and immediately synchronize local cache
@@ -689,25 +909,32 @@ export async function addDoc(collectionRef: any, data: any): Promise<any> {
     throw new Error("Invalid collection reference in addDoc");
   }
   const colPath = collectionRef.path || '';
+  const randomId = 'local_' + Math.random().toString(36).substring(2, 11);
+  const path = colPath ? `${colPath}/${randomId}` : `unknown/${randomId}`;
+
+  // Synchronize local doc cache immediately
+  updateLocalDocCache(path, true, data);
+  invalidateQueryCaches(colPath);
 
   let liveRef: any = null;
   try {
     // Perform live write
     liveRef = await realAddDoc(collectionRef, data);
+    if (liveRef && liveRef.path && liveRef.path !== path) {
+      updateLocalDocCache(liveRef.path, true, data);
+      safeStorage.removeItem(`ciya_fs_doc_${path.replace(/[^a-zA-Z0-9_]/g, '_')}_data`);
+      safeStorage.removeItem(`ciya_fs_doc_${path.replace(/[^a-zA-Z0-9_]/g, '_')}_time`);
+    }
   } catch (error) {
-    console.warn(`addDoc live write failed for collection ${colPath} (saving locally only):`, error);
-    const randomId = 'local_' + Math.random().toString(36).substring(2, 11);
+    console.warn(`addDoc live write failed for collection ${colPath} (saved locally):`, error);
+    if (safeStorage.getItem('ciya_db_connection_disabled') !== 'true') {
+      throw error;
+    }
     liveRef = {
       id: randomId,
-      path: colPath ? `${colPath}/${randomId}` : `unknown/${randomId}`
+      path: path
     };
   }
-
-  // Synchronize local doc cache immediately
-  if (liveRef && liveRef.path) {
-    updateLocalDocCache(liveRef.path, true, data);
-  }
-  invalidateQueryCaches(colPath);
 
   return liveRef;
 }
@@ -718,14 +945,17 @@ export async function deleteDoc(docRef: any): Promise<void> {
   const path = docRef.path || '';
   const colPath = getCollectionPathFromDocPath(path);
 
+  // Synchronize local cache immediately
+  updateLocalDocCache(path, false, null);
+  invalidateQueryCaches(colPath);
+
   try {
     // Perform live write
     await realDeleteDoc(docRef);
   } catch (error) {
-    console.warn(`deleteDoc live write failed for path ${path} (saving locally only):`, error);
+    console.warn(`deleteDoc live write failed for path ${path} (saved locally):`, error);
+    if (safeStorage.getItem('ciya_db_connection_disabled') !== 'true') {
+      throw error;
+    }
   }
-
-  // Synchronize local cache immediately
-  updateLocalDocCache(path, false, null);
-  invalidateQueryCaches(colPath);
 }

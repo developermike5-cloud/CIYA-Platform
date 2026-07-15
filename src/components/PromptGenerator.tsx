@@ -48,8 +48,25 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
     const merged: TemplateItem[] = [];
     try {
       const fullData = staticFullPrompts as any;
-      if (fullData && Array.isArray(fullData.templates)) {
-        fullData.templates.forEach((t: any) => {
+      if (fullData) {
+        let fullList: any[] = [];
+        if (Array.isArray(fullData.templates)) {
+          fullList = fullData.templates;
+        } else {
+          // Backward compatibility/migration from old landing and ecommerce arrays
+          if (Array.isArray(fullData.landing)) {
+            fullData.landing.forEach((t: any) => {
+              fullList.push({ ...t, category: t.category || 'Landing Page' });
+            });
+          }
+          if (Array.isArray(fullData.ecommerce)) {
+            fullData.ecommerce.forEach((t: any) => {
+              fullList.push({ ...t, category: t.category || 'eCommerce' });
+            });
+          }
+        }
+
+        fullList.forEach((t: any) => {
           merged.push({
             id: t.id || `landing_${Date.now()}_${Math.random()}`,
             name: t.name,
@@ -141,16 +158,106 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   // Interaction states for the mock phone screen
-  const [isPlayingVideo, setIsPlayingVideo] = useState(false);
-  const [isVideoPaused, setIsVideoPaused] = useState(false);
+  const [isShowingLinkPreview, setIsShowingLinkPreview] = useState(false);
   const [isShowingText, setIsShowingText] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const previewLink = selectedTemplate?.link1 || selectedTemplate?.link2;
 
   useEffect(() => {
-    // Already populated statically to prevent any database egress
-    setLoading(false);
+    async function fetchCloudTemplates() {
+      setLoading(true);
+      try {
+        const fullDocRef = doc(db, 'settings', 'full_prompts');
+        const modDocRef = doc(db, 'settings', 'modular_prompts');
+
+        const [fullSnap, modSnap] = await Promise.all([
+          getDoc(fullDocRef),
+          getDoc(modDocRef)
+        ]);
+
+        const loadedTemplates: TemplateItem[] = [];
+
+        // 1. Process Full Templates
+        if (fullSnap.exists()) {
+          const data = fullSnap.data();
+          let fullList: any[] = [];
+          if (Array.isArray(data.templates)) {
+            fullList = data.templates;
+          } else {
+            // Older database format support: landing + ecommerce arrays
+            if (Array.isArray(data.landing)) {
+              data.landing.forEach((t: any) => {
+                fullList.push({ ...t, category: t.category || 'Landing Page' });
+              });
+            }
+            if (Array.isArray(data.ecommerce)) {
+              data.ecommerce.forEach((t: any) => {
+                fullList.push({ ...t, category: t.category || 'eCommerce' });
+              });
+            }
+          }
+
+          fullList.forEach((t: any) => {
+            loadedTemplates.push({
+              id: t.id,
+              name: t.name,
+              template: t.template,
+              category: (t.category || 'Landing Page').trim(),
+              industry: t.industry || 'General',
+              imageUrl: t.imageUrl,
+              videoUrl: t.videoUrl,
+              link1: t.link1,
+              link2: t.link2,
+              description: t.description || `Full prompt blueprint targeting ${t.industry || 'General'} niches.`,
+              type: 'full'
+            });
+          });
+        }
+
+        // 2. Process Modular Templates
+        if (modSnap.exists()) {
+          const data = modSnap.data();
+          if (Array.isArray(data.templates)) {
+            data.templates.forEach((t: any) => {
+              loadedTemplates.push({
+                id: t.id,
+                name: t.name,
+                template: t.template,
+                category: (t.category || 'Landing Page').trim(),
+                industry: t.industry || 'Universal',
+                imageUrl: t.imageUrl,
+                videoUrl: t.videoUrl,
+                link1: t.link1,
+                link2: t.link2,
+                description: t.description || 'Focused modular segment layout blueprint.',
+                type: 'modular'
+              });
+            });
+          }
+        }
+
+        if (fullSnap.exists() || modSnap.exists()) {
+          setTemplates(loadedTemplates);
+          
+          // Set initial selected template from the newly loaded list
+          const fulls = loadedTemplates.filter(x => x.type === 'full');
+          if (fulls.length > 0) {
+            setSelectedTemplate(fulls[0]);
+          } else if (loadedTemplates.length > 0) {
+            setSelectedTemplate(loadedTemplates[0]);
+          } else {
+            setSelectedTemplate(null);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch custom templates from cloud, using static presets:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchCloudTemplates();
   }, []);
 
   // Filter templates list based on type (activeTab)
@@ -179,13 +286,8 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
   // Handle template selection
   const handleSelectTemplate = (tpl: TemplateItem) => {
     setSelectedTemplate(tpl);
-    setIsPlayingVideo(false);
-    setIsVideoPaused(false);
+    setIsShowingLinkPreview(false);
     setIsShowingText(false);
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-    }
   };
 
   // Cycle navigation - Prev (Left Swipe)
@@ -204,54 +306,14 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
     handleSelectTemplate(filteredTemplates[nextIdx]);
   };
 
-  // Play / Toggle Pause video logic
-  const handlePlayVideo = () => {
-    if (!selectedTemplate?.videoUrl) {
-      alert("No walkthrough video attached to this template blueprint.");
+  // Toggle showcase link preview
+  const handleToggleLinkPreview = () => {
+    if (!previewLink) {
+      alert("No showcase link attached to this template blueprint.");
       return;
     }
-    
-    // Toggle play/pause if already on video view
-    if (isPlayingVideo) {
-      if (videoRef.current) {
-        if (!videoRef.current.paused) {
-          videoRef.current.pause();
-          setIsVideoPaused(true);
-        } else {
-          videoRef.current.play().catch(err => console.error("Error toggling play:", err));
-          setIsVideoPaused(false);
-        }
-      }
-      return;
-    }
-
     setIsShowingText(false);
-    setIsPlayingVideo(true);
-    setIsVideoPaused(false);
-    
-    // Play video element using a short timeout to let the element render in DOM
-    setTimeout(() => {
-      if (videoRef.current) {
-        videoRef.current.currentTime = 0;
-        videoRef.current.play().catch(err => {
-          console.error("Error playing video walkthrough:", err);
-        });
-      }
-    }, 50);
-  };
-
-  // Immediate interruption and pause function for switching views
-  const interruptAndPauseVideo = () => {
-    if (videoRef.current) {
-      videoRef.current.pause();
-    }
-    setIsPlayingVideo(false);
-    setIsVideoPaused(false);
-  };
-
-  const handleVideoEnded = () => {
-    setIsPlayingVideo(false);
-    setIsVideoPaused(false);
+    setIsShowingLinkPreview(!isShowingLinkPreview);
   };
 
   // Copy template text to clipboard
@@ -558,37 +620,40 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
                     </div>
                   ) : null}
 
-                  {/* VIEW 2: VIDEO WALKTHROUGH PLAYER */}
-                  {isPlayingVideo && selectedTemplate?.videoUrl ? (
-                    <div 
-                      onClick={handlePlayVideo} // Pauses video immediately and shows status
-                      className="absolute inset-0 bg-black flex items-center justify-center z-15 cursor-pointer group"
-                      title="Click to Pause / Resume"
-                    >
-                      <video
-                        ref={videoRef}
-                        src={selectedTemplate.videoUrl}
-                        className="w-full h-full object-cover"
-                        onEnded={handleVideoEnded}
-                        playsInline
-                        muted={false}
-                        autoPlay
-                        controls={false}
-                      />
+                  {/* VIEW 2: EMBEDDED LINK PREVIEW */}
+                  {isShowingLinkPreview && previewLink ? (
+                    <div className="absolute inset-0 bg-slate-955 p-0 flex flex-col z-15 pt-8 animate-in fade-in duration-300">
+                      {/* Interactive top bar inside phone simulator */}
+                      <div className="h-9 bg-slate-900 px-3 flex items-center justify-between border-b border-slate-800 shrink-0">
+                        <span className="text-[9px] text-slate-400 truncate max-w-[140px] font-mono select-all">
+                          {previewLink}
+                        </span>
+                        <a
+                          href={previewLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[9px] bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded font-extrabold flex items-center gap-1 transition-all cursor-pointer border-0"
+                        >
+                          <ExternalLink className="w-2.5 h-2.5" /> Launch
+                        </a>
+                      </div>
                       
-                      {/* Pause icon overlay toggle */}
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        {isVideoPaused ? (
-                          <Play className="w-10 h-10 text-white drop-shadow-md" />
-                        ) : (
-                          <Pause className="w-10 h-10 text-white drop-shadow-md" />
-                        )}
+                      <div className="flex-1 w-full bg-white relative flex flex-col">
+                        <iframe
+                          src={previewLink}
+                          title="Showcase Live Preview"
+                          className="w-full flex-1 border-0 bg-white"
+                          sandbox="allow-scripts allow-same-origin allow-forms"
+                        />
+                        <div className="bg-slate-900 text-[10px] text-slate-350 p-2.5 text-center border-t border-slate-800 leading-normal font-sans">
+                          🔒 If blank, this site blocks iframe embedding. Click <strong className="text-indigo-400">Launch</strong> above!
+                        </div>
                       </div>
                     </div>
                   ) : null}
 
                   {/* VIEW 3: IMAGE ATTACHMENT VIEW */}
-                  {!isShowingText && (!isPlayingVideo || !selectedTemplate?.videoUrl) && (
+                  {!isShowingText && (!isShowingLinkPreview || !previewLink) && (
                     <div className="absolute inset-0 w-full h-full">
                       {selectedTemplate?.imageUrl ? (
                         <img
@@ -611,7 +676,7 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
                               {selectedTemplate?.name}
                             </h4>
                             <p className="text-[10px] text-slate-400 leading-normal mt-1 max-w-[180px] mx-auto">
-                              No layout mockup attached. Click "Open" to inspect prompt templates or "Play Video" if a walkthrough is available.
+                              No layout mockup attached. Click "Open" to inspect prompt templates or "Live Preview" if a live site showcase is available.
                             </p>
                           </div>
                         </div>
@@ -647,24 +712,24 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
 
           {/* TWO BUTTONS DIRECTLY BELOW MOCK PHONE */}
           <div className="mt-6 w-[290px] grid grid-cols-2 gap-4">
-            {/* Play Video Button */}
+            {/* Live Preview Button */}
             <button
-              onClick={handlePlayVideo}
-              disabled={!selectedTemplate?.videoUrl}
+              onClick={handleToggleLinkPreview}
+              disabled={!previewLink}
               className={`py-3.5 rounded-2xl border-0 font-extrabold text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm ${
-                selectedTemplate?.videoUrl 
+                previewLink 
                   ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 cursor-pointer active:scale-95' 
                   : 'bg-slate-100 text-slate-400 cursor-not-allowed'
               }`}
-              title={selectedTemplate?.videoUrl ? "Play video walkthrough inside simulator" : "No video walkthrough attached"}
+              title={previewLink ? "Preview embedded showcase link inside simulator" : "No showcase link attached"}
             >
-              {isPlayingVideo && !isVideoPaused ? (
+              {isShowingLinkPreview ? (
                 <>
-                  <Pause className="w-4 h-4" /> Pause Video
+                  <Globe className="w-4 h-4" /> Hide Preview
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4" /> Play Video
+                  <Globe className="w-4 h-4" /> Live Preview
                 </>
               )}
             </button>
@@ -672,7 +737,7 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
             {/* Open Button */}
             <button
               onClick={() => {
-                interruptAndPauseVideo();
+                setIsShowingLinkPreview(false);
                 setIsShowingText(!isShowingText);
               }}
               className={`py-3.5 rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer active:scale-95 border-0 ${
