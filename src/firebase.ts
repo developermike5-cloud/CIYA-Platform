@@ -4,21 +4,12 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getDatabase, ref, set, onValue } from 'firebase/database';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Dynamically use the custom Netlify domain if running in production on Netlify,
-// otherwise fall back to the default gen-lang Firebase authDomain.
-let customAuthDomain = firebaseConfig.authDomain;
-if (typeof window !== 'undefined') {
-  const hostname = window.location.hostname;
-  if (hostname === 'ciyacademy.netlify.app') {
-    customAuthDomain = 'ciyacademy.netlify.app';
-  } else if (hostname.endsWith('.netlify.app')) {
-    customAuthDomain = hostname;
-  }
-}
-
+// Use the official Firebase-hosted authDomain (which contains the compiled auth handlers).
+// Overriding this to a Netlify domain fails because Netlify does not host Firebase's 
+// Auth backend files (like /__/auth/handler), which causes the page to load blank or fail.
 const activeFirebaseConfig = {
   ...firebaseConfig,
-  authDomain: customAuthDomain
+  authDomain: firebaseConfig.authDomain
 };
 
 // Safe localStorage wrapper to prevent crash in sandboxed iframes

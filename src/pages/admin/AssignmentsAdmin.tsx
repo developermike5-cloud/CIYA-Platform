@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, limit, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, limit, where, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db, auth, triggerSystemSignal } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { CheckCircle2, XCircle, Clock, Search, FileText, Download, Check, RefreshCw } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Search, FileText, Download, Check, RefreshCw, Trash2, Trash } from 'lucide-react';
 import { safeStorage } from '../../utils/safeStorage';
 
 interface Submission {
@@ -42,15 +42,99 @@ export default function AssignmentsAdmin() {
   });
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Approved' | 'Disapproved'>('Pending');
   const [cohortFilter, setCohortFilter] = useState<string>('All');
+  const [courseTypeFilter, setCourseTypeFilter] = useState<'All' | 'Beginner' | 'Advanced'>('All');
+  const [checkedSubIds, setCheckedSubIds] = useState<string[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   
+  // Custom confirmation modal states to bypass sandboxed iframe confirm() blocks
+  const [deleteConfirmSubId, setDeleteConfirmSubId] = useState<string | null>(null);
+  const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
+
   const [reason, setReason] = useState('');
   const [submittingGrade, setSubmittingGrade] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'refused', msg: string } | null>(null);
 
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
+
+  // Fetch courses list to map courseId -> beginner/advanced tier
+  useEffect(() => {
+    const q = query(collection(db, 'courses'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setCourses(list);
+    }, (error) => {
+      console.warn("Error fetching courses for admin assignments filter:", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const isSubmissionAdvanced = (sub: Submission) => {
+    const course = courses.find(c => c.id === sub.courseId);
+    if (!course) {
+      const cIdLower = (sub.courseId || '').toLowerCase();
+      return cIdLower.includes('advanced') || cIdLower.includes('masterclass') || cIdLower.includes('adv');
+    }
+    const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || (course.level && ['advanced', 'masterclass'].includes(course.level.toLowerCase()));
+    return !!isAdv;
+  };
+
+  const handleDeleteSingle = (subId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setDeleteConfirmSubId(subId);
+  };
+
+  const executeDeleteSingle = async () => {
+    if (!deleteConfirmSubId) return;
+    const subId = deleteConfirmSubId;
+    setDeleteConfirmSubId(null);
+    try {
+      await deleteDoc(doc(db, 'assignments', subId));
+      showToastMsg("Assignment submission deleted successfully!", "success");
+      if (selectedSub?.id === subId) {
+        setSelectedSub(null);
+      }
+      setCheckedSubIds(prev => prev.filter(id => id !== subId));
+    } catch (err: any) {
+      console.error("Error deleting assignment:", err);
+      showToastMsg(`Failed to delete assignment: ${err.message}`, "refused");
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (checkedSubIds.length === 0) return;
+    setIsBulkDeleteConfirmOpen(true);
+  };
+
+  const executeBulkDelete = async () => {
+    setIsBulkDeleteConfirmOpen(false);
+    if (checkedSubIds.length === 0) return;
+    setLoading(true);
+    try {
+      const batch = writeBatch(db);
+      checkedSubIds.forEach(id => {
+        batch.delete(doc(db, 'assignments', id));
+      });
+      await batch.commit();
+      
+      showToastMsg(`Successfully wiped ${checkedSubIds.length} assignment submissions!`, "success");
+      
+      if (selectedSub && checkedSubIds.includes(selectedSub.id)) {
+        setSelectedSub(null);
+      }
+      setCheckedSubIds([]);
+    } catch (err: any) {
+      console.error("Error in bulk deletion:", err);
+      showToastMsg(`Bulk deletion failed: ${err.message}`, "refused");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let qUnsubscribe: (() => void) | null = null;
@@ -206,11 +290,17 @@ export default function AssignmentsAdmin() {
   const filteredSubmissions = submissions.filter((sub) => {
     const matchesStatus = statusFilter === 'All' || sub.status === statusFilter;
     const matchesCohort = cohortFilter === 'All' || (sub as any).cohort === cohortFilter || (!cohortFilter && (sub as any).cohort === 'Cohort 1');
+    
+    const isAdv = isSubmissionAdvanced(sub);
+    const matchesCourseType = courseTypeFilter === 'All' || (
+      courseTypeFilter === 'Advanced' ? isAdv : !isAdv
+    );
+
     const matchesSearch = 
       sub.userEmail?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sub.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       sub.id.includes(searchQuery);
-    return matchesStatus && matchesCohort && matchesSearch;
+    return matchesStatus && matchesCohort && matchesCourseType && matchesSearch;
   });
 
   return (
@@ -280,6 +370,16 @@ export default function AssignmentsAdmin() {
                 className="w-full bg-slate-50 border border-slate-200 pl-10 pr-4 py-2.5 outline-none rounded-xl text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
               />
             </div>
+            {/* Course Type Filter Dropdown */}
+            <select
+              value={courseTypeFilter}
+              onChange={(e) => setCourseTypeFilter(e.target.value as any)}
+              className="bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm shrink-0"
+            >
+              <option value="All">All Curriculum Levels</option>
+              <option value="Beginner">Beginner's Courses Only</option>
+              <option value="Advanced">Advanced Courses Only</option>
+            </select>
             {/* Cohort Filter Dropdown */}
             <select
               value={cohortFilter}
@@ -295,6 +395,30 @@ export default function AssignmentsAdmin() {
               {!uniqueCohorts.includes('Cohort 2') && <option value="Cohort 2">Cohort 2</option>}
             </select>
           </div>
+
+          {/* Bulk deletion action banner */}
+          {checkedSubIds.length > 0 && (
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="text-xs font-extrabold text-rose-800 flex items-center gap-2">
+                <span>⚠️</span>
+                <span>Bulk Selection Active: <strong className="font-black text-rose-950">{checkedSubIds.length}</strong> task submissions selected for bulk operations.</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCheckedSubIds([])}
+                  className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-extrabold rounded-xl cursor-pointer"
+                >
+                  Deselect All
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border-0 shadow-sm active:scale-95 transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Wipe/Delete Selected ({checkedSubIds.length})
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Table list view */}
           {loading ? (
@@ -312,6 +436,22 @@ export default function AssignmentsAdmin() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-150 text-slate-500 uppercase font-black text-[10px]">
+                    <th className="p-3 w-10 text-center">
+                      <input 
+                        type="checkbox"
+                        checked={filteredSubmissions.length > 0 && filteredSubmissions.every(s => checkedSubIds.includes(s.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const allIds = filteredSubmissions.map(s => s.id);
+                            setCheckedSubIds(prev => Array.from(new Set([...prev, ...allIds])));
+                          } else {
+                            const filteredIds = filteredSubmissions.map(s => s.id);
+                            setCheckedSubIds(prev => prev.filter(id => !filteredIds.includes(id)));
+                          }
+                        }}
+                        className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 accent-indigo-600 cursor-pointer"
+                      />
+                    </th>
                     <th className="p-3">Student</th>
                     <th className="p-3">Day Index</th>
                     <th className="p-3">Uploaded Media</th>
@@ -329,10 +469,29 @@ export default function AssignmentsAdmin() {
                         selectedSub?.id === sub.id ? 'bg-indigo-50/40 font-extrabold' : ''
                       }`}
                     >
+                      <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <input 
+                          type="checkbox"
+                          checked={checkedSubIds.includes(sub.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setCheckedSubIds(prev => [...prev, sub.id]);
+                            } else {
+                              setCheckedSubIds(prev => prev.filter(id => id !== sub.id));
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 accent-indigo-600 cursor-pointer"
+                        />
+                      </td>
                       <td className="p-3">
                         <div className="font-extrabold text-slate-900">{sub.userName || "CIYA Cadet"}</div>
                         <div className="text-slate-400 text-[10px] select-all">{sub.userEmail}</div>
-                        <div className="mt-0.5"><span className="text-[9px] bg-indigo-50 border border-indigo-100 text-indigo-700 font-black px-1.5 py-0.5 rounded-full uppercase">{(sub as any).cohort || 'Cohort 1'}</span></div>
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          <span className="text-[9px] bg-indigo-50 border border-indigo-100 text-indigo-700 font-black px-1.5 py-0.5 rounded-full uppercase">{(sub as any).cohort || 'Cohort 1'}</span>
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase ${isSubmissionAdvanced(sub) ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+                            {isSubmissionAdvanced(sub) ? 'Advanced' : 'Beginner'}
+                          </span>
+                        </div>
                       </td>
                       <td className="p-3">
                         <span className="bg-slate-100 text-slate-800 border font-mono px-2 py-0.5 rounded-md font-bold">
@@ -364,10 +523,22 @@ export default function AssignmentsAdmin() {
                           {sub.status}
                         </span>
                       </td>
-                      <td className="p-3 text-right">
-                        <button className="text-indigo-600 hover:text-indigo-900 text-xs font-black uppercase">
-                          Inspect &rarr;
-                        </button>
+                      <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            onClick={() => { setSelectedSub(sub); setReason(sub.adminReason || ''); }}
+                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1.5 rounded-lg text-xs font-black uppercase border-0 cursor-pointer transition-all"
+                          >
+                            Inspect
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteSingle(sub.id, e)}
+                            className="bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 p-1.5 rounded-lg border-0 cursor-pointer transition-all"
+                            title="Wipe & Delete Submission"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -535,6 +706,16 @@ export default function AssignmentsAdmin() {
                     Approve & Unlock
                   </button>
                 </div>
+
+                <div className="border-t pt-3 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">Dangerous Action</span>
+                  <button
+                    onClick={() => handleDeleteSingle(selectedSub.id)}
+                    className="py-1.5 px-3 bg-red-50 hover:bg-red-100 text-red-650 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-red-200"
+                  >
+                    <Trash className="w-3.5 h-3.5" /> Wipe Assignment Doc
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -568,6 +749,79 @@ export default function AssignmentsAdmin() {
             />
             <div className="text-center pt-2 text-slate-400 text-[10px] font-semibold tracking-wide uppercase">
               Click anywhere outside or press the Close button to dismiss lightroom.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom React-based Confirmation Modals */}
+      {deleteConfirmSubId && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="relative w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-2xl p-6 overflow-hidden flex flex-col items-center text-center">
+            {/* Elegant top color band */}
+            <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-rose-500 to-red-600" />
+            
+            <div className="mb-4 p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 mt-2">
+              <Trash2 className="w-8 h-8" />
+            </div>
+
+            <h3 className="text-base font-black text-slate-800 tracking-tight mb-2">
+              Confirm Submission Deletion
+            </h3>
+
+            <p className="text-xs font-semibold text-slate-500 leading-relaxed px-2 mb-6">
+              Are you sure you want to permanently delete and wipe out this student assignment submission? This action cannot be undone and will reset the student's submission status.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 w-full">
+              <button
+                onClick={() => setDeleteConfirmSubId(null)}
+                className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold rounded-2xl transition-all cursor-pointer border-0"
+              >
+                No, Keep It
+              </button>
+              <button
+                onClick={executeDeleteSingle}
+                className="py-3 px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-2xl shadow-md transition-all cursor-pointer border-0"
+              >
+                Yes, Permanently Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isBulkDeleteConfirmOpen && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="relative w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-2xl p-6 overflow-hidden flex flex-col items-center text-center">
+            {/* Elegant top color band */}
+            <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-rose-500 to-red-600" />
+            
+            <div className="mb-4 p-3.5 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 mt-2">
+              <Trash2 className="w-8 h-8" />
+            </div>
+
+            <h3 className="text-base font-black text-slate-800 tracking-tight mb-2">
+              Bulk Wipe Active Submissions
+            </h3>
+
+            <p className="text-xs font-semibold text-slate-500 leading-relaxed px-2 mb-6">
+              Are you sure you want to permanently delete all <strong className="text-rose-700 font-extrabold">{checkedSubIds.length}</strong> selected assignment submissions? This will wipe these documents completely from the database.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 w-full">
+              <button
+                onClick={() => setIsBulkDeleteConfirmOpen(false)}
+                className="py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold rounded-2xl transition-all cursor-pointer border-0"
+              >
+                Cancel Action
+              </button>
+              <button
+                onClick={executeBulkDelete}
+                className="py-3 px-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-2xl shadow-md transition-all cursor-pointer border-0"
+              >
+                Wipe Selected Docs
+              </button>
             </div>
           </div>
         </div>

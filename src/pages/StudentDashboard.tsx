@@ -2559,13 +2559,13 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                                                   <span className="font-mono text-xs font-black text-indigo-800 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg mt-0.5 shrink-0 select-none">
                                                     ⏱ {stamp}
                                                   </span>
-                                                  <p className="text-slate-900 font-extrabold leading-normal m-0">{rest}</p>
+                                                  <p className="text-slate-900 font-extrabold leading-normal m-0">{renderClickableLinks(rest)}</p>
                                                 </div>
                                               );
                                             }
                                             return (
                                               <p key={idx} className="leading-relaxed m-0 text-slate-900 font-extrabold">
-                                                {line}
+                                                {renderClickableLinks(line)}
                                               </p>
                                             );
                                           })}
@@ -2592,12 +2592,12 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                                     <p className="text-xs text-slate-500 italic pt-1">No separate walkthrough text provided.</p>
                                   )}
                                 </div>
-
+ 
                                 {vid.resources && (
                                   <div className="bg-teal-50 border border-teal-100 rounded-xl p-3.5">
                                     <span className="text-xs font-black text-teal-900 block uppercase">📎 Attached Resource Download Links</span>
                                     <p className="text-teal-950 font-mono text-[11px] md:text-xs mt-1.5 leading-relaxed font-bold whitespace-pre-wrap">
-                                      {vid.resources}
+                                      {renderClickableLinks(vid.resources)}
                                     </p>
                                   </div>
                                 )}
@@ -3618,6 +3618,7 @@ export default function StudentDashboard() {
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   const cleanupPerformedRef = useRef(false);
+  const dismissedCongratsCoursesRef = useRef<string[]>([]);
 
   // Automatically clean up screenshot images older than 3 days to keep Firestore lightweight and prevent hitting limits
   const cleanUpOldSubmissionsLocal = async (uid: string, progress: any) => {
@@ -5080,8 +5081,9 @@ export default function StudentDashboard() {
       
       const isCompleted = progressRatio === 100 && totalVideos > 0;
       const alreadyCongratulated = userProfile.congratulatedCourses?.includes(r.id);
+      const isDismissedInSession = dismissedCongratsCoursesRef.current.includes(r.id);
 
-      if (isCompleted && !alreadyCongratulated) {
+      if (isCompleted && !alreadyCongratulated && !isDismissedInSession) {
         setCourseCompletionModal(r);
         break;
       }
@@ -5137,6 +5139,10 @@ export default function StudentDashboard() {
 
   const handleDismissCompletionCongrats = async (courseId: string) => {
     try {
+      if (!dismissedCongratsCoursesRef.current.includes(courseId)) {
+        dismissedCongratsCoursesRef.current.push(courseId);
+      }
+
       const currentCongratulated = userProfile?.congratulatedCourses || [];
       const updatedCongratulated = [...currentCongratulated];
       if (!updatedCongratulated.includes(courseId)) {
@@ -6853,11 +6859,20 @@ export default function StudentDashboard() {
                 You have officially completed 100% of the daily modules, lesson clips, and assessments for <strong className="text-teal-700 font-extrabold">"{courseCompletionModal.title}"</strong>! This is an incredible milestone.
               </p>
 
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-left mt-6 space-y-1.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">🎓 What's Next?</span>
-                <p className="font-bold text-slate-700 text-xs leading-normal">
-                  You are now fully eligible to enroll in any other available tracks! Choose standard or express courses from your dashboard catalog to keep learning and expanding your technical skillsets.
-                </p>
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-left mt-6 space-y-3">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">🎓 Your Student ID</span>
+                  <div className="font-mono text-xs font-black text-indigo-700 break-all select-all bg-white border border-indigo-100 px-3 py-2 rounded-xl mt-1 shadow-sm flex items-center justify-between gap-2">
+                    <span>{currentUser?.uid}</span>
+                    <span className="text-[9px] bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded uppercase font-black tracking-wide">Copy</span>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">🚀 Course Completed Eligibility</span>
+                  <p className="font-bold text-slate-700 text-xs leading-normal mt-1">
+                    You are now fully eligible to enroll in any other available beginner's course tracks! Choose standard or express beginner's courses from your dashboard catalog to keep building.
+                  </p>
+                </div>
               </div>
             </div>
 
