@@ -285,7 +285,7 @@ export default function AdminLayout() {
       )}
 
       {/* Sidebar */}
-      <aside className={`w-64 bg-slate-900 text-white flex flex-col fixed md:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <aside className={`w-64 bg-slate-900 text-white flex flex-col fixed md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-6 flex flex-col gap-1 relative border-b border-slate-800">
           <div className="flex items-center justify-between gap-2">
             <BrandingLogo size="sm" />
@@ -337,13 +337,22 @@ export default function AdminLayout() {
         </div>
         <nav className="flex-1 px-4 space-y-2 mt-4">
           {canManageCourses && (
-            <Link 
-              to="/admin" 
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`block px-4 py-2 rounded-md ${location.pathname === '/admin' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-            >
-              Courses
-            </Link>
+            <>
+              <Link 
+                to="/admin" 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`block px-4 py-2 rounded-md ${location.pathname === '/admin' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+              >
+                Courses (Beginner)
+              </Link>
+              <Link 
+                to="/admin/advanced-courses" 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`block px-4 py-2 rounded-md ${location.pathname === '/admin/advanced-courses' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+              >
+                Advanced Course Builder
+              </Link>
+            </>
           )}
           {canManageStudents && (
             <Link 
@@ -376,7 +385,7 @@ export default function AdminLayout() {
             onClick={() => setIsMobileMenuOpen(false)}
             className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/locks') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
           >
-            🔒 Portal Locks Control
+            ⚙️ Settings & Portal Locks
           </Link>
 
           <Link 

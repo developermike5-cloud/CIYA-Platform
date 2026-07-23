@@ -1042,7 +1042,7 @@ export default function CourseEdit() {
     });
   };
 
-  const handleAssignmentChange = (dayIdx: number, subField: 'prompt' | 'dueNote', value: string) => {
+  const handleAssignmentChange = (dayIdx: number, subField: 'prompt' | 'dueNote' | 'autoApprove' | 'minChars' | 'requireLink' | 'minScreenshots' | 'requiredKeywords', value: any) => {
     setForm(prev => {
       const updatedDays = [...(prev.days || DAYS_RANGE.map(d => emptyDay(d)))];
       const currentAss = updatedDays[dayIdx]?.assignment || { prompt: '', dueNote: '' };
@@ -1200,7 +1200,8 @@ export default function CourseEdit() {
 
       await coursesStore.saveCourse(updatedCourse);
 
-      navigate('/admin');
+      const isAdvanced = updatedCourse.tier === 'advanced' || updatedCourse.tier === 'masterclass' || updatedCourse.level === 'Advanced' || updatedCourse.level === 'Masterclass';
+      navigate(isAdvanced ? '/admin/advanced-courses' : '/admin');
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'An error occurred while saving the course.');
@@ -1219,12 +1220,17 @@ export default function CourseEdit() {
   }
 
   const selectedSkillMeta = SKILLS[form.skill || "web"];
+  const isAdvanced = form.tier === 'advanced' || form.tier === 'masterclass' || form.level === 'Advanced' || form.level === 'Masterclass';
+  const unitLabel = isAdvanced ? "Module" : "Day";
 
   return (
     <div className="max-w-4xl mx-auto pb-16 font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <Link to="/admin" className="p-2 hover:bg-slate-100 rounded-full transition-colors border">
+          <Link 
+            to={form.tier === 'advanced' || form.tier === 'masterclass' || form.level === 'Advanced' || form.level === 'Masterclass' ? "/admin/advanced-courses" : "/admin"} 
+            className="p-2 hover:bg-slate-100 rounded-full transition-colors border"
+          >
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </Link>
           <div>
@@ -1512,7 +1518,7 @@ export default function CourseEdit() {
             <div className="space-y-1">
               <span className="text-xs font-black uppercase text-indigo-700 block">📅 Customize Course Duration</span>
               <span className="text-xs text-slate-500 font-bold block">
-                Current duration: <strong className="text-slate-800 font-extrabold">{(form.days || []).length} Days</strong>
+                Current duration: <strong className="text-slate-800 font-extrabold">{(form.days || []).length} {isAdvanced ? 'Modules' : 'Days'}</strong>
               </span>
             </div>
             <div className="flex gap-2">
@@ -1538,14 +1544,14 @@ export default function CourseEdit() {
                 }}
                 className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-black px-4 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm"
               >
-                ➕ Add Day
+                ➕ Add {unitLabel}
               </button>
               <button
                 type="button"
                 onClick={() => {
                   const currentDays = form.days || [];
                   if (currentDays.length <= 1) {
-                    setError("A course must have at least 1 day.");
+                    setError(`A course must have at least 1 ${unitLabel.toLowerCase()}.`);
                     return;
                   }
                   if (confirmDeleteDayIndex === activeDayIdx) {
@@ -1583,8 +1589,8 @@ export default function CourseEdit() {
                 }`}
               >
                 {confirmDeleteDayIndex === activeDayIdx
-                  ? `⚠️ Confirm Delete Day ${activeDayIdx + 1}!`
-                  : `❌ Remove Day ${activeDayIdx + 1}`}
+                  ? `⚠️ Confirm Delete ${unitLabel} ${activeDayIdx + 1}!`
+                  : `❌ Remove ${unitLabel} ${activeDayIdx + 1}`}
               </button>
             </div>
           </div>
@@ -1605,7 +1611,7 @@ export default function CourseEdit() {
                       : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
                   }`}
                 >
-                  <div className="text-[10px] uppercase tracking-wider">Day {dayNum}</div>
+                  <div className="text-[10px] uppercase tracking-wider">{unitLabel} {dayNum}</div>
                   <div className="text-[9px] text-slate-400 font-extrabold mt-0.5">
                     {(currentDayObj.videos || []).length}/10 Lessons
                   </div>
@@ -1617,29 +1623,29 @@ export default function CourseEdit() {
           {/* Day Theme info block */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
             <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center justify-between pb-3 border-b">
-              <span>📅 Day {activeDayIdx + 1} Theme and Topic</span>
+              <span>📅 {unitLabel} {activeDayIdx + 1} Theme and Topic</span>
               <span className="text-[10px] font-bold text-slate-500">Study Theme</span>
             </h3>
 
             <div className="grid grid-cols-1 gap-4">
               <div>
-                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Day Heading/Goal *</label>
+                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">{unitLabel} Heading/Goal *</label>
                 <input
                   type="text"
                   className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold"
                   value={(form.days || DAYS_RANGE.map(d => emptyDay(d)))[activeDayIdx]?.title || ""}
                   onChange={e => handleDayFieldChange(activeDayIdx, 'title', e.target.value)}
-                  placeholder={`Day ${activeDayIdx + 1} Foundations & Setup`}
+                  placeholder={`${unitLabel} ${activeDayIdx + 1} Foundations & Setup`}
                 />
               </div>
               <div>
-                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Day Description Narrative</label>
+                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">{isAdvanced ? "Module Description Narrative" : "Day Description Narrative"}</label>
                 <textarea
                   rows={5}
                   className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm"
                   value={(form.days || DAYS_RANGE.map(d => emptyDay(d)))[activeDayIdx]?.description || ""}
                   onChange={e => handleDayFieldChange(activeDayIdx, 'description', e.target.value)}
-                  placeholder="In this module, scholars will configure their local workspaces and test several AI generative models..."
+                  placeholder={isAdvanced ? "Provide a thorough module description narrative, setting clear mastery expectations..." : "In this module, scholars will configure their local workspaces and test several AI generative models..."}
                 />
               </div>
             </div>
@@ -1850,13 +1856,13 @@ export default function CourseEdit() {
                     </div>
 
                     <div className="mt-3">
-                      <label className="block text-[10px] uppercase font-bold text-slate-500 mb-0.5">Brief Video Summary / Instructions</label>
+                      <label className="block text-[10px] uppercase font-bold text-slate-500 mb-0.5">{isAdvanced ? "Foundational Required Knowledge" : "Brief Video Summary / Instructions"}</label>
                       <textarea
                         rows={4}
                         className="w-full bg-slate-50 border border-slate-220 rounded-lg p-2.5 text-sm text-slate-600 outline-none focus:border-indigo-400"
                         value={v.description || ""}
                         onChange={e => setVideoField(activeDayIdx, vIdx, 'description', e.target.value)}
-                        placeholder="Detail which core parameters should be experimented with after watching this walkthrough clip..."
+                        placeholder={isAdvanced ? "Describe the foundational required knowledge, concepts, and steps for this module..." : "Detail which core parameters should be experimented with after watching this walkthrough clip..."}
                       />
                     </div>
 
@@ -1945,10 +1951,10 @@ export default function CourseEdit() {
                 <span className="text-lg">📋</span>
                 <div>
                   <h3 className="text-sm font-black uppercase text-slate-850 tracking-wider">
-                    Day {activeDayIdx + 1} End-of-Day Assignment Section
+                    {unitLabel} {activeDayIdx + 1} End-of-{unitLabel} Assignment Section
                   </h3>
                   <p className="text-[10px] text-slate-500 font-bold">
-                    Decide whether students must submit an assignment response for today
+                    Decide whether students must submit an assignment response for this {unitLabel.toLowerCase()}
                   </p>
                 </div>
               </div>
@@ -1976,7 +1982,7 @@ export default function CourseEdit() {
                       Assignment section is active
                     </span>
                     <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
-                      Students will see this prompt and be required to submit answers under the "My Assignments" workspace to unlock successive days.
+                      Students will see this prompt and be required to submit answers under the "My Assignments" workspace to unlock successive {unitLabel.toLowerCase()}s.
                     </p>
                   </div>
                 </div>
@@ -1987,7 +1993,7 @@ export default function CourseEdit() {
                     className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-teal-500 outline-none text-sm font-semibold"
                     value={(form.days || [])[activeDayIdx]?.assignment?.prompt || ""}
                     onChange={e => handleAssignmentChange(activeDayIdx, 'prompt', e.target.value)}
-                    placeholder={`Apply today's learnings into a draft portfolio canvas and copy/pasted submission link inside the field below...`}
+                    placeholder={`Apply this ${unitLabel.toLowerCase()}'s learnings into a draft portfolio canvas and copy/pasted submission link inside the field below...`}
                   />
                 </div>
                 <div>
@@ -2000,14 +2006,86 @@ export default function CourseEdit() {
                     placeholder="e.g., Submit before midnight to stay eligible for direct coaching verification."
                   />
                 </div>
+
+                {/* Automated Compliance Section */}
+                <div className="mt-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-150 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-black uppercase text-indigo-700 tracking-wider block">🤖 Automated Compliance Auto-Approval</span>
+                      <p className="text-[10px] text-slate-500 font-semibold">Enable system to instantly approve qualifying homework submissions</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={!!(form.days || [])[activeDayIdx]?.assignment?.autoApprove}
+                        onChange={e => handleAssignmentChange(activeDayIdx, 'autoApprove', e.target.checked)}
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+
+                  {!!(form.days || [])[activeDayIdx]?.assignment?.autoApprove && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-indigo-100/60">
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Min Text Characters</label>
+                        <input
+                          type="number"
+                          className="w-full bg-white text-slate-950 border border-slate-200 rounded-xl p-2.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                          value={(form.days || [])[activeDayIdx]?.assignment?.minChars || 0}
+                          onChange={e => handleAssignmentChange(activeDayIdx, 'minChars', Math.max(0, parseInt(e.target.value) || 0))}
+                          placeholder="e.g. 50 (or 0 to ignore)"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Min Screenshot Uploads</label>
+                        <select
+                          className="w-full bg-white text-slate-950 border border-slate-200 rounded-xl p-2.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                          value={(form.days || [])[activeDayIdx]?.assignment?.minScreenshots || 0}
+                          onChange={e => handleAssignmentChange(activeDayIdx, 'minScreenshots', parseInt(e.target.value) || 0)}
+                        >
+                          <option value="0">No screenshots required (0)</option>
+                          <option value="1">At least 1 screenshot</option>
+                          <option value="2">At least 2 screenshots</option>
+                          <option value="3">At least 3 screenshots (Recommended)</option>
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Required Keywords (Comma separated)</label>
+                        <input
+                          type="text"
+                          className="w-full bg-white text-slate-950 border border-slate-200 rounded-xl p-2.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
+                          value={(form.days || [])[activeDayIdx]?.assignment?.requiredKeywords || ""}
+                          onChange={e => handleAssignmentChange(activeDayIdx, 'requiredKeywords', e.target.value)}
+                          placeholder="e.g. ChatGPT, prompt, screenshot, final output"
+                        />
+                        <span className="text-[9px] text-slate-400 font-semibold block mt-1">If specified, student's text must contain these words (case-insensitive) for compliance.</span>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="relative inline-flex items-center gap-2 cursor-pointer pt-1">
+                          <input 
+                            type="checkbox" 
+                            className="rounded text-indigo-600 focus:ring-indigo-500"
+                            checked={!!(form.days || [])[activeDayIdx]?.assignment?.requireLink}
+                            onChange={e => handleAssignmentChange(activeDayIdx, 'requireLink', e.target.checked)}
+                          />
+                          <span className="text-[11px] font-bold text-slate-600">Require Valid URL submission (e.g. Github, netlify link)</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="bg-slate-50/50 text-center py-8 rounded-2xl border border-dashed border-slate-200">
                 <p className="text-xs text-slate-500 font-bold">
-                  No end-of-day assignment is set for Day {activeDayIdx + 1}.
+                  No end-of-{unitLabel.toLowerCase()} assignment is set for {unitLabel} {activeDayIdx + 1}.
                 </p>
                 <p className="text-[10px] text-slate-400 mt-1 font-semibold max-w-sm mx-auto">
-                  Students will complete today's lesson videos and proceed without submitting a project response.
+                  Students will complete this {unitLabel.toLowerCase()}'s lesson videos and proceed without submitting a project response.
                 </p>
                 <button
                   type="button"

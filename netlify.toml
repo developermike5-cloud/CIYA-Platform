@@ -1,19 +1,15 @@
-# netlify.toml - Configuration file for Netlify deployments
+# Netlify configuration file
+# This file is automatically read by Netlify when you deploy.
 
-[build]
-  # Configures the build command and directory where Vite stores build outputs
-  publish = "dist"
-  command = "npm run build"
-
-# Redirect / Proxy rules for Firebase Auth Handler with Custom Domain
-[[redirects]]
-  from = "/__/auth/*"
-  to = "https://gen-lang-client-0862975917.firebaseapp.com/__/auth/:splat"
-  status = 200
-  force = true
-
-# Fallback for React Single Page Application (SPA) client-side routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Clear the X-Frame-Options header to allow the site to be framed in previews
+    X-Frame-Options = ""
+    # Allow framing from Netlify, local hosts, and your specific AI Studio preview domains
+    Content-Security-Policy = "frame-ancestors 'self' https://ais-pre-skdnreasgm2xhvmncrdpgs-526599491602.europe-west2.run.app https://ais-dev-skdnreasgm2xhvmncrdpgs-526599491602.europe-west2.run.app https://ai.studio https://*.google.com;"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { safeStorage } from '../utils/safeStorage';
@@ -22,7 +22,11 @@ import {
   FolderOpen,
   Briefcase,
   Tag,
-  Globe
+  Globe,
+  Maximize2,
+  X,
+  AlertTriangle,
+  RotateCw
 } from 'lucide-react';
 
 interface TemplateItem {
@@ -37,6 +41,333 @@ interface TemplateItem {
   link2?: string;
   description?: string;
   type: 'full' | 'modular';
+}
+
+interface PreviewFrameProps {
+  url: string;
+  title?: string;
+  height?: string | number;
+  onExpand?: () => void;
+  expandable?: boolean;
+}
+
+function getHostname(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function PreviewFrame({ url, title, height = '100%', onExpand, expandable = true }: PreviewFrameProps) {
+  const [status, setStatus] = useState<"loading" | "loaded" | "failed">("loading");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [viewMode, setViewMode] = useState<"portal" | "iframe">("portal");
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  let iframeSrc = url;
+  let isProxied = false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.origin !== window.location.origin) {
+      iframeSrc = `/api/proxy?url=${encodeURIComponent(url)}`;
+      isProxied = true;
+    }
+  } catch (e) {
+    // Relative URL or invalid url format
+  }
+
+  const handleLoad = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setStatus("loaded");
+  }, []);
+
+  const startTimeout = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      // If it's proxied, we know framing is allowed. We auto-reveal the iframe
+      // after 2.5s so slow tracking scripts don't make the user wait infinitely.
+      if (isProxied) {
+        setStatus("loaded");
+      } else {
+        setStatus((s) => (s === "loaded" ? s : "failed"));
+      }
+    }, isProxied ? 2500 : 8000);
+  }, [isProxied]);
+
+  const retry = () => {
+    setStatus("loading");
+    setReloadKey((k) => k + 1);
+    startTimeout();
+  };
+
+  useEffect(() => {
+    setStatus("loading");
+    setViewMode(isProxied ? "portal" : "iframe");
+    startTimeout();
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [url, startTimeout, isProxied]);
+
+  return (
+    <div
+      style={{
+        border: "1px solid #1e293b",
+        borderRadius: 14,
+        overflow: "hidden",
+        background: "#0f172a",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        width: "100%",
+      }}
+    >
+      {/* fake browser chrome */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "9px 12px",
+          background: "#1e293b",
+          borderBottom: "1px solid #334155",
+          position: "relative",
+        }}
+      >
+        <div style={{ display: "flex", gap: 6 }}>
+          {["#EF4444", "#F59E0B", "#10B981"].map((c) => (
+            <span
+              key={c}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 999,
+                background: c,
+                opacity: 0.9,
+              }}
+            />
+          ))}
+        </div>
+        <div
+          style={{
+            flex: 1,
+            fontSize: 11,
+            color: "#94a3b8",
+            background: "#0f172a",
+            border: "1px solid #334155",
+            borderRadius: 999,
+            padding: "3px 10px",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            textAlign: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6
+          }}
+          title={url}
+        >
+          {status === "loading" && <RefreshCw size={10} className="animate-spin text-indigo-400" />}
+          <span>{getHostname(url)}</span>
+        </div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#94a3b8", display: "flex", cursor: "pointer" }}
+          title="Open in new tab"
+        >
+          <ExternalLink size={14} className="hover:text-white transition-colors" />
+        </a>
+        {expandable && (
+          <button
+            onClick={onExpand}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#94a3b8",
+              display: "flex",
+              padding: 0,
+            }}
+            title="Expand"
+          >
+            <Maximize2 size={14} className="hover:text-white transition-colors" />
+          </button>
+        )}
+        
+        {/* Sleek browser-style active loading line */}
+        {status === "loading" && (
+          <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 animate-pulse" />
+        )}
+      </div>
+
+      {/* live embedded site */}
+      <div style={{ position: "relative", flex: 1, background: "#0f172a", display: "flex", flexDirection: "column" }}>
+        {isProxied && viewMode === "portal" ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 24,
+              textAlign: "center",
+              background: "#0f172a",
+              color: "#94a3b8"
+            }}
+          >
+            <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-3 text-indigo-400">
+              <Globe size={24} className="animate-pulse" />
+            </div>
+            <h4 className="text-sm font-semibold text-slate-200 mb-1.5">Secure Workspace Application</h4>
+            <p className="text-xs text-slate-400 max-w-xs leading-relaxed mb-5">
+              This app is hosted on another secure container. For complete access to database operations, sessions, and active assets, view it in a secure top-level tab.
+            </p>
+            <div className="flex flex-col gap-3 w-full max-w-xs items-center">
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 text-xs font-semibold px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-all w-full shadow-lg shadow-indigo-600/10"
+              >
+                <span>Open in Secure Tab</span>
+                <ExternalLink size={13} />
+              </a>
+              <button
+                onClick={() => setViewMode("iframe")}
+                className="text-[10px] text-slate-500 hover:text-slate-400 transition-colors underline underline-offset-4"
+              >
+                Force load inline anyway
+              </button>
+            </div>
+          </div>
+        ) : status === "failed" ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              padding: 16,
+              textAlign: "center",
+              background: "#0f172a",
+              color: "#94a3b8"
+            }}
+          >
+            <AlertTriangle size={24} className="text-amber-500 animate-pulse" />
+            <div style={{ fontSize: 11.5, color: "#cbd5e1", maxWidth: 220, lineHeight: 1.4 }}>
+              This site can't be shown inline — it's likely blocking embedded previews.
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              <button
+                onClick={retry}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 10.5,
+                  padding: "5px 10px",
+                  borderRadius: 999,
+                  border: "1px solid #334155",
+                  background: "#1e293b",
+                  cursor: "pointer",
+                  color: "#cbd5e1",
+                }}
+              >
+                <RotateCw size={11} /> Retry
+              </button>
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 10.5,
+                  padding: "5px 10px",
+                  borderRadius: 999,
+                  background: "#6366f1",
+                  color: "#fff",
+                  textDecoration: "none",
+                }}
+              >
+                Open <ExternalLink size={11} />
+              </a>
+            </div>
+          </div>
+        ) : (
+          <iframe
+            key={reloadKey}
+            src={iframeSrc}
+            title={title || url}
+            onLoad={handleLoad}
+            loading="lazy"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+            style={{
+              width: "100%",
+              height: "100%",
+              border: "none",
+              background: "#ffffff",
+              opacity: 1, // Keep the iframe visible immediately so the user can see it stream in
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface LiveProjectPreviewProps {
+  url: string;
+  title?: string;
+}
+
+function LiveProjectPreview({ url, title }: LiveProjectPreviewProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <>
+      <div className="w-full h-full p-0 flex flex-col">
+        <PreviewFrame
+          url={url}
+          title={title}
+          onExpand={() => setExpanded(true)}
+        />
+      </div>
+
+      {expanded && (
+        <div
+          onClick={() => setExpanded(false)}
+          className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[999] flex items-center justify-center p-4 md:p-6 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-5xl h-[85vh] relative animate-in zoom-in-95 duration-200 cursor-default"
+          >
+            <PreviewFrame url={url} title={title} expandable={false} />
+            <button
+              onClick={() => setExpanded(false)}
+              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-slate-900 text-white hover:bg-slate-800 border-0 cursor-pointer flex items-center justify-center shadow-lg transition-colors"
+              title="Close"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 interface PromptGeneratorProps {
@@ -162,7 +493,7 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
   const [isShowingText, setIsShowingText] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  const previewLink = selectedTemplate?.link1 || selectedTemplate?.link2;
+  const previewLink = selectedTemplate?.videoUrl || selectedTemplate?.link1 || selectedTemplate?.link2;
 
   useEffect(() => {
     async function fetchCloudTemplates() {
@@ -622,33 +953,8 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
 
                   {/* VIEW 2: EMBEDDED LINK PREVIEW */}
                   {isShowingLinkPreview && previewLink ? (
-                    <div className="absolute inset-0 bg-slate-955 p-0 flex flex-col z-15 pt-8 animate-in fade-in duration-300">
-                      {/* Interactive top bar inside phone simulator */}
-                      <div className="h-9 bg-slate-900 px-3 flex items-center justify-between border-b border-slate-800 shrink-0">
-                        <span className="text-[9px] text-slate-400 truncate max-w-[140px] font-mono select-all">
-                          {previewLink}
-                        </span>
-                        <a
-                          href={previewLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[9px] bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded font-extrabold flex items-center gap-1 transition-all cursor-pointer border-0"
-                        >
-                          <ExternalLink className="w-2.5 h-2.5" /> Launch
-                        </a>
-                      </div>
-                      
-                      <div className="flex-1 w-full bg-white relative flex flex-col">
-                        <iframe
-                          src={previewLink}
-                          title="Showcase Live Preview"
-                          className="w-full flex-1 border-0 bg-white"
-                          sandbox="allow-scripts allow-same-origin allow-forms"
-                        />
-                        <div className="bg-slate-900 text-[10px] text-slate-350 p-2.5 text-center border-t border-slate-800 leading-normal font-sans">
-                          🔒 If blank, this site blocks iframe embedding. Click <strong className="text-indigo-400">Launch</strong> above!
-                        </div>
-                      </div>
+                    <div className="absolute inset-0 bg-slate-950 p-0 flex flex-col z-[15] pt-8 animate-in fade-in duration-300">
+                      <LiveProjectPreview url={previewLink} title={selectedTemplate?.name || "Showcase Live Preview"} />
                     </div>
                   ) : null}
 
@@ -725,11 +1031,11 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
             >
               {isShowingLinkPreview ? (
                 <>
-                  <Globe className="w-4 h-4" /> Hide Preview
+                  <Play className="w-4 h-4" /> Hide Preview
                 </>
               ) : (
                 <>
-                  <Globe className="w-4 h-4" /> Live Preview
+                  <Play className="w-4 h-4" /> Live Preview
                 </>
               )}
             </button>

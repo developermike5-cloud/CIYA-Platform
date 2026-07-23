@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp, where } from 'firebase/firestore';
+import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp, where, addDoc } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, getActiveDatabaseId, setActiveDatabaseId, triggerSystemSignal } from '../../firebase';
 import { ref as dbRef, set as dbSet } from 'firebase/database';
-import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
+import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock, TrendingUp, Users, Award, ShieldAlert, BookOpen, Calendar, HelpCircle } from 'lucide-react';
+import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line, AreaChart, Area } from 'recharts';
 import BrandingLogo from '../../components/BrandingLogo';
+import StudentAnalyticsDashboard from '../../components/StudentAnalyticsDashboard';
 import { Course } from '../../types';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
 import { uploadToCloudinary } from '../../utils/cloudinary';
@@ -71,6 +73,11 @@ interface UserProfile {
   approvalStatus?: string;
   adminCode?: string;
   isDashboardUnlocked?: boolean;
+  hasYearBadge?: boolean;
+  membershipId?: string;
+  badgePurchaseDate?: number;
+  badgeExpiryDate?: number;
+  badgePaymentRequestStatus?: string;
   createdAt: any;
   ageRange?: string;
   educationLevel?: string;
@@ -168,6 +175,7 @@ export default function UsersAdmin() {
   };
 
   // Actions Toggle & States
+  const [activeSubTab, setActiveSubTab] = useState<'students' | 'analytics'>('students');
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, 'approve' | 'disapprove' | 'delete' | null>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -216,7 +224,8 @@ export default function UsersAdmin() {
 
     setLogoUploading(true);
     try {
-      const publicUrl = await uploadToCloudinary(file, 'branding');
+      const uploadRes = await uploadToCloudinary(file, 'branding');
+      const publicUrl = uploadRes.url;
 
       await setDoc(doc(db, 'settings', 'app'), {
         logo: publicUrl,
@@ -414,52 +423,79 @@ export default function UsersAdmin() {
     let hasUsedCache = false;
     const cacheKey = 'ciya_admin_cached_users_list_All';
 
+    // Stale-while-revalidate: Load from cache instantly, using consolidated 'All' list
+    const cachedUsersStr = safeStorage.getItem(cacheKey) || safeStorage.getItem(`ciya_admin_cached_users_list_${targetCohort}`);
+    const cachedAdminsStr = safeStorage.getItem('ciya_admin_cached_admins_list');
+    const cachedAdminsDataStr = safeStorage.getItem('ciya_admin_cached_admins_data');
+
+    let cachedUsers: UserProfile[] = [];
+    let cachedAdmins: string[] = [];
+    let cachedAdminsData: Record<string, any> = {};
+
+    if (cachedUsersStr) {
+      try {
+        cachedUsers = JSON.parse(cachedUsersStr);
+      } catch (e) {
+        console.warn("Could not parse cached users:", e);
+      }
+    }
+    if (cachedAdminsStr) {
+      try {
+        cachedAdmins = JSON.parse(cachedAdminsStr);
+      } catch (e) {}
+    }
+    if (cachedAdminsDataStr) {
+      try {
+        cachedAdminsData = JSON.parse(cachedAdminsDataStr);
+      } catch (e) {}
+    }
+
+    if (cachedUsers.length > 0) {
+      setUsers(cachedUsers);
+      setAdmins(cachedAdmins);
+      setAdminsData(cachedAdminsData);
+      setLoading(false);
+      hasUsedCache = true;
+    }
+
     if (forceRefresh) {
       setIsRefreshing(true);
     } else {
-      // Stale-while-revalidate: Load from cache instantly, using consolidated 'All' list
-      const cachedUsersStr = safeStorage.getItem(cacheKey) || safeStorage.getItem(`ciya_admin_cached_users_list_${targetCohort}`);
-      const cachedAdminsStr = safeStorage.getItem('ciya_admin_cached_admins_list');
-      const cachedAdminsDataStr = safeStorage.getItem('ciya_admin_cached_admins_data');
-
-      if (cachedUsersStr && cachedAdminsStr && cachedAdminsDataStr) {
-        try {
-          setUsers(JSON.parse(cachedUsersStr));
-          setAdmins(JSON.parse(cachedAdminsStr));
-          setAdminsData(JSON.parse(cachedAdminsDataStr));
-          setLoading(false);
-          hasUsedCache = true;
-          setIsRefreshing(true); // show subtle syncing indicator
-        } catch (e) {
-          console.warn("Could not parse cached users:", e);
-        }
-      }
-
       if (!hasUsedCache) {
         setLoading(true);
       }
     }
 
+    // Strictly enforce: if we have cached data, and the admin did NOT click "Sync Live", DO NOT trigger any Firestore network calls!
     if (hasUsedCache && !forceRefresh) {
-      const lastFetchStr = safeStorage.getItem('ciya_admin_cached_users_time_All');
-      if (lastFetchStr) {
-        const lastFetch = parseInt(lastFetchStr, 10);
-        if (!isNaN(lastFetch) && Date.now() - lastFetch < 3600000) {
-          setIsRefreshing(false);
-          setLoading(false);
-          return;
-        }
-      }
+      const coursesData = coursesStore.getCourses();
+      setAllCourses(coursesData);
+      setIsRefreshing(false);
+      setLoading(false);
+      return;
     }
 
     try {
-      // Fresh Firestore fetch: load all users to ensure legacy users without a cohort are default-grouped correctly in-memory
+      // Fresh Firestore fetch: load all users
       const q = query(collection(db, 'users'));
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile));
+      const freshData = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile));
       
-      // Sort in memory by createdAt descending to avoid requiring composite indexes on Firestore
-      data.sort((a, b) => {
+      // Smart Merge: combine newly fetched records with cached ones, keeping all previous records safe.
+      let finalUsers = freshData;
+      if (cachedUsers.length > 0) {
+        const mergedMap = new Map<string, UserProfile>();
+        cachedUsers.forEach(u => {
+          if (u && u.id) mergedMap.set(u.id, u);
+        });
+        freshData.forEach(u => {
+          if (u && u.id) mergedMap.set(u.id, u);
+        });
+        finalUsers = Array.from(mergedMap.values());
+      }
+
+      // Sort in memory by createdAt descending
+      finalUsers.sort((a, b) => {
         const getMills = (fieldVal: any) => {
           if (!fieldVal) return 0;
           if (typeof fieldVal.toDate === 'function') {
@@ -469,26 +505,33 @@ export default function UsersAdmin() {
         };
         return getMills(b.createdAt) - getMills(a.createdAt);
       });
-      setUsers(data);
+      setUsers(finalUsers);
 
       const coursesData = coursesStore.getCourses();
       setAllCourses(coursesData);
 
       const adminSnapshot = await getDocs(collection(db, 'admins'));
-      const adminIds: string[] = [];
-      const adminMap: Record<string, { email: string, role?: string, permissions?: string[] }> = {};
+      const freshAdminIds: string[] = [];
+      const freshAdminMap: Record<string, { email: string, role?: string, permissions?: string[] }> = {};
       adminSnapshot.docs.forEach(docSnap => {
-        adminIds.push(docSnap.id);
-        adminMap[docSnap.id] = (docSnap.data() || {}) as any;
+        freshAdminIds.push(docSnap.id);
+        freshAdminMap[docSnap.id] = (docSnap.data() || {}) as any;
       });
-      setAdmins(adminIds);
-      setAdminsData(adminMap);
 
-      // Save to local cache
-      safeStorage.setItem(cacheKey, JSON.stringify(data));
+      let finalAdminIds = freshAdminIds;
+      if (cachedAdmins.length > 0) {
+        finalAdminIds = Array.from(new Set([...cachedAdmins, ...freshAdminIds]));
+      }
+      const finalAdminMap = { ...cachedAdminsData, ...freshAdminMap };
+
+      setAdmins(finalAdminIds);
+      setAdminsData(finalAdminMap);
+
+      // Save to local cache permanently
+      safeStorage.setItem(cacheKey, JSON.stringify(finalUsers));
       safeStorage.setItem('ciya_admin_cached_users_time_All', Date.now().toString());
-      safeStorage.setItem('ciya_admin_cached_admins_list', JSON.stringify(adminIds));
-      safeStorage.setItem('ciya_admin_cached_admins_data', JSON.stringify(adminMap));
+      safeStorage.setItem('ciya_admin_cached_admins_list', JSON.stringify(finalAdminIds));
+      safeStorage.setItem('ciya_admin_cached_admins_data', JSON.stringify(finalAdminMap));
 
     } catch (error) {
       if (!hasUsedCache || forceRefresh) {
@@ -1209,40 +1252,66 @@ export default function UsersAdmin() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-5 border-t-4 border-indigo-500">
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Applicants</h3>
-          <p className="text-3xl font-bold text-indigo-600 mt-1">{cohortFilteredUsers.length}</p>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-5 border-t-4 border-amber-500">
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Pending Review</h3>
-          <p className="text-3xl font-bold text-amber-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('pending')}>
-            {cohortFilteredUsers.filter(u => !u.approvalStatus || u.approvalStatus === 'Pending').length}
-          </p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-5 border-t-4 border-emerald-500">
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Approved Applicants</h3>
-          <p className="text-3xl font-bold text-emerald-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('approved')}>
-            {cohortFilteredUsers.filter(u => u.approvalStatus === 'Approved').length}
-          </p>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-5 border-t-4 border-rose-500">
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Disapproved</h3>
-          <p className="text-3xl font-bold text-rose-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('disapproved')}>
-            {cohortFilteredUsers.filter(u => u.approvalStatus === 'Disapproved').length}
-          </p>
-        </div>
+      {/* Sub-Tabs Switcher */}
+      <div className="flex border-b border-slate-200 gap-1.5 mb-6">
+        <button
+          onClick={() => setActiveSubTab('students')}
+          className={`pb-3 px-4 text-xs font-black uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+            activeSubTab === 'students'
+              ? 'border-indigo-600 text-indigo-700 font-extrabold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 font-semibold'
+          }`}
+        >
+          📋 Students List
+        </button>
+        <button
+          onClick={() => setActiveSubTab('analytics')}
+          className={`pb-3 px-4 text-xs font-black uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+            activeSubTab === 'analytics'
+              ? 'border-indigo-600 text-indigo-700 font-extrabold'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 font-semibold'
+          }`}
+        >
+          📊 Analytics Dashboard
+        </button>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+      {activeSubTab === 'students' ? (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white rounded-lg shadow p-5 border-t-4 border-indigo-500">
+              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Applicants</h3>
+              <p className="text-3xl font-bold text-indigo-600 mt-1">{cohortFilteredUsers.length}</p>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow p-5 border-t-4 border-amber-500">
+              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Pending Review</h3>
+              <p className="text-3xl font-bold text-amber-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('pending')}>
+                {cohortFilteredUsers.filter(u => !u.approvalStatus || u.approvalStatus === 'Pending').length}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-5 border-t-4 border-emerald-500">
+              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Approved Applicants</h3>
+              <p className="text-3xl font-bold text-emerald-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('approved')}>
+                {cohortFilteredUsers.filter(u => u.approvalStatus === 'Approved').length}
+              </p>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow p-5 border-t-4 border-rose-500">
+              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Disapproved</h3>
+              <p className="text-3xl font-bold text-rose-600 mt-1 cursor-pointer" onClick={() => setFilterApproval('disapproved')}>
+                {cohortFilteredUsers.filter(u => u.approvalStatus === 'Disapproved').length}
+              </p>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-5 py-4 bg-slate-50 border-b border-slate-150 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-slate-800">Showing {filteredUsers.length} of {cohortFilteredUsers.length} total students</span>
@@ -1281,6 +1350,14 @@ export default function UsersAdmin() {
                         <td className="px-4 py-3">
                           <div className="font-bold text-slate-900 leading-tight mb-1">{u.fullName || '-'}</div>
                           <div className="text-slate-500 text-xs">{u.gender ? `${u.gender} • ` : ''}{u.state || '-'}</div>
+                          
+                          {u.hasYearBadge && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[9px] font-black tracking-wider uppercase rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                🏷️ Year Badge
+                              </span>
+                            </div>
+                          )}
                           
                           <div className="mt-2.5">
                             <button
@@ -1481,6 +1558,75 @@ export default function UsersAdmin() {
                                         <option key={cohort} value={cohort}>{cohort}</option>
                                       ))}
                                     </select>
+                                  </div>
+
+                                  <div className="pt-2.5 border-t border-slate-150 mt-2.5">
+                                    <span className="text-slate-500 block font-bold text-[9px] uppercase tracking-wider">🏷️ Year Badge Ownership</span>
+                                    <div className="flex items-center justify-between mt-1.5 bg-slate-100/50 p-2 rounded-xl border border-slate-205">
+                                      <span className={`text-xs font-black ${u.hasYearBadge ? 'text-amber-700' : 'text-slate-450'}`}>
+                                        {u.hasYearBadge ? '🏷️ Badge Active (Paid/Granted)' : 'No Badge Active'}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          const nextVal = !u.hasYearBadge;
+                                          try {
+                                            const updateData: any = {
+                                              hasYearBadge: nextVal,
+                                              updatedAt: serverTimestamp()
+                                            };
+
+                                            if (nextVal) {
+                                              const year = new Date().getFullYear();
+                                              const randNum = Math.floor(1000 + Math.random() * 9000);
+                                              const membershipId = u.membershipId || `CIYA-PRO-${year}-${randNum}`;
+                                              const startDate = Date.now();
+                                              const expiryDate = startDate + 30 * 24 * 60 * 60 * 1000;
+
+                                              updateData.badgePaymentRequestStatus = 'Approved';
+                                              updateData.badgePurchaseDate = startDate;
+                                              updateData.badgeExpiryDate = expiryDate;
+                                              updateData.membershipId = membershipId;
+
+                                              // Send Notification
+                                              await addDoc(collection(db, 'notifications'), {
+                                                userId: u.id,
+                                                title: 'Upgraded to CIYA Student Pro! 🎖️🚀',
+                                                message: `Congratulations! Your payment has been approved and confirmed by the Academy Admin. You have been officially upgraded to "CIYA Student Pro" and are now a member of the elite CIYA ecosystem!
+
+Your exclusive benefits include:
+• 🏷️ Verified CIYA Badge: Displayed on your profile page.
+• 📁 Profile Photo Upload: Customize your badge with a professional photo before download.
+• 🚀 30-Day Ecosystem Membership: Valid from ${new Date(startDate).toLocaleDateString()} to ${new Date(expiryDate).toLocaleDateString()}.
+• 🎓 Advanced Syllabus Access: Access to specialized courses, assignments, and practical training templates.
+• 💻 Netlify Verified Link: Host and showcase your projects with premium support.
+
+Please go to your profile now to see your "CIYA badge" reflected, upload your photo, and download your high-resolution badge PNG to celebrate your status!`,
+                                                type: 'badge_upgrade',
+                                                isRead: false,
+                                                triggeredBy: 'Academy Admin Office',
+                                                createdAt: serverTimestamp()
+                                              });
+                                            }
+
+                                            await updateDoc(doc(db, 'users', u.id), updateData);
+                                            await triggerSystemSignal('user_signals', u.id);
+                                            setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, hasYearBadge: nextVal, membershipId: nextVal ? updateData.membershipId : usr.membershipId } : usr));
+                                            alert(`Year badge ${nextVal ? 'granted' : 'revoked'} successfully!`);
+                                          } catch (err) {
+                                            console.error(err);
+                                            alert("Failed to update Year Badge status.");
+                                          }
+                                        }}
+                                        className={`px-2.5 py-1 rounded text-[10px] font-black uppercase transition-all border-0 cursor-pointer ${
+                                          u.hasYearBadge 
+                                            ? 'bg-amber-150 text-amber-900 hover:bg-amber-200' 
+                                            : 'bg-slate-200 hover:bg-slate-300 text-slate-750'
+                                        }`}
+                                      >
+                                        {u.hasYearBadge ? 'Revoke Badge' : 'Grant Badge'}
+                                      </button>
+                                    </div>
                                   </div>
 
                                   <div className="col-span-full pt-3 border-t border-slate-100 mt-2">
@@ -1855,6 +2001,13 @@ export default function UsersAdmin() {
             </table>
           </div>
         </div>
+      )}
+      </>
+      ) : (
+        <StudentAnalyticsDashboard 
+          users={cohortFilteredUsers} 
+          cohortName={filterCohort === 'All' ? 'All Cohorts (Aggregated)' : filterCohort} 
+        />
       )}
     </div>
   );

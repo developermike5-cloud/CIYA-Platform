@@ -5,6 +5,26 @@ html {
   font-size: 18px; /* Increases default root font size so all rem classes scale up */
 }
 
+body {
+  color: #0f172a; /* Slate 900 for crisp text default */
+  font-weight: 500; /* Bolder default font readability */
+  background-color: #f8fafc;
+}
+
+/* Enhance faded classes to be much darker and high contrast for excellent readability */
+.text-slate-400 {
+  color: #475569 !important; /* Slate 600 - much darker than 400 */
+}
+.text-slate-500 {
+  color: #334155 !important; /* Slate 700 - much darker than 500 */
+}
+.text-gray-400 {
+  color: #4b5563 !important; /* Gray 600 - much darker than 400 */
+}
+.text-gray-500 {
+  color: #374151 !important; /* Gray 700 - much darker than 500 */
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;

@@ -41,7 +41,7 @@ function TierBadge({ tier }: { tier: string }) {
 }
 
 export default function CoursesAdmin() {
-  const [courses, setCourses] = useState<Course[]>(() => coursesStore.getCourses());
+  const [courses, setCourses] = useState<Course[]>(() => coursesStore.getStandardCoursesOnly());
   const [loading, setLoading] = useState(false);
   
   // Filters state
@@ -60,10 +60,11 @@ export default function CoursesAdmin() {
   // Load courses in real-time by subscribing to coursesStore updates
   useEffect(() => {
     const unsubscribe = coursesStore.subscribe((updatedCourses) => {
-      setCourses(updatedCourses);
+      const standard = updatedCourses.filter(c => !(c.tier === 'advanced' || c.tier === 'masterclass' || c.level === 'Advanced' || c.level === 'Masterclass'));
+      setCourses(standard);
     });
     // Set initial list just in case
-    setCourses(coursesStore.getCourses());
+    setCourses(coursesStore.getStandardCoursesOnly());
     return () => unsubscribe();
   }, []);
 

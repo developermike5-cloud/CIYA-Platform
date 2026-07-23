@@ -1,6 +1,7 @@
 import { Course } from '../types';
 import { safeStorage } from './safeStorage';
 import staticCourses from '../data/courses.json';
+import staticAdvancedCourses from '../data/advanced_courses.json';
 
 // Broadcast channel/event for synchronizing across component mounts or active sessions
 const BROADCAST_EVENT = 'ciya_courses_updated';
@@ -76,33 +77,55 @@ function normalizeCourse(c: any): Course {
 }
 
 export const coursesStore = {
-  getCourses(): Course[] {
+  getStandardCoursesOnly(): Course[] {
     const cached = safeStorage.getItem('ciya_frontend_courses');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
-          return parsed;
+          return parsed.map(normalizeCourse);
         }
       } catch (e) {
-        console.error("Error parsing frontend courses from storage:", e);
+        console.error("Error parsing frontend standard courses from storage:", e);
       }
     }
-
-    // Initialize with normalized static courses
     const initial = (staticCourses as any[]).map(normalizeCourse);
-    this.saveAll(initial);
+    safeStorage.setItem('ciya_frontend_courses', JSON.stringify(initial));
     return initial;
   },
 
-  async saveAll(courses: Course[]): Promise<void> {
+  getAdvancedCourses(): Course[] {
+    const cached = safeStorage.getItem('ciya_frontend_advanced_courses');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          return parsed.map(normalizeCourse);
+        }
+      } catch (e) {
+        console.error("Error parsing frontend advanced courses from storage:", e);
+      }
+    }
+    const initial = (staticAdvancedCourses as any[]).map(normalizeCourse);
+    safeStorage.setItem('ciya_frontend_advanced_courses', JSON.stringify(initial));
+    return initial;
+  },
+
+  getCourses(): Course[] {
+    const standard = this.getStandardCoursesOnly();
+    const advanced = this.getAdvancedCourses();
+    return [...standard, ...advanced];
+  },
+
+  async saveAllAdvanced(courses: Course[]): Promise<void> {
     try {
-      safeStorage.setItem('ciya_frontend_courses', JSON.stringify(courses));
+      safeStorage.setItem('ciya_frontend_advanced_courses', JSON.stringify(courses));
+      const merged = [...this.getStandardCoursesOnly(), ...courses];
+      
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent(BROADCAST_EVENT, { detail: courses }));
-        
-        // Save to backend files (courses.json)
-        fetch('/api/courses/save', {
+        window.dispatchEvent(new CustomEvent(BROADCAST_EVENT, { detail: merged }));
+
+        fetch('/api/advanced-courses/save', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -112,13 +135,65 @@ export const coursesStore = {
         .then(res => res.json())
         .then(data => {
           if (data.success) {
-            console.log("Successfully updated courses.json on disk.");
-          } else {
-            console.error("Failed to update courses.json on disk:", data.error);
+            console.log("Successfully updated advanced_courses.json on disk.");
           }
         })
         .catch(err => {
-          console.warn("Unable to save courses.json on disk (offline or server not active):", err);
+          console.warn("Unable to save advanced_courses.json on disk:", err);
+        });
+      }
+      return Promise.resolve();
+    } catch (e) {
+      console.error("Failed to save advanced courses to safeStorage:", e);
+      return Promise.reject(e);
+    }
+  },
+
+  async saveAll(courses: Course[]): Promise<void> {
+    const standard = courses.filter(c => !(c.tier === 'advanced' || c.tier === 'masterclass' || c.level === 'Advanced' || c.level === 'Masterclass'));
+    const advanced = courses.filter(c => (c.tier === 'advanced' || c.tier === 'masterclass' || c.level === 'Advanced' || c.level === 'Masterclass'));
+
+    try {
+      safeStorage.setItem('ciya_frontend_courses', JSON.stringify(standard));
+      safeStorage.setItem('ciya_frontend_advanced_courses', JSON.stringify(advanced));
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(BROADCAST_EVENT, { detail: courses }));
+        
+        // Save standard to backend files (courses.json)
+        fetch('/api/courses/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ courses: standard })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            console.log("Successfully updated courses.json on disk.");
+          }
+        })
+        .catch(err => {
+          console.warn("Unable to save courses.json on disk:", err);
+        });
+
+        // Save advanced to backend files (advanced_courses.json)
+        fetch('/api/advanced-courses/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ courses: advanced })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            console.log("Successfully updated advanced_courses.json on disk.");
+          }
+        })
+        .catch(err => {
+          console.warn("Unable to save advanced_courses.json on disk:", err);
         });
       }
       return Promise.resolve();
@@ -129,7 +204,7 @@ export const coursesStore = {
   },
 
   saveCourse(course: Course): Promise<void> {
-    const current = this.getCourses();
+    const isAdvanced = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass';
     
     // Remove from deleted list if we are saving/adding it back
     try {
@@ -143,23 +218,43 @@ export const coursesStore = {
       }
     } catch (e) {}
 
-    const idx = current.findIndex(c => c.id === course.id);
-    const updatedCourse = {
-      ...normalizeCourse(course),
-      updatedAt: new Date().toISOString()
-    };
+    if (isAdvanced) {
+      const current = this.getAdvancedCourses();
+      const idx = current.findIndex(c => c.id === course.id);
+      const updatedCourse = {
+        ...normalizeCourse(course),
+        updatedAt: new Date().toISOString()
+      };
 
-    if (idx >= 0) {
-      current[idx] = updatedCourse;
+      if (idx >= 0) {
+        current[idx] = updatedCourse;
+      } else {
+        current.push(updatedCourse);
+      }
+      return this.saveAllAdvanced(current);
     } else {
-      current.push(updatedCourse);
+      const current = this.getStandardCoursesOnly();
+      const idx = current.findIndex(c => c.id === course.id);
+      const updatedCourse = {
+        ...normalizeCourse(course),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (idx >= 0) {
+        current[idx] = updatedCourse;
+      } else {
+        current.push(updatedCourse);
+      }
+      return this.saveAll([...current, ...this.getAdvancedCourses()]);
     }
-    return this.saveAll(current);
   },
 
   async deleteCourse(courseId: string): Promise<void> {
-    const current = this.getCourses();
-    const filtered = current.filter(c => c.id !== courseId);
+    const currentStandard = this.getStandardCoursesOnly();
+    const currentAdvanced = this.getAdvancedCourses();
+    
+    const filteredStandard = currentStandard.filter(c => c.id !== courseId);
+    const filteredAdvanced = currentAdvanced.filter(c => c.id !== courseId);
     
     // Add to deleted cache to prevent reappearing on merge
     try {
@@ -173,7 +268,7 @@ export const coursesStore = {
       console.warn("Error caching deleted course ID:", e);
     }
 
-    return this.saveAll(filtered);
+    return this.saveAll([...filteredStandard, ...filteredAdvanced]);
   },
 
   cloneCourse(course: Course, newTitle: string): Promise<Course> {
@@ -211,9 +306,16 @@ export const coursesStore = {
       updatedAt: new Date().toISOString()
     };
 
-    const current = this.getCourses();
-    current.push(cloned);
-    return this.saveAll(current).then(() => cloned);
+    const isAdvanced = cloned.tier === 'advanced' || cloned.tier === 'masterclass' || cloned.level === 'Advanced' || cloned.level === 'Masterclass';
+    if (isAdvanced) {
+      const current = this.getAdvancedCourses();
+      current.push(cloned);
+      return this.saveAllAdvanced(current).then(() => cloned);
+    } else {
+      const current = this.getStandardCoursesOnly();
+      current.push(cloned);
+      return this.saveAll([...current, ...this.getAdvancedCourses()]).then(() => cloned);
+    }
   },
 
   subscribe(callback: (courses: Course[]) => void): () => void {
@@ -234,40 +336,46 @@ if (typeof window !== 'undefined') {
     try {
       console.log("Starting courses synchronization on boot...");
       
-      let fetchedCourses: Course[] = [];
+      let fetchedStandard: Course[] = [];
+      let fetchedAdvanced: Course[] = [];
 
-      // 1. Fetch from server disk api /api/courses
+      // 1. Fetch standard from server disk api /api/courses
       try {
         const res = await fetch(`/api/courses?t=${Date.now()}`);
         if (res.ok) {
           const serverCourses = await res.json();
           if (Array.isArray(serverCourses) && serverCourses.length > 0) {
-            fetchedCourses = serverCourses.map(normalizeCourse);
-            console.log(`Loaded ${fetchedCourses.length} courses from server courses.json file.`);
+            fetchedStandard = serverCourses.map(normalizeCourse);
+            console.log(`Loaded ${fetchedStandard.length} standard courses from server.`);
           }
         }
       } catch (serverErr) {
-        console.warn("Unable to load courses from server disk on startup:", serverErr);
+        console.warn("Unable to load standard courses from server disk on startup:", serverErr);
       }
 
-      // 2. If server API failed or returned empty, use static fallback
-      if (fetchedCourses.length === 0) {
-        fetchedCourses = (staticCourses as any[]).map(normalizeCourse);
-      }
-
-      // 3. Get existing local courses
-      const localCached = safeStorage.getItem('ciya_frontend_courses');
-      let localCourses: Course[] = [];
-      if (localCached) {
-        try {
-          const parsed = JSON.parse(localCached);
-          if (Array.isArray(parsed)) {
-            localCourses = parsed.map(normalizeCourse);
+      // 2. Fetch advanced from server disk api /api/advanced-courses
+      try {
+        const res = await fetch(`/api/advanced-courses?t=${Date.now()}`);
+        if (res.ok) {
+          const serverCourses = await res.json();
+          if (Array.isArray(serverCourses) && serverCourses.length > 0) {
+            fetchedAdvanced = serverCourses.map(normalizeCourse);
+            console.log(`Loaded ${fetchedAdvanced.length} advanced courses from server.`);
           }
-        } catch (e) {}
+        }
+      } catch (serverErr) {
+        console.warn("Unable to load advanced courses from server disk on startup:", serverErr);
       }
 
-      // 4. Get deleted course IDs
+      // Fallbacks if server files are empty
+      if (fetchedStandard.length === 0) {
+        fetchedStandard = (staticCourses as any[]).map(normalizeCourse);
+      }
+      if (fetchedAdvanced.length === 0) {
+        fetchedAdvanced = (staticAdvancedCourses as any[]).map(normalizeCourse);
+      }
+
+      // Merge deleted IDs filter
       let deletedIds: string[] = [];
       try {
         const deletedCached = safeStorage.getItem('ciya_deleted_course_ids');
@@ -276,45 +384,52 @@ if (typeof window !== 'undefined') {
         }
       } catch (e) {}
 
-      // 5. Merge server courses and local courses
-      const mergedMap = new Map<string, Course>();
-      
-      // Add server courses
-      fetchedCourses.forEach(c => {
-        if (!deletedIds.includes(c.id)) {
-          mergedMap.set(c.id, c);
-        }
-      });
+      // Get local caches
+      const localCachedStandard = safeStorage.getItem('ciya_frontend_courses');
+      const localCachedAdvanced = safeStorage.getItem('ciya_frontend_advanced_courses');
 
-      // Overlay with local courses (preferring newer updatedAt)
-      localCourses.forEach(c => {
-        if (!deletedIds.includes(c.id)) {
-          const existing = mergedMap.get(c.id);
+      let localStandard: Course[] = [];
+      let localAdvanced: Course[] = [];
+
+      if (localCachedStandard) {
+        try {
+          const parsed = JSON.parse(localCachedStandard);
+          if (Array.isArray(parsed)) localStandard = parsed.map(normalizeCourse);
+        } catch (e) {}
+      }
+      if (localCachedAdvanced) {
+        try {
+          const parsed = JSON.parse(localCachedAdvanced);
+          if (Array.isArray(parsed)) localAdvanced = parsed.map(normalizeCourse);
+        } catch (e) {}
+      }
+
+      // Merge standard
+      const standardMap = new Map<string, Course>();
+      fetchedStandard.forEach(c => { if (!deletedIds.includes(c.id!)) standardMap.set(c.id!, c); });
+      localStandard.forEach(c => {
+        if (!deletedIds.includes(c.id!)) {
+          const existing = standardMap.get(c.id!);
           if (!existing) {
-            mergedMap.set(c.id, c);
+            if (fetchedStandard.length === 0) {
+              standardMap.set(c.id!, c);
+            }
           } else {
-            // Smart Check: If local version has placeholder/empty Day 4 but server has real Day 4 content,
-            // we merge the server's real Day 4 into the local course so they get the update without losing other changes!
+            // Apply smart Day 4/5 merging
             const localDay4 = c.days?.find(d => d.dayNumber === 4);
             const serverDay4 = existing.days?.find(d => d.dayNumber === 4);
             const localDay4IsPlaceholder = !localDay4 || localDay4.title.toLowerCase().includes('core fundamentals') || !localDay4.description;
             const serverDay4IsReal = serverDay4 && serverDay4.title.toLowerCase().includes('prompt engineering');
-
             if (localDay4IsPlaceholder && serverDay4IsReal && c.days) {
-              console.log(`Smart merge: Replacing placeholder Day 4 of course ${c.id} with updated server Prompt Engineering content.`);
               c.days = c.days.map(d => d.dayNumber === 4 ? serverDay4 : d);
               c.updatedAt = new Date().toISOString();
             }
 
-            // Smart Check: If local version has placeholder/empty Day 5 but server has real Day 5 content,
-            // we merge the server's real Day 5 into the local course so they get the update without losing other changes!
             const localDay5 = c.days?.find(d => d.dayNumber === 5);
             const serverDay5 = existing.days?.find(d => d.dayNumber === 5);
             const localDay5IsPlaceholder = !localDay5 || localDay5.title.toLowerCase().includes('core fundamentals') || !localDay5.description;
             const serverDay5IsReal = serverDay5 && serverDay5.title.toLowerCase().includes('branding');
-
             if (localDay5IsPlaceholder && serverDay5IsReal && c.days) {
-              console.log(`Smart merge: Replacing placeholder Day 5 of course ${c.id} with updated server branding content.`);
               c.days = c.days.map(d => d.dayNumber === 5 ? serverDay5 : d);
               c.updatedAt = new Date().toISOString();
             }
@@ -322,34 +437,56 @@ if (typeof window !== 'undefined') {
             const localTime = new Date(c.updatedAt || 0).getTime();
             const serverTime = new Date(existing.updatedAt || 0).getTime();
             if (localTime > serverTime) {
-              mergedMap.set(c.id, c);
+              standardMap.set(c.id!, c);
             }
           }
         }
       });
 
-      const finalCourses = Array.from(mergedMap.values());
+      // Merge advanced
+      const advancedMap = new Map<string, Course>();
+      fetchedAdvanced.forEach(c => { if (!deletedIds.includes(c.id!)) advancedMap.set(c.id!, c); });
+      localAdvanced.forEach(c => {
+        if (!deletedIds.includes(c.id!)) {
+          const existing = advancedMap.get(c.id!);
+          if (!existing) {
+            if (fetchedAdvanced.length === 0) {
+              advancedMap.set(c.id!, c);
+            }
+          } else {
+            const localTime = new Date(c.updatedAt || 0).getTime();
+            const serverTime = new Date(existing.updatedAt || 0).getTime();
+            if (localTime > serverTime) {
+              advancedMap.set(c.id!, c);
+            }
+          }
+        }
+      });
 
-      // 6. Update local storage and broadcast to UI
-      safeStorage.setItem('ciya_frontend_courses', JSON.stringify(finalCourses));
-      window.dispatchEvent(new CustomEvent(BROADCAST_EVENT, { detail: finalCourses }));
-      console.log(`Courses synchronized and merged successfully. Total courses in view: ${finalCourses.length}`);
+      const finalStandard = Array.from(standardMap.values());
+      const finalAdvanced = Array.from(advancedMap.values());
 
-      // 7. Save back to the backend disk courses.json so that the server has the merged version
+      // Save to cache
+      safeStorage.setItem('ciya_frontend_courses', JSON.stringify(finalStandard));
+      safeStorage.setItem('ciya_frontend_advanced_courses', JSON.stringify(finalAdvanced));
+
+      const merged = [...finalStandard, ...finalAdvanced];
+      window.dispatchEvent(new CustomEvent(BROADCAST_EVENT, { detail: merged }));
+      console.log(`Synchronization finished. standard: ${finalStandard.length}, advanced: ${finalAdvanced.length}`);
+
+      // Sync back standard to backend disk
       fetch('/api/courses/save', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ courses: finalCourses })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          console.log("Updated server disk courses.json with merged courses.");
-        }
-      })
-      .catch(() => {});
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courses: finalStandard })
+      }).catch(() => {});
+
+      // Sync back advanced to backend disk
+      fetch('/api/advanced-courses/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courses: finalAdvanced })
+      }).catch(() => {});
 
     } catch (err) {
       console.error("Critical error during courses synchronization startup:", err);

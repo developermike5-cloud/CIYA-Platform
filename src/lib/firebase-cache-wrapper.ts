@@ -21,6 +21,7 @@ import {
   getFirestore as realGetFirestore,
   disableNetwork as realDisableNetwork,
   enableNetwork as realEnableNetwork,
+  deleteField as realDeleteField,
 } from '@firebase/firestore';
 
 import { safeStorage } from '../utils/safeStorage';
@@ -57,6 +58,7 @@ export const getFirestore = realGetFirestore;
 export const writeBatch = realWriteBatch;
 export const disableNetwork = realDisableNetwork;
 export const enableNetwork = realEnableNetwork;
+export const deleteField = realDeleteField;
 
 // 6 Hours in milliseconds
 const CACHE_EXPIRATION_MS = 6 * 60 * 60 * 1000;
@@ -75,11 +77,8 @@ export function isNetworkDisabled(): boolean {
 // Critical paths that require live, real-time responses and bypass cache completely
 function isBypassCachePath(path: string): boolean {
   if (!path) return false;
-  // Always bypass cache for settings/app, settings/system_signals, and all user profile paths
-  if (path === 'settings/app' || path === 'settings/system_signals') {
-    return true;
-  }
-  if (path.startsWith('users/')) {
+  // Always bypass cache for settings documents and user profile paths to ensure immediate updates
+  if (path.startsWith('settings/') || path.startsWith('users/')) {
     return true;
   }
   return false;
@@ -794,14 +793,64 @@ export function onSnapshot(
   }
 }
 
+// Helper to sanitize Firestore entities or FieldValues for local JSON storage
+function sanitizeForJSON(val: any): any {
+  if (val === null || val === undefined) {
+    return val;
+  }
+  
+  if (typeof val === 'object') {
+    // Check if it is a Firestore FieldValue
+    const isFieldValue = val._methodName || 
+      val.constructor?.name?.includes('FieldValue') || 
+      val.constructor?.name?.includes('Delete') || 
+      val.constructor?.name?.includes('ServerTimestamp') ||
+      val.constructor?.name?.includes('ArrayUnion') ||
+      val.constructor?.name?.includes('ArrayRemove') ||
+      val.constructor?.name?.includes('NumericIncrement');
+      
+    if (isFieldValue) {
+      if (val._methodName === 'FieldValue.delete' || val.constructor?.name?.includes('Delete')) {
+        return undefined;
+      }
+      if (val._methodName === 'FieldValue.serverTimestamp' || val.constructor?.name?.includes('ServerTimestamp')) {
+        return new Date().toISOString();
+      }
+      return null;
+    }
+
+    if (Array.isArray(val)) {
+      return val.map(item => sanitizeForJSON(item)).filter(item => item !== undefined);
+    }
+
+    const cleaned: any = {};
+    Object.keys(val).forEach(k => {
+      const cleanedVal = sanitizeForJSON(val[k]);
+      if (cleanedVal !== undefined) {
+        cleaned[k] = cleanedVal;
+      }
+    });
+    return cleaned;
+  }
+
+  return val;
+}
+
 // Helper to write a single document to local storage to keep user changes responsive
 function updateLocalDocCache(path: string, exists: boolean, data: any) {
   const cacheKey = `ciya_fs_doc_${path.replace(/[^a-zA-Z0-9_]/g, '_')}`;
   const dataKey = `${cacheKey}_data`;
   const timeKey = `${cacheKey}_time`;
-  const serialized = { id: path.split('/').pop() || '', exists, data };
-  safeStorage.setItem(dataKey, JSON.stringify(serialized));
-  safeStorage.setItem(timeKey, String(Date.now()));
+  
+  const sanitizedData = data ? sanitizeForJSON(data) : null;
+  const serialized = { id: path.split('/').pop() || '', exists, data: sanitizedData };
+  
+  try {
+    safeStorage.setItem(dataKey, JSON.stringify(serialized));
+    safeStorage.setItem(timeKey, String(Date.now()));
+  } catch (err) {
+    console.warn("Failed to write to safeStorage in updateLocalDocCache:", err);
+  }
 
   // Special synchronization: update general user profile cache if users table is written
   // and the updated profile matches the currently logged-in student's UID.
@@ -809,7 +858,11 @@ function updateLocalDocCache(path: string, exists: boolean, data: any) {
     const docUid = path.split('/').pop();
     const currentUid = getCurrentUserUid();
     if (docUid && currentUid && docUid === currentUid) {
-      safeStorage.setItem('ciya_cached_profile', JSON.stringify(data));
+      try {
+        safeStorage.setItem('ciya_cached_profile', JSON.stringify(sanitizedData));
+      } catch (err) {
+        console.warn("Failed to write profile to safeStorage:", err);
+      }
     }
   }
 }
@@ -825,7 +878,19 @@ function setNestedProperty(obj: any, pathStr: string, value: any) {
     }
     current = current[part];
   }
-  current[parts[parts.length - 1]] = value;
+  
+  const lastKey = parts[parts.length - 1];
+  const isDeleteField = value && typeof value === 'object' && (
+    value._methodName === 'FieldValue.delete' ||
+    value.constructor?.name?.includes('FieldValue') ||
+    value.constructor?.name?.includes('Delete')
+  );
+
+  if (isDeleteField) {
+    delete current[lastKey];
+  } else {
+    current[lastKey] = value;
+  }
 }
 
 // Overridden setDoc to write live and immediately synchronize local cache

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag } from 'lucide-react';
+import { ALL_COUNTRIES } from '../utils/countries';
 
 type Pathway = 'A' | 'B' | 'C' | null;
 
@@ -10,12 +11,45 @@ export default function WaitingOnboarding() {
   const [step, setStep] = useState(1);
   const [pathway, setPathway] = useState<Pathway>(null);
   
-  const NIGERIAN_STATES = [
-    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
-    "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe", "Imo",
-    "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa",
-    "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
-  ];
+  const COUNTRIES = ALL_COUNTRIES;
+
+  const COUNTRY_STATES: Record<string, string[]> = {
+    "Nigeria": [
+      "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+      "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe", "Imo",
+      "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa",
+      "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
+    ],
+    "Ghana": [
+      "Greater Accra", "Ashanti", "Central", "Western", "Eastern", "Northern", "Volta", "Brong-Ahafo", "Upper East", "Upper West", "Oti", "Bono", "Bono East", "Ahafo", "Savannah", "North East"
+    ],
+    "Kenya": [
+      "Nairobi", "Mombasa", "Kiambu", "Nakuru", "Uasin Gishu", "Kisumu", "Machakos", "Meru", "Nyeri", "Kajiado", "Kakamega"
+    ],
+    "South Africa": [
+      "Gauteng", "KwaZulu-Natal", "Western Cape", "Eastern Cape", "Limpopo", "Mpumalanga", "North West", "Free State", "Northern Cape"
+    ],
+    "United Kingdom": [
+      "England", "Scotland", "Wales", "Northern Ireland", "Greater London", "West Midlands", "Greater Manchester", "West Yorkshire"
+    ],
+    "United States": [
+      "California", "Texas", "New York", "Florida", "Illinois", "Pennsylvania", "Ohio", "Georgia", "North Carolina", "Michigan"
+    ],
+    "Canada": [
+      "Ontario", "Quebec", "British Columbia", "Alberta", "Manitoba", "Saskatchewan", "Nova Scotia", "New Brunswick"
+    ],
+    "Cameroon": [
+      "Littoral", "Centre", "Adamaoua", "East", "Far North", "North", "North West", "South", "South West", "West"
+    ]
+  };
+
+  const handleCountryChange = (country: string) => {
+    setData(prev => ({
+      ...prev,
+      country,
+      state: ''
+    }));
+  };
 
   const [data, setData] = useState({
     intent: '',
@@ -33,6 +67,7 @@ export default function WaitingOnboarding() {
     fullName: '',
     gender: '',
     whatsapp: '',
+    country: 'Nigeria',
     state: '',
     referralCode: '',
     myReferralCode: '',
@@ -89,7 +124,7 @@ export default function WaitingOnboarding() {
   ];
 
   const validateForm = () => {
-    if (!data.fullName || !data.gender || !data.ageRange || !data.whatsapp || !data.state || !data.learningTool || !data.educationLevel) {
+    if (!data.fullName || !data.gender || !data.ageRange || !data.whatsapp || !data.country || !data.state || !data.learningTool || !data.educationLevel) {
       setFormError('Please fill in all required fields.');
       return false;
     }
@@ -184,6 +219,7 @@ export default function WaitingOnboarding() {
 • *WhatsApp:* ${data.whatsapp || ''}
 • *Gender:* ${data.gender || ''}
 • *Age Range:* ${data.ageRange || 'N/A'}
+• *Country:* ${data.country || 'Nigeria'}
 • *State:* ${data.state || ''}
 
 *📚 ACADEMIC PROFILE:*
@@ -438,15 +474,37 @@ _Action: Please review my CIY Academy application. Thank you!_`;
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">State *</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Country *</label>
                   <div className="relative">
-                    <MapPin className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                    <select value={data.state} onChange={e => selectData('state', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-800">
-                      <option value="" disabled>Select State</option>
-                      {NIGERIAN_STATES.map(s => (
-                        <option key={s} value={s}>{s}</option>
+                    <Globe className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+                    <select value={data.country} onChange={e => handleCountryChange(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-800 cursor-pointer">
+                      <option value="" disabled>Select Country</option>
+                      {COUNTRIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">State / Region *</label>
+                  <div className="relative">
+                    <MapPin className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+                    {data.country && COUNTRY_STATES[data.country] ? (
+                      <select value={data.state} onChange={e => selectData('state', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-800 cursor-pointer">
+                        <option value="" disabled>Select State</option>
+                        {COUNTRY_STATES[data.country].map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input 
+                        type="text" 
+                        value={data.state} 
+                        onChange={e => selectData('state', e.target.value)} 
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all text-slate-800" 
+                        placeholder="Type State/Region..." 
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -559,7 +617,11 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
             <span className="text-slate-800 font-mono font-semibold">{data.whatsapp || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">State of Residence</span>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">Country</span>
+            <span className="text-slate-800 font-semibold">{data.country || 'Nigeria'}</span>
+          </div>
+          <div>
+            <span className="text-slate-600 block text-[10px] uppercase font-bold">State / Region</span>
             <span className="text-slate-800 font-semibold">{data.state || '-'}</span>
           </div>
         </div>

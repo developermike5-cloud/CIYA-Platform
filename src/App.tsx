@@ -4,6 +4,7 @@ import Home from './pages/Home';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminLayout from './pages/admin/AdminLayout';
 import CoursesAdmin from './pages/admin/CoursesAdmin';
+import AdvancedCoursesAdmin from './pages/admin/AdvancedCoursesAdmin';
 import CourseEdit from './pages/admin/CourseEdit';
 import UsersAdmin from './pages/admin/UsersAdmin';
 import AdminKycbQuestionnaire from './pages/admin/AdminKycbQuestionnaire';
@@ -102,6 +103,7 @@ export default function App() {
         <Route path="/dashboard" element={<StudentDashboard />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<CoursesAdmin />} />
+          <Route path="advanced-courses" element={<AdvancedCoursesAdmin />} />
           <Route path="users" element={<UsersAdmin />} />
           <Route path="kycb" element={<AdminKycbQuestionnaire />} />
           <Route path="prompts" element={<PromptsAdmin />} />

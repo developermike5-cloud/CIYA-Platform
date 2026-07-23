@@ -2,7 +2,19 @@
  * Utility to upload files to Cloudinary via the server-side Express proxy.
  * This secures the Cloudinary API Key and Secret on the server.
  */
-export const uploadToCloudinary = async (file: File, folder: string = 'ciya'): Promise<string> => {
+export interface CloudinaryUploadResponse {
+  url: string;
+  public_id: string;
+  folder: string;
+  tags: string[];
+}
+
+export const uploadToCloudinary = async (
+  file: File, 
+  folder: string = 'ciya',
+  projectId?: string,
+  studentId?: string
+): Promise<CloudinaryUploadResponse> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = async () => {
@@ -15,7 +27,9 @@ export const uploadToCloudinary = async (file: File, folder: string = 'ciya'): P
           },
           body: JSON.stringify({
             file: base64String,
-            folder: folder
+            folder: folder,
+            projectId: projectId,
+            studentId: studentId
           })
         });
 
@@ -28,7 +42,12 @@ export const uploadToCloudinary = async (file: File, folder: string = 'ciya'): P
         if (!data.url) {
           throw new Error('Cloudinary response did not return a valid URL');
         }
-        resolve(data.url);
+        resolve({
+          url: data.url,
+          public_id: data.public_id,
+          folder: data.folder,
+          tags: data.tags
+        });
       } catch (err: any) {
         console.error("Cloudinary upload utility error:", err);
         reject(err);

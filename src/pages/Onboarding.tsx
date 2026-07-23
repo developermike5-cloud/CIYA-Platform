@@ -8,6 +8,7 @@ import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, whe
 import LoginModal from '../components/LoginModal';
 import BrandingLogo from '../components/BrandingLogo';
 import { safeStorage } from '../utils/safeStorage';
+import { ALL_COUNTRIES } from '../utils/countries';
 
 type Pathway = 'A' | 'B' | 'C' | null;
 
@@ -33,12 +34,45 @@ export default function Onboarding() {
     }
   });
   
-  const NIGERIAN_STATES = [
-    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
-    "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe", "Imo",
-    "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa",
-    "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
-  ];
+  const COUNTRIES = ALL_COUNTRIES;
+
+  const COUNTRY_STATES: Record<string, string[]> = {
+    "Nigeria": [
+      "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+      "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe", "Imo",
+      "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa",
+      "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
+    ],
+    "Ghana": [
+      "Greater Accra", "Ashanti", "Central", "Western", "Eastern", "Northern", "Volta", "Brong-Ahafo", "Upper East", "Upper West", "Oti", "Bono", "Bono East", "Ahafo", "Savannah", "North East"
+    ],
+    "Kenya": [
+      "Nairobi", "Mombasa", "Kiambu", "Nakuru", "Uasin Gishu", "Kisumu", "Machakos", "Meru", "Nyeri", "Kajiado", "Kakamega"
+    ],
+    "South Africa": [
+      "Gauteng", "KwaZulu-Natal", "Western Cape", "Eastern Cape", "Limpopo", "Mpumalanga", "North West", "Free State", "Northern Cape"
+    ],
+    "United Kingdom": [
+      "England", "Scotland", "Wales", "Northern Ireland", "Greater London", "West Midlands", "Greater Manchester", "West Yorkshire"
+    ],
+    "United States": [
+      "California", "Texas", "New York", "Florida", "Illinois", "Pennsylvania", "Ohio", "Georgia", "North Carolina", "Michigan"
+    ],
+    "Canada": [
+      "Ontario", "Quebec", "British Columbia", "Alberta", "Manitoba", "Saskatchewan", "Nova Scotia", "New Brunswick"
+    ],
+    "Cameroon": [
+      "Littoral", "Centre", "Adamaoua", "East", "Far North", "North", "North West", "South", "South West", "West"
+    ]
+  };
+
+  const handleCountryChange = (country: string) => {
+    setData(prev => ({
+      ...prev,
+      country,
+      state: ''
+    }));
+  };
 
   const [data, setData] = useState({
     intent: '',
@@ -56,6 +90,7 @@ export default function Onboarding() {
     fullName: '',
     gender: '',
     whatsapp: '',
+    country: 'Nigeria',
     state: '',
     referralCode: '',
     myReferralCode: '',
@@ -184,7 +219,8 @@ export default function Onboarding() {
     if (!data.gender) { setFormError('Gender is required.'); return false; }
     if (!data.ageRange) { setFormError('Age Range is required.'); return false; }
     if (!data.whatsapp.trim()) { setFormError('WhatsApp Number is required.'); return false; }
-    if (!data.state) { setFormError('State is required.'); return false; }
+    if (!data.country) { setFormError('Country is required.'); return false; }
+    if (!data.state.trim()) { setFormError('State/Region is required.'); return false; }
     return true;
   };
 
@@ -267,6 +303,7 @@ export default function Onboarding() {
       fullName: data.fullName,
       gender: data.gender,
       whatsapp: data.whatsapp,
+      country: data.country || 'Nigeria',
       state: data.state,
       referralCode: data.referralCode || '',
       myReferralCode: userCode,
@@ -299,6 +336,7 @@ export default function Onboarding() {
         fullName: data.fullName,
         gender: data.gender,
         whatsapp: data.whatsapp,
+        country: data.country || 'Nigeria',
         state: data.state,
         referralCode: data.referralCode || '',
         myReferralCode: userCode,
@@ -763,15 +801,37 @@ export default function Onboarding() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">State *</label>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Country *</label>
                   <div className="relative">
-                    <MapPin className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 z-10" />
-                    <select value={data.state} onChange={e => selectData('state', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all appearance-none text-slate-100 font-bold cursor-pointer">
-                      <option value="" disabled>Select State</option>
-                      {NIGERIAN_STATES.map(s => (
-                        <option key={s} value={s}>{s}</option>
+                    <Globe className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 z-10" />
+                    <select value={data.country} onChange={e => handleCountryChange(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all appearance-none text-slate-100 font-bold cursor-pointer">
+                      <option value="" disabled>Select Country</option>
+                      {COUNTRIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">State / Region *</label>
+                  <div className="relative">
+                    <MapPin className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 z-10" />
+                    {data.country && COUNTRY_STATES[data.country] ? (
+                      <select value={data.state} onChange={e => selectData('state', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all appearance-none text-slate-100 font-bold cursor-pointer">
+                        <option value="" disabled>Select State</option>
+                        {COUNTRY_STATES[data.country].map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input 
+                        type="text" 
+                        value={data.state} 
+                        onChange={e => selectData('state', e.target.value)} 
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 font-bold" 
+                        placeholder="Type State/Region..." 
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -906,7 +966,11 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
             <span className="text-slate-100 font-mono font-semibold">{data.whatsapp || '-'}</span>
           </div>
           <div>
-            <span className="text-slate-450 block text-[10px] uppercase font-bold">State of Residence</span>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">Country</span>
+            <span className="text-slate-100 font-semibold">{data.country || 'Nigeria'}</span>
+          </div>
+          <div>
+            <span className="text-slate-450 block text-[10px] uppercase font-bold">State / Region</span>
             <span className="text-slate-100 font-semibold">{data.state || '-'}</span>
           </div>
         </div>

@@ -76,6 +76,79 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // Fast in-memory cache for proxied websites to load them instantly
+  const proxyCache = new Map<string, { body: string; contentType: string; timestamp: number }>();
+  const PROXY_CACHE_TTL = 120000; // Cache for 2 minutes
+
+  // Secure, high-compatibility website proxy to bypass X-Frame-Options & CSP headers for nested previews
+  app.get("/api/proxy", async (req, res) => {
+    const targetUrl = req.query.url as string;
+    if (!targetUrl) {
+      return res.status(400).send("URL parameter is required.");
+    }
+
+    try {
+      new URL(targetUrl);
+    } catch {
+      return res.status(400).send("Invalid URL format.");
+    }
+
+    // Check cache first for lightning fast loading
+    const cached = proxyCache.get(targetUrl);
+    if (cached && Date.now() - cached.timestamp < PROXY_CACHE_TTL) {
+      res.setHeader("X-Frame-Options", "ALLOWALL");
+      res.setHeader("Content-Security-Policy", "frame-ancestors *;");
+      res.setHeader("Content-Type", cached.contentType || "text/html; charset=utf-8");
+      return res.send(cached.body);
+    }
+
+    try {
+      const response = await fetch(targetUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+        }
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+      const body = await response.text();
+
+      // Inject base URL so relative assets (CSS, JS, images) load from original host correctly
+      let modifiedBody = body;
+      if (contentType.includes("text/html")) {
+        const baseTag = `<base href="${targetUrl}">`;
+        if (body.includes("<head>")) {
+          modifiedBody = body.replace("<head>", `<head>${baseTag}`);
+        } else if (body.includes("<HEAD>")) {
+          modifiedBody = body.replace("<HEAD>", `<HEAD>${baseTag}`);
+        } else if (body.includes("<html>")) {
+          modifiedBody = body.replace("<html>", `<html>${baseTag}`);
+        } else if (body.includes("<HTML>")) {
+          modifiedBody = body.replace("<HTML>", `<HTML>${baseTag}`);
+        } else {
+          modifiedBody = baseTag + body;
+        }
+      }
+
+      // Store in memory cache
+      proxyCache.set(targetUrl, {
+        body: modifiedBody,
+        contentType,
+        timestamp: Date.now()
+      });
+
+      // Overwrite frame blocking headers to allow framing
+      res.setHeader("X-Frame-Options", "ALLOWALL");
+      res.setHeader("Content-Security-Policy", "frame-ancestors *;");
+      res.setHeader("Content-Type", contentType || "text/html; charset=utf-8");
+
+      res.send(modifiedBody);
+    } catch (err: any) {
+      console.error(`Proxy failure for URL ${targetUrl}:`, err);
+      res.status(500).send(`Failed to fetch preview: ${err.message}`);
+    }
+  });
+
   const getCoursesFilePath = () => {
     const possiblePaths = [
       path.resolve(process.cwd(), "src", "data", "courses.json"),
@@ -83,6 +156,22 @@ async function startServer() {
       path.resolve(currentDir, "src", "data", "courses.json"),
       path.resolve(currentDir, "..", "src", "data", "courses.json"),
       path.resolve(currentDir, "courses.json")
+    ];
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+    return possiblePaths[0];
+  };
+
+  const getAdvancedCoursesFilePath = () => {
+    const possiblePaths = [
+      path.resolve(process.cwd(), "src", "data", "advanced_courses.json"),
+      path.resolve(process.cwd(), "dist", "advanced_courses.json"),
+      path.resolve(currentDir, "src", "data", "advanced_courses.json"),
+      path.resolve(currentDir, "..", "src", "data", "advanced_courses.json"),
+      path.resolve(currentDir, "advanced_courses.json")
     ];
     for (const p of possiblePaths) {
       if (fs.existsSync(p)) {
@@ -110,6 +199,24 @@ async function startServer() {
     }
   });
 
+  app.get("/api/advanced-courses", (req, res) => {
+    try {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      const filePath = getAdvancedCoursesFilePath();
+      if (fs.existsSync(filePath)) {
+        const fileData = fs.readFileSync(filePath, "utf-8");
+        res.json(JSON.parse(fileData));
+      } else {
+        res.json([]);
+      }
+    } catch (err: any) {
+      console.error("Failed to read advanced_courses.json:", err);
+      res.status(500).json({ error: err.message || "Failed to read advanced courses." });
+    }
+  });
+
   app.post("/api/courses/save", (req, res) => {
     try {
       const { courses } = req.body;
@@ -126,6 +233,25 @@ async function startServer() {
     } catch (err: any) {
       console.error("Failed to write to courses.json:", err);
       res.status(500).json({ error: err.message || "Failed to save courses to files." });
+    }
+  });
+
+  app.post("/api/advanced-courses/save", (req, res) => {
+    try {
+      const { courses } = req.body;
+      if (!Array.isArray(courses)) {
+        return res.status(400).json({ error: "Invalid advanced courses data. Expected an array." });
+      }
+      const filePath = getAdvancedCoursesFilePath();
+      const dirPath = path.dirname(filePath);
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+      fs.writeFileSync(filePath, JSON.stringify(courses, null, 2), "utf-8");
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Failed to write to advanced_courses.json:", err);
+      res.status(500).json({ error: err.message || "Failed to save advanced courses to files." });
     }
   });
 
@@ -299,7 +425,7 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
 
   app.post("/api/cloudinary/upload", async (req: express.Request, res: express.Response) => {
     try {
-      const { file, folder } = req.body;
+      const { file, folder: customFolder, projectId, studentId } = req.body;
       if (!file) {
         return res.status(400).json({ error: "No file data provided." });
       }
@@ -313,6 +439,22 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
         return res.status(400).json({ error: "Cloudinary Cloud Name is not configured in the environment." });
       }
 
+      // Automatically organize under projects/{projectId} if projectId is supplied
+      let folder = customFolder || "ciya";
+      if (projectId) {
+        folder = `projects/${projectId}`;
+      }
+
+      // Automatically tag project and student identifier tags
+      const tagsList: string[] = [];
+      if (projectId) {
+        tagsList.push(`project-${projectId}`);
+      }
+      if (studentId) {
+        tagsList.push(`student-${studentId}`);
+      }
+      const tags = tagsList.length > 0 ? tagsList.join(",") : undefined;
+
       const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
       const formData = new URLSearchParams();
       formData.append("file", file);
@@ -320,10 +462,15 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
       if (apiSecret && apiKey) {
         // Signed upload (Most secure, proxies using credentials)
         const timestamp = Math.floor(Date.now() / 1000);
-        let paramString = `timestamp=${timestamp}`;
-        if (folder) {
-          paramString = `folder=${folder}&timestamp=${timestamp}`;
-        }
+        const params: Record<string, string> = {
+          timestamp: String(timestamp),
+        };
+        if (folder) params.folder = folder;
+        if (tags) params.tags = tags;
+
+        // Cloudinary requires signed parameters to be sorted alphabetically by key
+        const sortedKeys = Object.keys(params).sort();
+        const paramString = sortedKeys.map(key => `${key}=${params[key]}`).join("&");
 
         const signature = crypto
           .createHash("sha1")
@@ -336,11 +483,17 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
         if (folder) {
           formData.append("folder", folder);
         }
+        if (tags) {
+          formData.append("tags", tags);
+        }
       } else if (uploadPreset) {
         // Unsigned fallback
         formData.append("upload_preset", uploadPreset);
         if (folder) {
           formData.append("folder", folder);
+        }
+        if (tags) {
+          formData.append("tags", tags);
         }
       } else {
         return res.status(400).json({
@@ -363,7 +516,12 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
       }
 
       const data = await response.json();
-      return res.json({ url: data.secure_url || data.url });
+      return res.json({
+        url: data.secure_url || data.url,
+        public_id: data.public_id,
+        folder: data.folder || folder,
+        tags: data.tags || (tagsList.length > 0 ? tagsList : [])
+      });
     } catch (err: any) {
       console.error("Cloudinary upload proxy error:", err);
       return res.status(500).json({ error: err.message || "Cloudinary upload proxy failed." });

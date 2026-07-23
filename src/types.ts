@@ -37,6 +37,14 @@ export interface CourseDay {
   assignment?: {
     prompt: string;
     dueNote: string;
+    autoApprove?: boolean;
+    approvalDelay?: 'instant' | '10m' | '20m' | '30m' | '1h';
+    minChars?: number;
+    requireLink?: boolean;
+    minScreenshots?: number;
+    requiredKeywords?: string;
+    approveComment?: string;
+    disapproveComment?: string;
   };
 }
 

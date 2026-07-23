@@ -4,9 +4,10 @@ import { Maximize, Minimize, Play } from 'lucide-react';
 interface SecureYoutubePlayerProps {
   url: string;
   title: string;
+  isAdvanced?: boolean;
 }
 
-export default function SecureYoutubePlayer({ url, title }: SecureYoutubePlayerProps) {
+export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYoutubePlayerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -83,8 +84,11 @@ export default function SecureYoutubePlayer({ url, title }: SecureYoutubePlayerP
     // playsinline=1: enables in-line mobile view
     // fs=0: disables native fullscreen button inside YouTube player
     // controls=1: keeps timeline and volume interface readable but secured
+    // cc_load_policy=1: forces captions on for advanced courses
+    // cc_load_policy=3: disables forcing captions for beginner courses
+    const ccParam = isAdvanced ? 'cc_load_policy=1' : 'cc_load_policy=3';
     return videoId 
-      ? `https://www.youtube.com/embed/${videoId}?controls=1&modestbranding=1&rel=0&disablekb=1&playsinline=1&fs=0`
+      ? `https://www.youtube.com/embed/${videoId}?controls=1&modestbranding=1&rel=0&disablekb=1&playsinline=1&fs=0&${ccParam}`
       : rawUrl;
   };
 

@@ -6,7 +6,7 @@ import { ref as dbRef, onValue } from 'firebase/database';
 import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link, useLocation } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../types';
-import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText, Wifi, WifiOff } from 'lucide-react';
+import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText, Wifi, WifiOff, Award } from 'lucide-react';
 import { motion } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 import LoginModal from '../components/LoginModal';
@@ -18,6 +18,9 @@ import { safeStorage } from '../utils/safeStorage';
 import { supabase, getStoragePublicUrl } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { coursesStore } from '../utils/coursesStore';
+import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
+import CIYAMembershipBadge from '../components/CIYAMembershipBadge';
+import { verifyTimeBasedCode, getPasscodeSecondsLeft } from '../utils/passcode';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -48,6 +51,105 @@ function TierBadge({ tier }: { tier: string }) {
   };
   const [c, b, t] = m[tier] || ["#64748b", "#f1f5f9", tier];
   return <Badge text={t} color={c} bg={b} />;
+}
+
+// ==========================================
+// OPTION A ADVANCED CLASS PASSCODE VALIDATOR
+// ==========================================
+function AdvancedCoursePasscodeSection({
+  secret,
+  onVerifySuccess,
+  whatsappNumber,
+  courseTitle,
+  price,
+  userEmail
+}: {
+  secret: string;
+  onVerifySuccess: () => void;
+  whatsappNumber: string;
+  courseTitle: string;
+  price: number;
+  userEmail: string;
+}) {
+  const [passcodeVal, setPasscodeVal] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handlePasscodeVerify = () => {
+    setErrorMsg(null);
+    if (!passcodeVal || passcodeVal.length !== 6) {
+      setErrorMsg("Please enter a valid 6-digit passcode.");
+      return;
+    }
+
+    const isValid = verifyTimeBasedCode(passcodeVal, secret);
+    if (isValid) {
+      onVerifySuccess();
+    } else {
+      setErrorMsg("Invalid access code or passcode and check with admin support.");
+    }
+  };
+
+  const cleanWaNumber = whatsappNumber.replace(/[^0-9\+]/g, '');
+  const waPreFilledText = `Hello CIYA Admin, I have completed the direct interbank payment of ₦${price.toLocaleString()} for the advanced class course: "${courseTitle}". Please send me the active 6-digit passcode. My registered email is: ${userEmail}`;
+  const waLink = `https://wa.me/${cleanWaNumber.replace('+', '')}?text=${encodeURIComponent(waPreFilledText)}`;
+
+  return (
+    <div className="space-y-4 pt-3 border-t border-slate-100 text-slate-800">
+      <div className="space-y-1 text-center">
+        <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+          🔑 Advanced Course Verification
+        </h4>
+        <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+          Enter the tuition access code or passcode below to unlock your premium classroom.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <label className="block text-xs font-black text-slate-755 uppercase tracking-wide">
+          Enter 6-Digit Verification Code
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            maxLength={6}
+            value={passcodeVal}
+            onChange={(e) => {
+              setPasscodeVal(e.target.value.replace(/[^0-9]/g, ''));
+              setErrorMsg(null);
+            }}
+            placeholder="e.g. 123456"
+            className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-bold font-mono tracking-widest text-center rounded-xl p-3 outline-none focus:ring-1 focus:ring-purple-500"
+          />
+          <button
+            type="button"
+            onClick={handlePasscodeVerify}
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs uppercase rounded-xl border-0 cursor-pointer shadow-lg select-none"
+          >
+            Unlock
+          </button>
+        </div>
+        {errorMsg && (
+          <p className="text-[10px] font-bold text-rose-500 animate-pulse text-center">
+            {errorMsg}
+          </p>
+        )}
+      </div>
+
+      <div className="pt-2">
+        <a
+          href={waLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase rounded-xl tracking-wider shadow-md text-center inline-block no-underline border-0 transition-all cursor-pointer select-none"
+        >
+          💬 Message Admin Receipt on WhatsApp
+        </a>
+        <p className="text-[9px] text-slate-400 font-medium text-center mt-2 leading-relaxed">
+          Instantly message the instructor with your transfer screenshot on WhatsApp to request your 6-digit active classroom passcode.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function CheckTypeBadge({ type }: { type: string }) {
@@ -395,10 +497,156 @@ function isDayUnlockedUnified(
   dbSubmissions: any[] = [],
   isCloned: boolean = false,
   userProfile?: any,
-  courseId?: string
+  courseId?: string,
+  appSettings?: any
 ) {
-  // All course days are unlocked for now (without assignment submission requirements)
-  return true;
+  // Check Year Badge requirement on beginner courses
+  const isBeginner = ['najnq9llx', 'psw96tm5o', 'qlpspor4hm'].includes(courseId || '');
+  if (isBeginner && appSettings?.yearBadgeSettings?.enabled) {
+    const hasBadge = !!userProfile?.hasYearBadge;
+    if (appSettings.yearBadgeSettings.requireForDay1 && di >= 0 && !hasBadge) {
+      return false; // Day 1 locked for students without badge
+    }
+    if (appSettings.yearBadgeSettings.requireForDay4 && di >= 3 && !hasBadge) {
+      return false; // Day 4 & 5 locked for students without badge
+    }
+  }
+
+  // 1. Check manual administrative overrides first
+  if (courseId && appSettings?.courseDaysLocks) {
+    const override = appSettings.courseDaysLocks[`${courseId}_day-${di}`];
+    if (override === 'locked') {
+      return false; // Force locked!
+    }
+    if (override === 'unlocked') {
+      return true; // Force unlocked!
+    }
+  }
+
+  // Check custom calendar unlock settings
+  const dayKey = `day-${di}`;
+  const scheduledUnlock = appSettings?.unlockSettings?.[dayKey];
+  if (scheduledUnlock && scheduledUnlock.type === 'date_time' && scheduledUnlock.unlockDateTime) {
+    const nowStr = new Date().toISOString();
+    if (nowStr < scheduledUnlock.unlockDateTime) {
+      return false; // Scheduled time not reached yet!
+    }
+  }
+
+  // 2. Day index 0 is always unlocked by default
+  if (di === 0) return true;
+
+  // 3. For cloned courses, check if preceding lessons are fully completed
+  if (isCloned) {
+    const precedingDayLessons = days[di - 1]?.videos || [];
+    if (precedingDayLessons.length === 0) return true;
+    return precedingDayLessons.every((v: any) => completedKeys.includes(v.id || v.youtubeId));
+  }
+
+  // 4. Default progression rule: preceding day assignment must be approved
+  const precedingApproved = dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
+  return precedingApproved;
+}
+
+function YearBadgePaywallCard({
+  di,
+  unitLabel,
+  price,
+  currentUser,
+  userProfile,
+  setUserProfile,
+  appSettings
+}: {
+  di: number;
+  unitLabel: string;
+  price: number;
+  currentUser: any;
+  userProfile: any;
+  setUserProfile: any;
+  appSettings?: any;
+}) {
+  const isPendingApproval = userProfile?.badgePaymentRequestStatus === 'PendingApproval';
+
+  // Handle WhatsApp composition
+  const waPhone = appSettings?.yearBadgeSettings?.whatsappNumber || '+2348123456789';
+  const waCleanPhone = waPhone.replace(/[^0-9+]/g, '');
+  const waMessage = encodeURIComponent(
+    `Hello Admin! I have made the bank transfer payment for the CIYA Year Badge. Please verify and approve my account! Registered Email: ${currentUser?.email || userProfile?.email || 'N/A'}, UID: ${currentUser?.uid || ''}`
+  );
+  const waLink = `https://wa.me/${waCleanPhone}?text=${waMessage}`;
+
+  if (isPendingApproval) {
+    return (
+      <div className="rounded-3xl border-2 border-amber-300 bg-amber-50/10 p-6 md:p-8 text-left space-y-6 shadow-md relative overflow-hidden" id="year-badge-paywall-card">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-2xl pointer-events-none -mr-12 -mt-12" />
+        
+        <div className="space-y-4 animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <span className="flex h-4 w-4 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-500"></span>
+            </span>
+            <div>
+              <span className="text-[10px] bg-amber-100 text-amber-800 font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">
+                Verification Status: PENDING ADMIN APPROVAL ⏳
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-lg font-black text-slate-900 tracking-tight leading-snug">
+              Your Year Badge Payment Is Currently Under Review!
+            </h4>
+            <p className="text-xs md:text-sm text-slate-600 font-semibold leading-relaxed">
+              We have recorded your simulated payment reference for <strong>₦{(price || appSettings?.yearBadgeSettings?.price || 25000).toLocaleString()}</strong>. The administrator will verify the interbank transfer ledger manually.
+            </p>
+            <div className="p-3.5 bg-amber-50 border border-amber-200/50 rounded-xl text-xs text-amber-900 font-semibold leading-relaxed">
+              📢 <strong>Want to speed things up?</strong> Click the button below to message the admin directly on WhatsApp. Sending your receipt/UID allows immediate live verification!
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-slate-150">
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noreferrer"
+              className="px-6 py-3 bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-md flex items-center justify-center gap-2 no-underline border-0 select-none max-w-sm"
+            >
+              💬 Message Admin on WhatsApp to Approve
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Define nested flow
+  return (
+    <div className="rounded-3xl border-2 border-amber-300 bg-amber-50/10 p-4 md:p-6 text-left space-y-6 shadow-md relative overflow-hidden" id="year-badge-paywall-card">
+      <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-2xl pointer-events-none -mr-12 -mt-12" />
+      
+      <div className="space-y-2">
+        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
+          🏷️ Premium Certification Gate
+        </span>
+        <h4 className="text-lg font-black text-slate-905 tracking-tight leading-snug">
+          Complete Your Registration & Unlock Elite Day 4 & 5 Modules!
+        </h4>
+        <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+          The remaining days of this training cohort are reserved for certified students. Complete the quick secure transfer session to progress immediately.
+        </p>
+      </div>
+
+      <YearBadgePaymentFlow
+        yearBadgeSettings={appSettings?.yearBadgeSettings}
+        price={price || appSettings?.yearBadgeSettings?.price || 25000}
+        currentUser={currentUser}
+        userProfile={userProfile}
+        setUserProfile={setUserProfile}
+        isAdminSimulation={false}
+      />
+    </div>
+  );
 }
 
 // Unified lesson lock validator helper function
@@ -412,13 +660,19 @@ function isLessonUnlockedUnified(
   isAdmin: boolean = false,
   isCloned: boolean = false,
   userProfile?: any,
-  courseId?: string
+  courseId?: string,
+  appSettings?: any
 ) {
   if (isAdmin) return true;
 
   // 1. Check if the day di is unlocked on a day-level
-  const isDayUnlocked = isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, isCloned, userProfile, courseId);
+  const isDayUnlocked = isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, isCloned, userProfile, courseId, appSettings);
   if (!isDayUnlocked) return false;
+
+  // If quizzes are bypassed globally, return true immediately!
+  if (appSettings?.quizzesOverrideMode === 'bypassed') {
+    return true;
+  }
 
   // 2. The first lesson of every day should remain unlocked
   if (vi === 0) return true;
@@ -443,6 +697,78 @@ function isLessonUnlockedUnified(
   }
 
   return true;
+}
+
+// Evaluate assignment compliance checks (Character count, Links, Screenshot counts, Keywords)
+function evaluateComplianceAndGetStatus(
+  assignmentConfig: any,
+  submittedText: string,
+  fileUrl?: string,
+  images: string[] = []
+): { status: 'Pending' | 'Approved' | 'Disapproved'; adminReason: string } {
+  if (!assignmentConfig || !assignmentConfig.autoApprove) {
+    return {
+      status: 'Pending',
+      adminReason: ''
+    };
+  }
+
+  const minChars = assignmentConfig.minChars || 0;
+  const requireLink = !!assignmentConfig.requireLink;
+  const minScreenshots = assignmentConfig.minScreenshots || 0;
+  const requiredKeywordsStr = assignmentConfig.requiredKeywords || '';
+
+  const text = submittedText || '';
+
+  // 1. Min character check
+  if (minChars && text.length < minChars) {
+    return {
+      status: 'Disapproved',
+      adminReason: `Automated Compliance: Submitted text is too short (${text.length}/${minChars} characters required).`
+    };
+  }
+
+  // 2. Link check
+  if (requireLink) {
+    const urlPattern = /https?:\/\/[^\s/$.?#].[^\s]*/i;
+    const hasUrl = urlPattern.test(text) || (fileUrl && urlPattern.test(fileUrl));
+    if (!hasUrl) {
+      return {
+        status: 'Disapproved',
+        adminReason: "Automated Compliance: Missing a valid reference URL link (http:// or https://)."
+      };
+    }
+  }
+
+  // 3. Screenshots check
+  if (minScreenshots && minScreenshots > 0) {
+    const totalImages = (images || []).length;
+    if (totalImages < minScreenshots) {
+      return {
+        status: 'Disapproved',
+        adminReason: `Automated Compliance: Insufficient screenshots (${totalImages}/${minScreenshots} required).`
+      };
+    }
+  }
+
+  // 4. Keywords check
+  if (requiredKeywordsStr && requiredKeywordsStr.trim().length > 0) {
+    const keywords = requiredKeywordsStr.split(',').map((k: string) => k.trim().toLowerCase()).filter((k: string) => k.length > 0);
+    const textLower = text.toLowerCase();
+    const missingKeywords = keywords.filter((kw: string) => !textLower.includes(kw));
+    
+    if (missingKeywords.length > 0) {
+      return {
+        status: 'Disapproved',
+        adminReason: `Automated Compliance: Missing required keywords: ${missingKeywords.join(', ')}.`
+      };
+    }
+  }
+
+  return {
+    status: 'Approved',
+    adminReason: "Automatically approved by compliance checker."
+  };
 }
 
 // Helper to check if student has completed a course (either 100% video progress or passed all quizzes)
@@ -660,31 +986,33 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
         safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
       }
 
+      // Buffer quiz score locally in the localDayProgress buffer in localStorage
       try {
-        const userRef = doc(db, 'users', currentUser.uid);
-
-        if (!existingScoreRecord) {
-          await updateDoc(userRef, {
-            [`progress.${courseId}.quizScores.${checkKey}`]: {
-              score: finalPct,
-              passed: passesQuiz,
-              answeredAt: new Date().toLocaleString(),
-              firstAttemptRecorded: true
-            },
-            updatedAt: serverTimestamp()
-          });
-          showToast(`First Attempt recorded: ${finalPct}%! 🎉`);
-        } else {
-          if (passesQuiz && !existingScoreRecord.passed) {
-            await updateDoc(userRef, {
-              [`progress.${courseId}.quizScores.${checkKey}.passed`]: true,
-              updatedAt: serverTimestamp()
-            });
-            showToast(`Module updated as passed!`);
+        const activeDayIdx = parseInt(checkKey.split('-')[0]) || 0;
+        const stored = localStorage.getItem(`ciya_local_day_progress_${courseId}`);
+        const currentLocal = stored ? JSON.parse(stored) : {};
+        const dayLocal = currentLocal[activeDayIdx] || { watched: [], checkPassed: [], quizScores: {} };
+        
+        dayLocal.quizScores = {
+          ...(dayLocal.quizScores || {}),
+          [checkKey]: {
+            score: finalPct,
+            passed: passesQuiz,
+            answeredAt: new Date().toLocaleString(),
+            firstAttemptRecorded: true
           }
+        };
+        
+        currentLocal[activeDayIdx] = dayLocal;
+        localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(currentLocal));
+        
+        if (!existingScoreRecord) {
+          showToast(`First Attempt recorded: ${finalPct}%! 🎉 (Progress buffered locally)`);
+        } else if (passesQuiz && !existingScoreRecord.passed) {
+          showToast(`Module updated as passed! (Progress buffered locally)`);
         }
       } catch (dbErr) {
-        console.warn("Database sync deferred (offline/disabled), progress saved to local cache:", dbErr);
+        console.warn("Database sync deferred (buffered), progress saved to local cache:", dbErr);
         if (!existingScoreRecord) {
           showToast(`First Attempt recorded: ${finalPct}%! 🎉 (Cached Offline)`);
         } else if (passesQuiz && !existingScoreRecord.passed) {
@@ -991,6 +1319,8 @@ interface CourseViewerProps {
   hasCompletedFirstCourse?: boolean;
   loading?: boolean;
   allMySubmissions?: any[];
+  appSettings?: any;
+  onRequestUnlockAdvanced?: (course: Course) => void;
 }
 
 function renderBulletList(text: string, icon: string, textClass: string = "text-sm text-slate-800") {
@@ -1012,7 +1342,7 @@ function renderBulletList(text: string, icon: string, textClass: string = "text-
   );
 }
 
-function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false, allMySubmissions = [] }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false, allMySubmissions = [], appSettings, onRequestUnlockAdvanced }: CourseViewerProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -1022,6 +1352,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   const [showAssignment, setShowAssignment] = useState(false);
   const [viewingSyllabus, setViewingSyllabus] = useState(true);
   const [showTrackSelectionModal, setShowTrackSelectionModal] = useState(false);
+  const [expandedAssignments, setExpandedAssignments] = useState<Record<number, boolean>>({});
 
   // Auto scroll window to top when day or course changes
   useEffect(() => {
@@ -1142,7 +1473,66 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   };
 
   const courseId = course.id || 'general';
-  const dbProgressStore = userProfile?.progress?.[courseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+
+  // Local progress buffer for standard courses to prevent writing to DB until the entire day is completed
+  const [localDayProgress, setLocalDayProgress] = useState<Record<string, { watched: string[]; checkPassed: string[]; quizScores: Record<string, any> }>>(() => {
+    try {
+      const stored = localStorage.getItem(`ciya_local_day_progress_${courseId}`);
+      return stored ? JSON.parse(stored) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  // Sync state if courseId changes
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`ciya_local_day_progress_${courseId}`);
+      setLocalDayProgress(stored ? JSON.parse(stored) : {});
+    } catch (e) {
+      setLocalDayProgress({});
+    }
+  }, [courseId]);
+
+  // Merge standard DB progress with any local day-level buffered progress
+  const mergedUserProfile = useMemo(() => {
+    if (!userProfile) return null;
+    const originalProgressStore = userProfile.progress?.[courseId] || {};
+    const tempDurationMode = originalProgressStore.durationMode || course.durationMode || 'standard';
+    if (tempDurationMode === 'express' || !!course.isCloned) return userProfile;
+
+    const progress = { ...(userProfile.progress || {}) };
+    const dbStore = progress[courseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+
+    const watchedSet = new Set<string>(dbStore.watched || []);
+    const checkPassedSet = new Set<string>(dbStore.checkPassed || []);
+    const mergedQuizScores = { ...(dbStore.quizScores || {}) };
+
+    Object.keys(localDayProgress).forEach((dayIdxStr) => {
+      const dayData = localDayProgress[dayIdxStr];
+      if (dayData) {
+        (dayData.watched || []).forEach(k => watchedSet.add(k));
+        (dayData.checkPassed || []).forEach(k => checkPassedSet.add(k));
+        if (dayData.quizScores) {
+          Object.assign(mergedQuizScores, dayData.quizScores);
+        }
+      }
+    });
+
+    progress[courseId] = {
+      ...dbStore,
+      watched: Array.from(watchedSet),
+      checkPassed: Array.from(checkPassedSet),
+      quizScores: mergedQuizScores
+    };
+
+    return {
+      ...userProfile,
+      progress
+    };
+  }, [userProfile, localDayProgress, course, courseId]);
+
+  const dbProgressStore = mergedUserProfile?.progress?.[courseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
   const selectedDurationMode = dbProgressStore.durationMode || course.durationMode || 'standard';
   const isExpress = selectedDurationMode === 'express' || !!course.isCloned;
 
@@ -1186,7 +1576,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   const days: CourseDay[] = selectedDurationMode === 'express' 
     ? (course.days || []).slice(0, 3) 
     : (course.days || []);
-  const activeDay: any = days[activeDayIdx] || { dayNumber: activeDayIdx + 1, title: 'Study Module', videos: [], assignment: { prompt: '', dueNote: '' } };
+  const isCourseAdvanced = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass';
+  const unitLabel = isCourseAdvanced ? 'Module' : 'Day';
+  const activeDay: any = days[activeDayIdx] || { dayNumber: activeDayIdx + 1, title: `Study ${unitLabel}`, videos: [], assignment: { prompt: '', dueNote: '' } };
   const videos: CourseVideo[] = activeDay.videos || [];
   const currentVideo = videos[activeVideoIdx] || null;
 
@@ -1246,7 +1638,10 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   }, [showFunFactPopup, currentFunFact, isFunFactInteracted]);
 
   useEffect(() => {
-    if (!currentVideo) return;
+    if (!currentVideo || viewingSyllabus) {
+      setShowFunFactPopup(false);
+      return;
+    }
 
     // Immediately load the current video's funFact if exists
     if (currentVideo.funFact && currentVideo.funFact.headline?.trim() && currentVideo.funFact.body?.trim()) {
@@ -1271,7 +1666,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     const interval = setInterval(triggerFunFact, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [currentVideo, activeDayIdx, activeVideoIdx]);
+  }, [currentVideo, activeDayIdx, activeVideoIdx, viewingSyllabus]);
 
   const checkKey = `${activeDayIdx}-${activeVideoIdx}`;
   const isVideoWatched = completedKeys.includes(checkKey);
@@ -1309,36 +1704,101 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         return;
       }
 
-      try {
+      // Check if this completes the entire day's lessons
+      const dayKeys = videos.map((_, vi) => `${activeDayIdx}-${vi}`);
+      const isDayFinishedWithThis = dayKeys.every(k => k === checkKey || completedKeys.includes(k));
+
+      // Check if all checks of the day are also passed
+      const allChecksPassed = videos.every((v, vi) => {
+        const k = `${activeDayIdx}-${vi}`;
+        const hasQuiz = !!(v && v.checkType && v.checkType !== 'none' && v.check);
+        return !hasQuiz || checkPassedKeys.includes(k);
+      });
+
+      const dayFullyCompleted = isDayFinishedWithThis && allChecksPassed;
+
+      if (dayFullyCompleted) {
+        // Retrieve buffered quiz scores for this day
+        let dayQuizScores: Record<string, any> = {};
+        try {
+          const storedLocal = localStorage.getItem(`ciya_local_day_progress_${courseId}`);
+          const localData = storedLocal ? JSON.parse(storedLocal) : {};
+          const dayData = localData[activeDayIdx] || { quizScores: {} };
+          dayQuizScores = dayData.quizScores || {};
+        } catch (e) {
+          console.warn("Error reading local day progress scores:", e);
+        }
+
+        // Synced write to Firestore!
+        try {
+          const finalWatched = Array.from(new Set([...(userProfile?.progress?.[courseId]?.watched || []), ...updatedWatched]));
+          
+          const updatedProfile = {
+            ...userProfile,
+            progress: {
+              ...(userProfile?.progress || {}),
+              [courseId]: {
+                ...(userProfile?.progress?.[courseId] || {}),
+                watched: finalWatched
+              }
+            }
+          };
+          setUserProfile(updatedProfile);
+          safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
+          const userRef = doc(db, 'users', currentUser.uid);
+          const updatePayload: any = {
+            [`progress.${courseId}.watched`]: finalWatched,
+            updatedAt: serverTimestamp()
+          };
+
+          // Merge buffered quiz scores into the Firestore update payload
+          Object.keys(dayQuizScores).forEach((scoreKey) => {
+            updatePayload[`progress.${courseId}.quizScores.${scoreKey}`] = dayQuizScores[scoreKey];
+          });
+
+          await updateDoc(userRef, updatePayload);
+
+          // Remove day buffer
+          const updatedLocalDayProgress = { ...localDayProgress };
+          delete updatedLocalDayProgress[activeDayIdx];
+          localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(updatedLocalDayProgress));
+          setLocalDayProgress(updatedLocalDayProgress);
+
+          showToast(`Full Day ${activeDayIdx + 1} Completed! Progress synced to Cloud Firestore! 🎓🚀`);
+          checkAndMarkCourseCompleted(updatedProfile, course, currentUser, setUserProfile, showToast);
+        } catch (dbErr) {
+          console.error("Database sync failed on day completion:", dbErr);
+          showToast(`Full Day ${activeDayIdx + 1} Completed! (Progress saved offline)`);
+        }
+      } else {
+        // Buffer locally!
+        const currentDayLocal = localDayProgress[activeDayIdx] || { watched: [], checkPassed: [], quizScores: {} };
+        const updatedLocalDayProgress = {
+          ...localDayProgress,
+          [activeDayIdx]: {
+            ...currentDayLocal,
+            watched: Array.from(new Set([...currentDayLocal.watched, checkKey]))
+          }
+        };
+        localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(updatedLocalDayProgress));
+        setLocalDayProgress(updatedLocalDayProgress);
+
+        // Update local profile state immediately so UI changes reactively
         const updatedProfile = {
           ...userProfile,
           progress: {
             ...(userProfile?.progress || {}),
             [courseId]: {
               ...(userProfile?.progress?.[courseId] || {}),
-              watched: updatedWatched
+              watched: Array.from(new Set([...(userProfile?.progress?.[courseId]?.watched || []), checkKey]))
             }
           }
         };
         setUserProfile(updatedProfile);
         safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
-        try {
-          const userRef = doc(db, 'users', currentUser.uid);
-          await updateDoc(userRef, {
-            [`progress.${courseId}.watched`]: updatedWatched,
-            updatedAt: serverTimestamp()
-          });
-          showToast("Lesson marked as completed! ✓");
-        } catch (dbErr) {
-          console.warn("Database sync deferred (offline/disabled), progress saved to local cache:", dbErr);
-          showToast("Lesson marked as completed! ✓ (Cached Offline)");
-        }
-
-        // Dynamically check for course completion
-        checkAndMarkCourseCompleted(updatedProfile, course, currentUser, setUserProfile, showToast);
-      } catch (e) {
-        console.error("Error updating completed lessons list:", e);
+        showToast("Lesson completed! ✓ (Progress saved in browser buffer until entire Day is finished)");
       }
     }
   };
@@ -1364,42 +1824,109 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       return;
     }
 
-    try {
+    // Check if this completes the entire day's lessons
+    const dayKeys = videos.map((_, vi) => `${activeDayIdx}-${vi}`);
+    const isDayFinishedWithThis = dayKeys.every(k => k === checkKey || completedKeys.includes(k));
+
+    // Check if all checks of the day are also passed
+    const allChecksPassed = videos.every((v, vi) => {
+      const k = `${activeDayIdx}-${vi}`;
+      const hasQuiz = !!(v && v.checkType && v.checkType !== 'none' && v.check);
+      return !hasQuiz || k === checkKey || checkPassedKeys.includes(k);
+    });
+
+    const dayFullyCompleted = isDayFinishedWithThis && allChecksPassed;
+
+    if (dayFullyCompleted) {
+      // Retrieve buffered quiz scores for this day
+      let dayQuizScores: Record<string, any> = {};
+      try {
+        const storedLocal = localStorage.getItem(`ciya_local_day_progress_${courseId}`);
+        const localData = storedLocal ? JSON.parse(storedLocal) : {};
+        const dayData = localData[activeDayIdx] || { quizScores: {} };
+        dayQuizScores = dayData.quizScores || {};
+      } catch (e) {
+        console.warn("Error reading local day progress scores:", e);
+      }
+
+      // Synced write to Firestore!
+      try {
+        const finalWatched = Array.from(new Set([...(userProfile?.progress?.[courseId]?.watched || []), ...updatedWatched]));
+        const finalPassed = Array.from(new Set([...(userProfile?.progress?.[courseId]?.checkPassed || []), ...updatedPassed]));
+
+        const updatedProfile = {
+          ...userProfile,
+          progress: {
+            ...(userProfile?.progress || {}),
+            [courseId]: {
+              ...(userProfile?.progress?.[courseId] || {}),
+              watched: finalWatched,
+              checkPassed: finalPassed
+            }
+          }
+        };
+        setUserProfile(updatedProfile);
+        safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
+        const userRef = doc(db, 'users', currentUser.uid);
+        const updatePayload: any = {
+          [`progress.${courseId}.watched`]: finalWatched,
+          [`progress.${courseId}.checkPassed`]: finalPassed,
+          updatedAt: serverTimestamp()
+        };
+
+        // Merge buffered quiz scores into the Firestore update payload
+        Object.keys(dayQuizScores).forEach((scoreKey) => {
+          updatePayload[`progress.${courseId}.quizScores.${scoreKey}`] = dayQuizScores[scoreKey];
+        });
+
+        await updateDoc(userRef, updatePayload);
+
+        // Remove day buffer
+        const updatedLocalDayProgress = { ...localDayProgress };
+        delete updatedLocalDayProgress[activeDayIdx];
+        localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(updatedLocalDayProgress));
+        setLocalDayProgress(updatedLocalDayProgress);
+
+        setShowQuizModal(false);
+        showToast(`Full Day ${activeDayIdx + 1} Completed! Progress synced to Cloud Firestore! 🎓🚀`);
+        checkAndMarkCourseCompleted(updatedProfile, course, currentUser, setUserProfile, showToast);
+      } catch (dbErr) {
+        console.error("Database sync failed on day completion:", dbErr);
+        setShowQuizModal(false);
+        showToast(`Full Day ${activeDayIdx + 1} Completed! (Progress saved offline)`);
+      }
+    } else {
+      // Buffer locally!
+      const currentDayLocal = localDayProgress[activeDayIdx] || { watched: [], checkPassed: [], quizScores: {} };
+      const updatedLocalDayProgress = {
+        ...localDayProgress,
+        [activeDayIdx]: {
+          ...currentDayLocal,
+          watched: Array.from(new Set([...currentDayLocal.watched, checkKey])),
+          checkPassed: Array.from(new Set([...currentDayLocal.checkPassed, checkKey]))
+        }
+      };
+      localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(updatedLocalDayProgress));
+      setLocalDayProgress(updatedLocalDayProgress);
+
+      // Update local profile state immediately so UI changes reactively
       const updatedProfile = {
         ...userProfile,
         progress: {
           ...(userProfile?.progress || {}),
           [courseId]: {
             ...(userProfile?.progress?.[courseId] || {}),
-            watched: updatedWatched,
-            checkPassed: updatedPassed
+            watched: Array.from(new Set([...(userProfile?.progress?.[courseId]?.watched || []), checkKey])),
+            checkPassed: Array.from(new Set([...(userProfile?.progress?.[courseId]?.checkPassed || []), checkKey]))
           }
         }
       };
       setUserProfile(updatedProfile);
       safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
-      try {
-        const userRef = doc(db, 'users', currentUser.uid);
-        await updateDoc(userRef, {
-          [`progress.${courseId}.watched`]: updatedWatched,
-          [`progress.${courseId}.checkPassed`]: updatedPassed,
-          updatedAt: serverTimestamp()
-        });
-        showToast("Comprehension check passed! Lesson unlocked! 🎉");
-      } catch (dbErr) {
-        console.warn("Database sync deferred (offline/disabled), progress saved to local cache:", dbErr);
-        showToast("Comprehension check passed! Lesson unlocked! 🎉 (Cached Offline)");
-      }
-
       setShowQuizModal(false);
-
-      // Dynamically check for course completion
-      checkAndMarkCourseCompleted(updatedProfile, course, currentUser, setUserProfile, showToast);
-    } catch (e) {
-      console.error("Error verification passing state:", e);
-      // Fallback close the modal anyway so student is not locked out of navigation
-      setShowQuizModal(false);
+      showToast("Comprehension check passed! Lesson unlocked! ✓ (Progress buffered in browser until entire Day is completed)");
     }
   };
 
@@ -1457,6 +1984,61 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
   const handleAssignmentSubmit = async (key: string, data: any) => {
     try {
+      const dayIndex = Number(key.replace('day-', ''));
+      const isBeginnerCourse = ['najnq9llx', 'psw96tm5o', 'qlpspor4hm'].includes(course?.id || '');
+      let assignmentConfig = course?.days?.[dayIndex]?.assignment;
+      const dayKey = `day-${dayIndex}`;
+      const customConfig = appSettings?.assignmentSettings?.[dayKey];
+      if (isBeginnerCourse && customConfig && customConfig.enabled) {
+        assignmentConfig = {
+          prompt: assignmentConfig?.prompt || '',
+          dueNote: assignmentConfig?.dueNote || '',
+          autoApprove: customConfig.autoApprove,
+          minChars: customConfig.minChars,
+          requireLink: customConfig.requireLink,
+          minScreenshots: customConfig.minScreenshots,
+          requiredKeywords: customConfig.requiredKeywords,
+          approveComment: customConfig.approveComment,
+          disapproveComment: customConfig.disapproveComment
+        };
+      }
+
+      const evalRes = evaluateComplianceAndGetStatus(
+        assignmentConfig,
+        data.text || '',
+        data.link || '',
+        data.images || []
+      );
+
+      let autoApproveAt: string | null = null;
+      let finalStatus: 'Pending' | 'Approved' | 'Disapproved' = evalRes.status;
+      let customToastMessage = "";
+
+      if (isBeginnerCourse && customConfig && customConfig.enabled && evalRes.status === 'Approved') {
+        const delay = customConfig.approvalDelay || 'instant';
+        if (delay !== 'instant') {
+          let minutes = 0;
+          let delayLabel = "";
+          if (delay === '10m') { minutes = 10; delayLabel = "10 minutes"; }
+          else if (delay === '20m') { minutes = 20; delayLabel = "20 minutes"; }
+          else if (delay === '30m') { minutes = 30; delayLabel = "30 minutes"; }
+          else if (delay === '1h') { minutes = 60; delayLabel = "1 hour"; }
+
+          if (minutes > 0) {
+            finalStatus = 'Pending';
+            autoApproveAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+            customToastMessage = `Compliance checklist passed! Approval queued for verification within ${delayLabel}.`;
+          }
+        }
+      }
+
+      const dataWithStatus = {
+        ...data,
+        status: finalStatus,
+        adminReason: finalStatus === 'Pending' && autoApproveAt ? "Approval delay timer is active." : evalRes.adminReason,
+        submittedAt: new Date().toISOString()
+      };
+
       const updatedProfile = {
         ...userProfile,
         progress: {
@@ -1465,7 +2047,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
             ...(userProfile?.progress?.[courseId] || {}),
             submissions: {
               ...(userProfile?.progress?.[courseId]?.submissions || {}),
-              [key]: data
+              [key]: dataWithStatus
             }
           }
         }
@@ -1475,7 +2057,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
-        [`progress.${courseId}.submissions.${key}`]: data,
+        [`progress.${courseId}.submissions.${key}`]: dataWithStatus,
         updatedAt: serverTimestamp()
       });
 
@@ -1483,21 +2065,67 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         ? (data.text || '') + "\n\n---IMAGES_JSON---\n" + JSON.stringify(data.images)
         : (data.text || '');
 
-      // Also append to global assignments collection
-      await addDoc(collection(db, 'assignments'), {
-        userId: currentUser.uid,
-        userEmail: currentUser.email || userProfile?.email || 'student@ciya.com',
-        userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
-        courseId: courseId,
-        dayIndex: Number(key.replace('day-', '')),
-        submittedText: combinedText,
-        fileUrl: data.link || '',
-        fileName: data.link ? 'Live URL Link' : '',
-        status: 'Pending',
-        createdAt: serverTimestamp()
-      });
+      const cohort = userProfile?.cohort || 'Cohort 1';
 
-      showToast("Assignment submitted successfully!");
+      // Check if there is an existing submission for this assignment (disapproved) to update or add new
+      const existingSub = allMySubmissions?.find(s => s.courseId === courseId && s.dayIndex === dayIndex);
+
+      if (existingSub) {
+        const subRef = doc(db, 'assignments', existingSub.id);
+        await updateDoc(subRef, {
+          submittedText: combinedText,
+          fileUrl: data.link || '',
+          images: data.images || [],
+          status: finalStatus,
+          cohort: cohort,
+          adminReason: finalStatus === 'Pending' && autoApproveAt ? "Approval delay timer is active." : evalRes.adminReason,
+          autoApproveAt: autoApproveAt,
+          createdAt: serverTimestamp()
+        });
+      } else {
+        // Also append to global assignments collection
+        await addDoc(collection(db, 'assignments'), {
+          userId: currentUser.uid,
+          userEmail: currentUser.email || userProfile?.email || 'student@ciya.com',
+          userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
+          courseId: courseId,
+          dayIndex: dayIndex,
+          submittedText: combinedText,
+          fileUrl: data.link || '',
+          fileName: data.link ? 'Live URL Link' : '',
+          status: finalStatus,
+          cohort: cohort,
+          adminReason: finalStatus === 'Pending' && autoApproveAt ? "Approval delay timer is active." : evalRes.adminReason,
+          autoApproveAt: autoApproveAt,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      if (finalStatus !== 'Pending') {
+        await addDoc(collection(db, 'notifications'), {
+          userId: currentUser.uid,
+          title: finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Compliance Check Failed ❌`,
+          message: finalStatus === 'Approved'
+            ? `Your assignment for Day ${dayIndex + 1} has been reviewed and approved!`
+            : `Your assignment for Day ${dayIndex + 1} did not meet requirements: "${evalRes.adminReason}". Please fix and resubmit.`,
+          type: 'assignment_graded',
+          isRead: false,
+          triggeredBy: 'Academy Coordinator',
+          createdAt: serverTimestamp()
+        });
+
+        if (finalStatus === 'Approved') {
+          showToast(`Assignment Approved! Day ${dayIndex + 2} is now unlocked! 🎉`);
+        } else {
+          showToast(`Compliance Failed: ${evalRes.adminReason} ❌`);
+        }
+      } else {
+        if (autoApproveAt && customToastMessage) {
+          showToast(customToastMessage);
+        } else {
+          showToast("Assignment submitted successfully!");
+        }
+      }
     } catch (e) {
       console.error("Error submitting assignment:", e);
     }
@@ -1627,7 +2255,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                 <span className="text-2xl select-none">💰</span>
                 <div className="text-xs leading-normal">
                   <span className="font-extrabold uppercase text-[9px] text-slate-400 block tracking-wider">Course Price Status</span>
-                  <span className="font-black text-slate-900 block mt-0.5">${course.price} USD</span>
+                  <span className="font-black text-slate-900 block mt-0.5">₦{Number(course.price).toLocaleString()}</span>
                 </div>
               </div>
             ) : null}
@@ -1662,6 +2290,15 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                   return;
                 }
                 if (!isEnrolled) {
+                  const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass';
+                  const isMonetized = appSettings?.advancedCourseSettings?.enabled ?? true;
+                  if (isAdv && isMonetized) {
+                    if (onRequestUnlockAdvanced) {
+                      onRequestUnlockAdvanced(course);
+                    }
+                    return;
+                  }
+
                   const runningCourseId = Object.keys(userProfile?.progress || {}).find(cId => {
                     const p = userProfile?.progress?.[cId];
                     if (!p) return false;
@@ -1744,7 +2381,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
           <div className="border-b pb-3 flex items-center justify-between">
             <div className="space-y-0.5">
               <span className="text-xs font-black uppercase text-indigo-700 tracking-wider">Course Syllabus Navigation</span>
-              <h4 className="text-base md:text-lg font-black text-slate-900">🗓️ Guided Training Daily Schedule</h4>
+              <h4 className="text-base md:text-lg font-black text-slate-900">🗓️ Guided Training {isCourseAdvanced ? 'Module' : 'Daily'} Schedule</h4>
             </div>
             <span className="text-sm bg-slate-100 text-slate-800 px-3 py-1 rounded-lg font-extrabold border border-slate-200">
               {totalWatchedCount} of {totalVideos} Clips Completed
@@ -1755,8 +2392,46 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
             {/* 1. Selected Day card at the top */}
             {days.map((d, di) => {
               if (activeDayIdx !== di) return null;
-              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId);
-              if (!isDayCoveredOrUnlocked) return null;
+              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId, appSettings);
+              
+              const isPrecedingApproved = di === 0 || dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
+              const isYearBadgeLocked = !isAdmin && isPrecedingApproved && !userProfile?.hasYearBadge && (
+                (appSettings?.yearBadgeSettings?.enabled === true) && (
+                  (appSettings?.yearBadgeSettings?.requireForDay1 && di >= 0) ||
+                  (appSettings?.yearBadgeSettings?.requireForDay4 && di >= 3)
+                )
+              );
+
+              if (isYearBadgeLocked) {
+                return (
+                  <YearBadgePaywallCard
+                    key={`badge-paywall-${di}`}
+                    di={di}
+                    unitLabel={unitLabel}
+                    price={appSettings?.yearBadgeSettings?.price || 25000}
+                    currentUser={currentUser}
+                    userProfile={userProfile}
+                    setUserProfile={setUserProfile}
+                    appSettings={appSettings}
+                  />
+                );
+              }
+
+              if (!isDayCoveredOrUnlocked) {
+                return (
+                  <div key={`day-locked-view-${di}`} className="rounded-3xl border-2 border-slate-200 bg-slate-50/50 p-6 text-center space-y-4 shadow-sm text-slate-800">
+                    <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                      <Lock className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-extrabold text-base tracking-tight">{unitLabel} {di + 1} is Progression-Locked 🔒</h4>
+                      <p className="text-xs text-slate-500 font-semibold max-w-md mx-auto leading-relaxed">
+                        To unlock this day's lessons, you must first complete and submit your assignment milestone for {unitLabel} {di} and wait for administrator review and approval.
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
 
               return (
                 <div
@@ -1767,7 +2442,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                     <div className="flex items-center justify-between font-sans">
                       <span className="text-xs md:text-sm font-black text-indigo-700 tracking-wider uppercase flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping" />
-                        Day {di + 1} (In View)
+                        {unitLabel} {di + 1} (In View)
                       </span>
                       <span className="text-xs bg-indigo-100 text-indigo-800 font-extrabold px-3 py-1 rounded-full uppercase tracking-normal">
                         {(d.videos || []).length} lessons
@@ -1859,6 +2534,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                               <SecureYoutubePlayer 
                                 url={vid.video_url || vid.url || ""} 
                                 title={vid.title || "Lesson Video"} 
+                                isAdvanced={isCourseAdvanced}
                               />
 
                               {/* 2. Walkthrough outline & resources SECOND */}
@@ -1993,7 +2669,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                         <button
                           type="button"
                           onClick={() => {
-                            const isDayUnlocked = di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId);
+                            const isDayUnlocked = di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId, appSettings);
 
                             const allVideosPassed = isDayUnlocked || (d.videos || []).every((v, vi) => {
                               const currentKey = `${di}-${vi}`;
@@ -2004,51 +2680,55 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                             });
 
                             if (allVideosPassed) {
-                              updateParams({
-                                day: String(di),
-                                assignment: 'true',
-                                syllabus: 'false'
-                              });
+                              setExpandedAssignments(prev => ({
+                                ...prev,
+                                [di]: !prev[di]
+                              }));
                             } else {
-                              alert("Complete all day's lessons and understanding checks first to unlock the end-of-day assignment!");
+                              alert(`Complete all ${unitLabel.toLowerCase()}'s lessons and understanding checks first to unlock the end-of-${unitLabel.toLowerCase()} assignment!`);
                             }
                           }}
                           className={`w-full p-3 border rounded-xl cursor-pointer text-left flex items-center justify-between text-xs md:text-sm transition-all tracking-wide ${
-                            showAssignment && activeDayIdx === di
+                            expandedAssignments[di]
                               ? 'bg-teal-600 text-white border-teal-600 font-black shadow-md'
                               : 'text-teal-950 bg-teal-50 border-teal-200 hover:bg-teal-100 font-extrabold'
                           }`}
                         >
                           <span className="flex items-center gap-2 flex-1 font-bold">
                             <span>{dbSubmissions.find(sub => sub.dayIndex === di)?.status === 'Approved' ? "✅" : "📋"}</span>
-                            <span>Day {di+1} Live Assignment Details</span>
+                            <span>{unitLabel} {di+1} Live Assignment Details</span>
+                          </span>
+                          <span className="text-xs select-none font-black px-2 py-0.5 rounded bg-teal-700/20 text-teal-950">
+                            {expandedAssignments[di] ? "▲ Hide" : "▼ Expand to View Question"}
                           </span>
                         </button>
 
-                        <div className="bg-teal-50/30 border border-teal-100 rounded-2xl p-4.5 space-y-3.5 text-left shadow-sm">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-base select-none">📋</span>
-                              <span className="text-xs uppercase font-black text-teal-900 tracking-wider">Day {di+1} End-of-Day Assignment Question</span>
+                        {expandedAssignments[di] && (
+                          <div className="bg-teal-50/30 border border-teal-100 rounded-2xl p-4.5 space-y-3.5 text-left shadow-sm animate-fadeIn">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-base select-none">📋</span>
+                                <span className="text-xs uppercase font-black text-teal-900 tracking-wider">{unitLabel} {di+1} End-of-{unitLabel} Assignment Question</span>
+                              </div>
+                              {d.assignment.dueNote && (
+                                <span className="text-[9px] uppercase font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">{d.assignment.dueNote}</span>
+                              )}
                             </div>
-                            {d.assignment.dueNote && (
-                              <span className="text-[9px] uppercase font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">{d.assignment.dueNote}</span>
-                            )}
+                            <div className="text-xs md:text-sm text-slate-800 leading-relaxed font-extrabold whitespace-pre-wrap bg-white border border-slate-100 p-4 rounded-xl shadow-sm">
+                              {renderClickableLinks(d.assignment.prompt || `Execute this ${unitLabel.toLowerCase()}'s syllabus lessons on your system and log your drafted link inside the Assignments tab.`)}
+                            </div>
+                            <div className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5 pl-1">
+                              <span>💡 Submit this assignment inside your</span>
+                              <button
+                                type="button"
+                                onClick={() => navigate('/dashboard?view=assignments')}
+                                className="text-teal-700 font-black underline hover:text-teal-850 border-0 bg-transparent cursor-pointer p-0 m-0 inline"
+                              >
+                                "My Assignments" Workspace
+                              </button>
+                            </div>
                           </div>
-                          <div className="text-xs md:text-sm text-slate-800 leading-relaxed font-extrabold whitespace-pre-wrap bg-white border border-slate-100 p-4 rounded-xl shadow-sm">
-                            {renderClickableLinks(d.assignment.prompt || "Execute today's syllabus lessons on your system and log your drafted link inside the Assignments tab.")}
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-bold flex items-center gap-1.5 pl-1">
-                            <span>💡 Submit this assignment inside your</span>
-                            <button
-                              type="button"
-                              onClick={() => navigate('/dashboard?view=assignments')}
-                              className="text-teal-700 font-black underline hover:text-teal-850 border-0 bg-transparent cursor-pointer p-0 m-0 inline"
-                            >
-                              "My Assignments" Workspace
-                            </button>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2059,11 +2739,20 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
             {/* Inactive Remaining Days listing at the bottom */}
             {days.length > 1 && (
               <div className="mt-4 border-t border-slate-100 pt-5 space-y-3 animate-fade-in">
-                <span className="text-xs md:text-sm font-black uppercase text-slate-500 tracking-wider block mb-1">Click to Switch Active Day in View:</span>
+                <span className="text-xs md:text-sm font-black uppercase text-slate-500 tracking-wider block mb-1">Click to Switch Active {unitLabel} in View:</span>
                 <div className="grid grid-cols-1 gap-4">
                   {days.map((d, di) => {
                     if (activeDayIdx === di) return null;
-                    const isDayUnlocked = di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId);
+                    const isDayUnlocked = di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId, appSettings);
+                    
+                    const isPrecedingApproved = di === 0 || dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
+                    const isYearBadgeLocked = !isAdmin && isPrecedingApproved && !userProfile?.hasYearBadge && (
+                      (appSettings?.yearBadgeSettings?.enabled === true) && (
+                        (appSettings?.yearBadgeSettings?.requireForDay1 && di >= 0) ||
+                        (appSettings?.yearBadgeSettings?.requireForDay4 && di >= 3)
+                      )
+                    );
+                    const canViewDay = isDayUnlocked || isYearBadgeLocked;
 
                     return (
                       <div
@@ -2071,16 +2760,18 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                         className={`rounded-2xl border p-4 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer ${
                           isDayUnlocked 
                             ? 'border-slate-200 bg-slate-50/50 hover:bg-white hover:border-indigo-200' 
-                            : 'border-slate-100 bg-slate-100/40 opacity-75'
+                            : isYearBadgeLocked
+                              ? 'border-amber-200 bg-amber-50/20 hover:bg-amber-100 hover:border-amber-300 shadow-sm'
+                              : 'border-slate-100 bg-slate-100/40 opacity-75'
                         }`}
                         onClick={() => {
-                          if (isDayUnlocked) {
+                          if (canViewDay) {
                             handleGoToVideo(di, 0);
                           } else {
                             if (course.isCloned) {
-                              alert(`⚠️ Day ${di + 1} lessons are locked! Please complete all Day ${di} lessons first.`);
+                              alert(`⚠️ ${unitLabel} ${di + 1} lessons are locked! Please complete all ${unitLabel} ${di} lessons first.`);
                             } else {
-                              alert(`⚠️ Day ${di + 1} lessons are locked! First submit your Day ${di} assignment and wait for coach approval to unlock Day ${di + 1} training.`);
+                              alert(`⚠️ ${unitLabel} ${di + 1} lessons are locked! First submit your ${unitLabel} ${di} assignment and wait for coach approval to unlock ${unitLabel} ${di + 1} training.`);
                             }
                           }
                         }}
@@ -2088,10 +2779,10 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                         <div className="space-y-1.5 text-left flex-1">
                           <div className="flex items-center justify-between font-sans">
                             <span className="text-xs font-black text-indigo-700 tracking-wider uppercase flex items-center gap-1.5">
-                              Day {di + 1} 
+                              {unitLabel} {di + 1} 
                               {!isDayUnlocked && (
                                 <span className="text-slate-500 text-xs font-normal">
-                                  🔒 Locked ({course.isCloned ? "Preceding Lessons Incomplete" : "Pending Assignment Approval"})
+                                  {isYearBadgeLocked ? "🏷️ Year Badge Required" : `🔒 Locked (${course.isCloned ? "Preceding Lessons Incomplete" : "Pending Assignment Approval"})`}
                                 </span>
                               )}
                             </span>
@@ -2107,6 +2798,10 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                           {isDayUnlocked ? (
                             <span className="text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer">
                               📅 View Day {di + 1} Syllabus →
+                            </span>
+                          ) : isYearBadgeLocked ? (
+                            <span className="text-xs font-black text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer">
+                              🏷️ Get Year Badge
                             </span>
                           ) : (
                             <span className="text-xs font-bold text-slate-400 bg-slate-150 border px-4 py-2 rounded-xl flex items-center gap-1.5 cursor-not-allowed">
@@ -2142,7 +2837,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       )}
 
       {/* SQUARE FUN FACT POPUP CARD (With increased font, auto scroll, and touch detection) */}
-      {showFunFactPopup && currentFunFact && (
+      {showFunFactPopup && !viewingSyllabus && currentFunFact && (
         <div id="fun-fact-popup-container" className="fixed bottom-4 right-4 z-[9999] p-1 select-none">
           <motion.div 
             id="fun-fact-card"
@@ -2407,15 +3102,28 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled, curre
   const totalWatchedCount = completedKeys.length;
   const progressRatio = totalVideos > 0 ? Math.round((totalWatchedCount / totalVideos) * 100) : 0;
   const isCompleted = progressRatio === 100 && totalVideos > 0;
-  let cardBorderClass = "border-slate-200 hover:border-slate-350 hover:shadow-lg";
-  let cardBgClass = "bg-slate-50/70";
+  
+  const isAdvancedCourse = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass';
+  let cardBorderClass = isAdvancedCourse ? "border-purple-200 hover:border-purple-350 hover:shadow-lg" : "border-slate-200 hover:border-slate-350 hover:shadow-lg";
+  let cardBgClass = isAdvancedCourse ? "bg-purple-50/30" : "bg-slate-50/70";
+  
   if (isEnrolled) {
     if (isCompleted) {
-      cardBorderClass = "border-emerald-500 ring-4 ring-emerald-500/15 shadow-xl hover:shadow-2xl shadow-emerald-500/10 hover:shadow-emerald-500/20";
-      cardBgClass = "bg-gradient-to-br from-emerald-50 via-emerald-100/10 to-white";
+      if (isAdvancedCourse) {
+        cardBorderClass = "border-emerald-500 ring-4 ring-emerald-500/15 shadow-xl hover:shadow-2xl shadow-emerald-500/10 hover:shadow-emerald-500/20";
+        cardBgClass = "bg-gradient-to-br from-purple-50 via-emerald-50/20 to-white";
+      } else {
+        cardBorderClass = "border-emerald-500 ring-4 ring-emerald-500/15 shadow-xl hover:shadow-2xl shadow-emerald-500/10 hover:shadow-emerald-500/20";
+        cardBgClass = "bg-gradient-to-br from-emerald-50 via-emerald-100/10 to-white";
+      }
     } else {
-      cardBorderClass = "border-indigo-500 ring-4 ring-indigo-500/15 shadow-xl hover:shadow-2xl shadow-indigo-100/40 hover:shadow-indigo-100/60";
-      cardBgClass = "bg-gradient-to-br from-indigo-50/70 via-indigo-100/10 to-white";
+      if (isAdvancedCourse) {
+        cardBorderClass = "border-purple-500 ring-4 ring-purple-500/15 shadow-xl hover:shadow-2xl shadow-purple-100/40 hover:shadow-purple-100/60";
+        cardBgClass = "bg-gradient-to-br from-purple-50/70 via-purple-100/20 to-white";
+      } else {
+        cardBorderClass = "border-indigo-500 ring-4 ring-indigo-500/15 shadow-xl hover:shadow-2xl shadow-indigo-100/40 hover:shadow-indigo-100/60";
+        cardBgClass = "bg-gradient-to-br from-indigo-50/70 via-indigo-100/10 to-white";
+      }
     }
   }
 
@@ -2544,7 +3252,7 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled, curre
                   <span className="text-base">💰</span>
                   <div className="text-[11px] leading-snug">
                     <span className="font-extrabold uppercase text-[8.5px] text-slate-400 block tracking-wider">Course Price Status</span>
-                    <span className="font-extrabold text-slate-950">${course.price} USD</span>
+                    <span className="font-extrabold text-slate-950">₦{Number(course.price).toLocaleString()}</span>
                   </div>
                 </div>
               ) : null}
@@ -2616,73 +3324,98 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled, curre
 }
 
 function SubmissionDetailsCard({ profile }: { profile: any }) {
+  const [isOpen, setIsOpen] = useState(false);
   if (!profile) return null;
   return (
-    <div className="w-full bg-slate-50/85 border border-slate-200 rounded-2xl p-6 text-left max-w-xl mx-auto mt-6">
-      <h3 className="font-extrabold text-slate-800 mb-4 text-sm tracking-tight border-b border-slate-200 pb-2 uppercase text-[11px] tracking-wider text-indigo-700 flex items-center gap-2">
-        <span>📋</span> Submitted Application Details
-      </h3>
-      <div className="space-y-4 text-xs md:text-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Full Name</span>
-            <span className="text-slate-800 font-semibold">{profile.fullName || '-'}</span>
-          </div>
-          <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Gender</span>
-            <span className="text-slate-800 font-semibold">{profile.gender || '-'}</span>
-          </div>
-          <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">WhatsApp Number</span>
-            <span className="text-slate-800 font-mono font-semibold">{profile.whatsapp || '-'}</span>
-          </div>
-          <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">State of Residence</span>
-            <span className="text-slate-800 font-semibold">{profile.state || '-'}</span>
-          </div>
-        </div>
+    <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 md:p-5 text-left max-w-xl mx-auto mt-6 transition-all shadow-sm">
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between cursor-pointer select-none border-b border-slate-200 pb-2.5 mb-3"
+      >
+        <h3 className="font-black text-slate-800 text-[11px] tracking-wider uppercase text-indigo-700 flex items-center gap-2 m-0">
+          <span>📋</span> Submitted Application
+        </h3>
+        <button className="flex items-center gap-1 text-[11px] font-black text-indigo-650 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border-0 transition-colors uppercase tracking-wider cursor-pointer">
+          {isOpen ? (
+            <>
+              Hide Details
+              <ChevronUp className="w-3.5 h-3.5" />
+            </>
+          ) : (
+            <>
+              See More
+              <ChevronDown className="w-3.5 h-3.5" />
+            </>
+          )}
+        </button>
+      </div>
 
-        <div className="border-t border-slate-200 pt-3 space-y-3">
-          <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Recommended Study Program</span>
-            <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded text-xs inline-block mt-0.5">
-              {profile.recommendedPath || '-'}
-            </span>
-          </div>
-          <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Path Selections</span>
-            <span className="text-slate-800 font-semibold text-xs">
-              {profile.courseType || ''} {profile.pathwaySelection ? `(${profile.pathwaySelection})` : ''}
-            </span>
-          </div>
-          {profile.pathwayReason && (
-            <div>
-              <span className="text-slate-600 block text-[10px] uppercase font-bold">Reason for Selection</span>
-              <p className="text-slate-600 italic mt-0.5 leading-relaxed font-semibold bg-white p-2 rounded border border-slate-200">{profile.pathwayReason}</p>
-            </div>
-          )}
-          <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Prior Experience in Course</span>
-            <span className="text-slate-800 font-semibold">{profile.pathwayExperience || profile.experience || 'None'}</span>
-          </div>
-          {profile.intent && (
-            <div>
-              <span className="text-slate-600 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
-              <p className="text-slate-600 italic mt-0.5 leading-relaxed font-semibold bg-white p-2 rounded border border-slate-200">{profile.intent}</p>
-            </div>
-          )}
-          {profile.goal && (
-            <div>
-              <span className="text-slate-600 block text-[10px] uppercase font-bold">Target Learning Goal</span>
-              <p className="text-slate-600 italic mt-0.5 leading-relaxed font-semibold bg-white p-2 rounded border border-slate-200">{profile.goal}</p>
-            </div>
-          )}
-          <div>
-            <span className="text-slate-600 block text-[10px] uppercase font-bold">Commitment Level</span>
-            <span className="text-slate-800 font-bold">{profile.availability || '-'}</span>
-          </div>
+      {/* Small Card (Summary always visible) */}
+      <div className="grid grid-cols-2 gap-3 text-xs">
+        <div>
+          <span className="text-slate-500 block text-[9px] uppercase font-bold tracking-wider">Full Name</span>
+          <span className="text-slate-800 font-extrabold">{profile.fullName || '-'}</span>
+        </div>
+        <div>
+          <span className="text-slate-500 block text-[9px] uppercase font-bold tracking-wider">Recommended Program</span>
+          <span className="text-indigo-700 font-extrabold">{profile.recommendedPath || '-'}</span>
         </div>
       </div>
+
+      {/* Expanded/Dropdown Area */}
+      {isOpen && (
+        <div className="mt-4 pt-4 border-t border-slate-200 space-y-4 text-xs md:text-sm animate-fadeIn">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">Gender</span>
+              <span className="text-slate-800 font-semibold">{profile.gender || '-'}</span>
+            </div>
+            <div>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">WhatsApp Number</span>
+              <span className="text-slate-800 font-mono font-semibold">{profile.whatsapp || '-'}</span>
+            </div>
+            <div>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">State of Residence</span>
+              <span className="text-slate-800 font-semibold">{profile.state || '-'}</span>
+            </div>
+            <div>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">Path Selections</span>
+              <span className="text-slate-800 font-semibold text-xs">
+                {profile.courseType || ''} {profile.pathwaySelection ? `(${profile.pathwaySelection})` : ''}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {profile.pathwayReason && (
+              <div>
+                <span className="text-slate-600 block text-[10px] uppercase font-bold">Reason for Selection</span>
+                <p className="text-slate-600 italic mt-0.5 leading-relaxed font-semibold bg-white p-2.5 rounded-xl border border-slate-200">{profile.pathwayReason}</p>
+              </div>
+            )}
+            <div>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">Prior Experience in Course</span>
+              <span className="text-slate-800 font-semibold">{profile.pathwayExperience || profile.experience || 'None'}</span>
+            </div>
+            {profile.intent && (
+              <div>
+                <span className="text-slate-600 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
+                <p className="text-slate-600 italic mt-0.5 leading-relaxed font-semibold bg-white p-2.5 rounded-xl border border-slate-200">{profile.intent}</p>
+              </div>
+            )}
+            {profile.goal && (
+              <div>
+                <span className="text-slate-600 block text-[10px] uppercase font-bold">Target Learning Goal</span>
+                <p className="text-slate-600 italic mt-0.5 leading-relaxed font-semibold bg-white p-2.5 rounded-xl border border-slate-200">{profile.goal}</p>
+              </div>
+            )}
+            <div>
+              <span className="text-slate-600 block text-[10px] uppercase font-bold">Commitment Level</span>
+              <span className="text-slate-800 font-bold">{profile.availability || '-'}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3005,6 +3738,8 @@ export default function StudentDashboard() {
     return params.get('courseId') || null;
   });
 
+  const [advancedPaymentCourse, setAdvancedPaymentCourse] = useState<any>(null);
+
   // Auto scroll window to top when selected course or view changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3037,11 +3772,17 @@ export default function StudentDashboard() {
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [submittingAssignment, setSubmittingAssignment] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [expandedAssignments, setExpandedAssignments] = useState<Record<number, boolean>>({});
 
-  const uploadToSupabaseStorage = async (file: File, bucket: string = 'assignments'): Promise<string> => {
+  const uploadToSupabaseStorage = async (
+    file: File, 
+    bucket: string = 'assignments',
+    projectId?: string,
+    studentId?: string
+  ): Promise<string> => {
     try {
-      const cloudinaryUrl = await uploadToCloudinary(file, bucket);
-      return cloudinaryUrl;
+      const uploadRes = await uploadToCloudinary(file, bucket, projectId, studentId);
+      return uploadRes.url;
     } catch (err: any) {
       console.error("Cloudinary upload failed:", err);
       throw err;
@@ -3073,7 +3814,7 @@ export default function StudentDashboard() {
     setSelectedCourseId(cId);
   }, [location.search]);
 
-  const [appSettings, setAppSettings] = useState<{ lockedSections?: { courses?: boolean; prompts?: boolean; assignments?: boolean; profile?: boolean; notifications?: boolean; blog?: boolean; kycb?: boolean } }>(() => {
+  const [appSettings, setAppSettings] = useState<any>(() => {
     try {
       const cached = safeStorage.getItem('ciya_cached_app_settings');
       return cached ? JSON.parse(cached) : {};
@@ -3141,6 +3882,61 @@ export default function StudentDashboard() {
     const activeCId = selectedAssignCourseId || (registeredCoursesList && registeredCoursesList[0]?.id);
     if (!activeCId) return;
     try {
+      const course = courses.find(c => c.id === activeCId);
+      const isBeginnerCourse = ['najnq9llx', 'psw96tm5o', 'qlpspor4hm'].includes(course?.id || '');
+      let assignmentConfig = course?.days?.[dayIndex]?.assignment;
+      const dayKey = `day-${dayIndex}`;
+      const customConfig = appSettings?.assignmentSettings?.[dayKey];
+      if (isBeginnerCourse && customConfig && customConfig.enabled) {
+        assignmentConfig = {
+          prompt: assignmentConfig?.prompt || '',
+          dueNote: assignmentConfig?.dueNote || '',
+          autoApprove: customConfig.autoApprove,
+          minChars: customConfig.minChars,
+          requireLink: customConfig.requireLink,
+          minScreenshots: customConfig.minScreenshots,
+          requiredKeywords: customConfig.requiredKeywords,
+          approveComment: customConfig.approveComment,
+          disapproveComment: customConfig.disapproveComment
+        };
+      }
+
+      const evalRes = evaluateComplianceAndGetStatus(
+        assignmentConfig,
+        data.text || '',
+        data.link || '',
+        data.images || []
+      );
+
+      let autoApproveAt: string | null = null;
+      let finalStatus: 'Pending' | 'Approved' | 'Disapproved' = evalRes.status;
+      let customToastMessage = "";
+
+      if (isBeginnerCourse && customConfig && customConfig.enabled && evalRes.status === 'Approved') {
+        const delay = customConfig.approvalDelay || 'instant';
+        if (delay !== 'instant') {
+          let minutes = 0;
+          let delayLabel = "";
+          if (delay === '10m') { minutes = 10; delayLabel = "10 minutes"; }
+          else if (delay === '20m') { minutes = 20; delayLabel = "20 minutes"; }
+          else if (delay === '30m') { minutes = 30; delayLabel = "30 minutes"; }
+          else if (delay === '1h') { minutes = 60; delayLabel = "1 hour"; }
+
+          if (minutes > 0) {
+            finalStatus = 'Pending';
+            autoApproveAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+            customToastMessage = `Compliance checklist passed! Approval queued for verification within ${delayLabel}.`;
+          }
+        }
+      }
+
+      const dataWithStatus = {
+        ...data,
+        status: finalStatus,
+        adminReason: finalStatus === 'Pending' && autoApproveAt ? "Approval delay timer is active." : evalRes.adminReason,
+        submittedAt: new Date().toISOString()
+      };
+
       const updatedProfile = {
         ...userProfile,
         progress: {
@@ -3149,7 +3945,7 @@ export default function StudentDashboard() {
             ...(userProfile?.progress?.[activeCId] || {}),
             submissions: {
               ...(userProfile?.progress?.[activeCId]?.submissions || {}),
-              [`day-${dayIndex}`]: data
+              [`day-${dayIndex}`]: dataWithStatus
             }
           }
         }
@@ -3159,7 +3955,7 @@ export default function StudentDashboard() {
 
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
-        [`progress.${activeCId}.submissions.day-${dayIndex}`]: data,
+        [`progress.${activeCId}.submissions.day-${dayIndex}`]: dataWithStatus,
         updatedAt: serverTimestamp()
       });
 
@@ -3167,21 +3963,67 @@ export default function StudentDashboard() {
         ? (data.text || '') + "\n\n---IMAGES_JSON---\n" + JSON.stringify(data.images)
         : (data.text || '');
 
-      // Also append to global assignments collection so it displays in Assignments Inbox
-      await addDoc(collection(db, 'assignments'), {
-        userId: currentUser.uid,
-        userEmail: currentUser.email || userProfile?.email || 'student@ciya.com',
-        userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
-        courseId: activeCId,
-        dayIndex: dayIndex,
-        submittedText: combinedText,
-        fileUrl: data.link || '',
-        fileName: data.link ? 'Live URL Link' : '',
-        status: 'Pending',
-        createdAt: serverTimestamp()
-      });
+      const cohort = userProfile?.cohort || 'Cohort 1';
 
-      showToast("Assignment submitted successfully!");
+      // Check if there is an existing submission (disapproved) to update or add new
+      const existingSub = allMySubmissions?.find(s => s.courseId === activeCId && s.dayIndex === dayIndex);
+
+      if (existingSub) {
+        const subRef = doc(db, 'assignments', existingSub.id);
+        await updateDoc(subRef, {
+          submittedText: combinedText,
+          fileUrl: data.link || '',
+          images: data.images || [],
+          status: finalStatus,
+          cohort: cohort,
+          adminReason: finalStatus === 'Pending' && autoApproveAt ? "Approval delay timer is active." : evalRes.adminReason,
+          autoApproveAt: autoApproveAt,
+          createdAt: serverTimestamp()
+        });
+      } else {
+        // Also append to global assignments collection so it displays in Assignments Inbox
+        await addDoc(collection(db, 'assignments'), {
+          userId: currentUser.uid,
+          userEmail: currentUser.email || userProfile?.email || 'student@ciya.com',
+          userName: userProfile?.fullName || currentUser.displayName || 'Invited Student',
+          courseId: activeCId,
+          dayIndex: dayIndex,
+          submittedText: combinedText,
+          fileUrl: data.link || '',
+          fileName: data.link ? 'Live URL Link' : '',
+          status: finalStatus,
+          cohort: cohort,
+          adminReason: finalStatus === 'Pending' && autoApproveAt ? "Approval delay timer is active." : evalRes.adminReason,
+          autoApproveAt: autoApproveAt,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      if (finalStatus !== 'Pending') {
+        await addDoc(collection(db, 'notifications'), {
+          userId: currentUser.uid,
+          title: finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Compliance Check Failed ❌`,
+          message: finalStatus === 'Approved'
+            ? `Your assignment for Day ${dayIndex + 1} has been reviewed and approved!`
+            : `Your assignment for Day ${dayIndex + 1} did not meet requirements: "${evalRes.adminReason}". Please fix and resubmit.`,
+          type: 'assignment_graded',
+          isRead: false,
+          triggeredBy: 'Academy Coordinator',
+          createdAt: serverTimestamp()
+        });
+
+        if (finalStatus === 'Approved') {
+          showToast(`Assignment Approved! Day ${dayIndex + 2} is now unlocked! 🎉`);
+        } else {
+          showToast(`Compliance Failed: ${evalRes.adminReason} ❌`);
+        }
+      } else {
+        if (autoApproveAt && customToastMessage) {
+          showToast(customToastMessage);
+        } else {
+          showToast("Assignment submitted successfully!");
+        }
+      }
     } catch (e) {
       console.error("Error submitting assignment:", e);
     }
@@ -3390,6 +4232,7 @@ export default function StudentDashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
   const [liveCheckComplete, setLiveCheckComplete] = useState(() => {
     const cachedProfile = safeStorage.getItem('ciya_cached_profile');
     if (cachedProfile) {
@@ -3402,6 +4245,9 @@ export default function StudentDashboard() {
   });
   
   const [activeSkillFilter, setActiveSkillFilter] = useState<string>('all');
+  const [courseLevelFilter, setCourseLevelFilter] = useState<'beginner' | 'advanced'>(() => {
+    return (safeStorage.getItem('ciya_course_level_filter') as 'beginner' | 'advanced') || 'beginner';
+  });
   const [activeDurationFilter, setActiveDurationFilter] = useState<'standard' | 'express'>('standard');
   const navigate = useNavigate();
 
@@ -3421,9 +4267,12 @@ export default function StudentDashboard() {
       const targetCourse = courses.find(c => c.id === cId);
       if (targetCourse) {
         const isRegistered = registeredCoursesList.some(r => r.id === cId);
-        if (!isRegistered && !hasCompletedFirstCourse) {
-          alert("Access Restricted: You must fully complete your first assigned course path from onboarding (100% video lessons completed) before enrolling or switching to other curriculum tracks.");
-          return;
+        const isAdv = targetCourse.tier === 'advanced' || targetCourse.tier === 'masterclass' || targetCourse.level === 'Advanced' || targetCourse.level === 'Masterclass';
+        if (!isAdv) {
+          if (!isRegistered && !hasCompletedFirstCourse) {
+            alert("Access Restricted: You must fully complete your first assigned course path from onboarding (100% video lessons completed) before enrolling or switching to other curriculum tracks.");
+            return;
+          }
         }
       }
     }
@@ -3540,7 +4389,7 @@ export default function StudentDashboard() {
     const lastUnlockedDayIdx = (() => {
       let lastIdx = 0;
       for (let idx = 0; idx < daysList.length; idx++) {
-        const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id);
+        const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id, appSettings);
         if (isUnlocked) {
           lastIdx = idx;
         }
@@ -3569,6 +4418,54 @@ export default function StudentDashboard() {
 
     setSubmittingAssignment(true);
     try {
+      const isBeginnerCourse = ['najnq9llx', 'psw96tm5o', 'qlpspor4hm'].includes(registeredCourse.id);
+      let assignmentConfig = registeredCourse.days?.[submitDayIndex]?.assignment;
+      
+      const dayKey = `day-${submitDayIndex}`;
+      const customConfig = appSettings?.assignmentSettings?.[dayKey];
+      if (isBeginnerCourse && customConfig && customConfig.enabled) {
+        assignmentConfig = {
+          prompt: assignmentConfig?.prompt || '',
+          dueNote: assignmentConfig?.dueNote || '',
+          autoApprove: customConfig.autoApprove,
+          minChars: customConfig.minChars,
+          requireLink: customConfig.requireLink,
+          minScreenshots: customConfig.minScreenshots,
+          requiredKeywords: customConfig.requiredKeywords,
+          approveComment: customConfig.approveComment,
+          disapproveComment: customConfig.disapproveComment
+        };
+      }
+
+      const evalRes = evaluateComplianceAndGetStatus(
+        assignmentConfig,
+        submitText,
+        submitLink,
+        uploadedImages
+      );
+
+      let autoApproveAt: string | null = null;
+      let finalStatus: 'Pending' | 'Approved' | 'Disapproved' = evalRes.status;
+      let customToastMessage = "";
+
+      if (isBeginnerCourse && customConfig && customConfig.enabled && evalRes.status === 'Approved') {
+        const delay = customConfig.approvalDelay || 'instant';
+        if (delay !== 'instant') {
+          let minutes = 0;
+          let delayLabel = "";
+          if (delay === '10m') { minutes = 10; delayLabel = "10 minutes"; }
+          else if (delay === '20m') { minutes = 20; delayLabel = "20 minutes"; }
+          else if (delay === '30m') { minutes = 30; delayLabel = "30 minutes"; }
+          else if (delay === '1h') { minutes = 60; delayLabel = "1 hour"; }
+
+          if (minutes > 0) {
+            finalStatus = 'Pending';
+            autoApproveAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+            customToastMessage = `Compliance checklist passed! Approval queued for verification within ${delayLabel}.`;
+          }
+        }
+      }
+
       const combinedSubmittedText = uploadedImages.length > 0
         ? submitText + "\n\n---IMAGES_JSON---\n" + JSON.stringify(uploadedImages)
         : submitText;
@@ -3576,15 +4473,16 @@ export default function StudentDashboard() {
       const cohort = userProfile?.cohort || 'Cohort 1';
 
       if (existingSub) {
-        // Update existing disapproved assignment document to 'Pending' status
+        // Update existing disapproved assignment document to calculated status
         const subRef = doc(db, 'assignments', existingSub.id);
         await updateDoc(subRef, {
           submittedText: combinedSubmittedText,
           fileUrl: submitLink,
           images: uploadedImages,
-          status: 'Pending',
+          status: finalStatus,
           cohort: cohort,
-          adminReason: "", // Clear old disapproval reason
+          adminReason: finalStatus === 'Pending' && autoApproveAt ? "Approval delay timer is active." : evalRes.adminReason,
+          autoApproveAt: autoApproveAt,
           createdAt: serverTimestamp() // Set new timestamp so it moves to top of admin inbox
         });
       } else {
@@ -3599,11 +4497,22 @@ export default function StudentDashboard() {
           fileUrl: submitLink,
           images: uploadedImages,
           fileName: 'Live URL Link',
-          status: 'Pending',
+          status: finalStatus,
           cohort: cohort,
+          adminReason: finalStatus === 'Pending' && autoApproveAt ? "Approval delay timer is active." : evalRes.adminReason,
+          autoApproveAt: autoApproveAt,
           createdAt: serverTimestamp()
         });
       }
+
+      const submissionData = {
+        text: submitText,
+        link: submitLink,
+        images: uploadedImages,
+        submittedAt: new Date().toISOString(),
+        status: finalStatus,
+        adminReason: finalStatus === 'Pending' && autoApproveAt ? "Approval delay timer is active." : evalRes.adminReason
+      };
 
       // 2. Submit to student progress in users doc
       const updatedProfile = {
@@ -3614,12 +4523,7 @@ export default function StudentDashboard() {
             ...(userProfile?.progress?.[registeredCourse.id] || {}),
             submissions: {
               ...(userProfile?.progress?.[registeredCourse.id]?.submissions || {}),
-              [`day-${submitDayIndex}`]: {
-                text: submitText,
-                link: submitLink,
-                images: uploadedImages,
-                submittedAt: new Date().toISOString()
-              }
+              [`day-${submitDayIndex}`]: submissionData
             }
           }
         }
@@ -3629,16 +4533,38 @@ export default function StudentDashboard() {
 
       const userRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userRef, {
-        [`progress.${registeredCourse.id}.submissions.day-${submitDayIndex}`]: {
-          text: submitText,
-          link: submitLink,
-          images: uploadedImages,
-          submittedAt: new Date().toISOString()
-        },
+        [`progress.${registeredCourse.id}.submissions.day-${submitDayIndex}`]: submissionData,
         updatedAt: serverTimestamp()
       });
 
-      // 3. Trigger success popup!
+      // 3. Trigger success notifications / toast
+      if (finalStatus !== 'Pending') {
+        await addDoc(collection(db, 'notifications'), {
+          userId: currentUser.uid,
+          title: finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Compliance Check Failed ❌`,
+          message: finalStatus === 'Approved'
+            ? `Your assignment for Day ${submitDayIndex + 1} has been reviewed and approved!`
+            : `Your assignment for Day ${submitDayIndex + 1} did not meet requirements: "${evalRes.adminReason}". Please fix and resubmit.`,
+          type: 'assignment_graded',
+          isRead: false,
+          triggeredBy: 'Academy Coordinator',
+          createdAt: serverTimestamp()
+        });
+
+        if (finalStatus === 'Approved') {
+          showToast(`Assignment Approved! Next day/module is now unlocked! 🎉`);
+        } else {
+          showToast(`Compliance Failed: ${evalRes.adminReason} ❌`);
+        }
+      } else {
+        if (autoApproveAt && customToastMessage) {
+          showToast(customToastMessage);
+        } else {
+          showToast("Assignment submitted successfully!");
+        }
+      }
+
+      // Trigger success popup!
       setShowSuccessPopup(true);
 
       // Clear fields
@@ -3889,6 +4815,12 @@ export default function StudentDashboard() {
   const isProfileRegisteredForCourse = (profile: any, course: any): boolean => {
     if (!profile || !course) return false;
     
+    // Check if the course is advanced/masterclass (strictly requires explicit progress entry via passcode)
+    const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || (course.level && ['advanced', 'masterclass'].includes(course.level.toLowerCase()));
+    if (isAdv) {
+      return !!(profile.progress && profile.progress[course.id]);
+    }
+    
     // Rule 1: If they have explicit progress for this course, they are registered!
     if (profile.progress && profile.progress[course.id]) {
       return true;
@@ -4053,8 +4985,32 @@ export default function StudentDashboard() {
   // Apply Skill tags sorting filters (locked courses are visible and carry padlocks)
   const filteredCourses = coursesToSee.filter(c => {
     if (activeSkillFilter !== 'all' && c.skill !== activeSkillFilter) return false;
+    const isAdv = c.tier === 'advanced' || c.tier === 'masterclass' || c.level === 'Advanced' || c.level === 'Masterclass';
+    if (courseLevelFilter === 'beginner' && isAdv) return false;
+    if (courseLevelFilter === 'advanced' && !isAdv) return false;
     return true;
   });
+
+  const handleProfilePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploadingProfilePhoto(true);
+    try {
+      const uploadRes = await uploadToCloudinary(file, 'profile_photos', undefined, currentUser?.uid);
+      const imageUrl = uploadRes.url;
+      setUserProfile((prev: any) => ({
+        ...prev,
+        photoURL: imageUrl
+      }));
+      alert("Profile photo uploaded successfully!");
+    } catch (err) {
+      console.error("Failed to upload profile photo:", err);
+      alert("Failed to upload profile photo. Please try again.");
+    } finally {
+      setUploadingProfilePhoto(false);
+    }
+  };
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4066,6 +5022,7 @@ export default function StudentDashboard() {
         whatsapp: userProfile.whatsapp,
         state: userProfile.state,
         goal: userProfile.goal,
+        photoURL: userProfile.photoURL || '',
         updatedAt: serverTimestamp()
       });
       safeStorage.setItem('ciya_cached_profile', JSON.stringify(userProfile));
@@ -4097,11 +5054,17 @@ export default function StudentDashboard() {
 
   const filteredRegisteredCourses = enrolledCourses.filter(c => {
     if (activeSkillFilter !== 'all' && c.skill !== activeSkillFilter) return false;
+    const isAdv = c.tier === 'advanced' || c.tier === 'masterclass' || c.level === 'Advanced' || c.level === 'Masterclass';
+    if (courseLevelFilter === 'beginner' && isAdv) return false;
+    if (courseLevelFilter === 'advanced' && !isAdv) return false;
     return true;
   });
 
   const filteredOtherCourses = notEnrolledCourses.filter(c => {
     if (activeSkillFilter !== 'all' && c.skill !== activeSkillFilter) return false;
+    const isAdv = c.tier === 'advanced' || c.tier === 'masterclass' || c.level === 'Advanced' || c.level === 'Masterclass';
+    if (courseLevelFilter === 'beginner' && isAdv) return false;
+    if (courseLevelFilter === 'advanced' && !isAdv) return false;
     return true;
   });
 
@@ -4124,6 +5087,41 @@ export default function StudentDashboard() {
       }
     }
   }, [currentUser, userProfile, courses, registeredCoursesList, isAdmin]);
+
+  const isNewUser = useMemo(() => {
+    if (!userProfile || !userProfile.createdAt) return true;
+    let creationTimeVal = new Date().getTime();
+    if (typeof userProfile.createdAt.toDate === 'function') {
+      creationTimeVal = userProfile.createdAt.toDate().getTime();
+    } else if (userProfile.createdAt.seconds !== undefined) {
+      creationTimeVal = userProfile.createdAt.seconds * 1000;
+    } else {
+      const parsed = new Date(userProfile.createdAt).getTime();
+      if (!isNaN(parsed)) {
+        creationTimeVal = parsed;
+      }
+    }
+    const now = new Date().getTime();
+    return (now - creationTimeVal) < 24 * 60 * 60 * 1000;
+  }, [userProfile]);
+
+  const timeOfDayGreeting = useMemo(() => {
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const nigeriaOffset = 1; // West Africa Time is UTC+1
+    const nigeriaDate = new Date(utc + (3600000 * nigeriaOffset));
+    const localHour = nigeriaDate.getHours();
+
+    if (localHour >= 5 && localHour < 12) {
+      return { text: "Good Morning", emoji: "🌅", desc: "Start your day by building something remarkable today!" };
+    } else if (localHour >= 12 && localHour < 17) {
+      return { text: "Good Afternoon", emoji: "☀️", desc: "Keep up the momentum! Consistency is the secret of tech experts." };
+    } else if (localHour >= 17 && localHour < 22) {
+      return { text: "Good Evening", emoji: "🌆", desc: "Perfect time to review your concepts and complete check questions." };
+    } else {
+      return { text: "Good Night", emoji: "🌙", desc: "Late night coding creates champions. Secure your learning progress before rest!" };
+    }
+  }, []);
 
   if (authChecking) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Validating Authorization Credentials...</div>;
@@ -4340,7 +5338,7 @@ export default function StudentDashboard() {
       )}
       
       {/* Sidebar navigation */}
-      <aside className={`w-64 bg-slate-900 border-r border-slate-800 flex flex-col fixed md:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <aside className={`w-64 bg-slate-900 border-r border-slate-800 flex flex-col fixed md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-6 flex flex-col gap-1 relative">
           <Link to="/" className="hover:opacity-85 transition-opacity">
             <BrandingLogo size="sm" />
@@ -4360,7 +5358,7 @@ export default function StudentDashboard() {
           <button 
             type="button"
             onClick={() => handleViewChange('courses', null)}
-            className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'courses' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+            className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'courses' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
           >
             <div className="flex items-center gap-3">
               <Compass className="w-4 h-4" />
@@ -4375,7 +5373,7 @@ export default function StudentDashboard() {
             <button 
               type="button"
               onClick={() => handleViewChange('assignments', null)}
-              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'assignments' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'assignments' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
             >
               <div className="flex items-center gap-3">
                 <FileText className="w-4 h-4 text-indigo-400" />
@@ -4390,7 +5388,7 @@ export default function StudentDashboard() {
           <button 
             type="button"
             onClick={() => handleViewChange('prompts', null)}
-            className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'prompts' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+            className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'prompts' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
           >
             <div className="flex items-center gap-3">
               <Sparkles className="w-4 h-4 text-teal-400" />
@@ -4405,7 +5403,7 @@ export default function StudentDashboard() {
             <button 
               type="button"
               onClick={() => handleViewChange('kycb', null)}
-              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'kycb' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'kycb' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
             >
               <div className="flex items-center gap-3">
                 <BookOpen className="w-4 h-4 text-emerald-400" />
@@ -4420,7 +5418,7 @@ export default function StudentDashboard() {
           <button 
             type="button"
             onClick={() => handleViewChange('blog', null)}
-            className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'blog' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+            className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'blog' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
           >
             <div className="flex items-center gap-3">
               <span className="w-4 h-4 flex items-center justify-center text-rose-400 text-xs">📰</span>
@@ -4435,7 +5433,7 @@ export default function StudentDashboard() {
             <button 
               type="button"
               onClick={() => handleViewChange('notifications', null)}
-              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'notifications' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'notifications' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
             >
               <div className="flex items-center gap-3">
                 <Bell className="w-4 h-4 text-amber-400" />
@@ -4457,10 +5455,10 @@ export default function StudentDashboard() {
             <button 
               type="button"
               onClick={() => handleViewChange('profile', null)}
-              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'profile' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-400 bg-transparent hover:bg-slate-800/60 hover:text-white'}`}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'profile' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
             >
               <div className="flex items-center gap-3">
-                <UserIcon className="w-4 h-4 text-slate-400" />
+                <UserIcon className="w-4 h-4 text-sky-400" />
                 <span>My Profile Settings</span>
               </div>
               {!isAdmin && appSettings?.lockedSections?.profile && (
@@ -4507,7 +5505,7 @@ export default function StudentDashboard() {
       </aside>
 
       {/* Main Container */}
-      <main className="flex-1 flex flex-col items-stretch h-screen overflow-hidden bg-slate-50/50">
+      <main className={`flex-1 flex flex-col items-stretch h-screen overflow-hidden transition-all duration-500 ${courseLevelFilter === 'advanced' ? 'bg-gradient-to-br from-purple-100/30 via-indigo-50/40 to-fuchsia-100/20' : 'bg-slate-50/50'}`}>
         <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10 shadow-sm">
           <div className="flex items-center gap-3">
             <button 
@@ -4633,36 +5631,88 @@ export default function StudentDashboard() {
               </div>
               
               {editingProfile ? (
-                 <form onSubmit={handleProfileSave} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div>
-                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Full Name</label>
-                        <input type="text" value={userProfile.fullName || ''} onChange={e => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans" required />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">WhatsApp Number</label>
-                        <input type="tel" value={userProfile.whatsapp || ''} onChange={e => setUserProfile({...userProfile, whatsapp: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
-                      </div>
-                    </div>
-                    <div className="text-xs">
-                      <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">State</label>
-                      <input type="text" value={userProfile.state || ''} onChange={e => setUserProfile({...userProfile, state: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
-                    </div>
-                    <div className="text-xs">
-                      <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Your Primary Goal</label>
-                      <textarea value={userProfile.goal || ''} onChange={e => setUserProfile({...userProfile, goal: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-medium leading-relaxed min-h-[100px] focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
-                    </div>
-                    <div className="flex gap-3 pt-2 text-xs">
-                      <button type="submit" disabled={profileSaving} className="flex-1 bg-teal-600 text-white font-extrabold py-3 border-0 rounded-xl hover:bg-teal-700 cursor-pointer flex items-center justify-center gap-1.5 shadow-md">
-                        {profileSaving ? 'Saving...' : <><Save className="w-4 h-4"/> Save Changes</>}
-                      </button>
-                      <button type="button" onClick={() => setEditingProfile(false)} disabled={profileSaving} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 border-0 rounded-xl hover:bg-slate-200 cursor-pointer">
-                        Cancel
-                      </button>
-                    </div>
-                 </form>
+                 <form onSubmit={handleProfileSave} className="space-y-4 text-left">
+                     {/* Photo Upload Area */}
+                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
+                       <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-indigo-500 overflow-hidden shrink-0 flex items-center justify-center font-black text-2xl text-slate-700 shadow-sm">
+                         {userProfile.photoURL ? (
+                           <img src={userProfile.photoURL} alt="Profile preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                         ) : (
+                           <span>{userProfile.fullName ? userProfile.fullName[0].toUpperCase() : 'U'}</span>
+                         )}
+                       </div>
+                       <div className="flex-1 space-y-1 text-center sm:text-left">
+                         <label className="block text-[10px] uppercase font-bold text-slate-500">Student Profile Photo</label>
+                         <input
+                           type="file"
+                           accept="image/*"
+                           onChange={handleProfilePhotoChange}
+                           disabled={uploadingProfilePhoto}
+                           id="student-profile-photo-upload-input"
+                           className="hidden"
+                         />
+                         <label
+                           htmlFor="student-profile-photo-upload-input"
+                           className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-black uppercase rounded-lg border border-indigo-200 cursor-pointer text-center inline-block"
+                         >
+                           {uploadingProfilePhoto ? 'Uploading image...' : 'Choose Profile Photo'}
+                         </label>
+                         <p className="text-[9px] text-slate-400 font-semibold">Will be embedded inside your high-fidelity membership badge!</p>
+                       </div>
+                     </div>
+
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-sans">
+                       <div>
+                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Full Name</label>
+                         <input type="text" value={userProfile.fullName || ''} onChange={e => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans" required />
+                       </div>
+                       <div>
+                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">WhatsApp Number</label>
+                         <input type="tel" value={userProfile.whatsapp || ''} onChange={e => setUserProfile({...userProfile, whatsapp: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
+                       </div>
+                     </div>
+                     <div className="text-xs">
+                       <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">State</label>
+                       <input type="text" value={userProfile.state || ''} onChange={e => setUserProfile({...userProfile, state: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
+                     </div>
+                     <div className="text-xs">
+                       <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Your Primary Goal</label>
+                       <textarea value={userProfile.goal || ''} onChange={e => setUserProfile({...userProfile, goal: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-medium leading-relaxed min-h-[100px] focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
+                     </div>
+                     <div className="flex gap-3 pt-2 text-xs">
+                       <button type="submit" disabled={profileSaving} className="flex-1 bg-teal-600 text-white font-extrabold py-3 border-0 rounded-xl hover:bg-teal-700 cursor-pointer flex items-center justify-center gap-1.5 shadow-md">
+                         {profileSaving ? 'Saving...' : <><Save className="w-4 h-4"/> Save Changes</>}
+                       </button>
+                       <button type="button" onClick={() => setEditingProfile(false)} disabled={profileSaving} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 border-0 rounded-xl hover:bg-slate-200 cursor-pointer">
+                         Cancel
+                       </button>
+                     </div>
+                  </form>
               ) : (
-                <div className="space-y-6 text-xs md:text-sm text-left">
+                <div className="space-y-6 text-xs md:text-sm text-left font-sans">
+                  
+                  {/* Photo & Basic details header */}
+                  <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                    <div className="w-20 h-20 rounded-full border-2 border-indigo-500 bg-slate-150 shrink-0 overflow-hidden flex items-center justify-center text-slate-700 text-2xl font-black shadow-sm">
+                      {userProfile.photoURL ? (
+                        <img src={userProfile.photoURL} alt="Profile photo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <span>{userProfile.fullName ? userProfile.fullName[0].toUpperCase() : 'U'}</span>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-center sm:text-left">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <h4 className="text-lg font-black text-slate-900 uppercase leading-none">{userProfile.fullName || 'Anonymous Student'}</h4>
+                        {userProfile.hasYearBadge ? (
+                          <span className="inline-block bg-indigo-600 text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">CIYA Student Pro</span>
+                        ) : (
+                          <span className="inline-block bg-slate-200 text-slate-700 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">Free Tier</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 font-mono font-bold">{userProfile.email || currentUser?.email}</p>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                       <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">Full Name</p>
@@ -4684,6 +5734,104 @@ export default function StudentDashboard() {
                       <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">My Learning Goal</p>
                       <p className="text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-lg border italic mt-1 font-medium">{userProfile.goal || 'Not provided'}</p>
                     </div>
+                  </div>
+
+                  {/* CIYA Membership Badge Section */}
+                  <div className="sm:col-span-2 pt-6 border-t border-slate-100 text-left">
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <Award className="w-5 h-5 text-indigo-600" />
+                      <div>
+                        <h3 className="font-extrabold text-slate-800 text-xs tracking-tight uppercase tracking-wider text-indigo-750">Official CIYA Pro Student Badge</h3>
+                        <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                          Your active 30-day membership badge within the CIYA Ecosystem.
+                        </p>
+                      </div>
+                    </div>
+
+                    {userProfile.hasYearBadge ? (
+                      <div className="space-y-4">
+                        {/* Membership start and end countdown alert banner */}
+                        {(() => {
+                          const now = Date.now();
+                          const expiry = userProfile.badgeExpiryDate || (userProfile.badgePurchaseDate ? userProfile.badgePurchaseDate + 30 * 24 * 60 * 60 * 1000 : 0);
+                          const isExpired = now > expiry;
+                          const daysLeft = Math.ceil((expiry - now) / (24 * 60 * 60 * 1000));
+                          
+                          if (isExpired) {
+                            return (
+                              <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-semibold leading-relaxed">
+                                ⚠️ <strong>Membership Expired:</strong> Your CIYA Membership ended. Please contact your administrator or purchase a new 30-day membership badge to reactivate your credentials.
+                              </div>
+                            );
+                          } else if (daysLeft <= 3) {
+                            return (
+                              <div className="p-4 bg-amber-50 border border-amber-200 text-amber-850 rounded-2xl text-xs font-semibold leading-relaxed animate-pulse">
+                                ⏰ <strong>Near Expiry Alert:</strong> Your premium "CIYA Student Pro" membership status is going to end soon in <strong>{daysLeft} days</strong> (on {new Date(expiry).toLocaleDateString()}). Please renew in advance to avoid access interruption!
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div className="p-4 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-2xl text-xs font-semibold leading-relaxed">
+                                ✓ <strong>Active Pro Student Member:</strong> Your premium CIYA Student Pro membership is active. You have <strong>{daysLeft} days remaining</strong> (expires on {new Date(expiry).toLocaleDateString()}).
+                              </div>
+                            );
+                          }
+                        })()}
+
+                        {/* Interactive Badge Canvas */}
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner gap-4">
+                          <div className="w-full max-w-[390px] bg-white p-4 rounded-2xl border border-slate-150 flex flex-col sm:flex-row items-center gap-4 shadow-sm text-left">
+                            <div className="w-12 h-12 rounded-full border border-amber-500 overflow-hidden bg-slate-100 flex items-center justify-center font-extrabold text-amber-600 shrink-0 shadow-sm">
+                              {userProfile.photoURL ? (
+                                <img src={userProfile.photoURL} alt="Badge Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              ) : (
+                                <span className="text-sm">📷</span>
+                              )}
+                            </div>
+                            <div className="flex-1 text-center sm:text-left">
+                              <h5 className="font-extrabold text-slate-805 text-xs uppercase tracking-wide">Personalize Your CIYA Badge</h5>
+                              <p className="text-[10px] text-slate-500 font-semibold mb-2">Upload your photo to embed it directly into the badge before downloading.</p>
+                              
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleProfilePhotoChange}
+                                disabled={uploadingProfilePhoto}
+                                id="student-badge-photo-upload-input"
+                                className="hidden"
+                              />
+                              <label
+                                htmlFor="student-badge-photo-upload-input"
+                                className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-black uppercase rounded-lg border border-amber-200 cursor-pointer inline-flex items-center gap-1 transition-all select-none"
+                              >
+                                {uploadingProfilePhoto ? 'Uploading Photo...' : 'Upload Badge Photo'}
+                              </label>
+                            </div>
+                          </div>
+
+                          <CIYAMembershipBadge 
+                            data={{
+                              fullName: userProfile.fullName || 'CIYA Student',
+                              email: userProfile.email || currentUser?.email || 'student@example.com',
+                              courseName: 'Advanced Website Development',
+                              membershipId: userProfile.membershipId || 'CIYA-PRO-2026-XXXX',
+                              expiryDate: userProfile.badgeExpiryDate 
+                                ? new Date(userProfile.badgeExpiryDate).toISOString() 
+                                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                              photoURL: userProfile.photoURL || ''
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-5 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-center space-y-3">
+                        <span className="text-3xl block">🔒</span>
+                        <h4 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">No Active Badge Found</h4>
+                        <p className="text-xs text-slate-500 font-semibold leading-relaxed max-w-md mx-auto">
+                          You do not currently have an active 30-day CIYA Membership Badge. Upgrade to "CIYA Student Pro" to unlock benefits and display your verified credentials.
+                        </p>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="sm:col-span-2 pt-6 border-t border-slate-100">
@@ -4958,7 +6106,7 @@ export default function StudentDashboard() {
                   const lastUnlockedDayIdx = (() => {
                     let lastIdx = 0;
                     for (let idx = 0; idx < daysList.length; idx++) {
-                      const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id);
+                      const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id, appSettings);
                       if (isUnlocked) {
                         lastIdx = idx;
                       }
@@ -4981,11 +6129,16 @@ export default function StudentDashboard() {
                         <select
                           value={submitDayIndex}
                           onChange={(e) => setSubmitDayIndex(Number(e.target.value))}
-                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-2xl py-3 px-4 font-bold text-xs focus:border-indigo-500 outline-none transition-all shadow-inner border-box"
+                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-2xl py-3 px-4 font-bold text-xs focus:border-indigo-500 outline-none transition-all shadow-inner border-box cursor-pointer"
                         >
-                          {Array.from({ length: daysList.length || 5 }).map((_, idx) => (
-                            <option key={idx} value={idx}>Day {idx + 1}: {daysList[idx]?.title || `Module Study Checklist`}</option>
-                          ))}
+                          {Array.from({ length: daysList.length || 5 }).map((_, idx) => {
+                            const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id, appSettings);
+                            return (
+                              <option key={idx} value={idx}>
+                                {isUnlocked ? "🔓" : "🔒"} Day {idx + 1}: {daysList[idx]?.title || `Module Study Checklist`} {!isUnlocked && " (Locked)"}
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
 
@@ -5132,7 +6285,7 @@ export default function StudentDashboard() {
                                       setUploadingImage(true);
                                       showToast(`Uploading ${file.name} to backend storage...`);
                                       try {
-                                        const publicUrl = await uploadToSupabaseStorage(file, 'assignments');
+                                        const publicUrl = await uploadToSupabaseStorage(file, 'assignments', registeredCourse?.id, currentUser?.uid);
                                         setUploadedImages(prev => [...prev, publicUrl]);
                                         showToast(`Successfully uploaded ${file.name}!`);
                                       } catch (err) {
@@ -5173,7 +6326,7 @@ export default function StudentDashboard() {
                                           setUploadingImage(true);
                                           showToast(`Uploading ${file.name} to backend storage...`);
                                           try {
-                                            const publicUrl = await uploadToSupabaseStorage(file, 'assignments');
+                                            const publicUrl = await uploadToSupabaseStorage(file, 'assignments', registeredCourse?.id, currentUser?.uid);
                                             setUploadedImages(prev => [...prev, publicUrl]);
                                             showToast(`Successfully uploaded ${file.name}!`);
                                           } catch (err) {
@@ -5195,7 +6348,7 @@ export default function StudentDashboard() {
                                   />
                                   <span className="text-2xl block mb-2 select-none">{uploadingImage ? "⏳" : "📸"}</span>
                                   <p className="text-xs font-bold text-slate-800">
-                                    {uploadingImage ? "Uploading to Cloudinary Cloud Storage..." : "Drag & Drop images or click to browse"}
+                                    {uploadingImage ? "Uploading..." : "Drag & Drop images or click to browse"}
                                   </p>
                                   <p className="text-[10px] text-slate-400 mt-1">Upload up to 3 screenshots confirming your active workspace outputs, or leave blank if providing text/links.</p>
                                 </div>
@@ -5294,6 +6447,8 @@ export default function StudentDashboard() {
                   hasCompletedFirstCourse={hasCompletedFirstCourse}
                   loading={loading}
                   allMySubmissions={allMySubmissions}
+                  appSettings={appSettings}
+                  onRequestUnlockAdvanced={(c) => setAdvancedPaymentCourse(c)}
                 />
               ) : (
                 <div className="space-y-8">
@@ -5330,7 +6485,7 @@ export default function StudentDashboard() {
                         </button>
                       </div>
                     </motion.div>
-                  ) : (
+                  ) : isNewUser ? (
                     <motion.div 
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -5356,6 +6511,62 @@ export default function StudentDashboard() {
                         </div>
                       </div>
                     </motion.div>
+                  ) : (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5 }}
+                      className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-teal-950 to-indigo-950 rounded-3xl p-6 md:p-8 text-white shadow-xl border border-teal-850 text-left"
+                    >
+                      <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16 animate-pulse" />
+                      
+                      <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                        <div className="space-y-3">
+                          <span className="inline-block bg-teal-500/20 border border-teal-400/35 text-teal-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+                            {timeOfDayGreeting.emoji} INTEL PORTAL ACTIVE
+                          </span>
+                          <h1 className="text-xl md:text-2xl font-black tracking-tight leading-tight">
+                            {timeOfDayGreeting.text}, <span className="text-amber-400">{userProfile?.fullName || 'Scholar'}</span>!
+                          </h1>
+                          <p className="text-xs text-slate-300 leading-relaxed font-medium max-w-sm">
+                            {timeOfDayGreeting.desc} Your intranet terminal has synced with Nigeria's local standard time.
+                          </p>
+                        </div>
+
+                        <div className="bg-white/5 border border-white/10 rounded-2.5xl p-5 shadow-inner">
+                          <h4 className="text-xs font-black tracking-widest uppercase text-teal-300 mb-3 flex items-center gap-2 select-none">
+                            <span>📈</span> Learning Progress Tracker
+                          </h4>
+                          {registeredCoursesList.length === 0 ? (
+                            <div className="text-[11px] text-slate-400 font-bold bg-white/5 border border-white/5 rounded-2xl p-4 text-center">
+                              No active courses registered yet. Explore the tracks below to enroll!
+                            </div>
+                          ) : (
+                            <div className="space-y-3 max-h-[140px] overflow-y-auto pr-1">
+                              {registeredCoursesList.map(r => {
+                                const progressStore = userProfile?.progress?.[r.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+                                const completedKeys: string[] = progressStore.watched || [];
+                                const totalVideos = r.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
+                                const progressRatio = totalVideos > 0 ? Math.round((completedKeys.length / totalVideos) * 100) : 0;
+                                return (
+                                  <div key={r.id} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl p-3 flex flex-col gap-1.5 transition-colors">
+                                    <div className="flex justify-between items-center gap-2">
+                                      <span className="font-extrabold text-[11px] text-white truncate max-w-[170px]">{r.title}</span>
+                                      <span className="font-black text-[9px] text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-full shrink-0">
+                                        {progressRatio}% COMPLETE
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                                      <div className="bg-gradient-to-r from-teal-400 to-amber-300 h-full rounded-full transition-all duration-500" style={{ width: `${progressRatio}%` }} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
                   )}
 
                   <div className="space-y-4 text-left">
@@ -5374,6 +6585,29 @@ export default function StudentDashboard() {
                             {v.icon} {v.label}
                           </button>
                         ))}
+                      </div>
+
+                      {/* Course Level Filter Dropdown */}
+                      <div className="flex items-center gap-3 bg-white border border-slate-200/80 rounded-xl px-3 py-1.5 shadow-sm shrink-0 w-full sm:w-auto justify-between sm:justify-start">
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Level:</span>
+                        <select
+                          value={courseLevelFilter}
+                          onChange={(e) => {
+                            const val = e.target.value as 'beginner' | 'advanced';
+                            setCourseLevelFilter(val);
+                            safeStorage.setItem('ciya_course_level_filter', val);
+                          }}
+                          className="bg-transparent border-0 text-xs font-black text-slate-700 focus:ring-0 focus:outline-none cursor-pointer uppercase tracking-wider text-right sm:text-left select-none appearance-none pr-6"
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right center',
+                            backgroundSize: '12px',
+                          }}
+                        >
+                          <option value="beginner">Beginner's Course</option>
+                          <option value="advanced">Advance Course</option>
+                        </select>
                       </div>
                     </div>
 
@@ -5644,6 +6878,159 @@ export default function StudentDashboard() {
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-slate-900 border border-slate-800 text-white font-extrabold text-xs px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 max-w-sm truncate select-none">
           <span>🔔</span>
           <span>{toastMsg}</span>
+        </div>
+      )}
+
+      {/* Option A Advanced Course Monetization Flow Modal */}
+      {advancedPaymentCourse && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            className="bg-white rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl border border-purple-100 text-left space-y-6 my-8 font-sans relative max-h-[90vh] overflow-y-auto"
+          >
+            {/* Top Close Button */}
+            <button
+              onClick={() => setAdvancedPaymentCourse(null)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 border-0 bg-transparent cursor-pointer p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="text-center space-y-2">
+              <span className="bg-purple-100 text-purple-800 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full inline-block">
+                🎓 ADVANCED CURRICULUM ACCESS GATE
+              </span>
+              <h3 className="text-xl font-black text-slate-900 leading-tight">
+                Unlock {advancedPaymentCourse.title}
+              </h3>
+              <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                Unlock this elite syllabus path immediately via secure direct transfer.
+              </p>
+            </div>
+
+            {/* Price Alert */}
+            <div className="bg-purple-50/50 border border-purple-100 rounded-2xl p-4 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-bold text-purple-500 uppercase tracking-widest block">Class Registration Tuition Fee</span>
+                <span className="text-2xl font-black text-purple-950">
+                  ₦{(appSettings?.advancedCourseSettings?.price ?? 50000).toLocaleString()}
+                </span>
+              </div>
+              <span className="text-2xl">⚡</span>
+            </div>
+
+            {/* Transfer Instructions & Details */}
+            <div className="space-y-3.5">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                🏦 Interbank Direct Transfer Details
+              </h4>
+              
+              <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 space-y-3 text-xs font-bold text-slate-700">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-400">Bank Name</span>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-slate-900 font-extrabold">{appSettings?.advancedCourseSettings?.bankName ?? 'United Bank for Africa (UBA)'}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(appSettings?.advancedCourseSettings?.bankName ?? 'United Bank for Africa (UBA)');
+                        showToast('Copied Bank Name! 📋');
+                      }}
+                      className="text-[10px] text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-0 rounded px-1.5 py-0.5 cursor-pointer font-bold"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-400">Account Name</span>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-slate-900 font-extrabold text-right truncate max-w-[200px]">{appSettings?.advancedCourseSettings?.accountName ?? 'CIYA Academy International Ltd'}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(appSettings?.advancedCourseSettings?.accountName ?? 'CIYA Academy International Ltd');
+                        showToast('Copied Account Name! 📋');
+                      }}
+                      className="text-[10px] text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-0 rounded px-1.5 py-0.5 cursor-pointer font-bold"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Account Number</span>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-slate-900 font-black tracking-wide">{appSettings?.advancedCourseSettings?.accountNumber ?? '1023948576'}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(appSettings?.advancedCourseSettings?.accountNumber ?? '1023948576');
+                        showToast('Copied Account Number! 📋');
+                      }}
+                      className="text-[10px] text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-0 rounded px-1.5 py-0.5 cursor-pointer font-bold"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Countdown / Rotating code sync status block */}
+            <AdvancedCoursePasscodeSection
+              secret={appSettings?.advancedCourseSettings?.secretPasscode ?? 'CIYA_ADVANCED_PASSCODE_SECRET_2026'}
+              onVerifySuccess={async () => {
+                try {
+                  const courseId = advancedPaymentCourse.id;
+                  
+                  // Set userProfile progress
+                  const progressUpdates: Record<string, any> = {};
+                  progressUpdates[courseId] = {
+                    durationMode: 'standard',
+                    createdAt: new Date().toISOString()
+                  };
+
+                  const updatedProfile = {
+                    ...userProfile,
+                    progress: {
+                      ...(userProfile?.progress || {}),
+                      ...progressUpdates
+                    }
+                  };
+                  setUserProfile(updatedProfile);
+                  safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
+                  const userRef = doc(db, 'users', currentUser.uid);
+                  const dbUpdates: Record<string, any> = {
+                    [`progress.${courseId}.durationMode`]: 'standard',
+                    [`progress.${courseId}.createdAt`]: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                  };
+                  await updateDoc(userRef, dbUpdates);
+
+                  setAdvancedPaymentCourse(null);
+                  setSelectedCourseId(courseId);
+                  navigate(`/dashboard?view=courses&courseId=${courseId}`);
+                  setShowCongratsPopup(true);
+                  showToast(`🎉 Success! Advanced track unlocked!`);
+                } catch (err) {
+                  console.error(err);
+                  alert("Passcode correct, but failed to save enrollment in database. Please check connection and try again.");
+                }
+              }}
+              whatsappNumber={appSettings?.advancedCourseSettings?.whatsappNumber ?? '+2349042544355'}
+              courseTitle={advancedPaymentCourse.title}
+              price={appSettings?.advancedCourseSettings?.price ?? 50000}
+              userEmail={currentUser?.email || ''}
+            />
+
+          </motion.div>
         </div>
       )}
 

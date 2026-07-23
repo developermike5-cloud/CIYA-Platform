@@ -1,0 +1,862 @@
+[
+  {
+    "title": "CIYA ADVANCE WEBSITE FULLSTACK COURSE",
+    "subtitle": "Master advanced AI engineering, fullstack app development, and database optimizations",
+    "tagline": "Master advanced AI engineering, fullstack app development, and database optimizations",
+    "thumbnail": "https://res.cloudinary.com/di4dlnd5x/image/upload/v1784712745/WhatsApp_Image_2026-07-22_at_10.27.17_oreqyx.jpg",
+    "description": "The CIYA Advanced Website Development Class is designed for students who have completed the beginner training and are ready to build professional, client-ready websites. In this course, you will learn how to transform a static website into a fully functional web application by integrating authentication, databases, cloud storage, admin dashboards, custom domains, and live hosting. You'll also learn industry best practices for refining projects, managing real-world clients, and turning your skills into a sustainable source of income.",
+    "overview": "The CIYA Advanced Website Development Class is designed for students who have completed the beginner training and are ready to build professional, client-ready websites. In this course, you will learn how to transform a static website into a fully functional web application by integrating authentication, databases, cloud storage, admin dashboards, custom domains, and live hosting. You'll also learn industry best practices for refining projects, managing real-world clients, and turning your skills into a sustainable source of income.",
+    "category": "AI Website Class",
+    "skill": "web",
+    "subskill": "Backend Development",
+    "skillPath": "",
+    "durationMode": "standard",
+    "level": "Advanced",
+    "tier": "advanced",
+    "price": 15000,
+    "instructor": "CIYA Team",
+    "outcomes": "By the end of this course, you will be able to:\n\nBuild secure websites with user authentication and authorization.\nConnect websites to modern cloud databases and storage systems.\nCreate professional admin dashboards to manage website content.\nDeploy websites to multiple hosting platforms and connect custom domains.\nUpdate website content, images, and videos without rebuilding the entire project.\nOptimize, refine, and prepare websites for real clients.\nPackage, price, and confidently sell your website development services.\nGet CIYA certificate of completion",
+    "requirements": "Successful completion of the CIYA Beginner Website Development Class (recommended).\nA smartphone, tablet, or laptop with internet access.\nA Google account and willingness to create free developer accounts during the training.\nBasic understanding of website creation and AI-assisted development.\nCommitment to complete practical exercises and build the class project.",
+    "publish_status": "Draft",
+    "status": "draft",
+    "isLocked": true,
+    "days": [
+      {
+        "dayNumber": 1,
+        "title": "MODULE 1: BACKEND FUNDAMENTALS",
+        "description": "Understanding system architecture, databases, secure backend proxies, and how multi-user states interact with the frontend.",
+        "assignment": {
+          "prompt": "MODULE 1 FINAL ASSIGNMENT\nUnderstanding Modern Web Application Architecture\n\nCongratulations on completing Module 1\n\nBefore moving into the practical sessions in Module 2, your goal is to prove that you understand how a complete full-stack application works, even before writing any backend code.\n\nComplete all the tasks below.\n\nTask 1 – Analyze Your Favorite App (20 Marks)\n\nChoose one application you use regularly.\n\nExamples:\n\nWhatsApp\nFacebook\nInstagram\nTikTok\nJumia\nAmazon\nNetflix\nOpay\nPalmPay\nUber\nBolt\nSpotify\nGmail\n\nThen answer the following questions:\n\nWhat is the frontend of this application?\nWhat backend activities happen behind the scenes?\nWhat information do you think is stored in the database?\nWhat files are likely stored in cloud storage?\nWhat APIs do you think this application uses?\nWhat type of users does the application have?\nWhat authentication methods does it likely support?\n\n\nTask 2 – Do further research and list different types of backend platforms developers use for the following (30 Marks)\n\nAuthentication\nDatabase\nStorage\nPayment Gateway\nMaps API\nEmail Service\nPush Notifications\nAnalytics\n\nExplain why you think each service is needed.\n\n\n\nTask 3 – Backend Thinking Challenge (20 Marks)\n\nImagine you're building an Online School Portal.\n\nSeparate the following into the correct backend service.\n\n                                                                                                             Authentication\t         Database\t                 Storage\nStudent Profile Picture\t\t\t\nStudent Name\t\t\t\nPassword\t\t\t\nMathematics Result\t\t\t\nGraduation Video\t\t\t\nSchool Logo\t\t\t\nParent Phone Number\t\t\t\nPDF Report Card\t\t\t\nEmail Address\t\t\t\nPDF\t\n\n\t\t\nTask 4 – Explain Like You're Teaching Someone (15 Marks)\n\nIn your own words, explain the following concepts as if you were teaching a complete beginner.\n\nBackend\nAPI\nDatabase\nAuthentication\nCloud Storage\nHosting\n\nUse simple language.\n\nAvoid copying definitions from Google or any AI\n\n\n\nTask 5 – Build Your Own System Design (15 Marks)\n\nChoose one of the following:\n\nHospital Management System\nE-commerce Website\nHotel Booking System\nEstate Management Portal\nChurch Management System\nSchool Portal\n\nThen answer:\n\nWhat information will your database store?\nWhat files will cloud storage store?\nWho are the users?\nWhat authentication methods will you use?\nWhat pages will the frontend have?\nWhat backend services will your application need?\nSubmission Format\n\nSubmit your assignment as a texts format in the assignment submission page\n\n1. By copying the questions one after the other and putting their answers under them\n2. By not skipping any question or not giving full detailed answers\n\n\nTotal Marks\n\nTask\t                                                                        Marks\nFavorite App Analysis\t                                           20\nBackend types lists\t                                               30\nBackend Thinking Challenge                                20\nExplain the Concepts\t                                           15\nSystem Design\t                                                       15\nTotal\t                                                                           100 Marks\n\n\n\n\n\nRemember, this assignment is not about being 100% correct.\n\nIt is designed to help you think like a software engineer.\n\nModule 1 was all about understanding how systems work together. If you can analyze an application, identify its components, and explain how data flows through it, you've built the mindset you'll need for the practical lessons ahead.\n\nIn Module 2, you'll begin turning these ideas into real, working applications with Firebase. Good luck!",
+          "dueNote": "Take your time and complete the assignment, submit on time to speed up your learning journey"
+        },
+        "videos": [
+          {
+            "id": "adv-v1",
+            "title": "INTRO TO ADVANCED CLASS COURSE ",
+            "video_url": "https://youtu.be/ybXSN6dB1sk",
+            "url": "https://youtu.be/ybXSN6dB1sk",
+            "duration": "06:31 min",
+            "description": "A deep dive into server-client architect5 Points of Prior Foundational Required Knowledge\nBasic Web Appearance Skills: You should already know how to use AI tools or standard tools to spin up a professional-looking, static web page focusing on aesthetics like layout, typography, and colors [00:26].\n\nUnderstanding Front-End Basics: A basic grasp of what a \"front end\" is—the visible part of an app containing the buttons, forms, and visual interface that users interact with [02:21].\n\nFamiliarity with the Idea of Cloud/Hosting Tools: An awareness that modern tools exist to host code and handle files (like GitHub, Netlify, or Firebase) without needing to manage physical computer servers yourself [03:23].\n\nAwareness of Core Business Needs: Understanding the basic functional requirements a real-world business has, such as needing user accounts, secure login systems, and a way to take payments or book appointments [01:32].\n\nA Growth Mindset Towards Errors: A willingness to accept that making mistakes, breaking things, and fixing bugs is the core process of learning to build functional software [04:31].ures, secure environment variables, and scalable state machines.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "type": "tf",
+                "statement": "A standard website primarily exists to present static information, while software allows users to interact, solve problems, and perform secure actions.",
+                "answer": true,
+                "explanation": "The video explains that a website acts like a beautiful digital billboard to display information, whereas software functions like a fully stocked vending machine that processes secure interactions like logins and payments [01:18]."
+              },
+              {
+                "type": "tf",
+                "statement": "The front end of an application is responsible for securely storing user data and validating user permissions.",
+                "answer": false,
+                "explanation": "The front end is just the visual layer the user sees. It is the back end that acts as the \"brain,\" processing requests, checking permissions, and protecting data [02:34]."
+              },
+              {
+                "type": "tf",
+                "statement": "Using serverless logic via tools like Firebase means developers have to manually configure and manage physical computers.",
+                "answer": false,
+                "explanation": "Serverless tools like Firebase mean you do not have to manage physical computers yourself; the cloud handles all of that heavy lifting behind the scenes [03:23]."
+              },
+              {
+                "type": "tf",
+                "statement": "Making coding mistakes and encountering bugs is a sign of failure and means you are not cut out for software development.",
+                "answer": false,
+                "explanation": "Making mistakes and debugging is actually the fastest way to learn and is the exact process that builds a developer's real-world confidence [04:31]."
+              },
+              {
+                "type": "tf",
+                "statement": "Modern businesses pay a premium for fancy animations rather than functional systems that automate their business processes.",
+                "answer": false,
+                "explanation": "Businesses do not wake up looking for animations; they pay for practical solutions that save time, generate revenue, and solve tangible problems [05:32]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "The internet is completely flooded with people who can make a nice-looking web page, but mastering the underlying backend architecture is what makes you completely future-proof"
+            }
+          },
+          {
+            "id": "wadhjll",
+            "title": "WHAT IS A BACKEND?",
+            "video_url": "https://youtu.be/opS9d-azlRU",
+            "url": "https://youtu.be/opS9d-azlRU",
+            "duration": "09:01min",
+            "description": "3 Points of Prior Foundational Required Knowledge\n\nThe Role of the Front End: Understanding that the front end consists of the user-facing interface—buttons, text boxes, forms, images, and animations—that users interact with directly [01:34].\n\nThe Structural Distinction of Static Pages: Knowing that a basic website (like a company profile or portfolio) displays hardcoded information that doesn't change when you click around [04:51].\n\nBasic Understanding of Data Inputs: Knowing how standard interactive features work from a user's perspective, such as typing in an email/password, adding items to a shopping cart, or uploading a profile picture [02:21, 05:24].",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: Using the presenter's restaurant analogy, what part of a web application does the hidden kitchen represent?",
+                "options": [
+                  "The frontend user interface",
+                  "The web browser's search history cache",
+                  "The back-end development system",
+                  "The physical menu given to the customer"
+                ],
+                "correct": 2,
+                "explanation": "The video uses a restaurant analogy where the waiter and menu represent the front end, while the hidden kitchen—where the heavy lifting, ingredient sorting, and cooking happen—represents the back end [01:45]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What is a major misconception regarding how user logins work on the front end?",
+                "options": [
+                  "The backend blindly approves every login request without checking",
+                  "The text boxes on the front end inherently know and store your password",
+                  "Logins only function if a website uses hardcoded static profile files",
+                  "Passwords can only be typed out using physical laptop computers"
+                ],
+                "correct": 1,
+                "explanation": "The presenter notes a massive misconception that the front end naturally \"knows\" your password. In reality, the front end has zero decision-making power; it simply collects the data and hands it off to the backend [02:16]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: According to the video, what is the sharp indicator or trigger that a project officially requires a backend?",
+                "options": [
+                  "The moment you change the website's font styles and layout animations",
+                  "The moment the application needs to securely remember or change data, such as a user registration or shopping cart",
+                  "The moment you share the static profile link to a mobile phone browser",
+                  "The moment you decide to use basic HTML text blocks on a single page"
+                ],
+                "correct": 1,
+                "explanation": "The video states that the sharp line between a static website and software is memory. The moment your app needs to remember something—like logins, cart items, or file uploads—a backend becomes an absolute necessity [05:24]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: Why does the presenter recommend using Firebase instead of building a backend from scratch with tools like Node.js or Python?",
+                "options": [
+                  "Firebase is completely free for global corporations while others cost money",
+                  "It completely eliminates the need to understand how databases operate",
+                  "It handles the infrastructure and server management heavy lifting, allowing you to focus purely on learning core concepts",
+                  "Firebase writes all front-end animations and layout designs automatically"
+                ],
+                "correct": 2,
+                "explanation": "Managing infrastructure from scratch can take weeks and become frustrating. Firebase is recommended because it bundles databases, security, and authentication into one platform, taking care of server management so you can focus on building [06:22]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: How does the presenter describe back-end development using the analogy of an \"invisible office\"?",
+                "options": [
+                  "An office where employees focus strictly on sketching visual templates and typography layouts",
+                  "A disorganized storage unit where digital files are thrown away after every single session",
+                  "An organized system that receives data, neatly sorts and stores it in database \"filing cabinets,\" and restricts access based on clearance",
+                  "A physical computer lab that can only be accessed using complex coding languages"
+                ],
+                "correct": 2,
+                "explanation": "To make back-end development less intimidating, the presenter explains it as running an efficient digital office where files (data) come in, get stored securely in filing cabinets (databases), and are rigorously protected [07:00]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "The front end of a website possesses absolutely zero decision-making power—when you log into an application, the pretty text boxes you interact with don't actually know who you are; they are completely dependent on an invisible back-end \"brain\" to securely evaluate, approve, or deny your request"
+            }
+          },
+          {
+            "id": "beh3mji",
+            "title": "FRONTEND VS BACKEND",
+            "video_url": "https://youtu.be/Qi0wDSUbH1A",
+            "url": "https://youtu.be/Qi0wDSUbH1A",
+            "duration": "07:56 min",
+            "description": "3 Points of Prior Foundational Required Knowledge\nThe Fundamental Concept of the Front End: Understanding that the front end refers to everything a user can directly see and interact with on a screen, such as layouts, dark mode, buttons, and animations [01:07].\n\nThe Fundamental Concept of the Back End: Understanding that the back end acts as the invisible \"brain\" of an application, responsible for processing data, validating information, and authenticating users out of sight [01:32].\n\nFamiliarity with Modern Web Interfaces: Basic familiarity with modern interactive web features that require data synchronization, such as typing a search query into an online store or submitting user forms [03:05].",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "type": "tf",
+                "statement": "If the back end of an application disappears completely, the buttons on the front end will still function perfectly.",
+                "answer": false,
+                "explanation": "If the back end disappears, you might still see the pretty buttons on the front end, but clicking them wouldn't do a single thing, rendering the app totally useless [01:51]."
+              },
+              {
+                "type": "tf",
+                "statement": "When you search for an item on an online shopping site, the front end independently crawls and searches the entire product index on its own.",
+                "answer": false,
+                "explanation": "The front end doesn’t search the products itself; it merely collects your text input and sends that request across an invisible bridge to the backend, which crawls the database and fires the results back [03:05]."
+              },
+              {
+                "type": "tf",
+                "statement": "Firebase eliminates the need for a backend entirely, allowing the front end to talk to databases without any backend logic or security rules.",
+                "answer": false,
+                "explanation": "Firebase is a Backend-as-a-Service (BaaS) that handles the heavy lifting for you, but back-end concepts like security rules, backend logic, and permissions absolutely still exist and are required [04:36]."
+              },
+              {
+                "type": "tf",
+                "statement": "Because AI can generate beautiful website code, developers no longer need to understand underlying back-end architectures or how data is saved.",
+                "answer": true,
+                "explanation": "AI is a fantastic tool that can generate code, but it still requires specific instructions from you. If you don't understand the underlying architecture, you won't be able to solve problems or understand why a login, image upload, or database save breaks [05:08]."
+              },
+              {
+                "type": "tf",
+                "statement": "On an online course platform, displaying a video or showing a visual progress bar is a front-end task, but securely saving that student's progress for tomorrow is handled by the back end.",
+                "answer": true,
+                "explanation": "Visual representation is always a front-end responsibility, whereas capturing, processing, and permanently storing that state data is strictly the job of the back end [06:18]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "True application success requires a delicate, full-stack balance—even if you engineer a powerful, lightning-fast back-end data system, a confusing or poor front-end interface will completely discourage users from ever wanting to use it"
+            }
+          },
+          {
+            "id": "0f8lhfh",
+            "title": "CLIENT VS SERVER",
+            "video_url": "https://youtu.be/o4wOJW9-RvA",
+            "url": "https://youtu.be/o4wOJW9-RvA",
+            "duration": "07:02 min",
+            "description": "3 Points of Prior Foundational Required Knowledge\nThe Core Concept of a Request and Response: Understanding that data on the internet does not appear magically; it relies on an exchange where one side asks for something and the other side provides an answer [00:51].\n\nThe Visual Role of the User Interface (UI): Knowing that web browsers, mobile apps, and smartwatches are tools designed to visually display text, images, and dashboards to human beings [01:10].\n\nThe Basic Meaning of Backend Infrastructure: A basic familiarity with the idea that heavy computational processes, user verification (authentication), and permanent data tracking happen remotely away from a user's local device hardware [02:56].",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What core definition does the presenter provide for the \"client\" in the internet's architectural conversation?",
+                "options": [
+                  "The physical cloud facility that hosts thousands of hardware racks",
+                  "Any application or device doing the requesting, such as a web browser, mobile app, or smartwatch",
+                  "The financial merchant system that securely processes credit card transactions",
+                  "The fiber optic cables laid under the ocean to connect global networks"
+                ],
+                "correct": 1,
+                "explanation": "The video explains that the client is simply whatever device or application is making the request, and it can be a browser, a mobile phone app, or even a smartwatch [01:04]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: How does the video describe the behavioral difference between personal laptops and servers?",
+                "options": [
+                  "Laptops stay online all day and night to route traffic, while servers must be shut down to cool off",
+                  "Laptops process database commands, while servers are only used to draw visual layout designs",
+                  "Personal laptops are put to sleep or tossed in bags, whereas servers are built to stay online 24 hours a day, 7 days a week",
+                  "Laptops require fiber optic lines, while servers operate completely without an internet connection"
+                ],
+                "correct": 2,
+                "explanation": "Unlike individual laptops that users turn off or carry around, servers are tireless, specialized computers engineered to remain online 24/7 to process incoming requests from all over the world [01:26]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: When a user enters their email and password into a client browser login portal, what power dynamic takes place?",
+                "options": [
+                  "The client independently decides if the credentials are right and automatically creates a new session",
+                  "The client blindly passes the credentials to a remote server (like Firebase) which evaluates the data and hands down the final verdict",
+                  "The client overrides the server to unlock permissions without requiring a database check",
+                  "The client completely deletes the database record to protect the user's personal privacy cache"
+                ],
+                "correct": 1,
+                "explanation": "The video states that the client follows orders; it has no decision-making power during login verification. It blindly passes your credentials to a server, which checks the database and dictates whether access is granted [02:43]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What is the true meaning behind the industry term \"serverless\" when utilizing modern tools like Firebase?",
+                "options": [
+                  "Physical servers have been completely destroyed and replaced by artificial intelligence algorithms",
+                  "Web applications no longer need backend horsepower or secure routing layers to save photos",
+                  "Physical servers absolutely still exist, but a company like Google manages the massive infrastructure kitchen for you so you don't have to maintain hardware",
+                  "Code blocks are directly written into the user's phone hard drive to operate entirely offline"
+                ],
+                "correct": 2,
+                "explanation": "\"Serverless\" is a misnomer; physical servers still exist. The term means that cloud providers like Google handle all the server setup, scaling, and maintenance, allowing developers to use backend horsepower without managing physical hardware [03:59]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: How does the \"separation of concerns\" between client and server streamline technical troubleshooting when an app breaks?",
+                "options": [
+                  "It forces the developer to completely rewrite the entire codebase from scratch",
+                  "It isolates logic so developers can logically pinpoint whether the client sent a bad request or the server returned a broken response",
+                  "It automatically alerts the WhatsApp product support queue to patch the bug instantly",
+                  "It converts the layout into a static company billboard profile automatically"
+                ],
+                "correct": 1,
+                "explanation": "Because the client (presentation/requests) and server (processing/responses) have distinct boundaries, developers can troubleshoot intelligently by analyzing exactly where the communication broke down [05:01]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Without a functional server online to process requests, even the most gorgeously designed application in the world is instantly reduced to a completely empty, static, and useless shell"
+            }
+          },
+          {
+            "id": "mg8u80o",
+            "title": "SERVER REQUEST JOURNEY",
+            "video_url": "https://youtu.be/Pqxfz0ow2vo",
+            "url": "https://youtu.be/Pqxfz0ow2vo",
+            "duration": "08:10 min",
+            "description": "3 Points of Prior Foundational Required Knowledge\nThe Client-Server Split: Knowing that an application is divided into a front-end client (the device requesting information) and a back-end server (the computer processing and answering that request) [00:10].\n\nBasic Interaction Concepts: Understanding that simple online actions—like clicking a thumbs-up button, submitting text, or picking a file—are translated by a web browser into digital packages sent over the internet [00:35].\n\nThe Global Scale of Network Hardware: Realizing that the cloud and the internet are physically supported by a global infrastructure of connected devices, routers, network switches, and data centers [01:18, 03:35].",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "type": "tf",
+                "statement": "The internet is physically structured as one massive, centralized supercomputer hidden away in a secret underground facility.",
+                "answer": false,
+                "explanation": "The internet is actually a decentralized network of millions of regular computers—belonging to individuals, universities, governments, and tech companies—all connected globally [01:18]."
+              },
+              {
+                "type": "tf",
+                "statement": "While humans use domain names like youtube.com to remember websites, computers communicate strictly using numbers called IP (Internet Protocol) addresses.",
+                "answer": true,
+                "explanation": "Humans rely on catchy names, but computers need numerical addresses (like 142.250.xx.xx) to route data packets to the correct device destination, just like a physical street address [02:04]."
+              },
+              {
+                "type": "tf",
+                "statement": "The Domain Name System (DNS) acts as the internet's fast phone book, translating human-readable website names into numerical IP addresses.",
+                "answer": true,
+                "explanation": "Without DNS, users would have to memorize long strings of numbers for every website. Instead, the browser asks a DNS server for the mapping coordinates, and it instantly provides the numbers [02:38]."
+              },
+              {
+                "type": "tf",
+                "statement": "Simple actions like hitting a \"like\" button do not require a request to a server because the browser can update the permanent database independently.",
+                "answer": false,
+                "explanation": "Even a tiny action like a \"like\" triggers the full three-stage pattern: the browser sends a request, the server updates its database, and the server sends a confirmation response back so the browser can update the screen [04:04]."
+              },
+              {
+                "type": "tf",
+                "statement": "Latency is purely determined by the speed of your local home Wi-Fi connection and has nothing to do with physical global distances or underwater cables.",
+                "answer": false,
+                "explanation": "Latency is directly influenced by physical distance. If you are in Lagos, Nigeria, and request data from a server in London, that information physically has to travel thousands of kilometers through underwater fiber optic cables, which introduces a tiny physical time delay [05:42]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "When you upload a single photo to a modern application, it triggers a multi-stage digital relay race where your file is sent to one specialized server to generate a secure link, and then that link is immediately zipped off to an entirely separate database server to save your profile history—all in the span of a few milliseconds"
+            }
+          },
+          {
+            "id": "oa4l1s2",
+            "title": "WHAT IS AN API?",
+            "video_url": "https://youtu.be/Z9rt7fSGmkY",
+            "url": "https://youtu.be/Z9rt7fSGmkY",
+            "duration": "06:42 min",
+            "description": "Prior Foundational Required Knowledge\nTo fully grasp the concepts in this video, a learner should understand:\n\nThe Client-Server Model: Knowing that the web operates on a basic request-and-response system between a user's device (the client) and a remote computer storing data (the server).\n\nThe Messiness of Raw Human Data: A basic awareness that computers cannot easily read or guess unstructured text, meaning software needs a clean, standardized format to share data smoothly.\n\nThe Concept of Specialized Tech Services: Understanding that modern apps don't build everything themselves; they rely on third-party specialists for tasks like user login, databases, maps, and payment processing.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What real-world analogy does the presenter use to describe how an API works?",
+                "options": [
+                  "A taxi driver navigating through heavy city traffic",
+                  "A restaurant waiter carrying orders back and forth between the customer and the kitchen",
+                  "A librarian sorting heavy books into alphabetical order",
+                  "A security guard locking the front doors of a massive bank tower"
+                ],
+                "correct": 1,
+                "explanation": "The video explains that the API acts exactly like a waiter, taking your order to the kitchen (the backend server) and bringing back the response (your food) without you ever having to cook it yourself [01:12]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: According to the video, what would you have to do to build a simple weather app if APIs did not exist?",
+                "options": [
+                  "Manually draw map outlines using graphic design tools",
+                  "Pay thousands of users to text you their local temperature daily",
+                  "Launch your own satellites to monitor the Earth's atmosphere yourself",
+                  "Code a brand new web browser from scratch using JavaScript"
+                ],
+                "correct": 2,
+                "explanation": "The presenter highlights that instead of doing the insane work of launching your own satellites, you simply ping a weather API that does all the atmospheric lifting for you [01:35]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: Which standard HTTP method must an API use when it needs to retrieve information from a system?",
+                "options": [
+                  "DELETE",
+                  "POST",
+                  "PUT",
+                  "GET"
+                ],
+                "correct": 3,
+                "explanation": "The video outlines the fundamental language of APIs, noting that you use a \"get\" request to retrieve information, while \"post\" is used for creating new data [03:51]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What universal data format is highlighted in the tutorial as a neatly organized way for different programming languages to understand data?",
+                "options": [
+                  "XML Scripting Code",
+                  "JSON (JavaScript Object Notation)",
+                  "Python Dictionary Lists",
+                  "Plain TXT Paragraphs"
+                ],
+                "correct": 1,
+                "explanation": "The video explains that because apps are built in completely different programming languages, JSON acts as a highly structured, predictable universal format of name-value pairs that they can all instantly read [04:19]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: Instead of building an online store as one massive, clunky monolith, how does the presenter say you should view modern software?",
+                "options": [
+                  "As a giant hidden spreadsheet that updates once a day",
+                  "As a completely manual setup where users write code to submit forms",
+                  "As a finely tuned orchestra of distinct services communicating flawlessly together",
+                  "As a temporary layout that must be completely deleted every week"
+                ],
+                "correct": 2,
+                "explanation": "The core takeaway of the lesson is to stop seeing software as one big clunky monolith and instead see it as a beautiful orchestration of distinct systems working together via APIs [05:45]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Instead of building every complex feature from scratch—which would take years of manual coding—modern apps operate by borrowing world-class mapping, payment, and photo storage expertise from specialist companies in just seconds using invisible API messengers."
+            }
+          },
+          {
+            "id": "bbnvgx9",
+            "title": "DATABASE EXPLAINED",
+            "video_url": "https://youtu.be/oUfnpJbPiYg",
+            "url": "https://youtu.be/oUfnpJbPiYg",
+            "duration": "08:59 min",
+            "description": "Prior Foundational Required Knowledge\nTo fully grasp the concepts in this video, a learner should understand:\n\nThe Basics of Front-End and Back-End Roles: Understanding that the front end handles what the user sees on the screen, while the back end manages the behind-the-scenes logic and routing of information.\n\nThe Nature of Data Transmission (APIs): A fundamental awareness of how data travels across the internet using API messengers to send user input from a website or mobile device to a background server.\n\nThe Concept of Digital vs. Physical Organization: Familiarity with how data can be categorized into folders and files rather than being dumped into one chaotic, unsearchable pile.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What major problem would an application face if it did not use a database to store information?",
+                "options": [
+                  "The application server would continuously overheat and break down",
+                  "The app would suffer from \"digital amnesia,\" wiping out user accounts so they have to register all over again every time they visit",
+                  "The website text would automatically convert into a completely foreign language",
+                  "Users would be forced to use physical paper forms mailed through the post office"
+                ],
+                "correct": 1,
+                "explanation": "The video explains that without a database, an application has no permanent memory, meaning a student's profile information would be wiped clean the moment they left the site [02:03]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: In backend development, what do the letters in the critical acronym \"CRUD\" stand for?",
+                "options": [
+                  "Control, Reset, Undo, Duplicate",
+                  "Code, Run, Upload, Download",
+                  "Create, Read, Update, Delete",
+                  "Cache, Route, Unlink, Deploy"
+                ],
+                "correct": 2,
+                "explanation": "The presenter highlights CRUD as the single most important acronym in backend development, representing the four foundational operations that every single database performs [03:24]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: What distinction does the presenter make between the \"Update\" and \"Create\" operations in a database?",
+                "options": [
+                  "Update requires paying a fee, while Create is always completely free",
+                  "Update deletes the entire database history, while Create merely hides it",
+                  "Create is only used for image files, while Update is strictly reserved for user passwords",
+                  "Update modifies existing entries already sitting in the digital filing cabinet rather than generating brand-new entries"
+                ],
+                "correct": 3,
+                "explanation": "The video notes that with an update operation, you aren't generating brand-new data from scratch; you are simply changing details (like editing a bio or a product price) that already exist in the system [04:18]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: Why does the presenter advise against storing heavy media files like videos, images, or audio directly inside Cloud Firestore?",
+                "options": [
+                  "Firestore code blocks cannot read video files and will completely crash the application server",
+                  "Heavy media files quickly slow things down and increase costs, so they should be outsourced to specialized storage like Cloudinary while saving only the text URL in the database",
+                  "Firestore only works on desktop screens and cannot stream audio or video to mobile devices",
+                  "Cloud security rules automatically delete any uploaded media file after twenty-four hours"
+                ],
+                "correct": 1,
+                "explanation": "The tutorial shares a vital tip that databases are optimized for structured text and numbers; therefore, heavy media files should go to a specialized media service like Cloudinary, with only their fast, cheap text URLs saved in Firestore [06:44]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: How does a NoSQL database like Cloud Firestore logically organize its nested data structure from top to bottom?",
+                "options": [
+                  "Elements, Layouts, and Brackets",
+                  "Code blocks, Text fields, and Version histories",
+                  "Collections, Documents, and Fields",
+                  "Servers, Routers, and Frontends"
+                ],
+                "correct": 2,
+                "explanation": "The presenter breaks down the Fire Store architecture into three chronological steps: Collections (the main folders), Documents (the individual files inside), and Fields (the specific pieces of text or numbers inside that file) [05:46]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "When you upload a profile picture to a modern web application, the image itself isn't stored in the main database; instead, it is instantly outsourced to a separate specialized cloud storage server, which fires back a tiny snippet of text (a URL) that your database holds to remember exactly where your picture lives."
+            }
+          },
+          {
+            "id": "r6jgndj",
+            "title": "WHAT IS AUTHENTICATION AND AUTHORIZATION?",
+            "video_url": "https://youtu.be/ocK6RziZapA",
+            "url": "https://youtu.be/ocK6RziZapA",
+            "duration": "07:54 min",
+            "description": "Prior Foundational Required Knowledge\nTo fully grasp the concepts in this video, a learner should understand:\n\nThe Concept of a Digital Profile: Knowing that websites use a unique identifier (like an email or account ID) to match actions on a screen with a specific row of information in a database.\n\nThe Client-Server Request loop: A basic understanding that when you type text into an app, your browser doesn't process it locally; it sends a package of data over the internet to a backend service to evaluate.\n\nBasic Online Risk Awareness: Understanding that if a company stores user information carelessly, malicious hackers can potentially break into data storage systems and read plain text files.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "type": "tf",
+                "statement": "Authentication and Authorization mean the exact same thing in backend architecture and are used interchangeably to describe user permissions.",
+                "answer": false,
+                "explanation": "The video clears up this massive architectural mix-up, explaining that authentication proves who you are, while authorization kicks in afterward to determine what you are allowed to do [01:56]."
+              },
+              {
+                "type": "tf",
+                "statement": "When you type your email and password to log in, your local web browser is the component that ultimately decides if you are a valid user.",
+                "answer": false,
+                "explanation": "The presenter highlights that your web browser never actually decides if you are valid; instead, it simply collects your info and passes it to a backend service like Firebase, which makes the critical call [03:56]."
+              },
+              {
+                "type": "tf",
+                "statement": "Modern backend systems use a mathematical process called hashing to scramble passwords into a jumbled representation so they cannot be read in plain text if a hacker gains unauthorized access.",
+                "answer": true,
+                "explanation": "The video states that to fix the plain text database nightmare, systems use hashing to securely scramble passwords into a highly secure, un-reversible format [04:42]."
+              },
+              {
+                "type": "tf",
+                "statement": "Authentication services remember your session after you close your laptop so you don't have to re-type your password every single time you open the app a few minutes later.",
+                "answer": true,
+                "explanation": "The presenter notes that apps recognize you've already been verified and save you the hassle of logging in continuously by remembering your active session [05:49]."
+              },
+              {
+                "type": "tf",
+                "statement": "If a student successfully authenticates into a school portal, the authorization system will automatically grant them the permission to upload and modify course grades.",
+                "answer": false,
+                "explanation": "The tutorial uses a school portal as an example, showing that while a student successfully authenticates (proving their identity), they are blocked from uploading grades because they are not authorized with teacher permissions [02:55]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "When modern websites secure your password, they use a one-way mathematical process called \"hashing\" that completely scrambles your text into a jumbled mess—meaning the backend system doesn't actually store or know your real password; it only knows what its scrambled counterpart looks like!"
+            }
+          },
+          {
+            "id": "64apznr",
+            "title": "WHAT IS STORAGE NEEDED FOR?",
+            "video_url": "https://youtu.be/I9wC6jiXoDM",
+            "url": "https://youtu.be/I9wC6jiXoDM",
+            "duration": "08:43 min",
+            "description": "Prior Foundational Required Knowledge\nTo fully grasp the concepts in this video, a learner should understand:\n\nThe Difference Between Text Data and Media Files: Understanding that basic words, numbers, and dates take up very little digital room, whereas a single high-resolution image or video contains millions of data points and is massive by comparison.\n\nThe Concept of a URL (Web Address): Knowing that a URL is just a string of plain text that acts as a clickable map or pointer telling a web browser exactly where an asset lives on the internet.\n\nBasic Application Slowdown: A fundamental awareness that overcrowding any digital system with bulky, heavy files causes performance to lag, slowing down loading times for users.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "type": "tf",
+                "statement": "Databases are naturally highly optimized to directly store millions of bulky, standalone media files like videos and high-resolution images without slowing down.",
+                "answer": false,
+                "explanation": "The video states that shoving heavy files directly into a database makes the system massively bloated, sluggish, and incredibly expensive to maintain [02:20]."
+              },
+              {
+                "type": "tf",
+                "statement": "When you upload a photo using an app, the image file travels straight to a specialized storage service like Cloudinary, which saves the file and generates a simple text URL.",
+                "answer": true,
+                "explanation": "The presenter explains that Cloudinary acts as a digital warehouse, locking down the bulky file and instantly sending back a secure, lightweight text link to be saved in the database [03:45]."
+              },
+              {
+                "type": "tf",
+                "statement": "Specialized media storage platforms are strictly limited to handling image files and will completely fail if you attempt to upload PDFs, animated GIFs, or documents.",
+                "answer": false,
+                "explanation": "The tutorial explicitly clears up this beginner myth, noting that a service like Cloudinary can handle videos, GIFs, PDFs, website banners, and pretty much any standalone digital file your app needs [04:37]."
+              },
+              {
+                "type": "tf",
+                "statement": "Cloudinary can automatically shrink massive 5-megabyte smartphone photos on the fly to deliver smaller file sizes without ruining the visible image quality.",
+                "answer": true,
+                "explanation": "The video highlights automatic optimization as a total game-changer, explaining that Cloudinary automatically resizes and shrinks file sizes on the fly so websites don't crawl to a halt [05:26]."
+              },
+              {
+                "type": "tf",
+                "statement": "If a developer deletes a user's record from the text database, the associated profile picture in the media storage service is automatically deleted by default.",
+                "answer": false,
+                "explanation": "The presenter warns against this common beginner trap, explaining that developers must write specific code to delete the picture from storage, otherwise \"ghost files\" pile up and waste money [07:03]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "When you browse a heavy, media-rich app like Instagram, your phone is pulling off a seamless tag-team trick: it instantly fetches all the captions, likes, and dates from a text database, while simultaneously fetching the bulky images and videos from an entirely separate digital warehouse!"
+            }
+          },
+          {
+            "id": "7kwgkew",
+            "title": "WHAT IS HOSTING AND DEPLOYMENT?",
+            "video_url": "https://youtu.be/awOGlzk55oU",
+            "url": "https://youtu.be/awOGlzk55oU",
+            "duration": "07:15 min",
+            "description": "Prior Foundational Required Knowledge\nTo fully understand this video tutorial on hosting and deployment, a student should ideally have background knowledge in the following areas:\n\nLocal Development Environments (localhost): Understanding how to build and test websites on a personal laptop or computer before they are ready to be shared publicly [03:00].\n\nVersion Control with GitHub: Basic familiarity with Git and GitHub as a digital warehouse used to store, manage, and track versions of your source code [03:15].\n\nFrontend vs. Backend Architecture: A general grasp of how a user-facing layout (like a React frontend) connects with backend systems like databases, authentication services, and media storage [05:30].",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What core problem does web hosting solve for developers?",
+                "options": [
+                  "It automatically writes complex backend JavaScript logic for the application",
+                  "It keeps a website continuously online and accessible 24/7 on a specialized computer, preventing it from going offline when a personal laptop sleeps or loses power",
+                  "It allows a developer to design mobile app icons without using graphic tools",
+                  "It converts static text files into high-definition streaming media files"
+                ],
+                "correct": 1,
+                "explanation": "The video explains that hosting places your application on a specialized computer that stays continuously connected to the internet, so people can visit it even when your local machine is turned off or asleep [01:37]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: According to the presenter's book analogy, what represents a live, hosted website?",
+                "options": [
+                  "A single handwritten draft locked securely inside a private bedroom",
+                  "A digital manuscript shared over a local Bluetooth connection",
+                  "A book placed in a public library where anyone walking through the doors can read it",
+                  "A book that has been completely deleted and rewritten from scratch"
+                ],
+                "correct": 2,
+                "explanation": "The presenter uses the library analogy to show that hosting takes your private local project and transforms it into a completely publicly accessible application [02:06]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: What specific roles do GitHub and Netlify play in the automated deployment pipeline?",
+                "options": [
+                  "GitHub designs user interfaces, while Netlify manages user passwords",
+                  "GitHub acts as a digital warehouse storing the source code, while Netlify acts as the hosting provider that builds and publishes it to web servers",
+                  "GitHub tracks financial records, while Netlify fixes broken internet routers",
+                  "GitHub serves as the primary domain name registrar, while Netlify is a physical database"
+                ],
+                "correct": 1,
+                "explanation": "The video highlights the distinction: GitHub safely stores every version of your source code, and Netlify connects to that warehouse to publish the application to live web servers [03:15]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: Why are domain names used instead of relying solely on default hosting links or IP addresses?",
+                "options": [
+                  "IP addresses are illegal to share publicly on modern web browsers",
+                  "Default links charge a hidden fee for every visitor who clicks them",
+                  "IP addresses act like complex GPS coordinates that are terrible for humans to remember; domains provide a recognizable, professional identity",
+                  "Domain names automatically translate website text into multiple international languages"
+                ],
+                "correct": 2,
+                "explanation": "The tutorial notes that domain names seamlessly point users to your hosting provider using recognizable names (like Amazon.com) because strings of IP addresses are too complicated for people to memorize [04:51]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: In the full-stack architecture of the CIYA digital album, which service handles user authentication?",
+                "options": [
+                  "Cloudinary",
+                  "Netlify",
+                  "Firestore",
+                  "Firebase"
+                ],
+                "correct": 3,
+                "explanation": "The presenter maps out the full-stack ecosystem, explaining that Netlify hosts the front end, Firestore acts as the database, Cloudinary handles image storage, and Firebase steps in to manage user authentication [05:44]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "A web server is essentially a heavy-duty computer without a monitor that sits in a freezing cold room somewhere, operating 24/7 with the sole purpose of waiting to instantly fire back website files the exact split second a user typed URL request hits it"
+            }
+          }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "title": "DAY 2: FIREBASE SETUP",
+        "description": "",
+        "assignment": null,
+        "videos": [
+          {
+            "id": "f7lg9j8",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "lpb768q",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "ykfhcbk",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "t027cm3",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "euvd0x2",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          }
+        ]
+      },
+      {
+        "dayNumber": 3,
+        "title": "DAY 3: CLOUDINARY SETUP",
+        "description": "",
+        "assignment": null,
+        "videos": [
+          {
+            "id": "rgteevd",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "vmxi7or",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "ogqdzzz",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          }
+        ]
+      },
+      {
+        "dayNumber": 4,
+        "title": "DAY 4: SETTING UP HOSTING & DOMAIN",
+        "description": "",
+        "assignment": null,
+        "videos": [
+          {
+            "id": "e1p8dqc",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "3fry8tx",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "0eex12m",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "xrbx0w1",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          }
+        ]
+      },
+      {
+        "dayNumber": 5,
+        "title": "DAY 5: MONETIZATION STRATEGIES",
+        "description": "",
+        "assignment": null,
+        "videos": [
+          {
+            "id": "sk075h1",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "a0i94e0",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          },
+          {
+            "id": "2npe3xi",
+            "title": "",
+            "video_url": "",
+            "url": "",
+            "duration": "10 min",
+            "description": "",
+            "resources": "",
+            "checkType": "none",
+            "check": null,
+            "funFact": null
+          }
+        ]
+      }
+    ],
+    "updatedAt": "2026-07-22T09:52:07.850Z",
+    "id": "advanced-ai-mastery",
+    "createdAt": "2026-07-16T03:00:00.000Z"
+  }
+]

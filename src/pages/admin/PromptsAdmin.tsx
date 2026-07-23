@@ -654,8 +654,8 @@ export default function PromptsAdmin() {
   // Helper to upload media file to Cloudinary
   const uploadToSupabaseStorage = async (file: File, bucket: string = 'prompts'): Promise<string> => {
     try {
-      const cloudinaryUrl = await uploadToCloudinary(file, bucket);
-      return cloudinaryUrl;
+      const uploadRes = await uploadToCloudinary(file, bucket);
+      return uploadRes.url;
     } catch (err: any) {
       console.error("Cloudinary upload failed in PromptsAdmin:", err);
       throw err;
@@ -712,7 +712,7 @@ export default function PromptsAdmin() {
     }
 
     try {
-      showToast("Uploading video walkthrough to Supabase Cloud Storage...");
+      showToast("Uploading video/media walkthrough to Cloudinary...");
       const publicUrl = await uploadToSupabaseStorage(file, 'prompts');
       
       if (isFull) {
@@ -724,10 +724,10 @@ export default function PromptsAdmin() {
           setEditingModTemplate({ ...editingModTemplate, videoUrl: publicUrl });
         }
       }
-      showToast("Video uploaded to Supabase Storage successfully!");
+      showToast("Video uploaded to Cloudinary successfully!");
     } catch (err) {
-      console.warn("Supabase storage upload failed, falling back to base64 encoding:", err);
-      showToast("Storage failed, encoding to document (Warning: Large files might exceed Firestore/Supabase row limits)...");
+      console.warn("Cloudinary upload failed, falling back to base64 encoding:", err);
+      showToast("Storage failed, encoding to document (Warning: Large files might exceed Firestore limits)...");
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result as string;
@@ -1142,20 +1142,20 @@ export default function PromptsAdmin() {
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[10px] uppercase font-black text-slate-455">Attached WebM Video Walkthrough</label>
-                    <span className="text-[9px] text-amber-600 font-black">URL Link Recommended</span>
+                    <label className="block text-[10px] uppercase font-black text-slate-455">Live Showcase / Website Preview URL</label>
+                    <span className="text-[9px] text-indigo-600 font-bold">Upload Video walkthrough / Paste Link</span>
                   </div>
                   <div className="space-y-2">
                     <input
                       type="file"
-                      accept="video/webm"
+                      accept="video/*,image/*"
                       onChange={(e) => handleVideoUpload(e, true)}
-                      className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+                      className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                     />
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        placeholder="Or paste direct .webm video link (URL)"
+                        placeholder="Or paste direct preview link (URL)"
                         value={editingFullTemplate.videoUrl || ''}
                         onChange={(e) => setEditingFullTemplate({ ...editingFullTemplate, videoUrl: e.target.value })}
                         className="flex-1 bg-white text-slate-900 border border-slate-300 shadow-sm rounded-xl p-2.5 outline-none text-xs font-semibold focus:border-indigo-500 transition-all"
@@ -1172,7 +1172,7 @@ export default function PromptsAdmin() {
                     </div>
                     {editingFullTemplate.videoUrl && (
                       <div className="mt-2 text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                        <span>✓ Walkthrough Video Attached</span>
+                        <span>✓ Live Preview URL Attached</span>
                       </div>
                     )}
                   </div>
@@ -1394,20 +1394,20 @@ export default function PromptsAdmin() {
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[10px] uppercase font-black text-slate-455">Attached WebM Video Walkthrough</label>
-                    <span className="text-[9px] text-amber-600 font-bold">URL Recommended</span>
+                    <label className="block text-[10px] uppercase font-black text-slate-455">Live Showcase / Website Preview URL</label>
+                    <span className="text-[9px] text-indigo-600 font-bold">Upload Video walkthrough / Paste Link</span>
                   </div>
                   <div className="space-y-2">
                     <input
                       type="file"
-                      accept="video/webm"
+                      accept="video/*,image/*"
                       onChange={(e) => handleVideoUpload(e, false)}
-                      className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+                      className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                     />
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        placeholder="Or paste direct WebM video URL"
+                        placeholder="Or paste direct preview link (URL)"
                         value={editingModTemplate.videoUrl || ''}
                         onChange={(e) => setEditingModTemplate({ ...editingModTemplate, videoUrl: e.target.value })}
                         className="flex-1 bg-white text-slate-900 border border-slate-300 shadow-sm rounded-xl p-2.5 outline-none text-xs font-semibold focus:border-indigo-500 transition-all"
@@ -1422,6 +1422,11 @@ export default function PromptsAdmin() {
                         </button>
                       )}
                     </div>
+                    {editingModTemplate.videoUrl && (
+                      <div className="mt-2 text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                        <span>✓ Live Preview URL Attached</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
