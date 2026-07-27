@@ -210,7 +210,15 @@ let rtdbInstance;
 try {
   // Safe regional construction supporting US/EU databases
   const defaultRtdbUrl = `https://${firebaseConfig.projectId}-default-rtdb.firebaseio.com`;
-  const isEurope = firebaseConfig.projectId?.includes('europe-west') || firebaseConfig.firestoreDatabaseId?.includes('europe');
+  const isEurope = 
+    firebaseConfig.projectId?.includes('europe-west') || 
+    firebaseConfig.firestoreDatabaseId?.includes('europe') ||
+    firebaseConfig.projectId === 'gen-lang-client-0862975917' ||
+    (typeof window !== 'undefined' && (
+      window.location.hostname.includes('europe') || 
+      window.location.hostname.includes('london') || 
+      window.location.hostname.includes('west2')
+    ));
   const fallbackUrl = isEurope 
     ? `https://${firebaseConfig.projectId}-default-rtdb.europe-west1.firebasedatabase.app` 
     : defaultRtdbUrl;
@@ -263,31 +271,28 @@ if (typeof window !== 'undefined' && rtdbInstance) {
 
 export async function setGlobalDbConnectionDisabled(disabled: boolean) {
   isLocalToggleInitiated = true;
+  
+  // Always update local storage first to guarantee local offline simulation works
+  try {
+    window.localStorage.setItem('ciya_db_connection_disabled', disabled ? 'true' : 'false');
+  } catch (e) {
+    // ignore
+  }
+
+  // Attempt to synchronize globally via RTDB if available
   if (rtdbInstance) {
     try {
       await set(ref(rtdbInstance, 'settings/db_connection_disabled'), disabled);
-      try {
-        window.localStorage.setItem('ciya_db_connection_disabled', disabled ? 'true' : 'false');
-      } catch (e) {
-        // ignore
-      }
-      await setFirestoreNetworkState(!disabled);
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
     } catch (err) {
-      console.error("Failed to push global db_connection_disabled state to RTDB:", err);
+      console.warn("Failed to push global db_connection_disabled state to RTDB (falling back to local-only toggle):", err);
     }
-  } else {
-    try {
-      window.localStorage.setItem('ciya_db_connection_disabled', disabled ? 'true' : 'false');
-    } catch (e) {
-      // ignore
-    }
+  }
+
+  // Always apply local Firestore network state to make the change immediate for the user
+  try {
     await setFirestoreNetworkState(!disabled);
-    if (typeof window !== 'undefined') {
-      window.location.reload();
-    }
+  } catch (err) {
+    console.warn("Failed to set Firestore network state:", err);
   }
 }
 

@@ -47,3 +47,10 @@ body {
 .animate-spin-slow {
   animation: spin-slow 22s linear infinite;
 }
+
+/* Hide navbar smoothly when template popup modal is open */
+body.template-modal-open nav {
+  transform: translateY(-100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

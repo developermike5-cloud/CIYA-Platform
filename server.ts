@@ -181,6 +181,38 @@ async function startServer() {
     return possiblePaths[0];
   };
 
+  const getFullPromptsFilePath = () => {
+    const possiblePaths = [
+      path.resolve(process.cwd(), "src", "data", "full_prompts.json"),
+      path.resolve(process.cwd(), "dist", "full_prompts.json"),
+      path.resolve(currentDir, "src", "data", "full_prompts.json"),
+      path.resolve(currentDir, "..", "src", "data", "full_prompts.json"),
+      path.resolve(currentDir, "full_prompts.json")
+    ];
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+    return possiblePaths[0];
+  };
+
+  const getModularPromptsFilePath = () => {
+    const possiblePaths = [
+      path.resolve(process.cwd(), "src", "data", "modular_prompts.json"),
+      path.resolve(process.cwd(), "dist", "modular_prompts.json"),
+      path.resolve(currentDir, "src", "data", "modular_prompts.json"),
+      path.resolve(currentDir, "..", "src", "data", "modular_prompts.json"),
+      path.resolve(currentDir, "modular_prompts.json")
+    ];
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+    return possiblePaths[0];
+  };
+
   app.get("/api/courses", (req, res) => {
     try {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -252,6 +284,82 @@ async function startServer() {
     } catch (err: any) {
       console.error("Failed to write to advanced_courses.json:", err);
       res.status(500).json({ error: err.message || "Failed to save advanced courses to files." });
+    }
+  });
+
+  app.get("/api/prompts", (req, res) => {
+    try {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+
+      const fullPath = getFullPromptsFilePath();
+      const modPath = getModularPromptsFilePath();
+
+      let fullTemplates = [];
+      let modularTemplates = [];
+      let fullUpdatedAt = "";
+      let modularUpdatedAt = "";
+
+      if (fs.existsSync(fullPath)) {
+        try {
+          const fullData = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+          fullTemplates = fullData.templates || [];
+          fullUpdatedAt = fullData.updatedAt || "";
+        } catch (e) {
+          console.error("Error reading full prompts on disk:", e);
+        }
+      }
+
+      if (fs.existsSync(modPath)) {
+        try {
+          const modData = JSON.parse(fs.readFileSync(modPath, "utf-8"));
+          modularTemplates = modData.templates || [];
+          modularUpdatedAt = modData.updatedAt || "";
+        } catch (e) {
+          console.error("Error reading modular prompts on disk:", e);
+        }
+      }
+
+      res.json({ fullTemplates, modularTemplates, fullUpdatedAt, modularUpdatedAt });
+    } catch (err: any) {
+      console.error("Failed to read prompts:", err);
+      res.status(500).json({ error: err.message || "Failed to read prompts." });
+    }
+  });
+
+  app.post("/api/prompts/save", (req, res) => {
+    try {
+      const { fullTemplates, modularTemplates } = req.body;
+      if (!Array.isArray(fullTemplates) || !Array.isArray(modularTemplates)) {
+        return res.status(400).json({ error: "Invalid prompts data. Expected arrays." });
+      }
+
+      const fullPath = getFullPromptsFilePath();
+      const modPath = getModularPromptsFilePath();
+
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.mkdirSync(path.dirname(modPath), { recursive: true });
+
+      const fullUpdatedAt = new Date().toISOString();
+      const modularUpdatedAt = new Date().toISOString();
+
+      const fullPayload = {
+        updatedAt: fullUpdatedAt,
+        templates: fullTemplates
+      };
+      const modPayload = {
+        updatedAt: modularUpdatedAt,
+        templates: modularTemplates
+      };
+
+      fs.writeFileSync(fullPath, JSON.stringify(fullPayload, null, 2), "utf-8");
+      fs.writeFileSync(modPath, JSON.stringify(modPayload, null, 2), "utf-8");
+
+      res.json({ success: true, fullUpdatedAt, modularUpdatedAt });
+    } catch (err: any) {
+      console.error("Failed to write to prompt files:", err);
+      res.status(500).json({ error: err.message || "Failed to save prompts to files." });
     }
   });
 

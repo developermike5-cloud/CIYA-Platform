@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import { safeStorage } from '../utils/safeStorage';
+import { promptsStore } from '../utils/promptsStore';
 import staticFullPrompts from '../data/full_prompts.json';
 import staticModularPrompts from '../data/modular_prompts.json';
 import { 
@@ -328,6 +327,88 @@ function PreviewFrame({ url, title, height = '100%', onExpand, expandable = true
   );
 }
 
+function CleanVideoPlayer({ url, title, isPlaying }: { url: string; title?: string; isPlaying: boolean }) {
+  const getEmbedUrl = (rawUrl: string): string => {
+    if (!rawUrl) return '';
+    let videoId = '';
+    try {
+      if (rawUrl.includes('youtube.com/embed/')) {
+        return rawUrl;
+      } else if (rawUrl.includes('youtube.com/watch')) {
+        const urlObj = new URL(rawUrl);
+        videoId = urlObj.searchParams.get('v') || '';
+      } else if (rawUrl.includes('youtu.be/')) {
+        const parts = rawUrl.split('youtu.be/');
+        if (parts[1]) {
+          videoId = parts[1].split('?')[0];
+        }
+      } else if (rawUrl.includes('youtube.com/v/')) {
+        const parts = rawUrl.split('youtube.com/v/');
+        if (parts[1]) {
+          videoId = parts[1].split('?')[0];
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    if (!videoId && rawUrl.length === 11) {
+      videoId = rawUrl;
+    }
+
+    return videoId 
+      ? `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&modestbranding=1&rel=0`
+      : rawUrl;
+  };
+
+  const isMp4 = url.toLowerCase().endsWith('.mp4') || url.toLowerCase().includes('.mp4?') || url.toLowerCase().endsWith('.webm');
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (isMp4 && videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.play().catch(err => {
+          console.log("Auto-play prevented or failed", err);
+        });
+      } else {
+        videoRef.current.pause();
+      }
+    }
+  }, [isPlaying, isMp4, url]);
+
+  if (isMp4) {
+    return (
+      <div className="w-full h-full bg-black flex items-center justify-center p-0 m-0">
+        <video 
+          ref={videoRef}
+          src={url} 
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-full object-contain rounded-[1.5rem]"
+        />
+      </div>
+    );
+  }
+
+  const embedUrl = getEmbedUrl(url);
+
+  return (
+    <div className="w-full h-full bg-black relative flex items-center justify-center p-0 m-0 rounded-[1.5rem] overflow-hidden">
+      <iframe 
+        className="w-full h-full absolute inset-0 border-0"
+        src={embedUrl}
+        title={title || "Video Preview"}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+        referrerPolicy="strict-origin-when-cross-origin"
+        allowFullScreen
+      />
+    </div>
+  );
+}
+
 interface LiveProjectPreviewProps {
   url: string;
   title?: string;
@@ -376,102 +457,43 @@ interface PromptGeneratorProps {
 
 export default function PromptGenerator({ isLocked = false }: PromptGeneratorProps) {
   const [templates, setTemplates] = useState<TemplateItem[]>(() => {
-    const merged: TemplateItem[] = [];
-    try {
-      const fullData = staticFullPrompts as any;
-      if (fullData) {
-        let fullList: any[] = [];
-        if (Array.isArray(fullData.templates)) {
-          fullList = fullData.templates;
-        } else {
-          // Backward compatibility/migration from old landing and ecommerce arrays
-          if (Array.isArray(fullData.landing)) {
-            fullData.landing.forEach((t: any) => {
-              fullList.push({ ...t, category: t.category || 'Landing Page' });
-            });
-          }
-          if (Array.isArray(fullData.ecommerce)) {
-            fullData.ecommerce.forEach((t: any) => {
-              fullList.push({ ...t, category: t.category || 'eCommerce' });
-            });
-          }
-        }
-
-        fullList.forEach((t: any) => {
-          merged.push({
-            id: t.id || `landing_${Date.now()}_${Math.random()}`,
-            name: t.name,
-            template: t.template,
-            category: (t.category || 'Landing Page').trim(),
-            industry: t.industry || 'General',
-            imageUrl: t.imageUrl,
-            videoUrl: t.videoUrl,
-            link1: t.link1,
-            link2: t.link2,
-            description: t.description || (
-              (t.category?.toLowerCase().includes('commerce') || t.category?.toLowerCase().includes('retail') || t.industry?.toLowerCase().includes('retail'))
-                ? 'Full prompt blueprint targeting online retail niches.'
-                : `Full prompt blueprint targeting ${t.industry || 'General'} niches.`
-            ),
-            type: 'full'
-          });
-        });
-      }
-    } catch (e) {
-      console.warn(e);
-    }
-
-    try {
-      const modData = staticModularPrompts as any;
-      if (modData && Array.isArray(modData.templates)) {
-        modData.templates.forEach((t: any) => {
-          merged.push({
-            id: t.id || `mod_${Date.now()}_${Math.random()}`,
-            name: t.name,
-            template: t.template,
-            category: (t.category || 'Landing Page').trim(),
-            industry: t.industry || 'Universal',
-            imageUrl: t.imageUrl,
-            videoUrl: t.videoUrl,
-            link1: t.link1,
-            link2: t.link2,
-            description: t.description || 'Focused modular segment layout blueprint.',
-            type: 'modular'
-          });
-        });
-      }
-    } catch (e) {
-      console.warn(e);
-    }
-
-    if (merged.length === 0) {
-      // Return premium fallback templates if none found in json
-      return [
-        {
-          id: 'default_full_1',
-          name: 'High-Converting SaaS Landing Page',
-          category: 'Landing Page',
-          industry: 'SaaS / Technology',
-          template: `Act as a senior frontend engineer and conversion rate optimization (CRO) expert. Write a fully modular, highly responsive tailwind CSS code for a premium SaaS landing page targeting modern developers.
-
-Ensure that you implement a glossy glassmorphism hero banner with clean visual rhythm, an elegant interactive logo-cloud showcase, a fluid bento-grid feature layout, and a frictionless pricing section.`,
-          description: 'Master full-page layout structure optimized for high-conversion software products.',
-          type: 'full'
-        },
-        {
-          id: 'default_full_2',
-          name: 'Elegant Minimalist Fashion eCommerce',
-          category: 'eCommerce',
-          industry: 'Fashion / Retail',
-          template: `Act as an expert UX researcher and eCommerce developer. Generate a beautiful Tailwind CSS single page eCommerce layout for a modern luxury fashion brand.
-
-Include a stunning asymmetric image grid showcase, fine typographic pairings, micro-animation interactive hover states for product cards, and a sticky fast-checkout cart slide drawer.`,
-          description: 'An elegant display focused template optimized for luxury consumer products.',
-          type: 'full'
-        }
-      ];
-    }
-    return merged;
+    const fulls = promptsStore.getFullTemplates();
+    const mods = promptsStore.getModularTemplates();
+    
+    const loaded: TemplateItem[] = [];
+    fulls.forEach(t => {
+      loaded.push({
+        id: t.id,
+        name: t.name,
+        template: t.template,
+        category: (t.category || 'Landing Page').trim(),
+        industry: t.industry || 'General',
+        imageUrl: t.imageUrl,
+        videoUrl: t.videoUrl,
+        link1: t.link1,
+        link2: t.link2,
+        description: t.description || `Full prompt blueprint targeting ${t.industry || 'General'} niches.`,
+        type: 'full'
+      });
+    });
+    
+    mods.forEach(t => {
+      loaded.push({
+        id: t.id,
+        name: t.name,
+        template: t.template,
+        category: (t.category || 'Landing Page').trim(),
+        industry: t.industry || 'Universal',
+        imageUrl: t.imageUrl,
+        videoUrl: t.videoUrl,
+        link1: t.link1,
+        link2: t.link2,
+        description: t.description || 'Focused modular segment layout blueprint.',
+        type: 'modular'
+      });
+    });
+    
+    return loaded;
   });
 
   const [loading, setLoading] = useState(false);
@@ -496,99 +518,49 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
   const previewLink = selectedTemplate?.videoUrl || selectedTemplate?.link1 || selectedTemplate?.link2;
 
   useEffect(() => {
-    async function fetchCloudTemplates() {
-      setLoading(true);
-      try {
-        const fullDocRef = doc(db, 'settings', 'full_prompts');
-        const modDocRef = doc(db, 'settings', 'modular_prompts');
+    const unsubscribe = promptsStore.subscribe((data) => {
+      const loaded: TemplateItem[] = [];
+      data.fullTemplates.forEach(t => {
+        loaded.push({
+          id: t.id,
+          name: t.name,
+          template: t.template,
+          category: (t.category || 'Landing Page').trim(),
+          industry: t.industry || 'General',
+          imageUrl: t.imageUrl,
+          videoUrl: t.videoUrl,
+          link1: t.link1,
+          link2: t.link2,
+          description: t.description || `Full prompt blueprint targeting ${t.industry || 'General'} niches.`,
+          type: 'full'
+        });
+      });
+      
+      data.modularTemplates.forEach(t => {
+        loaded.push({
+          id: t.id,
+          name: t.name,
+          template: t.template,
+          category: (t.category || 'Landing Page').trim(),
+          industry: t.industry || 'Universal',
+          imageUrl: t.imageUrl,
+          videoUrl: t.videoUrl,
+          link1: t.link1,
+          link2: t.link2,
+          description: t.description || 'Focused modular segment layout blueprint.',
+          type: 'modular'
+        });
+      });
+      
+      setTemplates(loaded);
+    });
 
-        const [fullSnap, modSnap] = await Promise.all([
-          getDoc(fullDocRef),
-          getDoc(modDocRef)
-        ]);
+    // Fetch latest updates from the server disk storage
+    promptsStore.loadFromServer().catch(err => {
+      console.warn("Failed to update templates from server on mount:", err);
+    });
 
-        const loadedTemplates: TemplateItem[] = [];
-
-        // 1. Process Full Templates
-        if (fullSnap.exists()) {
-          const data = fullSnap.data();
-          let fullList: any[] = [];
-          if (Array.isArray(data.templates)) {
-            fullList = data.templates;
-          } else {
-            // Older database format support: landing + ecommerce arrays
-            if (Array.isArray(data.landing)) {
-              data.landing.forEach((t: any) => {
-                fullList.push({ ...t, category: t.category || 'Landing Page' });
-              });
-            }
-            if (Array.isArray(data.ecommerce)) {
-              data.ecommerce.forEach((t: any) => {
-                fullList.push({ ...t, category: t.category || 'eCommerce' });
-              });
-            }
-          }
-
-          fullList.forEach((t: any) => {
-            loadedTemplates.push({
-              id: t.id,
-              name: t.name,
-              template: t.template,
-              category: (t.category || 'Landing Page').trim(),
-              industry: t.industry || 'General',
-              imageUrl: t.imageUrl,
-              videoUrl: t.videoUrl,
-              link1: t.link1,
-              link2: t.link2,
-              description: t.description || `Full prompt blueprint targeting ${t.industry || 'General'} niches.`,
-              type: 'full'
-            });
-          });
-        }
-
-        // 2. Process Modular Templates
-        if (modSnap.exists()) {
-          const data = modSnap.data();
-          if (Array.isArray(data.templates)) {
-            data.templates.forEach((t: any) => {
-              loadedTemplates.push({
-                id: t.id,
-                name: t.name,
-                template: t.template,
-                category: (t.category || 'Landing Page').trim(),
-                industry: t.industry || 'Universal',
-                imageUrl: t.imageUrl,
-                videoUrl: t.videoUrl,
-                link1: t.link1,
-                link2: t.link2,
-                description: t.description || 'Focused modular segment layout blueprint.',
-                type: 'modular'
-              });
-            });
-          }
-        }
-
-        if (fullSnap.exists() || modSnap.exists()) {
-          setTemplates(loadedTemplates);
-          
-          // Set initial selected template from the newly loaded list
-          const fulls = loadedTemplates.filter(x => x.type === 'full');
-          if (fulls.length > 0) {
-            setSelectedTemplate(fulls[0]);
-          } else if (loadedTemplates.length > 0) {
-            setSelectedTemplate(loadedTemplates[0]);
-          } else {
-            setSelectedTemplate(null);
-          }
-        }
-      } catch (err) {
-        console.warn("Failed to fetch custom templates from cloud, using static presets:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchCloudTemplates();
+    return () => unsubscribe();
   }, []);
 
   // Filter templates list based on type (activeTab)
@@ -602,11 +574,14 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
     ? currentTabTemplates
     : currentTabTemplates.filter(t => t.category?.trim() === selectedCategory);
 
-  // Synchronize selection when tabs or category changes
+  // Synchronize selection when tabs, category, or templates change
   useEffect(() => {
     if (filteredTemplates.length > 0) {
-      const exists = filteredTemplates.some(t => t.id === selectedTemplate?.id);
-      if (!exists) {
+      const match = filteredTemplates.find(t => t.id === selectedTemplate?.id);
+      if (match) {
+        // Update selectedTemplate to the latest object version from filteredTemplates to show live edits!
+        setSelectedTemplate(match);
+      } else {
         setSelectedTemplate(filteredTemplates[0]);
       }
     } else {
@@ -884,14 +859,14 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
               type="button"
               onClick={handlePrevTemplate}
               disabled={filteredTemplates.length <= 1}
-              className={`p-3 md:p-4 rounded-full border border-slate-200 transition-all duration-200 shrink-0 ${
+              className={`p-3 md:p-4 rounded-full border transition-all duration-200 shrink-0 ${
                 filteredTemplates.length > 1
-                  ? 'bg-white hover:bg-indigo-50 text-slate-800 shadow-lg cursor-pointer hover:border-slate-300 active:scale-95'
-                  : 'bg-slate-50 text-slate-300 cursor-not-allowed border-slate-100'
+                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700 shadow-lg cursor-pointer active:scale-95'
+                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
               }`}
               title="Previous Template"
             >
-              <ChevronLeft className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
+              <ChevronLeft className={`w-5 h-5 md:w-6 md:h-6 stroke-[3] ${filteredTemplates.length > 1 ? 'text-white' : 'text-slate-400'}`} />
             </button>
 
             {/* ANDROID DEVICE SIMULATOR CONTAINER */}
@@ -952,11 +927,17 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
                   ) : null}
 
                   {/* VIEW 2: EMBEDDED LINK PREVIEW */}
-                  {isShowingLinkPreview && previewLink ? (
-                    <div className="absolute inset-0 bg-slate-950 p-0 flex flex-col z-[15] pt-8 animate-in fade-in duration-300">
-                      <LiveProjectPreview url={previewLink} title={selectedTemplate?.name || "Showcase Live Preview"} />
+                  {previewLink && selectedTemplate?.videoUrl === previewLink ? (
+                    <div className={`absolute inset-0 bg-slate-950 p-0 flex flex-col z-[15] pt-8 ${isShowingLinkPreview ? 'flex' : 'hidden'}`}>
+                      <CleanVideoPlayer url={previewLink} title={selectedTemplate?.name} isPlaying={isShowingLinkPreview} />
                     </div>
-                  ) : null}
+                  ) : (
+                    isShowingLinkPreview && previewLink ? (
+                      <div className="absolute inset-0 bg-slate-950 p-0 flex flex-col z-[15] pt-8 animate-in fade-in duration-300">
+                        <LiveProjectPreview url={previewLink} title={selectedTemplate?.name || "Showcase Live Preview"} />
+                      </div>
+                    ) : null
+                  )}
 
                   {/* VIEW 3: IMAGE ATTACHMENT VIEW */}
                   {!isShowingText && (!isShowingLinkPreview || !previewLink) && (
@@ -1004,14 +985,14 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
               type="button"
               onClick={handleNextTemplate}
               disabled={filteredTemplates.length <= 1}
-              className={`p-3 md:p-4 rounded-full border border-slate-200 transition-all duration-200 shrink-0 ${
+              className={`p-3 md:p-4 rounded-full border transition-all duration-200 shrink-0 ${
                 filteredTemplates.length > 1
-                  ? 'bg-white hover:bg-indigo-50 text-slate-800 shadow-lg cursor-pointer hover:border-slate-300 active:scale-95'
-                  : 'bg-slate-50 text-slate-300 cursor-not-allowed border-slate-100'
+                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700 shadow-lg cursor-pointer active:scale-95'
+                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
               }`}
               title="Next Template"
             >
-              <ChevronRight className="w-5 h-5 md:w-6 md:h-6 stroke-[3]" />
+              <ChevronRight className={`w-5 h-5 md:w-6 md:h-6 stroke-[3] ${filteredTemplates.length > 1 ? 'text-white' : 'text-slate-400'}`} />
             </button>
 
           </div>
@@ -1027,15 +1008,15 @@ Include a stunning asymmetric image grid showcase, fine typographic pairings, mi
                   ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 cursor-pointer active:scale-95' 
                   : 'bg-slate-100 text-slate-400 cursor-not-allowed'
               }`}
-              title={previewLink ? "Preview embedded showcase link inside simulator" : "No showcase link attached"}
+              title={previewLink ? "Toggle prompt mockup preview" : "No showcase link attached"}
             >
               {isShowingLinkPreview ? (
                 <>
-                  <Play className="w-4 h-4" /> Hide Preview
+                  <Play className="w-4 h-4" /> Hide
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4" /> Live Preview
+                  <Play className="w-4 h-4" /> Preview
                 </>
               )}
             </button>

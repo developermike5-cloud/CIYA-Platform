@@ -415,11 +415,13 @@ interface AssignmentProps {
   dayIndex: number;
   submissions: Record<string, { text: string; link: string; submittedAt: string }>;
   onSubmit: (key: string, data: { text: string; link: string; submittedAt: string }) => void;
+  courseId?: string;
 }
 
-function AssignmentPanel({ assignment, dayIndex }: AssignmentProps) {
+function AssignmentPanel({ assignment, dayIndex, courseId }: AssignmentProps) {
+  const navigate = useNavigate();
   return (
-    <div className="bg-white border-2 border-dashed border-teal-600 rounded-3xl p-6 space-y-4 shadow-sm">
+    <div className="bg-white border-2 border-dashed border-teal-600 rounded-3xl p-6 space-y-4 shadow-sm text-left">
       <div className="flex items-center gap-2.5">
         <span className="text-2xl">📋</span>
         <div>
@@ -430,6 +432,20 @@ function AssignmentPanel({ assignment, dayIndex }: AssignmentProps) {
 
       <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 p-4 rounded-xl leading-relaxed font-semibold whitespace-pre-wrap">
         {renderClickableLinks(assignment?.prompt || "Execute today's syllabus lessons on your system and log your drafted link below.")}
+      </div>
+
+      {/* Direct Link to Submit */}
+      <div className="pt-2">
+        <button
+          type="button"
+          onClick={() => {
+            const path = `/dashboard?view=assignments${courseId ? `&courseId=${courseId}` : ''}&dayIndex=${dayIndex}`;
+            navigate(path);
+          }}
+          className="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-md transition-all border-0 cursor-pointer text-center"
+        >
+          Submit this Assignment on Submission Desk 📤
+        </button>
       </div>
 
       {/* Guidance box on how to submit assignment */}
@@ -2353,6 +2369,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
           dayIndex={activeDayIdx}
           submissions={submissions}
           onSubmit={handleAssignmentSubmit}
+          courseId={course.id}
         />
       ) : (
         <div className="space-y-6">
@@ -2721,7 +2738,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                               <span>💡 Submit this assignment inside your</span>
                               <button
                                 type="button"
-                                onClick={() => navigate('/dashboard?view=assignments')}
+                                onClick={() => navigate(`/dashboard?view=assignments&courseId=${course.id}&dayIndex=${di}`)}
                                 className="text-teal-700 font-black underline hover:text-teal-850 border-0 bg-transparent cursor-pointer p-0 m-0 inline"
                               >
                                 "My Assignments" Workspace
@@ -3813,6 +3830,19 @@ export default function StudentDashboard() {
 
     const cId = params.get('courseId') || null;
     setSelectedCourseId(cId);
+
+    if (view === 'assignments') {
+      if (cId) {
+        setSelectedAssignCourseId(cId);
+      }
+      const dayIdxParam = params.get('dayIndex');
+      if (dayIdxParam !== null && dayIdxParam !== '') {
+        const val = parseInt(dayIdxParam, 10);
+        if (!isNaN(val)) {
+          setSubmitDayIndex(val);
+        }
+      }
+    }
   }, [location.search]);
 
   const [appSettings, setAppSettings] = useState<any>(() => {
@@ -4231,6 +4261,7 @@ export default function StudentDashboard() {
   };
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationsPopupOpen, setIsNotificationsPopupOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
@@ -4355,7 +4386,8 @@ export default function StudentDashboard() {
 
   const handleCustomAssignmentSubmit = async () => {
     if (!currentUser) return;
-    let registeredCourse = registeredCoursesList[0];
+    const activeAssignCourseId = selectedAssignCourseId || (registeredCoursesList && registeredCoursesList[0]?.id);
+    let registeredCourse = registeredCoursesList.find(c => c.id === activeAssignCourseId) || registeredCoursesList[0];
     if (!registeredCourse) {
       alert("No active course path assigned to submit an assignment for.");
       return;
@@ -5126,15 +5158,33 @@ export default function StudentDashboard() {
   }, []);
 
   if (authChecking) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Validating Authorization Credentials...</div>;
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans p-6">
+        <div className="flex flex-col items-center justify-center max-w-sm w-full text-center animate-pulse">
+          <BrandingLogo size="lg" theme="light" />
+        </div>
+      </div>
+    );
   }
 
   if (!currentUser) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Redirecting to login...</div>;
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans p-6">
+        <div className="flex flex-col items-center justify-center max-w-sm w-full text-center animate-pulse">
+          <BrandingLogo size="lg" theme="light" />
+        </div>
+      </div>
+    );
   }
 
   if (!userProfile) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans font-semibold text-slate-500 text-sm">Retrieving Student Profile...</div>;
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans p-6">
+        <div className="flex flex-col items-center justify-center max-w-sm w-full text-center animate-pulse">
+          <BrandingLogo size="lg" theme="light" />
+        </div>
+      </div>
+    );
   }
 
   const handleDismissCompletionCongrats = async (courseId: string) => {
@@ -5182,8 +5232,7 @@ export default function StudentDashboard() {
   }
 
   // Master Full-Screen Gating Page for Unapproved or Locked Users (No dashboard UI visible)
-  // Bypassed completely as requested: as long as a user is signed in, nothing should validate or block their session
-  if (false && !isGuest && userProfile?.isDashboardUnlocked !== true) {
+  if (!isAdmin && !isGuest && userProfile?.isDashboardUnlocked !== true) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8 font-sans">
         {(!liveCheckComplete && !isApproved) ? (
@@ -5544,22 +5593,92 @@ export default function StudentDashboard() {
               </div>
             )}
             {!isGuest && (
-              <button 
-                onClick={() => handleViewChange('notifications')}
-                className={`p-2.5 rounded-full cursor-pointer transition-all relative border-0 flex items-center justify-center outline-none ${
-                  currentView === 'notifications' 
-                    ? 'bg-amber-50 text-amber-600 ring-2 ring-amber-500/20' 
-                    : 'text-slate-500 bg-slate-50 hover:bg-slate-100 hover:text-slate-700'
-                }`}
-                title="View Alerts & Notifications"
-              >
-                <Bell className="w-4.5 h-4.5" />
-                {unreadNotificationsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[8px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center ring-2 ring-white">
-                    {unreadNotificationsCount}
-                  </span>
+              <div className="relative">
+                <button 
+                  onClick={() => setIsNotificationsPopupOpen(!isNotificationsPopupOpen)}
+                  className={`p-2.5 rounded-full cursor-pointer transition-all relative border-0 flex items-center justify-center outline-none ${
+                    isNotificationsPopupOpen || currentView === 'notifications' 
+                      ? 'bg-amber-50 text-amber-600 ring-2 ring-amber-500/20' 
+                      : 'text-slate-500 bg-slate-50 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
+                  title="View Alerts & Notifications"
+                >
+                  <Bell className="w-4.5 h-4.5" />
+                  {unreadNotificationsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[8px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center ring-2 ring-white">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                </button>
+
+                {isNotificationsPopupOpen && (
+                  <>
+                    {/* Fixed full-screen transparent click catcher */}
+                    <div 
+                      className="fixed inset-0 z-40 bg-transparent cursor-default" 
+                      onClick={() => setIsNotificationsPopupOpen(false)}
+                    />
+                    
+                    {/* Pop-up dropdown */}
+                    <div className="absolute right-[-70px] xs:right-[-64px] sm:right-0 mt-2.5 w-[280px] xs:w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 py-3.5 z-50 text-left font-sans">
+                      <div className="px-4 pb-2.5 border-b border-slate-100 flex items-center justify-between">
+                        <span className="font-extrabold text-slate-800 text-sm">Notifications</span>
+                        {unreadNotificationsCount > 0 && (
+                          <button 
+                            type="button"
+                            onClick={handleMarkAllAsRead}
+                            className="text-[10px] font-black text-teal-600 hover:text-teal-700 bg-transparent border-0 cursor-pointer p-0"
+                          >
+                            Mark all as read
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="max-h-64 overflow-y-auto divide-y divide-slate-100/60">
+                        {dbNotifications.length === 0 ? (
+                          <div className="px-4 py-8 text-center text-slate-400 text-xs font-semibold">
+                            No notifications yet
+                          </div>
+                        ) : (
+                          dbNotifications.slice(0, 5).map((notif) => (
+                            <div 
+                              key={notif.id}
+                              onClick={() => {
+                                handleMarkAsRead(notif.id);
+                              }}
+                              className={`p-3.5 transition-colors cursor-pointer relative hover:bg-slate-50 flex gap-2.5 ${!notif.isRead ? 'bg-amber-50/20' : ''}`}
+                            >
+                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${!notif.isRead ? 'bg-amber-500' : 'bg-transparent'}`} />
+                              <div className="space-y-1 flex-1">
+                                <p className="text-xs text-slate-800 font-bold leading-relaxed">{notif.title}</p>
+                                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{notif.message}</p>
+                                {notif.createdAt && (
+                                  <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                                    {new Date(notif.createdAt.seconds * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="px-4 pt-2.5 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleViewChange('notifications');
+                            setIsNotificationsPopupOpen(false);
+                          }}
+                          className="w-full text-center py-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-teal-600 hover:text-teal-700 text-xs font-black transition-colors border-0 cursor-pointer"
+                        >
+                          See More
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
-              </button>
+              </div>
             )}
              {isGuest ? (
                <button 
@@ -6080,10 +6199,60 @@ export default function StudentDashboard() {
                   </p>
                 </div>
 
+                {/* Active Registered Courses / Submission Channels */}
+                {registeredCoursesList.length > 0 && (
+                  <div className="bg-slate-50 border border-slate-200/85 rounded-3xl p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                        Your Active Registered {registeredCoursesList.length === 1 ? 'Course' : 'Courses'} ({registeredCoursesList.length})
+                      </span>
+                      <span className="text-[10px] font-black text-teal-700 bg-teal-50 border border-teal-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        {registeredCoursesList.length === 1 ? '1 Active Track' : `${registeredCoursesList.length} Submission Channels`}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {registeredCoursesList.map((course) => {
+                        const activeAssignCId = selectedAssignCourseId || (registeredCoursesList && registeredCoursesList[0]?.id);
+                        const isActive = activeAssignCId === course.id;
+                        const isClickable = registeredCoursesList.length > 1;
+                        return (
+                          <button
+                            key={course.id}
+                            type="button"
+                            disabled={!isClickable}
+                            onClick={() => {
+                              if (isClickable) {
+                                setSelectedAssignCourseId(course.id);
+                                setSubmitDayIndex(0);
+                              }
+                            }}
+                            className={`flex flex-col text-left p-4 rounded-2xl transition-all border outline-none ${
+                              isActive
+                                ? 'bg-white border-teal-500 shadow-md ring-2 ring-teal-500/10'
+                                : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-100/30'
+                            } ${isClickable ? 'cursor-pointer' : 'cursor-default'}`}
+                          >
+                            <span className={`text-[9px] font-black uppercase tracking-wider mb-1 px-1.5 py-0.5 rounded self-start ${
+                              isActive ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {course.level || course.tier || 'Active'}
+                            </span>
+                            <span className="text-xs font-black text-slate-950 line-clamp-2 leading-snug">{course.title}</span>
+                            <span className="text-[10px] text-slate-400 font-semibold mt-1">
+                              {course.days?.length || 5} Daily Modules
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Main Form Fields */}
                 {(() => {
                   // Find registered course
-                  let registeredCourse = registeredCoursesList[0];
+                  const activeAssignCourseId = selectedAssignCourseId || (registeredCoursesList && registeredCoursesList[0]?.id);
+                  let registeredCourse = registeredCoursesList.find(c => c.id === activeAssignCourseId) || registeredCoursesList[0];
                   if (registeredCourse && !isAdmin) {
                     const enrolledExpress = courses.find(c => c.clonedFromId === registeredCourse.id && c.isCloned && c.durationMode === 'express' && (
                       (userProfile?.progress && userProfile.progress[c.id]) ||

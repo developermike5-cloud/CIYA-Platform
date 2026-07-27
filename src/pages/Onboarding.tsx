@@ -274,6 +274,7 @@ export default function Onboarding() {
 
     let isActivated = false;
     let activeCohort = 'Cohort 1';
+    let autoApprovalEnabled = false;
     try {
       const cohortsSnap = await getDoc(doc(db, 'settings', 'cohorts'));
       if (cohortsSnap.exists()) {
@@ -282,6 +283,22 @@ export default function Onboarding() {
     } catch (err) {
       console.warn("Could not fetch active cohort settings during registration:", err);
     }
+
+    try {
+      const appSettingsSnap = await getDoc(doc(db, 'settings', 'app'));
+      if (appSettingsSnap.exists()) {
+        const appData = appSettingsSnap.data();
+        if (appData && appData.autoApprovalEnabled === true) {
+          autoApprovalEnabled = true;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch app settings during registration:", err);
+    }
+
+    const finalApprovalStatus = autoApprovalEnabled ? 'Approved' : 'Pending';
+    const finalDashboardUnlocked = autoApprovalEnabled ? true : false;
+    const finalActivated = autoApprovalEnabled ? true : false;
 
     setCreationTime(new Date().getTime());
     const generatedAdminCode = `CIYA-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -307,11 +324,11 @@ export default function Onboarding() {
       state: data.state,
       referralCode: data.referralCode || '',
       myReferralCode: userCode,
-      isActivated: false,
+      isActivated: finalActivated,
       referralsCount: 0,
-      approvalStatus: 'Pending',
+      approvalStatus: finalApprovalStatus,
       adminCode: generatedAdminCode,
-      isDashboardUnlocked: false,
+      isDashboardUnlocked: finalDashboardUnlocked,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       cohort: activeCohort
@@ -340,11 +357,11 @@ export default function Onboarding() {
         state: data.state,
         referralCode: data.referralCode || '',
         myReferralCode: userCode,
-        isActivated: false,
+        isActivated: finalActivated,
         referralsCount: 0,
-        approvalStatus: 'Pending',
+        approvalStatus: finalApprovalStatus,
         adminCode: generatedAdminCode,
-        isDashboardUnlocked: false,
+        isDashboardUnlocked: finalDashboardUnlocked,
         cohort: activeCohort
       };
 
@@ -359,7 +376,7 @@ export default function Onboarding() {
       console.warn("Could not seed safeStorage on onboarding completion:", cacheErr);
     }
     
-    setData(d => ({ ...d, recommendedPath, myReferralCode: userCode, isActivated }));
+    setData(d => ({ ...d, recommendedPath, myReferralCode: userCode, isActivated: finalActivated }));
 
     if (data.referralCode) {
       try {

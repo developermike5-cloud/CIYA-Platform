@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import { Link, useNavigate, useLocation } from 'react-router';
 import BrandingLogo from '../components/BrandingLogo';
 import LoginModal from '../components/LoginModal';
+import InteractiveTemplatesSphere from '../components/InteractiveTemplatesSphere';
 import { 
   Lightbulb, Gift, Bot, Wallet, Check, Smartphone, Briefcase, Zap, TrendingUp, Globe, Film, Palette, Sparkles
 } from 'lucide-react';
@@ -442,6 +443,48 @@ const COURSES_DATA = {
       "Subscription & Box Stores (Weekly/Monthly)",
       "Local Grocery & Delivery Catalogs"
     ]
+  },
+  portfolio: {
+    icon: Briefcase,
+    title: "AI Portfolio Website Creation",
+    desc: "Build a stunning professional portfolio or service showcase website to present your skills, experience, and past projects beautifully. Learn how to craft responsive case studies, feature dynamic contact forms, embed real work mockups, and build an online CV that commands respect and wins high-ticket clients without needing a coder.",
+    tiers: [
+      {
+        level: "Beginner",
+        title: "Portfolio Foundations",
+        price: "100% Free",
+        isFree: true,
+        desc: "Design and launch your professional personal portfolio website in 5 days using AI. Show off your biography, skills checklist, career aspirations, and simple contact forms to jumpstart your career.",
+        features: ["Personal biography setup", "Interactive skills checklist", "Contact form submission", "Online CV publishing"]
+      },
+      {
+        level: "Advanced",
+        title: "Professional Agency Showcase",
+        price: "₦15,000",
+        subPrice: "/ 5-day course",
+        featured: true,
+        badge: "Most Popular",
+        desc: "Upgrade your portfolio into a world-class client acquisition machine. Create interactive multi-step case studies, integrate customized inquiry filters, host video testimonials, and link your custom domains.",
+        features: ["Rich case study pages", "Custom domain connections", "Inquiry filter forms", "Interactive client reviews"]
+      },
+      {
+        level: "Masterclass",
+        title: "Personal Brand Monopoly",
+        price: "₦30,000",
+        subPrice: "/ 5-day course",
+        desc: "Position yourself as an elite consultant or agency. Master personal branding secrets, secure high-ticket clients, utilize professional copywriting scripts, and deploy analytics dashboards to monitor leads.",
+        features: ["High-ticket client blueprints", "Elite copywriter scripts", "Analytics & lead tracking", "Agency service frameworks"]
+      }
+    ],
+    pillsTitle: "Portfolio Structures You'll Build",
+    pills: [
+      "Freelance Designer & Developer Portfolios",
+      "Consultant & Coach Showcases",
+      "Creative Art & Photography Galleries",
+      "Agency Capability Statements",
+      "Digital Marketer Case Study Centers",
+      "Online Resumes & Interactive CVs"
+    ]
   }
 };
 
@@ -457,10 +500,16 @@ const MEDIA_URLS = {
     'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
     'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
     'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4'
+  ],
+  portfolio: [
+    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/704f7970e09360476c34e5b8dd6a1239_720w_hkdauz.mp4',
+    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4',
+    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/704f7970e09360476c34e5b8dd6a1239_720w_hkdauz.mp4',
+    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4'
   ]
 };
 
-function CourseSkillSection({ skillId }: { skillId: 'landing' | 'ecommerce' }) {
+function CourseSkillSection({ skillId }: { skillId: 'landing' | 'ecommerce' | 'portfolio' }) {
   const d = COURSES_DATA[skillId];
   const Icon = d.icon;
   const mUrls = MEDIA_URLS[skillId];
@@ -486,6 +535,12 @@ function CourseSkillSection({ skillId }: { skillId: 'landing' | 'ecommerce' }) {
       "Digital catalogs",
       "Shopping flows",
       "Cart management"
+    ],
+    portfolio: [
+      "Case studies",
+      "Design systems",
+      "Services setup",
+      "Inquiry filters"
     ]
   }[skillId];
 
@@ -679,6 +734,7 @@ function Courses() {
               {[
                 { id: 'landing-section', label: '🌐 AI Landing Page Creation' },
                 { id: 'ecommerce-section', label: '🛍️ AI E-commerce Website Creation' },
+                { id: 'portfolio-section', label: '💼 AI Portfolio Website Creation' },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -695,15 +751,16 @@ function Courses() {
 
       <div id="landing-section"><CourseSkillSection skillId="landing" /></div>
       <div id="ecommerce-section"><CourseSkillSection skillId="ecommerce" /></div>
+      <div id="portfolio-section"><CourseSkillSection skillId="portfolio" /></div>
     </>
   );
 }
 
 function HowItWorks() {
   const steps = [
-    { title: "Pick Your Creator Track", desc: "Choose between AI Landing Pages and AI E-commerce Websites. Start with the free beginner course — no commitment needed." },
+    { title: "Pick Your Creator Track", desc: "Choose between AI Landing Pages, AI E-commerce Stores, and AI Portfolio Websites. Start with the free beginner course — no commitment needed." },
     { title: "Join the 5-Day Training", desc: "Attend daily live/recorded sessions with practical exercises. Each day builds on the last — by day 5 you'll have a real website live to show." },
-    { title: "Build Real Sites", desc: "Every class ends with a live project you build during training — a landing page or an e-commerce storefront — that you own and can use." },
+    { title: "Build Real Sites", desc: "Every class ends with a live project you build during training — a landing page, storefront, or service portfolio — that you own and can use." },
     { title: "Apply or Advance", desc: "Use the beginner skills to save money or start-up. When ready, upgrade to advanced or masterclass to unlock professional-grade client contract potential." },
   ];
 
@@ -823,6 +880,7 @@ function Footer() {
           <ul className="space-y-4">
             <li><a href="#landing-section" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">AI Landing Pages</a></li>
             <li><a href="#ecommerce-section" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">AI E-commerce Creator</a></li>
+            <li><a href="#portfolio-section" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">AI Portfolio Creator</a></li>
             <li><a href="#courses" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">All Tracks</a></li>
           </ul>
         </div>
@@ -910,6 +968,7 @@ export default function App() {
       <Navbar onOpenLogin={() => setIsLoginOpen(true)} />
       <main className="flex-1">
         <Hero />
+        <InteractiveTemplatesSphere />
         <Mission />
         <Courses />
         <HowItWorks />

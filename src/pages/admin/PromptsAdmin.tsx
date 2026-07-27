@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
 import { uploadToCloudinary } from '../../utils/cloudinary';
-import { db, handleFirestoreError, OperationType, triggerSystemSignal } from '../../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { promptsStore, FullPromptTemplate, ModularPromptTemplate } from '../../utils/promptsStore';
 import { 
   Plus, 
   Trash, 
@@ -20,33 +19,10 @@ import {
   RefreshCw, 
   ExternalLink, 
   Briefcase,
-  Tag
+  Tag,
+  Download,
+  Upload
 } from 'lucide-react';
-
-interface FullPromptTemplate {
-  id: string;
-  name: string;
-  category: string; // e.g. 'Landing Page', 'eCommerce', 'Portfolio Website', etc.
-  industry?: string; // e.g. 'SaaS', 'Fashion Retail', etc.
-  template: string;
-  imageUrl?: string;
-  videoUrl?: string;
-  link1?: string;
-  link2?: string;
-}
-
-interface ModularPromptTemplate {
-  id: string;
-  name: string;
-  category: string; // e.g. 'Landing Page', 'eCommerce', 'Portfolio Website', etc.
-  industry?: string;
-  description: string;
-  template: string;
-  imageUrl?: string;
-  videoUrl?: string;
-  link1?: string;
-  link2?: string;
-}
 
 const DEFAULT_FULL_TEMPLATES: FullPromptTemplate[] = [
   {
@@ -281,6 +257,9 @@ export default function PromptsAdmin() {
   // States for Modular Prompt Templates
   const [modularTemplates, setModularTemplates] = useState<ModularPromptTemplate[]>([]);
 
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'full' | 'modular'; index: number } | null>(null);
+
   // Active category filter on the admin list
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
 
@@ -365,93 +344,57 @@ export default function PromptsAdmin() {
     async function loadTemplates() {
       setLoading(true);
       try {
-        // Fetch full prompts document
-        const fullDocRef = doc(db, 'settings', 'full_prompts');
-        const fullSnap = await getDoc(fullDocRef);
-        if (fullSnap.exists()) {
-          const data = fullSnap.data();
-          if (Array.isArray(data.templates)) {
-            setFullTemplates(data.templates);
-          } else {
-            // Backward compatibility: migrate legacy structured landing & ecommerce fields
-            const migrated: FullPromptTemplate[] = [];
-            if (Array.isArray(data.landing)) {
-              data.landing.forEach((t: any) => {
-                migrated.push({
-                  id: t.id || `lp_custom_${Date.now()}_${Math.random()}`,
-                  name: t.name || 'Untitled Landing Blueprint',
-                  category: 'Landing Page',
-                  industry: t.industry || 'General Marketing',
-                  template: t.template || '',
-                  imageUrl: t.imageUrl || '',
-                  videoUrl: t.videoUrl || '',
-                  link1: t.link1 || '',
-                  link2: t.link2 || ''
-                });
-              });
-            }
-            if (Array.isArray(data.ecommerce)) {
-              data.ecommerce.forEach((t: any) => {
-                migrated.push({
-                  id: t.id || `ec_custom_${Date.now()}_${Math.random()}`,
-                  name: t.name || 'Untitled eCommerce Blueprint',
-                  category: 'eCommerce',
-                  industry: t.industry || 'Online Retail',
-                  template: t.template || '',
-                  imageUrl: t.imageUrl || '',
-                  videoUrl: t.videoUrl || '',
-                  link1: t.link1 || '',
-                  link2: t.link2 || ''
-                });
-              });
-            }
-
-            if (migrated.length > 0) {
-              setFullTemplates(migrated);
-            } else {
-              setFullTemplates(DEFAULT_FULL_TEMPLATES);
-            }
-          }
-        } else {
-          setFullTemplates(DEFAULT_FULL_TEMPLATES);
+        const migrated = await promptsStore.migrateFromFirestoreIfNeeded();
+        if (migrated) {
+          showToast("Successfully recovered your custom templates from database backup!");
         }
 
-        // Fetch modular prompts document
-        const modDocRef = doc(db, 'settings', 'modular_prompts');
-        const modSnap = await getDoc(modDocRef);
-        if (modSnap.exists()) {
-          const data = modSnap.data();
-          if (Array.isArray(data.templates)) {
-            setModularTemplates(data.templates);
-          } else {
-            setModularTemplates(DEFAULT_MODULAR_TEMPLATES);
-          }
+        // Fetch latest templates directly from the server disk storage
+        try {
+          await promptsStore.loadFromServer();
+        } catch (err) {
+          console.warn("Failed to load prompts from server:", err);
+        }
+
+        const fulls = promptsStore.getFullTemplates();
+        const mods = promptsStore.getModularTemplates();
+        
+        if (fulls.length === 0) {
+          setFullTemplates(DEFAULT_FULL_TEMPLATES);
+          await promptsStore.saveFullTemplates(DEFAULT_FULL_TEMPLATES);
         } else {
+          setFullTemplates(fulls);
+        }
+
+        if (mods.length === 0) {
           setModularTemplates(DEFAULT_MODULAR_TEMPLATES);
+          await promptsStore.saveModularTemplates(DEFAULT_MODULAR_TEMPLATES);
+        } else {
+          setModularTemplates(mods);
         }
       } catch (err) {
         console.error("Error loading prompt templates:", err);
-        showToast("Error retrieving templates from database.");
+        showToast("Error retrieving templates.");
       } finally {
         setLoading(false);
       }
     }
     loadTemplates();
+
+    const unsubscribe = promptsStore.subscribe((data) => {
+      setFullTemplates(data.fullTemplates);
+      setModularTemplates(data.modularTemplates);
+    });
+    return () => unsubscribe();
   }, []);
 
   // 2. Save full prompts
   const handleSaveFullPrompts = async (list: FullPromptTemplate[]) => {
     setSaving(true);
-    const path = 'settings/full_prompts';
     try {
-      await setDoc(doc(db, 'settings', 'full_prompts'), {
-        templates: list,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-      await triggerSystemSignal('settings');
-      showToast("Full blueprint templates updated in the cloud successfully!");
+      await promptsStore.saveFullTemplates(list);
+      showToast("Full blueprint templates updated successfully!");
     } catch (error: any) {
-      handleFirestoreError(error, OperationType.WRITE, path);
       showToast(`Error: ${error?.message || String(error)}`);
     } finally {
       setSaving(false);
@@ -461,20 +404,72 @@ export default function PromptsAdmin() {
   // 3. Save modular prompts
   const handleSaveModularPrompts = async (mods: ModularPromptTemplate[]) => {
     setSaving(true);
-    const path = 'settings/modular_prompts';
     try {
-      await setDoc(doc(db, 'settings', 'modular_prompts'), {
-        templates: mods,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-      await triggerSystemSignal('settings');
+      await promptsStore.saveModularTemplates(mods);
       showToast("Modular prompt templates saved successfully!");
     } catch (error: any) {
-      handleFirestoreError(error, OperationType.WRITE, path);
       showToast(`Error: ${error?.message || String(error)}`);
     } finally {
       setSaving(false);
     }
+  };
+
+  // Export all templates to a single JSON backup file
+  const handleExportAll = () => {
+    try {
+      const payload = {
+        fullTemplates,
+        modularTemplates,
+        exportedAt: new Date().toISOString()
+      };
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "prompt_templates_all.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast("Successfully exported prompt_templates_all.json backup file!");
+    } catch (err: any) {
+      showToast(`Export failed: ${err.message}`);
+    }
+  };
+
+  // Import templates from a single JSON backup file
+  const handleImportAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (!parsed) throw new Error("Invalid or empty file.");
+
+        let importedFull = parsed.fullTemplates || parsed.templates;
+        let importedModular = parsed.modularTemplates || parsed.modular;
+
+        if (!importedFull && Array.isArray(parsed)) {
+          importedFull = parsed;
+        }
+
+        if (!Array.isArray(importedFull)) {
+          throw new Error("Missing 'fullTemplates' array in JSON backup.");
+        }
+
+        const fullList = importedFull as FullPromptTemplate[];
+        const modularList = Array.isArray(importedModular) ? (importedModular as ModularPromptTemplate[]) : [];
+
+        setFullTemplates(fullList);
+        setModularTemplates(modularList);
+
+        await promptsStore.saveAll(fullList, modularList);
+        showToast("Successfully imported templates backup from JSON file!");
+      } catch (err: any) {
+        showToast(`Import failed: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Extract all active categories currently present in both collections
@@ -529,7 +524,7 @@ export default function PromptsAdmin() {
       : editingFullTemplate.category.trim();
 
     if (!editingFullTemplate.name.trim() || !finalCategory || !editingFullTemplate.template.trim()) {
-      alert("The 'Blueprint Template Name', 'Category', and 'Full Prompt Body' fields are required and cannot be left blank.");
+      showToast("Error: The 'Blueprint Template Name', 'Category', and 'Full Prompt Body' fields are required.");
       return;
     }
 
@@ -560,11 +555,7 @@ export default function PromptsAdmin() {
   };
 
   const deleteFullItem = (index: number) => {
-    if (!confirm("Are you sure you want to delete this prompt template blueprint?")) return;
-    let nextList = [...fullTemplates];
-    nextList.splice(index, 1);
-    setFullTemplates(nextList);
-    handleSaveFullPrompts(nextList);
+    setDeleteConfirm({ type: 'full', index });
   };
 
   // Modular templates utilities
@@ -613,7 +604,7 @@ export default function PromptsAdmin() {
       : editingModTemplate.category.trim();
 
     if (!editingModTemplate.name.trim() || !finalCategory || !editingModTemplate.template.trim()) {
-      alert("The 'Suggestion Title', 'Category', and 'Modular Prompt Content Template' fields are required and cannot be left blank.");
+      showToast("Error: The 'Suggestion Title', 'Category', and 'Modular Prompt Content Template' fields are required.");
       return;
     }
 
@@ -644,11 +635,28 @@ export default function PromptsAdmin() {
   };
 
   const deleteModItem = (index: number) => {
-    if (!confirm("Are you sure you want to delete this modular suggestion template?")) return;
-    let nextMods = [...modularTemplates];
-    nextMods.splice(index, 1);
-    setModularTemplates(nextMods);
-    handleSaveModularPrompts(nextMods);
+    setDeleteConfirm({ type: 'modular', index });
+  };
+
+  const executeDelete = () => {
+    if (!deleteConfirm) return;
+    const { type, index } = deleteConfirm;
+    if (type === 'full') {
+      let nextList = [...fullTemplates];
+      if (index >= 0 && index < nextList.length) {
+        nextList.splice(index, 1);
+        setFullTemplates(nextList);
+        handleSaveFullPrompts(nextList);
+      }
+    } else {
+      let nextMods = [...modularTemplates];
+      if (index >= 0 && index < nextMods.length) {
+        nextMods.splice(index, 1);
+        setModularTemplates(nextMods);
+        handleSaveModularPrompts(nextMods);
+      }
+    }
+    setDeleteConfirm(null);
   };
 
   // Helper to upload media file to Cloudinary
@@ -781,8 +789,8 @@ export default function PromptsAdmin() {
       )}
 
       {/* Header Panel */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl border border-slate-800 font-sans">
-        <div className="space-y-1">
+      <div className="bg-slate-900 text-white rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shadow-xl border border-slate-800 font-sans">
+        <div className="space-y-1 flex-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-black text-amber-400">
             <Sparkles className="w-3.5 h-3.5" /> Dynamic Prompt Console
           </div>
@@ -790,21 +798,41 @@ export default function PromptsAdmin() {
             Academy Prompts & Templates Manager
           </h1>
           <p className="text-xs text-slate-400 leading-relaxed max-w-3xl font-semibold">
-            Input and orchestrate templates of full prompts for customizable categories (like Landing Pages, eCommerce, Portfolio Websites), as well as refining suggestions. The student dashboard filters and shuffles these custom templates dynamically!
+            Manage your prompts in complete isolation from the backend. Since everything here is loaded statically from the frontend files, students will access templates directly with <strong>zero database queries</strong>.
           </p>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto shrink-0">
+          <button
+            type="button"
+            onClick={handleExportAll}
+            className="flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-2xl border-0 cursor-pointer shadow-lg transition-all"
+          >
+            <Download className="w-4 h-4" /> Export All Templates JSON
+          </button>
+          
+          <label className="flex items-center justify-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-750 text-slate-200 font-black text-xs rounded-2xl border border-slate-750 cursor-pointer transition-all">
+            <Upload className="w-4 h-4" /> Import Backup JSON
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleImportAll}
+              className="hidden"
+            />
+          </label>
         </div>
       </div>
 
-      {/* Informational Box about Firestore File Storage Limits */}
-      <div className="bg-amber-50 border border-amber-250 rounded-2xl p-4 text-xs font-medium text-amber-900 leading-relaxed space-y-1.5">
-        <div className="flex items-center gap-2 font-black uppercase text-[10px] text-amber-805 tracking-wider">
-          <Info className="w-4 h-4 shrink-0 text-amber-600" /> Storage Capacity & Link Instructions
+      {/* Informational Box about Frontend JSON Backups */}
+      <div className="bg-emerald-50 border border-emerald-250 rounded-2xl p-4 text-xs font-medium text-emerald-900 leading-relaxed space-y-1.5">
+        <div className="flex items-center gap-2 font-black uppercase text-[10px] text-emerald-805 tracking-wider">
+          <Info className="w-4 h-4 shrink-0 text-emerald-600" /> 📁 Frontend Storage & Offline-First Mode Active
         </div>
         <p>
-          <strong>Why are some images/videos not saving?</strong> Firestore has a hard <strong>1MB database size limit</strong> per document. Uploading large images or raw video files as raw Base64 data can exceed this limit and cause saving to fail. 
+          <strong>Excellent!</strong> Your prompt templates are now served completely from the frontend, meaning they are lightning-fast with <strong>zero database queries</strong> and <strong>no 1MB Firestore limit warnings</strong>.
         </p>
-        <p className="text-[11px] text-amber-800">
-          👉 <strong>Recommended Solution:</strong> We have added an auto-compression engine that resizes uploaded photos down to a tiny size (JPEG) so they save perfectly. For videos and high-res images, it is highly recommended to host them externally (e.g. Google Drive, Cloudinary, Dropbox, or any public folder) and simply <strong>paste their direct URL links</strong> in the fields provided. Direct URLs consume 0 bytes of your database limit!
+        <p className="text-[11px] text-emerald-800">
+          👉 <strong>How to save permanently:</strong> Any changes you save here are automatically synced to your browser and written immediately to local code files in development. After making your edits, click <strong>"Export All Templates JSON"</strong> above to download your backup. Simply upload that file to the AI in our chat, and the changes will be built permanently into your live code!
         </p>
       </div>
 
@@ -1491,6 +1519,34 @@ export default function PromptsAdmin() {
                 className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl border-0 cursor-pointer text-xs flex items-center gap-1.5 shadow-md"
               >
                 <Save className="w-4 h-4" /> Save modular prompt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[1100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <h3 className="font-extrabold text-slate-900 text-base mb-2">Delete Template Blueprint?</h3>
+            <p className="text-xs text-slate-500 font-semibold mb-6 leading-relaxed">
+              Are you sure you want to permanently delete this {deleteConfirm.type === 'full' ? 'blueprint template' : 'modular suggestion template'}? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2.5 border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold rounded-xl cursor-pointer text-xs border-0"
+              >
+                Cancel / Keep
+              </button>
+              <button
+                type="button"
+                onClick={executeDelete}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl border-0 cursor-pointer text-xs"
+              >
+                Yes, Delete
               </button>
             </div>
           </div>

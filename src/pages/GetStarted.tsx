@@ -11,6 +11,7 @@ export default function GetStarted() {
   const webTypes = [
     { title: 'Landing Pages', meaning: 'A standalone web page created specifically for a marketing or advertising campaign.', uses: 'Lead generation, sales funnels, webinar registrations, product launches.', businesses: 'Course creators, marketers, event organizers, startups.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp' },
     { title: 'E-commerce Stores', meaning: 'A virtual storefront where businesses can sell products or services online.', uses: 'Online retail, dropshipping, subscription services, digital products.', businesses: 'Fashion brands, retailers, creators, direct-to-consumer startups.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=5b233e180530fcf94134bfed78e2c49d_720w_gqclim' },
+    { title: 'Portfolio Websites', meaning: 'A professional online showcase of skills, resume details, interactive case studies, and services.', uses: 'Personal branding, career advancement, freelancer service pitching, agency leads acquisition.', businesses: 'Freelancers, consultants, designers, developers, agencies, coaches, creators.', src: 'https://player.cloudinary.com/embed/?cloud_name=di4dlnd5x&public_id=704f7970e09360476c34e5b8dd6a1239_720w_hkdauz' },
   ];
 
   return (
@@ -40,7 +41,7 @@ export default function GetStarted() {
             Explore the Website Skills You Will Master
           </h1>
           <p className="text-teal-200/90 text-sm md:text-base leading-relaxed">
-            Click through the website tracks below to preview beautiful, practical deliverables including high-converting landing pages and fully automated e-commerce web stores.
+            Click through the website tracks below to preview beautiful, practical deliverables including high-converting landing pages, fully automated e-commerce web stores, and professional portfolio showcases.
           </p>
         </div>
 

@@ -77,8 +77,27 @@ export function isNetworkDisabled(): boolean {
 // Critical paths that require live, real-time responses and bypass cache completely
 function isBypassCachePath(path: string): boolean {
   if (!path) return false;
-  // Always bypass cache for settings documents and user profile paths to ensure immediate updates
-  if (path.startsWith('settings/') || path.startsWith('users/')) {
+  
+  // Clean up any trailing slash or duplicate slashes
+  const cleanPath = path.replace(/\/$/, '');
+  
+  // Always bypass cache for settings documents and critical admin/user collections to ensure immediate updates when online
+  if (
+    cleanPath.startsWith('settings/') ||
+    cleanPath === 'settings' ||
+    cleanPath === 'users' ||
+    cleanPath.startsWith('users/') ||
+    cleanPath === 'admins' ||
+    cleanPath.startsWith('admins/') ||
+    cleanPath === 'assignments' ||
+    cleanPath.startsWith('assignments/') ||
+    cleanPath === 'kycb_questionnaires' ||
+    cleanPath.startsWith('kycb_questionnaires/') ||
+    cleanPath === 'notifications' ||
+    cleanPath.startsWith('notifications/') ||
+    cleanPath === 'notification_templates' ||
+    cleanPath.startsWith('notification_templates/')
+  ) {
     return true;
   }
   return false;
@@ -590,6 +609,62 @@ export function onSnapshot(
       clearTimeout(timer);
     };
   } else {
+    let path = ref?.path || '';
+    if (!path && ref?._query && ref?._query.path) {
+      path = ref._query.path.toString();
+    }
+    if (!path && ref?.type === 'collection') {
+      path = ref.path;
+    }
+
+    if (isBypassCachePath(path)) {
+      try {
+        return realOnSnapshot(ref, (liveSnap: any) => {
+          try {
+            if (!liveSnap) {
+              const emptySnap = new CachedQuerySnapshot([]);
+              onNext(emptySnap);
+              return;
+            }
+
+            const isDoc = typeof liveSnap?.exists === 'function';
+            let snapshotToEmit: any;
+
+            if (isDoc) {
+              if (liveSnap.exists()) {
+                updateLocalDocCache(path, true, liveSnap.data());
+              } else {
+                updateLocalDocCache(path, false, null);
+              }
+              snapshotToEmit = new CachedDocumentSnapshot(liveSnap.id, liveSnap.exists(), liveSnap.data(), liveSnap.ref);
+            } else {
+              const docs = (liveSnap.docs || []).map((docSnap: any) =>
+                new CachedDocumentSnapshot(
+                  docSnap?.id || '',
+                  typeof docSnap?.exists === 'function' ? docSnap.exists() : false,
+                  typeof docSnap?.data === 'function' ? docSnap.data() : null,
+                  docSnap?.ref
+                )
+              );
+              snapshotToEmit = new CachedQuerySnapshot(docs);
+            }
+
+            onNext(snapshotToEmit);
+          } catch (callbackErr) {
+            console.error("Direct onSnapshot callback internal error for path:", path, callbackErr);
+          }
+        }, (error: any) => {
+          if (onError) {
+            onError(error);
+          } else {
+            console.warn("Direct onSnapshot error for path:", path, error);
+          }
+        });
+      } catch (setupErr) {
+        console.warn("Direct realOnSnapshot setup failed for path:", path, setupErr);
+      }
+    }
+
     const subKey = getSubscriptionKey(ref);
     let sub = activeSubscriptions.get(subKey);
 
@@ -850,6 +925,15 @@ function updateLocalDocCache(path: string, exists: boolean, data: any) {
     safeStorage.setItem(timeKey, String(Date.now()));
   } catch (err) {
     console.warn("Failed to write to safeStorage in updateLocalDocCache:", err);
+  }
+
+  // Synchronize 'ciya_cached_app_settings' for portal settings to prevent stale renders
+  if (path === 'settings/app') {
+    try {
+      safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(sanitizedData));
+    } catch (err) {
+      console.warn("Failed to write app settings to safeStorage:", err);
+    }
   }
 
   // Special synchronization: update general user profile cache if users table is written

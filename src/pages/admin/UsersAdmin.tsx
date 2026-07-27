@@ -128,6 +128,36 @@ export default function UsersAdmin() {
   const [newCohortName, setNewCohortName] = useState('');
   const [isCreatingCohort, setIsCreatingCohort] = useState(false);
 
+  // Auto-approval settings state
+  const [autoApprovalEnabled, setAutoApprovalEnabled] = useState(false);
+  const [isUpdatingAutoApproval, setIsUpdatingAutoApproval] = useState(false);
+
+  const handleToggleAutoApproval = async () => {
+    setIsUpdatingAutoApproval(true);
+    const newValue = !autoApprovalEnabled;
+    try {
+      await setDoc(doc(db, 'settings', 'app'), {
+        autoApprovalEnabled: newValue,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      setAutoApprovalEnabled(newValue);
+      
+      // Trigger system signal so students dashboards react instantly to the changes in real-time
+      try {
+        await triggerSystemSignal('settings');
+      } catch (sigErr) {
+        console.warn("Could not trigger system signal:", sigErr);
+      }
+      
+      alert(`Automatic student approval setting is now successfully turned ${newValue ? 'ON' : 'OFF'}! 🎉`);
+    } catch (err: any) {
+      console.error("Error updating auto-approval setting:", err);
+      alert(`Could not update auto-approval setting: ${err?.message || err}`);
+    } finally {
+      setIsUpdatingAutoApproval(false);
+    }
+  };
+
   const handleCreateCohort = async () => {
     if (!newCohortName.trim()) {
       alert("Please enter a valid cohort name.");
@@ -417,14 +447,11 @@ export default function UsersAdmin() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchUsers = async (targetCohort: string, forceRefresh = false) => {
-    let hasUsedCache = false;
     const cacheKey = 'ciya_admin_cached_users_list_All';
 
-    if (forceRefresh) {
-      setIsRefreshing(true);
-    } else {
-      // Stale-while-revalidate: Load from cache instantly, using consolidated 'All' list
-      const cachedUsersStr = safeStorage.getItem(cacheKey) || safeStorage.getItem(`ciya_admin_cached_users_list_${targetCohort}`);
+    // 1. Look for browser local cache first if we are not forcing a refresh
+    if (!forceRefresh) {
+      const cachedUsersStr = safeStorage.getItem(cacheKey);
       const cachedAdminsStr = safeStorage.getItem('ciya_admin_cached_admins_list');
       const cachedAdminsDataStr = safeStorage.getItem('ciya_admin_cached_admins_data');
 
@@ -433,29 +460,24 @@ export default function UsersAdmin() {
           setUsers(JSON.parse(cachedUsersStr));
           setAdmins(JSON.parse(cachedAdminsStr));
           setAdminsData(JSON.parse(cachedAdminsDataStr));
+          
+          const coursesData = coursesStore.getCourses();
+          setAllCourses(coursesData);
+          
           setLoading(false);
-          hasUsedCache = true;
-          setIsRefreshing(true); // show subtle syncing indicator
+          setIsRefreshing(false);
+          return; // Perfect! Return instantly using high-speed local cache
         } catch (e) {
           console.warn("Could not parse cached users:", e);
         }
       }
-
-      if (!hasUsedCache) {
-        setLoading(true);
-      }
     }
 
-    if (hasUsedCache && !forceRefresh) {
-      const lastFetchStr = safeStorage.getItem('ciya_admin_cached_users_time_All');
-      if (lastFetchStr) {
-        const lastFetch = parseInt(lastFetchStr, 10);
-        if (!isNaN(lastFetch) && Date.now() - lastFetch < 3600000) {
-          setIsRefreshing(false);
-          setLoading(false);
-          return;
-        }
-      }
+    // 2. Fetch from Firestore (either first load with empty cache, or explicit Sync Live click)
+    if (forceRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
     }
 
     try {
@@ -496,11 +518,14 @@ export default function UsersAdmin() {
       safeStorage.setItem('ciya_admin_cached_admins_list', JSON.stringify(adminIds));
       safeStorage.setItem('ciya_admin_cached_admins_data', JSON.stringify(adminMap));
 
-    } catch (error) {
-      if (!hasUsedCache || forceRefresh) {
-        handleFirestoreError(error, OperationType.LIST, 'users');
-      } else {
-        console.warn("Quiet background sync failed (could be Firestore quota limit):", error);
+      if (forceRefresh) {
+        alert("🎉 Success! Latest student data and onboarding statistics successfully synchronized with Cloud Firestore.");
+      }
+
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.LIST, 'users');
+      if (forceRefresh) {
+        alert(`⚠️ Sync Failed: Could not fetch latest student statistics from Cloud Firestore.\n\nReason: ${error?.message || error || "Connection or permission error"}\n\nOperating on browser local cache instead.`);
       }
     } finally {
       setLoading(false);
@@ -508,7 +533,7 @@ export default function UsersAdmin() {
     }
   };
 
-  // Load cohorts config on mount, and set filterCohort to the active cohort as default
+  // Load cohorts config and trigger users fetch on mount
   useEffect(() => {
     const initCohorts = async () => {
       let active = 'Cohort 1';
@@ -530,18 +555,25 @@ export default function UsersAdmin() {
         console.warn("Could not fetch settings/cohorts document:", cohortErr);
       }
       setCohortsConfig({ activeCohort: active, cohortsList: list });
-      setFilterCohort(active); // This sets the selected active cohort as default and triggers the fetch
+      setFilterCohort(active); // Set default selected cohort in UI
+
+      // Fetch auto-approval setting
+      try {
+        const appSnap = await getDoc(doc(db, 'settings', 'app'));
+        if (appSnap.exists()) {
+          const appData = appSnap.data();
+          setAutoApprovalEnabled(appData?.autoApprovalEnabled === true);
+        }
+      } catch (appErr) {
+        console.warn("Could not fetch settings/app document on mount:", appErr);
+      }
+      
+      // Load all users on mount (uses local storage cache instantly, or falls back to one Firestore query if empty)
+      fetchUsers('All', false);
     };
 
     initCohorts();
   }, []);
-
-  // Fetch users specifically for the selected filterCohort when it changes
-  useEffect(() => {
-    if (filterCohort) {
-      fetchUsers(filterCohort, false);
-    }
-  }, [filterCohort]);
 
   // Keep admin local cache perfectly in-sync with users state updates instantly
   useEffect(() => {
@@ -831,13 +863,13 @@ export default function UsersAdmin() {
     }
   };
 
-  // Dynamically compute all unique cohorts that exist in the database or are configured in settings
+  // Dynamically compute all unique cohorts configured in settings to prevent user-generated messy inputs from polluting dropdown filters
   const allAvailableCohorts = useMemo(() => {
-    const fromSettings = cohortsConfig.cohortsList || ['Cohort 1'];
-    const fromUsers = users.map(u => u.cohort).filter(Boolean) as string[];
-    const combined = Array.from(new Set([...fromSettings, ...fromUsers]));
-    return combined.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-  }, [cohortsConfig.cohortsList, users]);
+    const fromSettings = cohortsConfig.cohortsList && cohortsConfig.cohortsList.length > 0
+      ? cohortsConfig.cohortsList
+      : ['Cohort 1', 'Cohort 2'];
+    return [...fromSettings].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [cohortsConfig.cohortsList]);
 
   const cohortFilteredUsers = useMemo(() => {
     return users.filter(u => {
@@ -929,29 +961,6 @@ export default function UsersAdmin() {
 
   return (
     <div>
-      {/* Database Instance Status */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-6 text-white shadow-lg">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="flex h-2.5 w-2.5 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-              <h2 className="text-sm font-bold tracking-wider text-slate-300 uppercase">Active Firestore Database</h2>
-            </div>
-            <p className="text-slate-400 text-xs max-w-2xl leading-relaxed">
-              Your application is permanently connected to your dedicated, custom provisioned Firestore database (<strong className="text-indigo-400">{getActiveDatabaseId()}</strong>). All of your settings, student records, courses, and application forms are safely secured inside this instance.
-            </p>
-          </div>
-          <div className="flex items-center gap-2.5 shrink-0">
-            <span className="text-xs font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 px-3 py-1.5 rounded-xl uppercase tracking-wider">
-              Connected & Secure
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* Website Branding Settings */}
       {hasBrandingPermission && (
         <div className="space-y-4 mb-6 animate-fade-in">
@@ -1034,6 +1043,45 @@ export default function UsersAdmin() {
                 ))}
               </select>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Student Automatic Approval Settings */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mb-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div className="space-y-1 md:max-w-xl">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span>⚡</span> Automatic Student Approval
+            </h3>
+            <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+              When <strong className="text-emerald-600">ON</strong>, newly registered students will be approved automatically. They will bypass the admin pending review queue and gain immediate dashboard access. When <strong className="text-rose-550">OFF</strong>, students will remain pending until manually approved.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 bg-slate-50 border border-slate-200 p-1.5 rounded-2xl">
+            <button
+              onClick={handleToggleAutoApproval}
+              disabled={isUpdatingAutoApproval}
+              className={`px-5 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all duration-150 border-0 cursor-pointer ${
+                !autoApprovalEnabled
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'bg-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              OFF
+            </button>
+            <button
+              onClick={handleToggleAutoApproval}
+              disabled={isUpdatingAutoApproval}
+              className={`px-5 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all duration-150 border-0 cursor-pointer ${
+                autoApprovalEnabled
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              ON
+            </button>
           </div>
         </div>
       </div>

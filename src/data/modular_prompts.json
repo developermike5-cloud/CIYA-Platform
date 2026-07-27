@@ -1,1 +1,45 @@
-{}
+{
+  "updatedAt": "2026-07-24T13:54:15.457Z",
+  "templates": [
+    {
+      "id": "mod_default_1",
+      "name": "Hero Section Finetuner",
+      "category": "Landing Page",
+      "industry": "SaaS / Marketing",
+      "description": "Generates sub-prompts focused on building a gorgeous, engaging landing or storefront hero segment.",
+      "template": "Act as a production-grade React & Tailwind designer. Draft a stunning, high-converting premium Hero component tailored for {name} based in {location}. Use a modern bold display font, ambient background gradients with blur backdrops, standard responsive layout paddings, and dual call-to-action buttons styled with elegant scaling hover transforms (hover:-translate-y-0.5 hover:shadow-lg transition-all)."
+    },
+    {
+      "id": "mod_default_2",
+      "name": "Interactive Glassmorphism Bento Grid",
+      "category": "Landing Page",
+      "industry": "Agency / Modern Tech",
+      "description": "Perfect for listing services, features, or benefits in a trendy modern asymmetrical matrix.",
+      "template": "Optimize the features showcase for {name} by designing a high-fidelity asymmetrical 3-column Bento Grid layout. Style each grid block with slate-900 border frames, 5% opacity white glassmorphism fillings, custom glowing focus gradients in the corners, and descriptive lucide icons paired with short, impactful bold titles and subtexts showing off the business advantages."
+    },
+    {
+      "id": "mod_default_3",
+      "name": "eCommerce Product Card Grid & Hover Effects",
+      "category": "eCommerce",
+      "industry": "Retail / Fashion",
+      "description": "Upgrades product displaying cards with slide-in cart modifiers and zoom triggers.",
+      "template": "Construct an premium catalog grid segment for {name}. Make each card feature zoom-on-hover image framing, clean bold price tags, quick category labeling pills, and an elegant \"Add to Cart\" block that unlocks interactive count modifiers once triggered. Ensure robust responsive scaling for mobile, tablet, and desktop screens."
+    },
+    {
+      "id": "mod_default_4",
+      "name": "Modern Interactive FAQ Accordion",
+      "category": "Landing Page",
+      "industry": "Universal",
+      "description": "Renders smooth expandable accordion panels for frequently asked customer questions.",
+      "template": "Write a self-contained interactive FAQ Accordion panel for {name}. Include 4 relevant, professionally worded questions about the service based on the profile context. Implement smooth height expands using React hooks, rotating chevron triggers, and hover highlight border responses styled entirely with native Tailwind utility classes."
+    },
+    {
+      "id": "mod_default_5",
+      "name": "High-Impact Testimonials Grid",
+      "category": "eCommerce",
+      "industry": "Universal",
+      "description": "Styled client review card layouts with customized rating metrics.",
+      "template": "Formulate an elegant client testimonial showcase section for {name}. Organize 3 distinct high-fidelity customer quotes in a masonry or row layout. Each review card should feature beautiful circular placeholders, bold metadata for reviewer details, gold ratings stars, and quotes written using elegant, italic typography."
+    }
+  ]
+}
