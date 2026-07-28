@@ -40,6 +40,35 @@ export function safeRemoveItem(key: string) {
   }
 }
 
+// Simple session-based loader guard to prevent any infinite reload loops
+export function safeReload() {
+  if (typeof window === 'undefined') return;
+  try {
+    const reloadCountStr = window.sessionStorage.getItem('ciya_reload_count') || '0';
+    const reloadCount = parseInt(reloadCountStr, 10);
+    if (reloadCount > 2) {
+      console.error("Excessive reload loop prevented (> 2 reloads). Stopping further reloads.");
+      return;
+    }
+    window.sessionStorage.setItem('ciya_reload_count', String(reloadCount + 1));
+    // Clear the reload count after 15 seconds of no reloads (normal usage)
+    setTimeout(() => {
+      try {
+        window.sessionStorage.removeItem('ciya_reload_count');
+      } catch (e) {}
+    }, 15000);
+  } catch (e) {
+    // If sessionStorage throws (e.g. in sandboxed iframe), use a window property as backup
+    const win = window as any;
+    win.__ciya_reload_count = (win.__ciya_reload_count || 0) + 1;
+    if (win.__ciya_reload_count > 2) {
+      console.error("Excessive reload loop prevented (window fallback). Stopping further reloads.");
+      return;
+    }
+  }
+  window.location.reload();
+}
+
 // Always use the correct, custom provisioned database ID from the configuration.
 // Do not allow switching to '(default)' since the default database does not exist on this project.
 const chosenDatabaseId = firebaseConfig.firestoreDatabaseId;
@@ -107,11 +136,7 @@ export const db = firestoreDb;
 // --- FIRESTORE DISCONNECT / TOGGLE SYSTEM ---
 let initialNetworkDisabled = false;
 if (typeof window !== 'undefined') {
-  try {
-    initialNetworkDisabled = window.localStorage.getItem('ciya_db_connection_disabled') === 'true';
-  } catch (e) {
-    // ignore
-  }
+  initialNetworkDisabled = safeGetItem('ciya_db_connection_disabled') === 'true';
 }
 
 let dbNetworkEnabled = !initialNetworkDisabled;
@@ -166,7 +191,7 @@ export function setActiveDatabaseId(dbId: string) {
     safeRemoveItem('ciya_admin_cached_users_time');
     safeRemoveItem('ciya_admin_cached_admins_list');
     safeRemoveItem('ciya_admin_cached_admins_data');
-    window.location.reload();
+    safeReload();
   }
 }
 
@@ -243,21 +268,16 @@ if (typeof window !== 'undefined' && rtdbInstance) {
       const shouldBeEnabled = !isDisabled;
       const isChange = shouldBeEnabled !== dbNetworkEnabled;
       
-      try {
-        window.localStorage.setItem('ciya_db_connection_disabled', isDisabled ? 'true' : 'false');
-      } catch (e) {
-        // ignore
-      }
+      safeSetItem('ciya_db_connection_disabled', isDisabled ? 'true' : 'false');
 
       if (isChange) {
         if (isLocalToggleInitiated) {
           isLocalToggleInitiated = false;
           setFirestoreNetworkState(shouldBeEnabled);
         } else {
+          // background sync - update Firestore connection mode reactively without disruptive page reload
           setFirestoreNetworkState(shouldBeEnabled).then(() => {
-            if (typeof window !== 'undefined') {
-              window.location.reload();
-            }
+            console.log("Firestore: DB Connection mode changed in background to", shouldBeEnabled ? "Online" : "Offline");
           });
         }
       }
@@ -273,11 +293,7 @@ export async function setGlobalDbConnectionDisabled(disabled: boolean) {
   isLocalToggleInitiated = true;
   
   // Always update local storage first to guarantee local offline simulation works
-  try {
-    window.localStorage.setItem('ciya_db_connection_disabled', disabled ? 'true' : 'false');
-  } catch (e) {
-    // ignore
-  }
+  safeSetItem('ciya_db_connection_disabled', disabled ? 'true' : 'false');
 
   // Attempt to synchronize globally via RTDB if available
   if (rtdbInstance) {
@@ -372,7 +388,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
       console.warn(`Auto-healing: Firestore error on custom database choice. Reverting from "${currentDb}" to "${targetDb}"`);
       safeSetItem('ciya_active_database_id', targetDb);
       setTimeout(() => {
-        window.location.reload();
+        safeReload();
       }, 500);
       return;
     }
@@ -405,7 +421,7 @@ if (typeof window !== 'undefined') {
         console.warn(`Auto-healing from unhandled error: Database issue. Reverting database from "${currentDb}" to "${targetDb}"`);
         safeSetItem('ciya_active_database_id', targetDb);
         setTimeout(() => {
-          window.location.reload();
+          safeReload();
         }, 500);
       }
     }

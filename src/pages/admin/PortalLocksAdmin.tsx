@@ -18,6 +18,7 @@ import { db, auth, rtdb, triggerSystemSignal } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { coursesStore } from '../../utils/coursesStore';
+import { FRONTEND_YEAR_BADGE_SETTINGS } from '../../constants/badgeSettings';
 import { 
   Lock, 
   Unlock, 
@@ -1341,11 +1342,11 @@ export default function PortalLocksAdmin() {
             </div>
           </div>
 
-          {/* Year Badge Monetization settings */}
+                  {/* CIYA Membership Badge Monetization settings */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
             <h2 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2 border-b pb-3 border-slate-100">
               <Award className="w-4 h-4 text-amber-500" />
-              3. Year Badge Monetization & Onboarding Locks
+              3. CIYA Membership Badge Monetization & Onboarding Locks
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
@@ -1353,7 +1354,7 @@ export default function PortalLocksAdmin() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
                   <div className="space-y-0.5 pr-4">
-                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Enable Year Badge Rules</span>
+                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Enable CIYA Membership Badge Rules</span>
                     <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">Require payment of the badge to pass subsequent cohort gates.</p>
                   </div>
                   <button
@@ -1389,7 +1390,7 @@ export default function PortalLocksAdmin() {
                 <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
                   <div className="space-y-0.5 pr-4">
                     <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Require Badge on Day 1 Onboarding</span>
-                    <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">Students cannot even access Day 1 without buying the Year Badge.</p>
+                    <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">Students cannot even access Day 1 without buying the CIYA Membership Badge.</p>
                   </div>
                   <button
                     disabled={!beginnersSettings.yearBadgeSettings.enabled}
@@ -1407,9 +1408,9 @@ export default function PortalLocksAdmin() {
 
               <div className="space-y-6">
                 <div className="space-y-1">
-                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">Year Badge Custom Price (₦ / $)</label>
+                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">CIYA Membership Badge Custom Price (₦ / $)</label>
                   <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-                    Set the checkout price shown in the student's payment simulation screen.
+                    Set the checkout price shown in the student's payment screen.
                   </p>
                   <div className="relative mt-2">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-450 font-extrabold text-sm">
@@ -1468,7 +1469,7 @@ export default function PortalLocksAdmin() {
                   <div className="space-y-1.5">
                     <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">📞 Admin WhatsApp Support Number</label>
                     <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-                      Used for the "Message Admin on WhatsApp" button after the simulated payment is completed.
+                      Used for the "Message Admin on WhatsApp" button after the payment is completed.
                     </p>
                     <input
                       type="text"
@@ -2401,9 +2402,9 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
             <div className="p-5 md:p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
               <div>
                 <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">
-                  🧪 Sandbox Simulation Environment
+                  🛡️ Secure Payment Environment
                 </span>
-                <h3 className="font-black text-slate-900 text-sm tracking-tight mt-1">Live Payment Gateway Simulator</h3>
+                <h3 className="font-black text-slate-900 text-sm tracking-tight mt-1">Live Payment Gateway Preview</h3>
               </div>
               <p className="text-[10px] text-slate-400 font-mono font-medium">Mode: Admin Preview</p>
             </div>
@@ -2587,7 +2588,7 @@ export function AdminPasscodeConsole({ secret }: { secret: string }) {
 // HIGH-FIDELITY YEAR BADGE PAYMENT FLOW COMPONENT
 // ==========================================
 export function YearBadgePaymentFlow({
-  yearBadgeSettings,
+  yearBadgeSettings = FRONTEND_YEAR_BADGE_SETTINGS,
   price,
   onSuccessClose,
   isAdminSimulation = false,
@@ -2595,7 +2596,7 @@ export function YearBadgePaymentFlow({
   userProfile,
   setUserProfile
 }: {
-  yearBadgeSettings: any;
+  yearBadgeSettings?: any;
   price?: number;
   onSuccessClose?: () => void;
   isAdminSimulation?: boolean;
@@ -2603,7 +2604,7 @@ export function YearBadgePaymentFlow({
   userProfile?: any;
   setUserProfile?: any;
 }) {
-  const finalPrice = price ?? yearBadgeSettings?.price ?? 25000;
+  const finalPrice = price ?? yearBadgeSettings?.price ?? FRONTEND_YEAR_BADGE_SETTINGS.price;
   const [step, setStep] = useState<'landing' | 'setup_popup' | 'countdown' | 'confirming' | 'success'>('landing');
   
   // 20 Minutes Countdown Timer State (1200 seconds)
@@ -2639,7 +2640,10 @@ export function YearBadgePaymentFlow({
         });
       }, 1000);
     } else if (step === 'confirming' && confirmingTime === 0) {
-      // Transition to success and persist state if applicable
+      // Transition immediately to Success to avoid any asynchronous blocking / infinite loop triggers!
+      setStep('success');
+
+      // Execute Firestore sync in the background
       const completeVerification = async () => {
         if (!isAdminSimulation && currentUser?.uid) {
           try {
@@ -2665,7 +2669,6 @@ export function YearBadgePaymentFlow({
             console.error("Failed to write payment request status to Firestore:", err);
           }
         }
-        setStep('success');
       };
       completeVerification();
     }
@@ -2716,19 +2719,19 @@ export function YearBadgePaymentFlow({
     if (confirmingTime > 6) return "🔌 Establishing interbank secure handshake...";
     if (confirmingTime > 4) return "🔍 Scanning NIBSS transaction ledgers for deposit signature...";
     if (confirmingTime > 2) return "🏷️ Confirming transaction logs & matching session IDs...";
-    return "✨ Securing and compiling your CIYA Year Badge tokens...";
+    return "✨ Securing and compiling your CIYA Membership Badge tokens...";
   };
 
   // WhatsApp Message composition
   const waPhone = yearBadgeSettings?.whatsappNumber || '+2348123456789';
   const waCleanPhone = waPhone.replace(/[^0-9+]/g, '');
   const waMessage = encodeURIComponent(
-    `Hello Admin! I have successfully completed the ₦${finalPrice.toLocaleString()} bank transfer payment for my CIYA Year Badge. Please verify and approve my badge! UID: ${currentUser?.uid || 'SimulatorAdmin'}`
+    `Hello Admin! I have successfully completed the ₦${finalPrice.toLocaleString()} bank transfer payment for my CIYA Membership Badge. Please verify and approve my badge! UID: ${currentUser?.uid || 'CIYA_Student'}`
   );
   const waLink = `https://wa.me/${waCleanPhone}?text=${waMessage}`;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 text-left relative overflow-hidden" id="year-badge-gateway-container">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 text-left relative overflow-hidden" id="ciya-membership-badge-gateway-container">
       <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-xl pointer-events-none" />
 
       {/* STEP 1: BENEFITS LANDING */}
@@ -2748,7 +2751,7 @@ export function YearBadgePaymentFlow({
               )}
             </div>
             <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
-              🏅 CIYA Academy Year Badge
+              🏅 CIYA Academy Membership Badge
             </span>
             <h4 className="text-base md:text-lg font-black text-slate-900 tracking-tight leading-snug">
               Unlock Elite Curriculum, Priority Reviews & Badging!
@@ -2782,7 +2785,7 @@ export function YearBadgePaymentFlow({
               onClick={handleStartPurchase}
               className="px-6 py-3 bg-amber-500 hover:bg-amber-600 border-0 text-amber-955 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-md transition-all flex items-center gap-2 select-none"
             >
-              Purchase Year Badge 🏷️
+              Purchase Membership Badge 🏷️
             </button>
           </div>
         </div>
@@ -2861,7 +2864,7 @@ export function YearBadgePaymentFlow({
                 <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full animate-pulse">
                   ⏳ Transaction Active
                 </span>
-                <h4 className="text-base font-black text-slate-900">Simulated Payment Gateway</h4>
+                <h4 className="text-base font-black text-slate-900">CIYA Payment Gateway</h4>
                 
                 {/* 20-Minutes Countdown Clock */}
                 <div className="text-3xl font-black font-mono text-indigo-600 tracking-widest py-3 bg-indigo-50 border border-indigo-100 rounded-2xl inline-block px-8">
@@ -2942,15 +2945,23 @@ export function YearBadgePaymentFlow({
 
       {/* STEP 4: 10 SECONDS CONFIRMING LOADER */}
       {step === 'confirming' && (
-        <div className="py-12 text-center space-y-6 animate-pulse">
+        <div className="py-12 text-center space-y-6">
           {/* Progress Circular Animation */}
-          <div className="relative w-20 h-20 mx-auto flex items-center justify-center bg-indigo-50 rounded-full border-2 border-indigo-200 shadow-inner">
+          <div 
+            onClick={() => {
+              setConfirmingTime(0);
+              setStep('success');
+            }}
+            className="relative w-24 h-24 mx-auto flex flex-col items-center justify-center bg-indigo-50 hover:bg-indigo-100 active:scale-95 transition-all rounded-full border-2 border-indigo-200 shadow-inner cursor-pointer"
+            title="Click to force skip"
+          >
             <span className="text-2xl font-black font-mono text-indigo-650">{confirmingTime}s</span>
+            <span className="text-[9px] font-black uppercase text-indigo-400 tracking-wider">Skip ⚡</span>
           </div>
 
           <div className="space-y-2">
             <h5 className="font-black text-slate-900 text-sm animate-bounce">{getConfirmingMessage()}</h5>
-            <p className="text-[11px] text-slate-500 font-semibold">Simulating Real-Time Interbank Blockchain Settlement ({confirmingProgress}% complete)...</p>
+            <p className="text-[11px] text-slate-500 font-semibold">Processing Real-Time Interbank Settlement ({confirmingProgress}% complete)...</p>
             
             {/* Horizontal progress bar */}
             <div className="w-48 bg-slate-100 h-1.5 rounded-full mx-auto overflow-hidden border">
@@ -2959,6 +2970,19 @@ export function YearBadgePaymentFlow({
                 style={{ width: `${100 - confirmingProgress}%` }}
               />
             </div>
+
+            <div className="pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmingTime(0);
+                  setStep('success');
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-black uppercase rounded-xl border-0 cursor-pointer transition-all duration-150 active:scale-95"
+              >
+                Force Skip Countdown & Verify ⚡
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2966,18 +2990,22 @@ export function YearBadgePaymentFlow({
       {/* STEP 5: SUCCESS & WHATSAPP REDIRECT */}
       {step === 'success' && (
         <div className="py-8 text-center space-y-6 animate-scaleUp">
-          <div className="mx-auto w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl shadow-md border border-emerald-200">
-            🎉
+          <div className="mx-auto w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-3xl shadow-md border border-amber-200">
+            ⏳
           </div>
           
           <div className="space-y-2">
-            <h5 className="font-black text-slate-900 text-base">Simulated Payment Recorded!</h5>
+            <h5 className="font-black text-slate-900 text-base">Awaiting Admin Confirmation</h5>
             <p className="text-xs text-slate-600 font-semibold max-w-md mx-auto leading-relaxed">
-              Congratulations! Your payment transfer receipt for <strong>₦{finalPrice.toLocaleString()}</strong> has been captured on our sandbox server.
+              Your payment verification request for <strong>₦{finalPrice.toLocaleString()}</strong> has been submitted.
             </p>
-            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 p-3 rounded-xl max-w-md mx-auto font-bold">
-              📢 For production validation: Please click the WhatsApp button below to message the admin AND forward your payment receipt. The admin will instantly verify your payment receipt and approve your Year Badge credentials!
-            </p>
+            <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl text-xs text-slate-700 font-semibold leading-relaxed max-w-md mx-auto space-y-2 text-left">
+              <p className="font-bold text-indigo-900 uppercase">⚠️ Manual Verification Pending:</p>
+              <p>Your CIYA Membership Badge is <strong>not yet active</strong>. An administrator must manually verify your bank transfer ledger entry before your account can be approved.</p>
+              <p className="bg-white p-3 rounded-xl border border-indigo-100 text-[11px] font-bold text-slate-800">
+                📢 <strong>Action Required:</strong> Click the WhatsApp button below to message the administrator and <strong>forward your bank transfer payment receipt</strong>.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col gap-2.5 max-w-sm mx-auto">
@@ -2985,9 +3013,6 @@ export function YearBadgePaymentFlow({
               href={waLink}
               target="_blank"
               rel="noreferrer"
-              onClick={() => {
-                if (onSuccessClose) onSuccessClose();
-              }}
               className="w-full py-3 bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-md flex items-center justify-center gap-2 no-underline border-0"
             >
               💬 Message Admin on WhatsApp
@@ -2999,7 +3024,7 @@ export function YearBadgePaymentFlow({
                 onClick={onSuccessClose}
                 className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase rounded-lg border-0 cursor-pointer"
               >
-                Close Gateway Simulation
+                Close Payment Gateway
               </button>
             )}
           </div>

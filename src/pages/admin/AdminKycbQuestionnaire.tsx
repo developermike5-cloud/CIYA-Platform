@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
-import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download } from 'lucide-react';
+import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock } from 'lucide-react';
+import { safeStorage } from '../../utils/safeStorage';
 import LpQuestionnaireForm from '../../components/LpQuestionnaireForm';
 import EcQuestionnaireForm from '../../components/EcQuestionnaireForm';
 import PortfolioQuestionnaireForm from '../../components/PortfolioQuestionnaireForm';
@@ -32,6 +33,27 @@ export default function AdminKycbQuestionnaire({
   defaultClientName = ''
 }: AdminKycbQuestionnaireProps = {}) {
   const [activeTab, setActiveTab] = useState<'lp' | 'ec' | 'portfolio'>('lp');
+
+  // Share link generator states
+  const [userProfile] = useState<any>(() => {
+    try {
+      const cached = safeStorage.getItem('ciya_cached_profile');
+      return cached ? JSON.parse(cached) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  const isPro = !!userProfile?.hasYearBadge;
+
+  const [shareType, setShareType] = useState<'lp' | 'ec' | 'portfolio'>('lp');
+  const [shareTitle, setShareTitle] = useState(
+    isPro ? 'Website Requirements Questionnaire' : 'CIYA Academy Website Requirements Form'
+  );
+  const [shareStudent, setShareStudent] = useState(
+    userProfile?.fullName || defaultClientName || ''
+  );
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Perspective helper function
   const qL = (clientText: string, freelancerText: string) => {
@@ -1453,6 +1475,108 @@ export default function AdminKycbQuestionnaire({
               </div>
             ))
           )}
+        </div>
+
+        {/* CLIENT LINK GENERATOR */}
+        <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 relative">
+          {!isPro && (
+            <div className="absolute inset-0 bg-white/95 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-center p-4 rounded-2xl border border-dashed border-amber-200">
+              <div className="p-3 bg-amber-50 rounded-full mb-3 text-amber-500 border border-amber-200 shadow-sm">
+                <Lock className="w-5 h-5" />
+              </div>
+              <h5 className="text-xs font-black text-slate-800 uppercase tracking-wider">Client Link Locked</h5>
+              <p className="text-[10px] text-slate-500 font-bold max-w-[200px] leading-relaxed mt-2">
+                The client link generator is reserved exclusively for students holding the <span className="text-amber-600 font-extrabold">CIYA Student Pro Badge</span>.
+              </p>
+              <div className="mt-4 text-[9px] font-black uppercase text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-150">
+                PRO MEMBERS ONLY
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <h4 className="text-xs font-black text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
+              <Link2 className="w-4 h-4 text-[#1A3C6E]" /> Client Share Link
+            </h4>
+            <p className="text-[10px] text-slate-400 font-bold leading-normal">
+              Generate a secure link for clients to fill out their design brief.
+            </p>
+          </div>
+
+          <div className="space-y-2 text-left">
+            <div>
+              <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">Target Form Profile</label>
+              <select
+                disabled={!isPro}
+                value={shareType}
+                onChange={(e) => setShareType(e.target.value as any)}
+                className="w-full text-xs font-bold border border-slate-200 rounded-xl px-2.5 py-2 focus:outline-none bg-slate-50 cursor-pointer disabled:opacity-50"
+              >
+                <option value="lp">✏️ Landing Page</option>
+                <option value="ec">🛒 eCommerce Store</option>
+                <option value="portfolio">💼 Portfolio Website</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                Custom Form Title {isPro ? '✨' : '🔒'}
+              </label>
+              <input
+                type="text"
+                value={shareTitle}
+                disabled={!isPro}
+                onChange={(e) => setShareTitle(e.target.value)}
+                placeholder="e.g. Website Requirements Form"
+                className={`w-full text-xs font-semibold border rounded-xl px-2.5 py-2 focus:outline-none ${
+                  isPro 
+                    ? 'border-slate-200 bg-white text-slate-800' 
+                    : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">Developer Name</label>
+              <input
+                type="text"
+                disabled={!isPro}
+                value={shareStudent}
+                onChange={(e) => setShareStudent(e.target.value)}
+                placeholder="Your Name / Agency"
+                className="w-full text-xs font-semibold border border-slate-200 rounded-xl px-2.5 py-2 focus:outline-none bg-white text-slate-800 disabled:opacity-50"
+              />
+            </div>
+          </div>
+
+          {linkCopied && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-center text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider animate-fadeIn">
+              Copied to Clipboard! ⚡ Send it to your Client!
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={!isPro}
+            onClick={() => {
+              if (!isPro) return;
+              const origin = window.location.origin;
+              const params = new URLSearchParams();
+              params.set('type', shareType);
+              params.set('title', isPro ? shareTitle : 'CIYA Academy Website Requirements Form');
+              if (shareStudent) {
+                params.set('student', shareStudent);
+              }
+              const fullUrl = `${origin}/client-form?${params.toString()}`;
+              navigator.clipboard.writeText(fullUrl);
+              setLinkCopied(true);
+              setTimeout(() => setLinkCopied(false), 3000);
+            }}
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 px-4 bg-teal-600 hover:bg-teal-700 hover:scale-[1.01] transition-all text-white rounded-xl text-xs font-black cursor-pointer shadow-md shadow-teal-700/10 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Link2 className="w-4 h-4" />
+            Generate & Copy Link
+          </button>
         </div>
       </div>
 

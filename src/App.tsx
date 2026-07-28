@@ -8,6 +8,7 @@ import AdvancedCoursesAdmin from './pages/admin/AdvancedCoursesAdmin';
 import CourseEdit from './pages/admin/CourseEdit';
 import UsersAdmin from './pages/admin/UsersAdmin';
 import AdminKycbQuestionnaire from './pages/admin/AdminKycbQuestionnaire';
+import ClientKycbForm from './pages/ClientKycbForm';
 import PromptsAdmin from './pages/admin/PromptsAdmin';
 import AssignmentsAdmin from './pages/admin/AssignmentsAdmin';
 import NotificationsAdmin from './pages/admin/NotificationsAdmin';
@@ -16,6 +17,7 @@ import BlogAdmin from './pages/admin/BlogAdmin';
 import Onboarding from './pages/Onboarding';
 import WaitingOnboarding from './pages/WaitingOnboarding';
 import GetStarted from './pages/GetStarted';
+import PastCohortProjects from './pages/PastCohortProjects';
 import { BrandedAlertContainer } from './components/BrandedAlert';
 import { safeStorage } from './utils/safeStorage';
 
@@ -101,6 +103,8 @@ export default function App() {
         <Route path="/waitingonboarding" element={<WaitingOnboarding />} />
         <Route path="/get-started" element={<GetStarted />} />
         <Route path="/dashboard" element={<StudentDashboard />} />
+        <Route path="/past-cohort-projects" element={<PastCohortProjects />} />
+        <Route path="/client-form" element={<ClientKycbForm />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<CoursesAdmin />} />
           <Route path="advanced-courses" element={<AdvancedCoursesAdmin />} />

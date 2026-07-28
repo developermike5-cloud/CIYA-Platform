@@ -127,23 +127,9 @@ export default function AdminLayout() {
           }
         }
       } else {
-        const cached = safeGetItem('ciya_cached_user');
-        if (cached) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (parsed && (parsed.email?.toLowerCase() === 'developermike5@gmail.com' || parsed.role === 'admin')) {
-              setUser(parsed);
-            } else {
-              safeRemoveItem('ciya_cached_user');
-              setUser(null);
-            }
-          } catch (e) {
-            safeRemoveItem('ciya_cached_user');
-            setUser(null);
-          }
-        } else {
-          setUser(null);
-        }
+        // ALWAYS clear cached user and reset state if Firebase says they are not authenticated!
+        safeRemoveItem('ciya_cached_user');
+        setUser(null);
         setLoading(false);
       }
     });

@@ -21,6 +21,7 @@ import { coursesStore } from '../utils/coursesStore';
 import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
 import CIYAMembershipBadge from '../components/CIYAMembershipBadge';
 import { verifyTimeBasedCode, getPasscodeSecondsLeft } from '../utils/passcode';
+import { FRONTEND_YEAR_BADGE_SETTINGS } from '../constants/badgeSettings';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -518,12 +519,12 @@ function isDayUnlockedUnified(
 ) {
   // Check Year Badge requirement on beginner courses
   const isBeginner = ['najnq9llx', 'psw96tm5o', 'qlpspor4hm'].includes(courseId || '');
-  if (isBeginner && appSettings?.yearBadgeSettings?.enabled) {
+  if (isBeginner && FRONTEND_YEAR_BADGE_SETTINGS.enabled) {
     const hasBadge = !!userProfile?.hasYearBadge;
-    if (appSettings.yearBadgeSettings.requireForDay1 && di >= 0 && !hasBadge) {
+    if (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay1 && di >= 0 && !hasBadge) {
       return false; // Day 1 locked for students without badge
     }
-    if (appSettings.yearBadgeSettings.requireForDay4 && di >= 3 && !hasBadge) {
+    if (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay4 && di >= 3 && !hasBadge) {
       return false; // Day 4 & 5 locked for students without badge
     }
   }
@@ -571,7 +572,8 @@ function YearBadgePaywallCard({
   currentUser,
   userProfile,
   setUserProfile,
-  appSettings
+  appSettings,
+  onTriggerPurchase
 }: {
   di: number;
   unitLabel: string;
@@ -580,87 +582,66 @@ function YearBadgePaywallCard({
   userProfile: any;
   setUserProfile: any;
   appSettings?: any;
+  onTriggerPurchase?: () => void;
 }) {
   const isPendingApproval = userProfile?.badgePaymentRequestStatus === 'PendingApproval';
 
   // Handle WhatsApp composition
-  const waPhone = appSettings?.yearBadgeSettings?.whatsappNumber || '+2348123456789';
+  const waPhone = FRONTEND_YEAR_BADGE_SETTINGS.whatsappNumber;
   const waCleanPhone = waPhone.replace(/[^0-9+]/g, '');
   const waMessage = encodeURIComponent(
-    `Hello Admin! I have made the bank transfer payment for the CIYA Year Badge. Please verify and approve my account! Registered Email: ${currentUser?.email || userProfile?.email || 'N/A'}, UID: ${currentUser?.uid || ''}`
+    `Hello Admin! I have made the bank transfer payment for the CIYA Membership Badge. Please verify and approve my account! Registered Email: ${currentUser?.email || userProfile?.email || 'N/A'}, UID: ${currentUser?.uid || ''}`
   );
   const waLink = `https://wa.me/${waCleanPhone}?text=${waMessage}`;
 
-  if (isPendingApproval) {
-    return (
-      <div className="rounded-3xl border-2 border-amber-300 bg-amber-50/10 p-6 md:p-8 text-left space-y-6 shadow-md relative overflow-hidden" id="year-badge-paywall-card">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-2xl pointer-events-none -mr-12 -mt-12" />
-        
-        <div className="space-y-4 animate-fadeIn">
-          <div className="flex items-center gap-3">
-            <span className="flex h-4 w-4 relative shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-500"></span>
-            </span>
-            <div>
-              <span className="text-[10px] bg-amber-100 text-amber-800 font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">
-                Verification Status: PENDING ADMIN APPROVAL ⏳
-              </span>
-            </div>
-          </div>
+  // Define locked flow - triggers pop-up modal
+  return (
+    <div className="rounded-3xl border-2 border-indigo-200 bg-indigo-50/5 p-6 md:p-8 text-left space-y-6 shadow-md relative overflow-hidden" id="ciya-membership-badge-locked-card">
+      <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none -mr-12 -mt-12" />
+      
+      <div className="space-y-4">
+        <span className="inline-flex items-center gap-1.5 bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
+          🔒 CIYA Membership Badge Required
+        </span>
+        <h4 className="text-xl font-black text-slate-900 tracking-tight leading-snug">
+          Unlock Elite Day 4 & 5 High-Income Course Content!
+        </h4>
+        <p className="text-xs md:text-sm text-slate-600 font-semibold leading-relaxed">
+          The remaining high-income curriculum days of this cohort are reserved exclusively for certified student members. Get your official CIYA Membership Badge to unlock these lessons immediately.
+        </p>
 
-          <div className="space-y-2">
-            <h4 className="text-lg font-black text-slate-900 tracking-tight leading-snug">
-              Your Year Badge Payment Is Currently Under Review!
-            </h4>
-            <p className="text-xs md:text-sm text-slate-600 font-semibold leading-relaxed">
-              We have recorded your simulated payment reference for <strong>₦{(price || appSettings?.yearBadgeSettings?.price || 25000).toLocaleString()}</strong>. The administrator will verify the interbank transfer ledger manually.
-            </p>
-            <div className="p-3.5 bg-amber-50 border border-amber-200/50 rounded-xl text-xs text-amber-900 font-semibold leading-relaxed">
-              📢 <strong>Want to speed things up?</strong> Click the button below to message the admin directly on WhatsApp. Sending your receipt/UID allows immediate live verification!
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-150">
-            <a
-              href={waLink}
-              target="_blank"
-              rel="noreferrer"
-              className="px-6 py-3 bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-md flex items-center justify-center gap-2 no-underline border-0 select-none max-w-sm"
-            >
-              💬 Message Admin on WhatsApp to Approve
-            </a>
+        {/* Perks list */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-150 space-y-3">
+          <span className="block text-[10px] font-black uppercase text-indigo-700 tracking-wider">What's Unlocked With Your Badge:</span>
+          <div className="text-xs font-semibold text-slate-700 leading-relaxed space-y-2">
+            {FRONTEND_YEAR_BADGE_SETTINGS.benefitText ? (
+              <div className="whitespace-pre-wrap">{FRONTEND_YEAR_BADGE_SETTINGS.benefitText}</div>
+            ) : (
+              <>
+                <p>• Unlocks Day 4 and Day 5 premium core modules</p>
+                <p>• Verified Professional CIYA Student Badge</p>
+                <p>• Certificate of Completion upon finishing assignments</p>
+                <p>• Direct priority 1-on-1 coach assignment review</p>
+              </>
+            )}
           </div>
         </div>
       </div>
-    );
-  }
 
-  // Define nested flow
-  return (
-    <div className="rounded-3xl border-2 border-amber-300 bg-amber-50/10 p-4 md:p-6 text-left space-y-6 shadow-md relative overflow-hidden" id="year-badge-paywall-card">
-      <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/5 rounded-full blur-2xl pointer-events-none -mr-12 -mt-12" />
-      
-      <div className="space-y-2">
-        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
-          🏷️ Premium Certification Gate
-        </span>
-        <h4 className="text-lg font-black text-slate-905 tracking-tight leading-snug">
-          Complete Your Registration & Unlock Elite Day 4 & 5 Modules!
-        </h4>
-        <p className="text-xs text-slate-600 font-semibold leading-relaxed">
-          The remaining days of this training cohort are reserved for certified students. Complete the quick secure transfer session to progress immediately.
-        </p>
+      <div className="pt-5 border-t border-slate-150 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Investment</span>
+          <span className="text-xl font-black text-slate-900">₦{(price || FRONTEND_YEAR_BADGE_SETTINGS.price).toLocaleString()}</span>
+        </div>
+
+        <button
+          type="button"
+          onClick={onTriggerPurchase}
+          className="px-6 py-3 bg-amber-500 hover:bg-amber-600 border-0 text-amber-955 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-md transition-all flex items-center gap-2 select-none"
+        >
+          Get CIYA Membership Badge 🏷️
+        </button>
       </div>
-
-      <YearBadgePaymentFlow
-        yearBadgeSettings={appSettings?.yearBadgeSettings}
-        price={price || appSettings?.yearBadgeSettings?.price || 25000}
-        currentUser={currentUser}
-        userProfile={userProfile}
-        setUserProfile={setUserProfile}
-        isAdminSimulation={false}
-      />
     </div>
   );
 }
@@ -1365,6 +1346,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   const [activeDayIdx, setActiveDayIdx] = useState(0);
   const [activeVideoIdx, setActiveVideoIdx] = useState(0);
   const [showQuizModal, setShowQuizModal] = useState(false);
+  const [showBadgePaymentModal, setShowBadgePaymentModal] = useState(false);
   const [showAssignment, setShowAssignment] = useState(false);
   const [viewingSyllabus, setViewingSyllabus] = useState(true);
   const [showTrackSelectionModal, setShowTrackSelectionModal] = useState(false);
@@ -1703,7 +1685,8 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   };
 
   const handleMarkComplete = async () => {
-    if (hasCheck && !isCheckPassed) {
+    const isQuizBypassed = appSettings?.quizzesOverrideMode === 'bypassed';
+    if (hasCheck && !isCheckPassed && !isQuizBypassed) {
       setShowQuizModal(true);
     } else {
       const updatedWatched = [...completedKeys];
@@ -1725,7 +1708,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       const isDayFinishedWithThis = dayKeys.every(k => k === checkKey || completedKeys.includes(k));
 
       // Check if all checks of the day are also passed
-      const allChecksPassed = videos.every((v, vi) => {
+      const allChecksPassed = appSettings?.quizzesOverrideMode === 'bypassed' || videos.every((v, vi) => {
         const k = `${activeDayIdx}-${vi}`;
         const hasQuiz = !!(v && v.checkType && v.checkType !== 'none' && v.check);
         return !hasQuiz || checkPassedKeys.includes(k);
@@ -1961,7 +1944,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     }
 
     if (goingToNextLesson) {
-      const isNextUnlocked = isAdmin || isLessonUnlockedUnified(nextDayIdx, nextVideoIdx, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId);
+      const isNextUnlocked = isAdmin || isLessonUnlockedUnified(nextDayIdx, nextVideoIdx, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId, appSettings);
       if (!isNextUnlocked) {
         alert("The next lesson is locked! You must complete the watch requirement and score at least 80% on this lesson's comprehension quiz first.");
         return;
@@ -2413,9 +2396,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
               
               const isPrecedingApproved = di === 0 || dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
               const isYearBadgeLocked = !isAdmin && isPrecedingApproved && !userProfile?.hasYearBadge && (
-                (appSettings?.yearBadgeSettings?.enabled === true) && (
-                  (appSettings?.yearBadgeSettings?.requireForDay1 && di >= 0) ||
-                  (appSettings?.yearBadgeSettings?.requireForDay4 && di >= 3)
+                (FRONTEND_YEAR_BADGE_SETTINGS.enabled === true) && (
+                  (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay1 && di >= 0) ||
+                  (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay4 && di >= 3)
                 )
               );
 
@@ -2425,11 +2408,12 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                     key={`badge-paywall-${di}`}
                     di={di}
                     unitLabel={unitLabel}
-                    price={appSettings?.yearBadgeSettings?.price || 25000}
+                    price={FRONTEND_YEAR_BADGE_SETTINGS.price}
                     currentUser={currentUser}
                     userProfile={userProfile}
                     setUserProfile={setUserProfile}
                     appSettings={appSettings}
+                    onTriggerPurchase={() => setShowBadgePaymentModal(true)}
                   />
                 );
               }
@@ -2475,7 +2459,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                        const isVidCurrent = activeDayIdx === di && activeVideoIdx === vi && !showAssignment;
                        const isVidWatched = completedKeys.includes(currentKey);
                        const isKeyCheckPassed = checkPassedKeys.includes(currentKey);
-                       const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId);
+                       const isUnlocked = isAdmin || isLessonUnlockedUnified(di, vi, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId, appSettings);
 
                       return (
                         <div 
@@ -2764,9 +2748,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                     
                     const isPrecedingApproved = di === 0 || dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
                     const isYearBadgeLocked = !isAdmin && isPrecedingApproved && !userProfile?.hasYearBadge && (
-                      (appSettings?.yearBadgeSettings?.enabled === true) && (
-                        (appSettings?.yearBadgeSettings?.requireForDay1 && di >= 0) ||
-                        (appSettings?.yearBadgeSettings?.requireForDay4 && di >= 3)
+                      (FRONTEND_YEAR_BADGE_SETTINGS.enabled === true) && (
+                        (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay1 && di >= 0) ||
+                        (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay4 && di >= 3)
                       )
                     );
                     const canViewDay = isDayUnlocked || isYearBadgeLocked;
@@ -2799,7 +2783,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                               {unitLabel} {di + 1} 
                               {!isDayUnlocked && (
                                 <span className="text-slate-500 text-xs font-normal">
-                                  {isYearBadgeLocked ? "🏷️ Year Badge Required" : `🔒 Locked (${course.isCloned ? "Preceding Lessons Incomplete" : "Pending Assignment Approval"})`}
+                                  {isYearBadgeLocked ? "🏷️ CIYA Badge Required" : `🔒 Locked (${course.isCloned ? "Preceding Lessons Incomplete" : "Pending Assignment Approval"})`}
                                 </span>
                               )}
                             </span>
@@ -2817,8 +2801,15 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                               📅 View Day {di + 1} Syllabus →
                             </span>
                           ) : isYearBadgeLocked ? (
-                            <span className="text-xs font-black text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer">
-                              🏷️ Get Year Badge
+                            <span 
+                              className="text-xs font-black text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGoToVideo(di, 0);
+                                setShowBadgePaymentModal(true);
+                              }}
+                            >
+                              🏷️ Get CIYA Membership Badge
                             </span>
                           ) : (
                             <span className="text-xs font-bold text-slate-400 bg-slate-150 border px-4 py-2 rounded-xl flex items-center gap-1.5 cursor-not-allowed">
@@ -2851,6 +2842,41 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
           showToast={showToast}
           isExpress={isExpress}
         />
+      )}
+
+      {/* Renders the CIYA Membership Badge Payment Popup Modal */}
+      {showBadgePaymentModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/85 backdrop-blur-sm flex items-center justify-center p-4 md:p-6 font-sans">
+          <div className="bg-white rounded-3xl w-full max-w-2xl border border-slate-200 overflow-hidden shadow-2xl relative animate-scaleUp">
+            <button
+              onClick={() => setShowBadgePaymentModal(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center border-0 cursor-pointer text-sm font-black z-10"
+              id="close-badge-payment-modal-btn"
+            >
+              ✕
+            </button>
+            <div className="p-5 md:p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <div>
+                <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">
+                  💳 Secure Payment Gateway
+                </span>
+                <h3 className="font-black text-slate-900 text-sm tracking-tight mt-1">CIYA Membership Badge Payment</h3>
+              </div>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[80vh]">
+              <YearBadgePaymentFlow
+                yearBadgeSettings={FRONTEND_YEAR_BADGE_SETTINGS}
+                price={FRONTEND_YEAR_BADGE_SETTINGS.price}
+                currentUser={currentUser}
+                userProfile={userProfile}
+                setUserProfile={setUserProfile}
+                isAdminSimulation={false}
+                onSuccessClose={() => setShowBadgePaymentModal(false)}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* SQUARE FUN FACT POPUP CARD (With increased font, auto scroll, and touch detection) */}
@@ -4171,8 +4197,10 @@ export default function StudentDashboard() {
             }
           }
         }
+        setLiveCheckComplete(true);
       }, (error) => {
         console.warn("Soft handling direct real-time user profile listener error:", error);
+        setLiveCheckComplete(true);
       });
     };
 
@@ -4758,21 +4786,17 @@ export default function StudentDashboard() {
         loadInitialProfile();
 
       } else {
-        const cachedUser = safeStorage.getItem('ciya_cached_user');
-        if (!cachedUser) {
-          safeStorage.removeItem('ciya_cached_user');
-          safeStorage.removeItem('ciya_cached_profile');
-          setLiveCheckComplete(false);
-          if (unsubSnapshot) {
-            unsubSnapshot();
-            unsubSnapshot = null;
-          }
-          setCurrentUser(null);
-          setUserProfile(null);
-          setAuthChecking(false);
-        } else {
-          setAuthChecking(false);
+        // ALWAYS clear cached user/profile and reset state if Firebase says they are not authenticated!
+        safeStorage.removeItem('ciya_cached_user');
+        safeStorage.removeItem('ciya_cached_profile');
+        setLiveCheckComplete(false);
+        if (unsubSnapshot) {
+          unsubSnapshot();
+          unsubSnapshot = null;
         }
+        setCurrentUser(null);
+        setUserProfile(null);
+        setAuthChecking(false);
       }
     });
 

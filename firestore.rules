@@ -82,6 +82,8 @@ service cloud.firestore {
         && (data.get('approvalStatus', 'Pending') is string && data.get('approvalStatus', 'Pending') in ['Pending', 'Approved', 'Disapproved'])
         && (data.get('isDashboardUnlocked', false) is bool)
         && (data.get('adminCode', '') is string)
+        && (data.get('badgePaymentRequestStatus', '') is string)
+        && (data.get('hasYearBadge', false) is bool)
         && (data.get('progress', {}) is map);
     }
     
@@ -183,7 +185,7 @@ service cloud.firestore {
                        && incoming().createdAt == existing().createdAt
                        && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt)
                        && incoming().diff(existing()).affectedKeys().hasOnly([
-                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'isDashboardUnlocked', 'adminCode', 'progress', 'congratulatedCourses', 'updatedAt'
+                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'isDashboardUnlocked', 'adminCode', 'progress', 'congratulatedCourses', 'updatedAt', 'badgePaymentRequestStatus', 'hasYearBadge'
                        ])
                       )
                       ||
