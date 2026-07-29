@@ -110,7 +110,7 @@ export default function PastCohortProjects() {
   useEffect(() => {
     const animate = () => {
       if (!isDragging.current && hoveredId === null && !selectedTemplate) {
-        setRotY(prev => prev + 0.007);
+        setRotY(prev => prev + 0.016);
       }
       requestRef.current = requestAnimationFrame(animate);
     };
@@ -326,7 +326,7 @@ export default function PastCohortProjects() {
           {/* Strong Action Button */}
           <div className="pt-4">
             <Link
-              to="/get-started"
+              to="/waitingonboarding"
               className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 text-sm font-black uppercase rounded-2xl shadow-lg shadow-amber-950/40 transition-all cursor-pointer border-0"
             >
               Start My 5-Day Journey Now
@@ -349,7 +349,7 @@ export default function PastCohortProjects() {
       <div className="flex-1 flex flex-col items-center justify-center relative min-h-[500px] lg:min-h-0 py-8 px-4 z-10">
         
         {/* Dynamic Marketing Centered Top Indicator */}
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 text-white text-[10px] uppercase font-black tracking-widest bg-amber-500/10 border border-amber-500/30 px-5 py-2.5 rounded-full z-10 shadow-lg">
+        <div className="absolute top-2 sm:top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 text-white text-[10px] uppercase font-black tracking-widest bg-amber-500/10 border border-amber-500/30 px-5 py-2.5 rounded-full z-10 shadow-lg text-center w-[92%] sm:w-auto justify-center">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
           <span>🎓 COHORT 1 & 2 GRADUATE PROJECTS — 100% MOBILE BUILT IN 5 DAYS!</span>
         </div>
@@ -361,7 +361,7 @@ export default function PastCohortProjects() {
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          className="relative w-full max-w-[900px] h-[380px] sm:h-[500px] md:h-[620px] lg:h-[720px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none"
+          className="relative w-full max-w-[900px] h-[380px] sm:h-[500px] md:h-[620px] lg:h-[720px] flex items-center justify-center cursor-grab active:cursor-grabbing select-none touch-none mt-10 sm:mt-0"
         >
           {/* Sphere center ambient lighting */}
           <div className="absolute w-64 h-64 rounded-full bg-teal-400/5 blur-[90px] pointer-events-none" />
@@ -552,7 +552,7 @@ export default function PastCohortProjects() {
                     {/* Actions */}
                     <div className="flex flex-col sm:flex-row gap-3 items-center w-full">
                       <button
-                        onClick={() => navigate('/get-started')}
+                        onClick={() => navigate('/waitingonboarding')}
                         className="w-full sm:flex-1 py-3 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 rounded-xl text-xs font-black uppercase transition-all cursor-pointer border-0 shadow-lg shadow-amber-950/20"
                       >
                         I Want to Build Like This

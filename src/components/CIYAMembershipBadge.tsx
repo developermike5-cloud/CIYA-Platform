@@ -445,7 +445,7 @@ export default function CIYAMembershipBadge({ data, isSample = false }: CIYAMemb
         className="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-md shadow-amber-500/20 flex items-center gap-2 border-0 select-none transition-all"
       >
         <Download className={`w-4 h-4 ${downloading ? 'animate-bounce' : ''}`} />
-        {downloading ? 'Generating Premium Badge PNG...' : isSample ? 'Download Sample Badge PNG' : 'Download My CIYA Badge'}
+        {downloading ? 'Generating Membership Badge PNG...' : isSample ? 'Download Sample Badge PNG' : 'Download My CIYA Badge'}
       </button>
     </div>
   );

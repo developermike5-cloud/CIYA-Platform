@@ -3,6 +3,8 @@ import { safeStorage } from '../utils/safeStorage';
 import { promptsStore } from '../utils/promptsStore';
 import staticFullPrompts from '../data/full_prompts.json';
 import staticModularPrompts from '../data/modular_prompts.json';
+import { db } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 import { 
   Play, 
   Pause,
@@ -453,9 +455,54 @@ function LiveProjectPreview({ url, title }: LiveProjectPreviewProps) {
 
 interface PromptGeneratorProps {
   isLocked?: boolean;
+  hasYearBadge?: boolean;
+  onTriggerBadgePurchase?: () => void;
+  userProfile?: any;
+  setUserProfile?: any;
+  currentUser?: any;
+  appSettings?: any;
 }
 
-export default function PromptGenerator({ isLocked = false }: PromptGeneratorProps) {
+export function getPromptResetTimestamps(resetTimeStr: string = '00:00') {
+  const nowMs = Date.now();
+  // Nigeria is UTC+1, so add 1 hour to UTC to get Nigeria date info
+  const ngDate = new Date(nowMs + 3600000); 
+  const year = ngDate.getUTCFullYear();
+  const month = ngDate.getUTCMonth();
+  const date = ngDate.getUTCDate();
+
+  const [hour, minute] = resetTimeStr.split(':').map(Number);
+  
+  // todayResetUTC is the reset time on the current Nigeria date
+  const todayResetUTC = Date.UTC(year, month, date, hour, minute, 0, 0) - 3600000;
+
+  let lastResetTimestamp: number;
+  let nextResetTimestamp: number;
+
+  if (nowMs >= todayResetUTC) {
+    lastResetTimestamp = todayResetUTC;
+    nextResetTimestamp = todayResetUTC + 24 * 60 * 60 * 1000;
+  } else {
+    lastResetTimestamp = todayResetUTC - 24 * 60 * 60 * 1000;
+    nextResetTimestamp = todayResetUTC;
+  }
+
+  return {
+    lastResetTimestamp,
+    nextResetTimestamp,
+    nowMs
+  };
+}
+
+export default function PromptGenerator({ 
+  isLocked = false,
+  hasYearBadge = false,
+  onTriggerBadgePurchase,
+  userProfile,
+  setUserProfile,
+  currentUser,
+  appSettings
+}: PromptGeneratorProps) {
   const [templates, setTemplates] = useState<TemplateItem[]>(() => {
     const fulls = promptsStore.getFullTemplates();
     const mods = promptsStore.getModularTemplates();
@@ -574,6 +621,14 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
     ? currentTabTemplates
     : currentTabTemplates.filter(t => t.category?.trim() === selectedCategory);
 
+  // Pro copy limit tracking
+  const resetTimeStr = appSettings?.promptLimitResetTime || '00:00';
+  const { lastResetTimestamp } = getPromptResetTimestamps(resetTimeStr);
+  const rawCopies = Array.isArray(userProfile?.promptCopies) ? userProfile.promptCopies : [];
+  const currentDayCopies = rawCopies.filter((t: number) => t >= lastResetTimestamp);
+  const remainingCopies = Math.max(0, 3 - currentDayCopies.length);
+  const hasExceededLimit = currentDayCopies.length >= 3;
+
   // Synchronize selection when tabs, category, or templates change
   useEffect(() => {
     if (filteredTemplates.length > 0) {
@@ -625,10 +680,51 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
   // Copy template text to clipboard
   const handleCopyText = async () => {
     if (!selectedTemplate) return;
+
+    // Safety check: basic members cannot copy
+    if (!hasYearBadge) {
+      if (onTriggerBadgePurchase) {
+        onTriggerBadgePurchase();
+      } else {
+        alert("Please request your badge to unlock copying.");
+      }
+      return;
+    }
+
+    // Limit check for pro members
+    if (currentDayCopies.length >= 3) {
+      alert(`⚠️ You have reached your daily copy limit of 3 prompts. It will reset at ${resetTimeStr}.`);
+      return;
+    }
+
     try {
       await navigator.clipboard.writeText(selectedTemplate.template);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
+
+      // Track the copy in Parent State synchronously, then update Firestore in background
+      const now = Date.now();
+      const fortyEightHoursAgo = now - 48 * 60 * 60 * 1000;
+      const filteredOldCopies = rawCopies.filter((t: number) => t >= fortyEightHoursAgo);
+      const updatedCopies = [...filteredOldCopies, now];
+
+      if (setUserProfile) {
+        setUserProfile((prev: any) => {
+          const updated = {
+            ...prev,
+            promptCopies: updatedCopies
+          };
+          safeStorage.setItem('ciya_cached_profile', JSON.stringify(updated));
+          return updated;
+        });
+      }
+
+      if (currentUser?.uid) {
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, {
+          promptCopies: updatedCopies
+        });
+      }
     } catch (err) {
       console.error("Failed to copy template prompt:", err);
     }
@@ -895,35 +991,83 @@ export default function PromptGenerator({ isLocked = false }: PromptGeneratorPro
                   
                   {/* VIEW 1: TEXT TEMPLATE MODE (Activated by Open button) */}
                   {isShowingText ? (
-                    <div className="absolute inset-0 bg-slate-950 p-4 pt-8 flex flex-col justify-between z-10 text-white animate-in fade-in slide-in-from-bottom-4 duration-300">
-                      <div className="flex-1 overflow-y-auto pr-1 space-y-3 pt-2">
-                        <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2 mb-2">
-                          <FileText className="w-3.5 h-3.5 text-indigo-400" />
-                          <span className="font-extrabold text-[10px] tracking-wider uppercase text-slate-400">Prompt Template Body</span>
+                    !hasYearBadge ? (
+                      <div className="absolute inset-0 bg-slate-950 p-6 pt-12 flex flex-col items-center justify-center text-center text-white z-10 animate-in fade-in duration-300">
+                        <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center mb-5 text-amber-400 border border-amber-500/20">
+                          <Sparkles className="w-7 h-7 animate-pulse" />
                         </div>
-                        <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
-                          {selectedTemplate?.template}
+                        
+                        <h3 className="text-sm font-black text-white uppercase tracking-wider leading-snug">
+                          Membership Badge Required
+                        </h3>
+                        
+                        <p className="text-[10px] text-slate-400 mt-2.5 leading-relaxed max-w-[190px] mx-auto font-medium">
+                          Prompt templates copying is restricted to Pro members. Kindly request your membership badge to unlock full access to copyable prompt blueprints and resources!
                         </p>
-                      </div>
 
-                      {/* Copy Prompt triggers */}
-                      <div className="pt-3 border-t border-slate-900 bg-slate-950">
-                        <button
-                          onClick={handleCopyText}
-                          className={`w-full py-3 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-all border-0 ${
-                            copySuccess 
-                              ? 'bg-green-600 text-white' 
-                              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-900/30'
-                          }`}
-                        >
-                          {copySuccess ? 'Copied to clipboard!' : (
-                            <>
-                              <Copy className="w-4 h-4" /> Copy Prompt Text
-                            </>
-                          )}
-                        </button>
+                        <div className="mt-6 w-full max-w-[200px] space-y-2">
+                          <button
+                            onClick={onTriggerBadgePurchase}
+                            className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-[11px] uppercase rounded-xl shadow-lg shadow-amber-500/10 transition-all border-0 cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                          >
+                            <span>Get My Badge Now 🏷️</span>
+                          </button>
+                          
+                          <button
+                            onClick={() => setIsShowingText(false)}
+                            className="w-full py-1.5 text-[10px] text-slate-500 hover:text-slate-400 transition-colors bg-transparent border-0 cursor-pointer underline underline-offset-4"
+                          >
+                            Go Back to Mockup Image
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="absolute inset-0 bg-slate-950 p-4 pt-8 flex flex-col justify-between z-10 text-white animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <div className="flex-1 overflow-y-auto pr-1 space-y-3 pt-2">
+                          <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2 mb-2">
+                            <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                            <span className="font-extrabold text-[10px] tracking-wider uppercase text-slate-400">Prompt Template Body</span>
+                          </div>
+                          <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
+                            {selectedTemplate?.template}
+                          </p>
+                        </div>
+
+                        {/* Copy Prompt triggers with tracking */}
+                        <div className="pt-3 border-t border-slate-900 bg-slate-950 space-y-2">
+                          <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold px-1 uppercase tracking-wider">
+                            <span>Daily Copy Tracker</span>
+                            <span className={hasExceededLimit ? "text-rose-400 font-extrabold" : "text-emerald-400 font-extrabold"}>
+                              {remainingCopies} / 3 left today
+                            </span>
+                          </div>
+
+                          <button
+                            onClick={handleCopyText}
+                            disabled={hasExceededLimit && !copySuccess}
+                            className={`w-full py-2.5 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-all border-0 ${
+                              copySuccess 
+                                ? 'bg-green-600 text-white' 
+                                : hasExceededLimit
+                                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-900/30'
+                            }`}
+                          >
+                            {copySuccess ? 'Copied to clipboard!' : hasExceededLimit ? 'Limit Reached' : (
+                              <>
+                                <Copy className="w-3.5 h-3.5" /> Copy Prompt Text
+                              </>
+                            )}
+                          </button>
+
+                          {hasExceededLimit && (
+                            <p className="text-[9px] text-slate-500 text-center italic leading-relaxed mt-1">
+                              Your copy limit resets today at {resetTimeStr} (Nigeria Time).
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
                   ) : null}
 
                   {/* VIEW 2: EMBEDDED LINK PREVIEW */}

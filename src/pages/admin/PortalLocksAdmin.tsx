@@ -81,6 +81,7 @@ interface BeginnersSettings {
   triggerTime1: string;
   triggerTime2: string;
   triggerTime3: string;
+  promptLimitResetTime?: string;
   yearBadgeSettings: {
     enabled: boolean;
     requireForDay1: boolean;
@@ -200,14 +201,16 @@ export default function PortalLocksAdmin() {
           if (advCourseIds.has(cId)) {
             const course = allStoreCourses.find(c => c.id === cId);
             const progressData = u.progress[cId];
-            list.push({
-              studentId: u.id || u.uid,
-              name: u.fullName || u.displayName || 'Unnamed Student',
-              email: u.email || 'No email',
-              courseId: cId,
-              courseTitle: course?.title || 'Unknown Advanced Course',
-              unlockedAt: progressData?.createdAt || progressData?.unlockedAt || ''
-            });
+            if (progressData && progressData.accessStatus !== 'revoked') {
+              list.push({
+                studentId: u.id || u.uid,
+                name: u.fullName || u.displayName || 'Unnamed Student',
+                email: u.email || 'No email',
+                courseId: cId,
+                courseTitle: course?.title || 'Unknown Advanced Course',
+                unlockedAt: progressData?.createdAt || progressData?.unlockedAt || ''
+              });
+            }
           }
         });
       }
@@ -235,7 +238,7 @@ export default function PortalLocksAdmin() {
     try {
       const userRef = doc(db, 'users', studentId);
       await updateDoc(userRef, {
-        [`progress.${courseId}`]: deleteField()
+        [`progress.${courseId}.accessStatus`]: 'revoked'
       });
       showToastMessage(`Successfully revoked ${studentName}'s access to "${courseTitle}".`, 'success');
     } catch (err) {
@@ -254,6 +257,7 @@ export default function PortalLocksAdmin() {
     triggerTime1: '08:00',
     triggerTime2: '14:00',
     triggerTime3: '20:00',
+    promptLimitResetTime: '00:00',
     yearBadgeSettings: {
       enabled: true,
       requireForDay1: false,
@@ -338,6 +342,7 @@ export default function PortalLocksAdmin() {
           triggerTime1: data?.triggerTime1 || '08:00',
           triggerTime2: data?.triggerTime2 || '14:00',
           triggerTime3: data?.triggerTime3 || '20:00',
+          promptLimitResetTime: data?.promptLimitResetTime || '00:00',
           yearBadgeSettings: {
             enabled: data?.yearBadgeSettings?.enabled ?? true,
             requireForDay1: data?.yearBadgeSettings?.requireForDay1 ?? false,
@@ -530,6 +535,7 @@ export default function PortalLocksAdmin() {
         triggerTime1: beginnersSettings.triggerTime1,
         triggerTime2: beginnersSettings.triggerTime2,
         triggerTime3: beginnersSettings.triggerTime3,
+        promptLimitResetTime: beginnersSettings.promptLimitResetTime || '00:00',
         yearBadgeSettings: beginnersSettings.yearBadgeSettings,
         advancedCourseSettings: beginnersSettings.advancedCourseSettings || {
           enabled: true,
@@ -767,6 +773,26 @@ export default function PortalLocksAdmin() {
       setGradingInProgress(false);
     }
   };
+
+  // Automatically trigger grading scan in the background every 20 seconds for real-time delay-based approval updates
+  useEffect(() => {
+    if (!beginnersSettings) return;
+
+    // Run manual grading scan 3 seconds after settings load / mount
+    const initialTimeout = setTimeout(() => {
+      triggerManualGradingScan();
+    }, 3000);
+
+    // Then scan periodically every 20 seconds
+    const interval = setInterval(() => {
+      triggerManualGradingScan();
+    }, 20000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [beginnersSettings]);
 
   const handleUpdateAssignmentSetting = (dayKey: string, field: keyof AssignmentDaySetting, value: any) => {
     const updated = {
@@ -1795,6 +1821,36 @@ export default function PortalLocksAdmin() {
                         />
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Pro Member Prompt Copy Limit Reset Time */}
+                <div className="space-y-3 pt-4 border-t border-slate-100">
+                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">Pro Member Prompt Copy Limit Reset Time</label>
+                  <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                    Set the exact time of day (24-hour format, Nigeria Local Time) when the daily 3-copy limit resets for premium Pro members.
+                  </p>
+                  
+                  <div className="flex gap-4 items-center">
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1 w-1/2">
+                      <span className="block text-[9px] font-black text-slate-500 uppercase tracking-wider">Reset Time of Day</span>
+                      <input
+                        type="text"
+                        value={beginnersSettings.promptLimitResetTime || '00:00'}
+                        onChange={(e) => {
+                          const updated = { ...beginnersSettings, promptLimitResetTime: e.target.value };
+                          setBeginnersSettings(updated);
+                          setHasUnsavedChanges(true);
+                          hasUnsavedChangesRef.current = true;
+                        }}
+                        className="w-full text-center bg-white border border-slate-200 text-xs font-black p-2 rounded-lg outline-none"
+                        placeholder="e.g. 00:00"
+                      />
+                    </div>
+                    
+                    <div className="p-3 bg-indigo-50 border border-indigo-150 rounded-xl space-y-1 w-1/2 text-indigo-950 text-[10px] font-semibold leading-normal">
+                      🛡️ <strong>Limit Status:</strong> Pro users are limited to 3 copied prompt templates per reset cycle. This setting guarantees their limits will reset daily at the chosen hour.
+                    </div>
                   </div>
                 </div>
 

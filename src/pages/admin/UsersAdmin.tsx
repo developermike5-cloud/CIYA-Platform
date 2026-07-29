@@ -815,20 +815,13 @@ export default function UsersAdmin() {
         updatedAt: serverTimestamp()
       };
 
-      let nextProgress: any = {};
-      if (clearProgress) {
-        // Enforce strict single active course by starting clean progress
-        nextProgress = {
-          [targetCourseId]: { watched: [], checkPassed: [], submissions: {}, quizScores: {} }
-        };
-      } else {
-        // Retain existing progress but ensure new course has progress entry
-        const existingProgress = userDoc.progress || {};
-        nextProgress = {
-          ...existingProgress,
-          [targetCourseId]: existingProgress[targetCourseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} }
-        };
-      }
+      const existingProgress = userDoc.progress || {};
+      const nextProgress = {
+        ...existingProgress,
+        [targetCourseId]: clearProgress 
+          ? { watched: [], checkPassed: [], submissions: {}, quizScores: {} }
+          : (existingProgress[targetCourseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} })
+      };
 
       updatedFields.progress = nextProgress;
 
@@ -1870,20 +1863,20 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                     <input
                                       type="checkbox"
                                       id={`clear-progress-chk-${u.id}`}
-                                      checked={clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : true}
+                                      checked={clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : false}
                                       onChange={(e) => {
                                         setClearProgressMap(prev => ({ ...prev, [u.id]: e.target.checked }));
                                       }}
                                       className="accent-indigo-600 rounded bg-white w-4 h-4"
                                     />
-                                    <span>Reset/Clear other course progress (Highly Recommended)</span>
+                                    <span>Reset progress of this target course only (Warning: Wipes progress for this specific course)</span>
                                   </label>
                                   <button
                                     type="button"
                                     id={`btn-course-switch-${u.id}`}
                                     onClick={() => {
                                       const selectedId = selectedCourses[u.id] !== undefined ? selectedCourses[u.id] : (getUserRegisteredCourses(u)[0]?.id || "");
-                                      const clearProgress = clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : true;
+                                      const clearProgress = clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : false;
 
                                       if (!selectedId) {
                                         alert("Please select a target course first.");

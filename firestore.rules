@@ -84,6 +84,7 @@ service cloud.firestore {
         && (data.get('adminCode', '') is string)
         && (data.get('badgePaymentRequestStatus', '') is string)
         && (data.get('hasYearBadge', false) is bool)
+        && (data.get('promptCopies', []) is list)
         && (data.get('progress', {}) is map);
     }
     
@@ -185,7 +186,7 @@ service cloud.firestore {
                        && incoming().createdAt == existing().createdAt
                        && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt)
                        && incoming().diff(existing()).affectedKeys().hasOnly([
-                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'isDashboardUnlocked', 'adminCode', 'progress', 'congratulatedCourses', 'updatedAt', 'badgePaymentRequestStatus', 'hasYearBadge'
+                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'isDashboardUnlocked', 'adminCode', 'progress', 'congratulatedCourses', 'updatedAt', 'badgePaymentRequestStatus', 'hasYearBadge', 'promptCopies'
                        ])
                       )
                       ||
@@ -248,7 +249,7 @@ service cloud.firestore {
                     && incoming().userId == request.auth.uid
                     && incoming().createdAt == request.time;
       allow update: if isSignedIn()
-                    && (isAdmin() || (incoming().userId == request.auth.uid && existing().get('userId', '') == request.auth.uid && existing().status == "Pending"));
+                    && (isAdmin() || (incoming().userId == request.auth.uid && existing().get('userId', '') == request.auth.uid && (existing().status == "Pending" || existing().status == "Disapproved")));
       allow delete: if isAdmin();
     }
 

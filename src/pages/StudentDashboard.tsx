@@ -517,36 +517,66 @@ function isDayUnlockedUnified(
   courseId?: string,
   appSettings?: any
 ) {
-  // Check Year Badge requirement on beginner courses
-  const isBeginner = ['najnq9llx', 'psw96tm5o', 'qlpspor4hm'].includes(courseId || '');
-  if (isBeginner && FRONTEND_YEAR_BADGE_SETTINGS.enabled) {
-    const hasBadge = !!userProfile?.hasYearBadge;
-    if (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay1 && di >= 0 && !hasBadge) {
-      return false; // Day 1 locked for students without badge
-    }
-    if (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay4 && di >= 3 && !hasBadge) {
-      return false; // Day 4 & 5 locked for students without badge
-    }
-  }
+  // Determine student's existing progress or organic unlocking for this day di
+  const hasSubmissionsForThisDay = dbSubmissions.some((sub: any) => sub.dayIndex >= di);
+  const dayVideos = days[di]?.videos || [];
+  const hasCompletedVideosForThisDay = dayVideos.length > 0 && dayVideos.some((v: any) => completedKeys.includes(v.id || v.youtubeId));
+  
+  const progressStore = userProfile?.progress?.[courseId || ''] || {};
+  const quizScores = progressStore.quizScores || {};
+  const hasQuizScoresForThisDay = Object.keys(quizScores).some(key => key.startsWith(`${di}-`));
 
-  // 1. Check manual administrative overrides first
-  if (courseId && appSettings?.courseDaysLocks) {
-    const override = appSettings.courseDaysLocks[`${courseId}_day-${di}`];
-    if (override === 'locked') {
-      return false; // Force locked!
-    }
-    if (override === 'unlocked') {
-      return true; // Force unlocked!
-    }
-  }
+  const precedingApproved = di > 0 && dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
+  const precedingVideos = di > 0 ? (days[di - 1]?.videos || []) : [];
+  const precedingVideosCompleted = di > 0 && precedingVideos.length > 0 && precedingVideos.every((v: any) => completedKeys.includes(v.id || v.youtubeId));
+  const precedingQuizScores = di > 0 && Object.keys(quizScores).some(key => key.startsWith(`${di-1}-`));
 
-  // Check custom calendar unlock settings
-  const dayKey = `day-${di}`;
-  const scheduledUnlock = appSettings?.unlockSettings?.[dayKey];
-  if (scheduledUnlock && scheduledUnlock.type === 'date_time' && scheduledUnlock.unlockDateTime) {
-    const nowStr = new Date().toISOString();
-    if (nowStr < scheduledUnlock.unlockDateTime) {
-      return false; // Scheduled time not reached yet!
+  const hasActivityOnThisDayOrLater = hasSubmissionsForThisDay || hasCompletedVideosForThisDay || hasQuizScoresForThisDay;
+  const completedPrecedingDayOrganically = di === 0 || precedingApproved || precedingVideosCompleted || precedingQuizScores;
+
+  // Exempt students who have active progress or have completed the preceding day's requirements organically from any locks
+  const exemptFromLock = hasActivityOnThisDayOrLater || completedPrecedingDayOrganically;
+
+  if (!exemptFromLock) {
+    // Check Year Badge requirement on beginner courses
+    const isBeginner = ['najnq9llx', 'psw96tm5o', 'qlpspor4hm'].includes(courseId || '');
+    if (isBeginner && FRONTEND_YEAR_BADGE_SETTINGS.enabled) {
+      const hasBadge = !!userProfile?.hasYearBadge;
+      if (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay1 && di >= 0 && !hasBadge) {
+        return false; // Day 1 locked for students without badge
+      }
+      if (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay4 && di >= 3 && !hasBadge) {
+        return false; // Day 4 & 5 locked for students without badge
+      }
+    }
+
+    // Check manual administrative overrides
+    if (courseId && appSettings?.courseDaysLocks) {
+      const override = appSettings.courseDaysLocks[`${courseId}_day-${di}`];
+      if (override === 'locked') {
+        return false; // Force locked!
+      }
+      if (override === 'unlocked') {
+        return true; // Force unlocked!
+      }
+    }
+
+    // Check custom calendar unlock settings
+    const dayKey = `day-${di}`;
+    const scheduledUnlock = appSettings?.unlockSettings?.[dayKey];
+    if (scheduledUnlock && scheduledUnlock.type === 'date_time' && scheduledUnlock.unlockDateTime) {
+      const nowStr = new Date().toISOString();
+      if (nowStr < scheduledUnlock.unlockDateTime) {
+        return false; // Scheduled time not reached yet!
+      }
+    }
+  } else {
+    // If they are exempt from lock, but there is an explicit unlock override, respect it
+    if (courseId && appSettings?.courseDaysLocks) {
+      const override = appSettings.courseDaysLocks[`${courseId}_day-${di}`];
+      if (override === 'unlocked') {
+        return true;
+      }
     }
   }
 
@@ -561,8 +591,8 @@ function isDayUnlockedUnified(
   }
 
   // 4. Default progression rule: preceding day assignment must be approved
-  const precedingApproved = dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
-  return precedingApproved;
+  const precedingApprovedVal = dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
+  return precedingApprovedVal;
 }
 
 function YearBadgePaywallCard({
@@ -765,6 +795,73 @@ function evaluateComplianceAndGetStatus(
   return {
     status: 'Approved',
     adminReason: "Automatically approved by compliance checker."
+  };
+}
+
+// Filter out admin-only terms/feedback to keep student facing logs elegant and clean
+function getCleanStudentFeedback(sub: any): string | null {
+  if (!sub) return null;
+  const reason = sub.adminReason;
+  const status = sub.status;
+  
+  if (!reason) {
+    if (status === 'Pending') {
+      return "Your assignment has been submitted successfully and is currently under review by our certified coaches.";
+    }
+    return null;
+  }
+  
+  const lower = reason.toLowerCase();
+  
+  // Hide internal admin statements completely for students
+  if (
+    lower.includes("timer is active") || 
+    lower.includes("automatically approved") || 
+    lower.includes("compliance checker") ||
+    lower.includes("delay timer")
+  ) {
+    if (status === 'Pending') {
+      return "Your assignment has been submitted successfully and is currently under review by our certified coaches.";
+    }
+    return null;
+  }
+  
+  // Clean up technical prefixes like "Automated Compliance:"
+  let clean = reason.replace(/^Automated Compliance:\s*/i, "");
+  
+  return clean;
+}
+
+// Helper to get next day unlock status description to prevent student confusion regarding scheduled locks
+function getNextDayUnlockStatus(nextDayIdx: number, appSettings: any): { isScheduled: boolean; message: string; toast: string } {
+  const nextDayKey = `day-${nextDayIdx}`;
+  const scheduledUnlock = appSettings?.unlockSettings?.[nextDayKey];
+  
+  if (scheduledUnlock && scheduledUnlock.type === 'date_time' && scheduledUnlock.unlockDateTime) {
+    const nowStr = new Date().toISOString();
+    const unlockTime = new Date(scheduledUnlock.unlockDateTime);
+    if (nowStr < scheduledUnlock.unlockDateTime) {
+      const formattedDate = unlockTime.toLocaleString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      return {
+        isScheduled: true,
+        message: `Your assignment has been reviewed and approved! Day ${nextDayIdx + 1} is scheduled to unlock on ${formattedDate}.`,
+        toast: `Assignment Approved! 🎉 Day ${nextDayIdx + 1} is scheduled to unlock on ${formattedDate}.`
+      };
+    }
+  }
+  
+  return {
+    isScheduled: false,
+    message: `Your assignment has been reviewed and approved! Day ${nextDayIdx + 1} is now unlocked.`,
+    toast: `Assignment Approved! Day ${nextDayIdx + 1} is now unlocked! 🎉`
   };
 }
 
@@ -2026,7 +2123,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
           if (minutes > 0) {
             finalStatus = 'Pending';
             autoApproveAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
-            customToastMessage = `Compliance checklist passed! Approval queued for verification within ${delayLabel}.`;
+            customToastMessage = "Assignment submitted successfully! Under review by our team.";
           }
         }
       }
@@ -2100,13 +2197,16 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         });
       }
 
+      const cleanReason = (evalRes.adminReason || '').replace(/^Automated Compliance:\s*/i, '');
+
       if (finalStatus !== 'Pending') {
+        const unlockInfo = getNextDayUnlockStatus(dayIndex + 1, appSettings);
         await addDoc(collection(db, 'notifications'), {
           userId: currentUser.uid,
-          title: finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Compliance Check Failed ❌`,
+          title: finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Assignment Needs Correction ❌`,
           message: finalStatus === 'Approved'
-            ? `Your assignment for Day ${dayIndex + 1} has been reviewed and approved!`
-            : `Your assignment for Day ${dayIndex + 1} did not meet requirements: "${evalRes.adminReason}". Please fix and resubmit.`,
+            ? unlockInfo.message
+            : `Your assignment for Day ${dayIndex + 1} did not meet requirements: "${cleanReason}". Please fix and resubmit.`,
           type: 'assignment_graded',
           isRead: false,
           triggeredBy: 'Academy Coordinator',
@@ -2114,9 +2214,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         });
 
         if (finalStatus === 'Approved') {
-          showToast(`Assignment Approved! Day ${dayIndex + 2} is now unlocked! 🎉`);
+          showToast(unlockInfo.toast);
         } else {
-          showToast(`Compliance Failed: ${evalRes.adminReason} ❌`);
+          showToast(`Submission Needs Correction: ${cleanReason} ❌`);
         }
       } else {
         if (autoApproveAt && customToastMessage) {
@@ -3563,6 +3663,7 @@ export default function StudentDashboard() {
   useEffect(() => {
     const unsubscribe = coursesStore.subscribe((updatedCourses) => {
       setCourses(updatedCourses);
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -3591,6 +3692,7 @@ export default function StudentDashboard() {
   });
   const [isRefreshingCourses, setIsRefreshingCourses] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [showDashboardBadgePaymentModal, setShowDashboardBadgePaymentModal] = useState(false);
   
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const cached = safeStorage.getItem('ciya_cached_user');
@@ -3935,6 +4037,126 @@ export default function StudentDashboard() {
     };
   }, [currentUser]);
 
+  // Automated delay-based compliance check processor (client-side executor)
+  useEffect(() => {
+    if (!currentUser || !allMySubmissions || !appSettings || !courses || courses.length === 0) return;
+
+    let isMounted = true;
+    const processActiveDelays = async () => {
+      const nowStr = new Date().toISOString();
+      const pendingExpiredSubmissions = allMySubmissions.filter((sub: any) => {
+        return (
+          sub.status === 'Pending' &&
+          sub.autoApproveAt &&
+          nowStr >= sub.autoApproveAt
+        );
+      });
+
+      if (pendingExpiredSubmissions.length === 0) return;
+
+      for (const sub of pendingExpiredSubmissions) {
+        try {
+          const course = courses.find(c => c.id === sub.courseId);
+          if (!course) continue;
+          
+          const isBeginnerCourse = ['najnq9llx', 'psw96tm5o', 'qlpspor4hm'].includes(course.id || '');
+          let assignmentConfig = course.days?.[sub.dayIndex]?.assignment;
+          const dayKey = `day-${sub.dayIndex}`;
+          const customConfig = appSettings?.assignmentSettings?.[dayKey];
+          
+          if (isBeginnerCourse && customConfig && customConfig.enabled) {
+            assignmentConfig = {
+              prompt: assignmentConfig?.prompt || '',
+              dueNote: assignmentConfig?.dueNote || '',
+              autoApprove: customConfig.autoApprove,
+              minChars: customConfig.minChars,
+              requireLink: customConfig.requireLink,
+              minScreenshots: customConfig.minScreenshots,
+              requiredKeywords: customConfig.requiredKeywords,
+              approveComment: customConfig.approveComment,
+              disapproveComment: customConfig.disapproveComment
+            };
+          }
+
+          const evalRes = evaluateComplianceAndGetStatus(
+            assignmentConfig,
+            sub.submittedText || '',
+            sub.fileUrl || '',
+            sub.images || []
+          );
+
+          const finalStatus = evalRes.status;
+          const finalReason = evalRes.status === 'Approved'
+            ? (customConfig?.approveComment || "Excellent submission! All compliance checks passed automatically. Next day unlocked.")
+            : evalRes.adminReason;
+
+          const dataWithStatus = {
+            text: sub.submittedText || '',
+            link: sub.fileUrl || '',
+            images: sub.images || [],
+            status: finalStatus,
+            adminReason: finalReason,
+            submittedAt: sub.submittedAt || new Date().toISOString()
+          };
+
+          // 1. Update the student's assignment document in the global assignments collection
+          const subRef = doc(db, 'assignments', sub.id);
+          await updateDoc(subRef, {
+            status: finalStatus,
+            adminReason: finalReason,
+            gradedBy: 'Academy Coordinator',
+            gradedAt: serverTimestamp()
+          });
+
+          // 2. Update the student's user doc progress
+          const userRef = doc(db, 'users', currentUser.uid);
+          await updateDoc(userRef, {
+            [`progress.${sub.courseId}.submissions.day-${sub.dayIndex}`]: dataWithStatus,
+            updatedAt: serverTimestamp()
+          });
+
+          // 3. Trigger notification alert
+          const cleanReason = (finalReason || '').replace(/^Automated Compliance:\s*/i, '');
+          const unlockInfo = getNextDayUnlockStatus(sub.dayIndex + 1, appSettings);
+          await addDoc(collection(db, 'notifications'), {
+            userId: currentUser.uid,
+            title: finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Assignment Needs Correction ❌`,
+            message: finalStatus === 'Approved'
+              ? unlockInfo.message
+              : `Your assignment for Day ${sub.dayIndex + 1} did not meet requirements: "${cleanReason}". Please fix and resubmit.`,
+            type: 'assignment_graded',
+            isRead: false,
+            triggeredBy: 'Academy Coordinator',
+            createdAt: serverTimestamp()
+          });
+
+          if (isMounted) {
+            if (finalStatus === 'Approved') {
+              showToast(unlockInfo.toast);
+            } else {
+              showToast(`Submission Needs Correction: ${cleanReason} ❌`);
+            }
+          }
+        } catch (err) {
+          console.error("Error processing client-side auto-approval update:", err);
+        }
+      }
+    };
+
+    // Run check immediately on mount/update
+    processActiveDelays();
+
+    // Set up a polling check every 2 seconds to handle real-time timer expiration
+    const interval = setInterval(() => {
+      processActiveDelays();
+    }, 2000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentUser, allMySubmissions, appSettings, courses]);
+
   const handleDashboardAssignmentSubmit = async (dayIndex: number, data: any) => {
     const activeCId = selectedAssignCourseId || (registeredCoursesList && registeredCoursesList[0]?.id);
     if (!activeCId) return;
@@ -3982,7 +4204,7 @@ export default function StudentDashboard() {
           if (minutes > 0) {
             finalStatus = 'Pending';
             autoApproveAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
-            customToastMessage = `Compliance checklist passed! Approval queued for verification within ${delayLabel}.`;
+            customToastMessage = "Assignment submitted successfully! Under review by our team.";
           }
         }
       }
@@ -4056,13 +4278,16 @@ export default function StudentDashboard() {
         });
       }
 
+      const cleanReason = (evalRes.adminReason || '').replace(/^Automated Compliance:\s*/i, '');
+
       if (finalStatus !== 'Pending') {
+        const unlockInfo = getNextDayUnlockStatus(dayIndex + 1, appSettings);
         await addDoc(collection(db, 'notifications'), {
           userId: currentUser.uid,
-          title: finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Compliance Check Failed ❌`,
+          title: finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Assignment Needs Correction ❌`,
           message: finalStatus === 'Approved'
-            ? `Your assignment for Day ${dayIndex + 1} has been reviewed and approved!`
-            : `Your assignment for Day ${dayIndex + 1} did not meet requirements: "${evalRes.adminReason}". Please fix and resubmit.`,
+            ? unlockInfo.message
+            : `Your assignment for Day ${dayIndex + 1} did not meet requirements: "${cleanReason}". Please fix and resubmit.`,
           type: 'assignment_graded',
           isRead: false,
           triggeredBy: 'Academy Coordinator',
@@ -4070,9 +4295,9 @@ export default function StudentDashboard() {
         });
 
         if (finalStatus === 'Approved') {
-          showToast(`Assignment Approved! Day ${dayIndex + 2} is now unlocked! 🎉`);
+          showToast(unlockInfo.toast);
         } else {
-          showToast(`Compliance Failed: ${evalRes.adminReason} ❌`);
+          showToast(`Submission Needs Correction: ${cleanReason} ❌`);
         }
       } else {
         if (autoApproveAt && customToastMessage) {
@@ -4522,7 +4747,7 @@ export default function StudentDashboard() {
           if (minutes > 0) {
             finalStatus = 'Pending';
             autoApproveAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
-            customToastMessage = `Compliance checklist passed! Approval queued for verification within ${delayLabel}.`;
+            customToastMessage = "Assignment submitted successfully! Under review by our team.";
           }
         }
       }
@@ -4598,14 +4823,17 @@ export default function StudentDashboard() {
         updatedAt: serverTimestamp()
       });
 
+      const cleanReason = (evalRes.adminReason || '').replace(/^Automated Compliance:\s*/i, '');
+
       // 3. Trigger success notifications / toast
       if (finalStatus !== 'Pending') {
+        const unlockInfo = getNextDayUnlockStatus(submitDayIndex + 1, appSettings);
         await addDoc(collection(db, 'notifications'), {
           userId: currentUser.uid,
-          title: finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Compliance Check Failed ❌`,
+          title: finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Assignment Needs Correction ❌`,
           message: finalStatus === 'Approved'
-            ? `Your assignment for Day ${submitDayIndex + 1} has been reviewed and approved!`
-            : `Your assignment for Day ${submitDayIndex + 1} did not meet requirements: "${evalRes.adminReason}". Please fix and resubmit.`,
+            ? unlockInfo.message
+            : `Your assignment for Day ${submitDayIndex + 1} did not meet requirements: "${cleanReason}". Please fix and resubmit.`,
           type: 'assignment_graded',
           isRead: false,
           triggeredBy: 'Academy Coordinator',
@@ -4613,9 +4841,9 @@ export default function StudentDashboard() {
         });
 
         if (finalStatus === 'Approved') {
-          showToast(`Assignment Approved! Next day/module is now unlocked! 🎉`);
+          showToast(unlockInfo.toast);
         } else {
-          showToast(`Compliance Failed: ${evalRes.adminReason} ❌`);
+          showToast(`Submission Needs Correction: ${cleanReason} ❌`);
         }
       } else {
         if (autoApproveAt && customToastMessage) {
@@ -4701,9 +4929,49 @@ export default function StudentDashboard() {
 
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        let isUserAdmin = false;
+        // 1. Instantly set current user to unblock state
+        setCurrentUser(user);
+        
+        // Cache-first offline profile loader
+        const loadInitialProfile = () => {
+          // 1. Immediately render cached profile if exists (Stale-While-Revalidate)
+          const cachedProfile = safeStorage.getItem('ciya_cached_profile');
+          if (cachedProfile) {
+            try {
+              const profileData = JSON.parse(cachedProfile);
+              setUserProfile(profileData);
+              if (!cleanupPerformedRef.current) {
+                cleanupPerformedRef.current = true;
+                cleanUpOldSubmissionsLocal(user.uid, profileData.progress);
+                cleanUpOldGlobalSubmissions(user.uid);
+              }
+            } catch (e) {
+              console.error("Error parsing cached profile on auth change:", e);
+            }
+          } else {
+            // Setup default profile candidate to show while listener connects
+            const defaultCandidate = {
+              fullName: user.displayName || user.email?.split('@')[0] || "CIYA Scholar",
+              email: user.email || "student@ciya.com",
+              whatsapp: "+0000000000",
+              state: "Global",
+              goal: "Acquire high-performance development skills",
+              approvalStatus: "Approved",
+              isActivated: true,
+              isDashboardUnlocked: true,
+              cohort: 'Cohort 1'
+            };
+            setUserProfile(defaultCandidate);
+          }
+          // Always ensure authChecking is marked false and liveCheckComplete is true
+          setAuthChecking(false);
+          setLiveCheckComplete(true);
+        };
+        
+        loadInitialProfile();
+
+        // 2. Perform admin verification asynchronously in the background
         if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
-          isUserAdmin = true;
           setIsAdmin(true);
           // Auto-provision Super Admin records in public database
           try {
@@ -4732,58 +5000,17 @@ export default function StudentDashboard() {
           }
         } else {
           // Check if upgraded admin
-          try {
-            const adminDocSnap = await getDoc(doc(db, 'admins', user.uid));
+          getDoc(doc(db, 'admins', user.uid)).then((adminDocSnap) => {
             if (adminDocSnap.exists()) {
-              isUserAdmin = true;
               setIsAdmin(true);
             } else {
               setIsAdmin(false);
             }
-          } catch (err) {
+          }).catch((err) => {
             console.error("Dashboard auth check failed for admin state:", err);
-          }
+            setIsAdmin(false);
+          });
         }
-
-        setCurrentUser(user);
-        
-        // Cache-first offline profile loader
-        const loadInitialProfile = async () => {
-          // 1. Immediately render cached profile if exists (Stale-While-Revalidate)
-          const cachedProfile = safeStorage.getItem('ciya_cached_profile');
-          if (cachedProfile) {
-            try {
-              const profileData = JSON.parse(cachedProfile);
-              setUserProfile(profileData);
-              if (!cleanupPerformedRef.current) {
-                cleanupPerformedRef.current = true;
-                cleanUpOldSubmissionsLocal(user.uid, profileData.progress);
-                cleanUpOldGlobalSubmissions(user.uid);
-              }
-              setAuthChecking(false);
-              setLiveCheckComplete(true);
-            } catch (e) {
-              console.error("Error parsing cached profile on auth change:", e);
-            }
-          } else {
-            // Setup default profile candidate to show while listener connects
-            const defaultCandidate = {
-              fullName: user.displayName || user.email?.split('@')[0] || "CIYA Scholar",
-              email: user.email || "student@ciya.com",
-              whatsapp: "+0000000000",
-              state: "Global",
-              goal: "Acquire high-performance development skills",
-              approvalStatus: "Approved",
-              isActivated: true,
-              isDashboardUnlocked: true,
-              cohort: 'Cohort 1'
-            };
-            setUserProfile(defaultCandidate);
-            setAuthChecking(false);
-            setLiveCheckComplete(true);
-          }
-        };
-        loadInitialProfile();
 
       } else {
         // ALWAYS clear cached user/profile and reset state if Firebase says they are not authenticated!
@@ -4861,12 +5088,8 @@ export default function StudentDashboard() {
     
     // Load courses instantly from cache
     const cached = coursesStore.getCourses();
-    if (cached && cached.length > 0) {
-      setCourses(cached);
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
+    setCourses(cached || []);
+    setLoading(false);
   }, [authChecking]);
 
   const isProfileRegisteredForCourse = (profile: any, course: any): boolean => {
@@ -4875,17 +5098,20 @@ export default function StudentDashboard() {
     // Check if the course is advanced/masterclass (strictly requires explicit progress entry via passcode)
     const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || (course.level && ['advanced', 'masterclass'].includes(course.level.toLowerCase()));
     if (isAdv) {
-      return !!(profile.progress && profile.progress[course.id]);
+      return !!(profile.progress && profile.progress[course.id] && profile.progress[course.id].accessStatus !== 'revoked');
     }
     
     // Rule 1: If they have explicit progress for this course, they are registered!
-    if (profile.progress && profile.progress[course.id]) {
+    if (profile.progress && profile.progress[course.id] && profile.progress[course.id].accessStatus !== 'revoked') {
       return true;
     }
 
     // Or if they have progress for its cloned express version, or selected express track on standard course
     const expressClone = courses.find(c => c.clonedFromId === course.id && c.isCloned && c.durationMode === 'express');
-    if (expressClone && profile.progress && (profile.progress[expressClone.id] || profile.progress[course.id]?.durationMode === 'express')) {
+    if (expressClone && profile.progress && (
+      (profile.progress[expressClone.id] && profile.progress[expressClone.id].accessStatus !== 'revoked') || 
+      (profile.progress[course.id]?.durationMode === 'express' && profile.progress[course.id]?.accessStatus !== 'revoked')
+    )) {
       return true;
     }
 
@@ -4945,7 +5171,9 @@ export default function StudentDashboard() {
     if (isAdmin) return courses;
 
     // Build a quick lookup of progress keys
-    const progressKeys = userProfile?.progress ? Object.keys(userProfile.progress) : [];
+    const progressKeys = userProfile?.progress 
+      ? Object.keys(userProfile.progress).filter(k => userProfile.progress[k]?.accessStatus !== 'revoked') 
+      : [];
     const progressSet = new Set(progressKeys);
 
     // Build a lookup of cloned express courses from standard course ID
@@ -5750,7 +5978,15 @@ export default function StudentDashboard() {
               />
             )
           ) : currentView === 'prompts' ? (
-            <PromptGenerator isLocked={!isAdmin && appSettings?.lockedSections?.prompts} />
+            <PromptGenerator 
+              isLocked={!isAdmin && appSettings?.lockedSections?.prompts} 
+              hasYearBadge={!!userProfile?.hasYearBadge}
+              onTriggerBadgePurchase={() => setShowDashboardBadgePaymentModal(true)}
+              userProfile={userProfile}
+              setUserProfile={setUserProfile}
+              currentUser={currentUser}
+              appSettings={appSettings}
+            />
           ) : currentView === 'profile' ? (
             (!isAdmin && appSettings?.lockedSections?.profile) ? (
               <div className="bg-white border text-sm border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
@@ -6279,8 +6515,8 @@ export default function StudentDashboard() {
                   let registeredCourse = registeredCoursesList.find(c => c.id === activeAssignCourseId) || registeredCoursesList[0];
                   if (registeredCourse && !isAdmin) {
                     const enrolledExpress = courses.find(c => c.clonedFromId === registeredCourse.id && c.isCloned && c.durationMode === 'express' && (
-                      (userProfile?.progress && userProfile.progress[c.id]) ||
-                      (userProfile?.progress?.[registeredCourse.id]?.durationMode === 'express')
+                      (userProfile?.progress && userProfile.progress[c.id] && userProfile.progress[c.id].accessStatus !== 'revoked') ||
+                      (userProfile?.progress?.[registeredCourse.id]?.durationMode === 'express' && userProfile.progress?.[registeredCourse.id]?.accessStatus !== 'revoked')
                     ));
                     if (enrolledExpress) {
                       registeredCourse = enrolledExpress;
@@ -6423,12 +6659,16 @@ export default function StudentDashboard() {
                                   🔗 Link: <a href={matchedSubForSelectedDay.fileUrl} target="_blank" rel="noreferrer" className="underline">{matchedSubForSelectedDay.fileUrl}</a>
                                 </p>
                               )}
-                              {matchedSubForSelectedDay.adminReason && (
-                                <div className="mt-3 pt-2.5 border-t border-dashed border-slate-200">
-                                  <strong className="text-slate-800 font-black block mb-0.5">ℹ️ Feedback:</strong>
-                                  {matchedSubForSelectedDay.adminReason}
-                                </div>
-                              )}
+                              {(() => {
+                                const cleanFeedback = getCleanStudentFeedback(matchedSubForSelectedDay);
+                                if (!cleanFeedback) return null;
+                                return (
+                                  <div className="mt-3 pt-2.5 border-t border-dashed border-slate-200">
+                                    <strong className="text-slate-800 font-black block mb-0.5">ℹ️ Feedback:</strong>
+                                    {cleanFeedback}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
 
@@ -6640,7 +6880,7 @@ export default function StudentDashboard() {
                   showToast={showToast}
                   handleResetProgress={handleResetProgress}
                   isAdmin={isAdmin}
-                  isEnrolled={isAdmin || !!(userProfile?.progress && userProfile.progress[selectedCourse.id]) || isProfileRegisteredForCourse(userProfile, selectedCourse)}
+                  isEnrolled={isAdmin || !!(userProfile?.progress && userProfile.progress[selectedCourse.id] && userProfile.progress[selectedCourse.id].accessStatus !== 'revoked') || isProfileRegisteredForCourse(userProfile, selectedCourse)}
                   onLogin={handleLogin}
                   courses={courses}
                   hasCompletedFirstCourse={hasCompletedFirstCourse}
@@ -7239,6 +7479,40 @@ export default function StudentDashboard() {
             />
 
           </motion.div>
+        </div>
+      )}
+
+      {showDashboardBadgePaymentModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/85 backdrop-blur-sm flex items-center justify-center p-4 md:p-6 font-sans">
+          <div className="bg-white rounded-3xl w-full max-w-2xl border border-slate-200 overflow-hidden shadow-2xl relative animate-scaleUp">
+            <button
+              onClick={() => setShowDashboardBadgePaymentModal(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center border-0 cursor-pointer text-sm font-black z-10"
+              id="close-dashboard-badge-payment-modal-btn"
+            >
+              ✕
+            </button>
+            <div className="p-5 md:p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <div>
+                <span className="inline-flex items-center gap-1.5 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full">
+                  💳 Secure Payment Gateway
+                </span>
+                <h3 className="font-black text-slate-900 text-sm tracking-tight mt-1">CIYA Membership Badge Payment</h3>
+              </div>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[80vh]">
+              <YearBadgePaymentFlow
+                yearBadgeSettings={FRONTEND_YEAR_BADGE_SETTINGS}
+                price={FRONTEND_YEAR_BADGE_SETTINGS.price}
+                currentUser={currentUser}
+                userProfile={userProfile}
+                setUserProfile={setUserProfile}
+                isAdminSimulation={false}
+                onSuccessClose={() => setShowDashboardBadgePaymentModal(false)}
+              />
+            </div>
+          </div>
         </div>
       )}
 
