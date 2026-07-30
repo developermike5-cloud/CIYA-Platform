@@ -506,6 +506,15 @@ function formatWalkthroughDescription(descText: string) {
   );
 }
 
+// Helper to determine if a user's Year Badge is active and not expired
+export function isBadgeActive(profile: any) {
+  if (!profile || !profile.hasYearBadge) return false;
+  const now = Date.now();
+  const expiry = profile.badgeExpiryDate || (profile.badgePurchaseDate ? profile.badgePurchaseDate + 30 * 24 * 60 * 60 * 1000 : 0);
+  if (expiry === 0) return true; // backward compatibility
+  return now <= expiry;
+}
+
 // Unified day level lock validator helper function
 function isDayUnlockedUnified(
   di: number,
@@ -541,7 +550,7 @@ function isDayUnlockedUnified(
     // Check Year Badge requirement on beginner courses
     const isBeginner = ['najnq9llx', 'psw96tm5o', 'qlpspor4hm'].includes(courseId || '');
     if (isBeginner && FRONTEND_YEAR_BADGE_SETTINGS.enabled) {
-      const hasBadge = !!userProfile?.hasYearBadge;
+      const hasBadge = isBadgeActive(userProfile);
       if (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay1 && di >= 0 && !hasBadge) {
         return false; // Day 1 locked for students without badge
       }
@@ -1557,13 +1566,50 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         dbUpdates[`progress.${expressClone.id}.createdAt`] = serverTimestamp();
       }
 
-      await updateDoc(userRef, dbUpdates);
+      try {
+        await updateDoc(userRef, dbUpdates);
+      } catch (updateErr: any) {
+        console.warn("Standard enrollment updateDoc failed, checking if document exists:", updateErr);
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) {
+          console.log("Document does not exist in Firestore. Creating it resiliently...");
+          
+          const progressMap: Record<string, any> = {
+            [courseId]: {
+              durationMode: track,
+              createdAt: new Date().toISOString()
+            }
+          };
+          if (track === 'express' && expressClone) {
+            progressMap[expressClone.id] = {
+              durationMode: 'express',
+              createdAt: new Date().toISOString()
+            };
+          }
+
+          const newProfileData = {
+            fullName: currentUser.displayName || currentUser.email?.split('@')[0] || 'CIYA Scholar',
+            email: currentUser.email,
+            approvalStatus: 'Approved',
+            isActivated: true,
+            isDashboardUnlocked: true,
+            cohort: 'Cohort 1',
+            progress: progressMap,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          };
+          await setDoc(userRef, newProfileData);
+        } else {
+          throw updateErr;
+        }
+      }
+
       showToast(`Successfully enrolled in ${track === 'express' ? 'Express Track (3 Days)' : 'Standard Track (5 Days)'}! 🚀`);
       setShowTrackSelectionModal(false);
       updateParams({ syllabus: 'false', assignment: 'false' });
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error enrolling course:", e);
-      alert("Failed to enroll in course. Please try again.");
+      alert(`Failed to enroll in course: ${e?.message || e || 'Unknown Error'}. Please try again.`);
     }
   };
 
@@ -2495,7 +2541,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
               const isDayCoveredOrUnlocked = isAdmin || di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId, appSettings);
               
               const isPrecedingApproved = di === 0 || dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
-              const isYearBadgeLocked = !isAdmin && isPrecedingApproved && !userProfile?.hasYearBadge && (
+              const isYearBadgeLocked = !isAdmin && isPrecedingApproved && !isBadgeActive(userProfile) && (
                 (FRONTEND_YEAR_BADGE_SETTINGS.enabled === true) && (
                   (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay1 && di >= 0) ||
                   (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay4 && di >= 3)
@@ -2847,7 +2893,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                     const isDayUnlocked = di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId, appSettings);
                     
                     const isPrecedingApproved = di === 0 || dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
-                    const isYearBadgeLocked = !isAdmin && isPrecedingApproved && !userProfile?.hasYearBadge && (
+                    const isYearBadgeLocked = !isAdmin && isPrecedingApproved && !isBadgeActive(userProfile) && (
                       (FRONTEND_YEAR_BADGE_SETTINGS.enabled === true) && (
                         (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay1 && di >= 0) ||
                         (FRONTEND_YEAR_BADGE_SETTINGS.requireForDay4 && di >= 3)
@@ -4423,9 +4469,63 @@ export default function StudentDashboard() {
           }
         }
         setLiveCheckComplete(true);
-      }, (error) => {
-        console.warn("Soft handling direct real-time user profile listener error:", error);
-        setLiveCheckComplete(true);
+      }, async (error) => {
+        console.warn("Soft handling direct real-time user profile listener error, falling back to direct getDoc:", error);
+        try {
+          const docRef = doc(db, 'users', activeUid);
+          const snapshot = await getDoc(docRef);
+          if (!isSubscribed) return;
+          if (snapshot.exists()) {
+            const profileData = snapshot.data();
+            setUserProfile(profileData);
+            safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
+            if (!cleanupPerformedRef.current) {
+              cleanupPerformedRef.current = true;
+              cleanUpOldSubmissionsLocal(activeUid, profileData.progress);
+              cleanUpOldGlobalSubmissions(activeUid);
+            }
+          } else {
+            // Auto-provision profile document if it does not exist
+            if (currentUser && currentUser.uid === activeUid) {
+              if (currentUser.email?.toLowerCase() === 'developermike5@gmail.com') {
+                const mockProfile = {
+                  fullName: "Admissions Administrator (Super Admin)",
+                  email: currentUser.email,
+                  whatsapp: "+00000000000",
+                  state: "Admin State",
+                  goal: "Previewing Student Dashboard",
+                  approvalStatus: "Approved",
+                  isActivated: true,
+                  isDashboardUnlocked: true,
+                  role: "super_admin",
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
+                };
+                await setDoc(doc(db, 'users', activeUid), mockProfile);
+                setUserProfile(mockProfile);
+                safeStorage.setItem('ciya_cached_profile', JSON.stringify(mockProfile));
+              } else {
+                const newProfile = {
+                  fullName: currentUser.displayName || currentUser.email?.split('@')[0] || 'CIYA Scholar',
+                  email: currentUser.email,
+                  approvalStatus: 'Approved',
+                  isActivated: true,
+                  isDashboardUnlocked: true,
+                  cohort: 'Cohort 1',
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
+                };
+                await setDoc(doc(db, 'users', activeUid), newProfile);
+                setUserProfile(newProfile);
+                safeStorage.setItem('ciya_cached_profile', JSON.stringify(newProfile));
+              }
+            }
+          }
+        } catch (getDocErr) {
+          console.error("Direct fallback getDoc for user profile failed too:", getDocErr);
+        } finally {
+          setLiveCheckComplete(true);
+        }
       });
     };
 
@@ -5980,7 +6080,7 @@ export default function StudentDashboard() {
           ) : currentView === 'prompts' ? (
             <PromptGenerator 
               isLocked={!isAdmin && appSettings?.lockedSections?.prompts} 
-              hasYearBadge={!!userProfile?.hasYearBadge}
+              hasYearBadge={isBadgeActive(userProfile)}
               onTriggerBadgePurchase={() => setShowDashboardBadgePaymentModal(true)}
               userProfile={userProfile}
               setUserProfile={setUserProfile}
@@ -6088,10 +6188,12 @@ export default function StudentDashboard() {
                     <div className="space-y-1 text-center sm:text-left">
                       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                         <h4 className="text-lg font-black text-slate-900 uppercase leading-none">{userProfile.fullName || 'Anonymous Student'}</h4>
-                        {userProfile.hasYearBadge ? (
+                        {isBadgeActive(userProfile) ? (
                           <span className="inline-block bg-indigo-600 text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">CIYA Student Pro</span>
                         ) : (
-                          <span className="inline-block bg-slate-200 text-slate-700 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">Free Tier</span>
+                          <span className="inline-block bg-rose-100 text-rose-800 border border-rose-200 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">
+                            {userProfile.hasYearBadge ? 'Membership Expired' : 'Free Tier'}
+                          </span>
                         )}
                       </div>
                       <p className="text-xs text-slate-500 font-mono font-bold">{userProfile.email || currentUser?.email}</p>
@@ -6144,8 +6246,17 @@ export default function StudentDashboard() {
                           
                           if (isExpired) {
                             return (
-                              <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-semibold leading-relaxed">
-                                ⚠️ <strong>Membership Expired:</strong> Your CIYA Membership ended. Please contact your administrator or purchase a new 30-day membership badge to reactivate your credentials.
+                              <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-semibold leading-relaxed space-y-3">
+                                <p>
+                                  ⚠️ <strong>Membership Expired:</strong> Your CIYA Membership ended. Please contact your administrator or purchase a new 30-day membership badge to reactivate your credentials.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowDashboardBadgePaymentModal(true)}
+                                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer border-0 shadow-sm transition-all flex items-center gap-1.5"
+                                >
+                                  🏷️ Renew Badge Membership
+                                </button>
                               </div>
                             );
                           } else if (daysLeft <= 3) {
@@ -7436,40 +7547,81 @@ export default function StudentDashboard() {
               onVerifySuccess={async () => {
                 try {
                   const courseId = advancedPaymentCourse.id;
+                  const allAvailableCourses = coursesStore.getCourses();
                   
-                  // Set userProfile progress
-                  const progressUpdates: Record<string, any> = {};
-                  progressUpdates[courseId] = {
+                  // 1. Maintain progress only for completed courses, removing any other non-completed course progress
+                  const nextProgress: Record<string, any> = {};
+                  const existingProgress = userProfile?.progress || {};
+                  
+                  Object.keys(existingProgress).forEach(existId => {
+                    const crs = allAvailableCourses.find(c => c.id === existId);
+                    if (crs) {
+                      if (isCourseCompleted(userProfile, crs)) {
+                        nextProgress[existId] = existingProgress[existId];
+                      }
+                    }
+                  });
+
+                  // 2. Assign progress for advanced course
+                  nextProgress[courseId] = {
                     durationMode: 'standard',
                     createdAt: new Date().toISOString()
                   };
 
                   const updatedProfile = {
                     ...userProfile,
-                    progress: {
-                      ...(userProfile?.progress || {}),
-                      ...progressUpdates
-                    }
+                    recommendedPath: advancedPaymentCourse.title,
+                    courseType: advancedPaymentCourse.title,
+                    pathwaySelection: advancedPaymentCourse.title,
+                    progress: nextProgress
                   };
                   setUserProfile(updatedProfile);
                   safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
                   const userRef = doc(db, 'users', currentUser.uid);
                   const dbUpdates: Record<string, any> = {
-                    [`progress.${courseId}.durationMode`]: 'standard',
-                    [`progress.${courseId}.createdAt`]: serverTimestamp(),
+                    recommendedPath: advancedPaymentCourse.title,
+                    courseType: advancedPaymentCourse.title,
+                    pathwaySelection: advancedPaymentCourse.title,
+                    progress: nextProgress,
                     updatedAt: serverTimestamp()
                   };
-                  await updateDoc(userRef, dbUpdates);
+
+                  try {
+                    await updateDoc(userRef, dbUpdates);
+                  } catch (updateErr: any) {
+                    console.warn("Advanced enrollment updateDoc failed, checking if document exists:", updateErr);
+                    const snap = await getDoc(userRef);
+                    if (!snap.exists()) {
+                      console.log("Document does not exist in Firestore. Creating it resiliently...");
+                      const newProfileData = {
+                        fullName: currentUser.displayName || currentUser.email?.split('@')[0] || 'CIYA Scholar',
+                        email: currentUser.email,
+                        approvalStatus: 'Approved',
+                        isActivated: true,
+                        isDashboardUnlocked: true,
+                        cohort: 'Cohort 1',
+                        recommendedPath: advancedPaymentCourse.title,
+                        courseType: advancedPaymentCourse.title,
+                        pathwaySelection: advancedPaymentCourse.title,
+                        progress: nextProgress,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                      };
+                      await setDoc(userRef, newProfileData);
+                    } else {
+                      throw updateErr;
+                    }
+                  }
 
                   setAdvancedPaymentCourse(null);
                   setSelectedCourseId(courseId);
                   navigate(`/dashboard?view=courses&courseId=${courseId}`);
                   setShowCongratsPopup(true);
                   showToast(`🎉 Success! Advanced track unlocked!`);
-                } catch (err) {
+                } catch (err: any) {
                   console.error(err);
-                  alert("Passcode correct, but failed to save enrollment in database. Please check connection and try again.");
+                  alert(`Passcode correct, but failed to save enrollment in database: ${err?.message || err || 'Unknown Error'}. Please check connection and try again.`);
                 }
               }}
               whatsappNumber={appSettings?.advancedCourseSettings?.whatsappNumber ?? '+2349042544355'}

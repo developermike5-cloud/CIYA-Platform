@@ -184,6 +184,17 @@ export default function PortalLocksAdmin() {
     return list;
   }, [allUsers]);
 
+  // Derived active badge owners (Approved and granted badge holders)
+  const activeBadgeOwners = React.useMemo(() => {
+    const list = allUsers.filter(u => u.hasYearBadge === true);
+    list.sort((a, b) => {
+      const nameA = (a.fullName || '').toLowerCase();
+      const nameB = (b.fullName || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+    return list;
+  }, [allUsers]);
+
   // Derived advanced course student list
   const advancedStudents = React.useMemo(() => {
     const allStoreCourses = coursesStore.getCourses();
@@ -934,7 +945,7 @@ export default function PortalLocksAdmin() {
             }`}
           >
             <Award className="w-4 h-4 text-amber-500" />
-            Pending Badge Approvals
+            Badge Portal & Members
             {pendingUsers.length > 0 && (
               <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white animate-pulse">
                 {pendingUsers.length}
@@ -2322,6 +2333,8 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                   createdAt: serverTimestamp()
                                 });
 
+                                await triggerSystemSignal('user_signals', pUser.id);
+
                                 setGradingLogs(prev => [`[UPGRADE ✅] Successfully approved ${pUser.fullName || pUser.email} to CIYA Student Pro member! Generated Membership ID: ${membershipId}`, ...prev]);
                                 alert(`Upgraded ${pUser.fullName || pUser.email} successfully!`);
                               } catch (err) {
@@ -2358,6 +2371,8 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                   createdAt: serverTimestamp()
                                 });
 
+                                await triggerSystemSignal('user_signals', pUser.id);
+
                                 setGradingLogs(prev => [`[REJECTED ❌] Rejected ${pUser.fullName || pUser.email}'s request. Reason: ${reason}`, ...prev]);
                                 alert(`Rejected request successfully.`);
                               } catch (err) {
@@ -2369,6 +2384,125 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                           className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer border border-rose-250 flex items-center gap-1.5 transition-all"
                         >
                           ✕ Disapprove
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Active Badge Owners (Approved Members) Card */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
+            <h2 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2 border-b pb-3 border-slate-100">
+              <Award className="w-4 h-4 text-indigo-650" />
+              Active Pro Student Members & Badge Owners ({activeBadgeOwners.length})
+            </h2>
+
+            {activeBadgeOwners.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-8 max-w-md mx-auto">
+                <span className="text-4xl block mb-2">📋</span>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">No Active Members</h3>
+                <p className="text-xs text-slate-400 font-semibold leading-relaxed mt-1">
+                  There are no students with active "CIYA Student Pro" badges in the registry right now.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6">
+                {activeBadgeOwners.map((member) => {
+                  const now = Date.now();
+                  const expiry = member.badgeExpiryDate || (member.badgePurchaseDate ? member.badgePurchaseDate + 30 * 24 * 60 * 60 * 1000 : 0);
+                  const isExpired = now > expiry;
+                  const daysLeft = Math.ceil((expiry - now) / (24 * 60 * 60 * 1000));
+                  
+                  const purchaseDateStr = member.badgePurchaseDate
+                    ? new Date(member.badgePurchaseDate).toLocaleDateString()
+                    : 'N/A';
+                  const expiryDateStr = expiry
+                    ? new Date(expiry).toLocaleDateString()
+                    : 'N/A';
+
+                  return (
+                    <div key={member.id} className="border border-slate-200 hover:border-indigo-200 p-5 rounded-2xl bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-full border-2 border-indigo-400 bg-slate-150 flex items-center justify-center text-slate-700 font-black text-lg shadow-sm shrink-0 overflow-hidden">
+                          {member.photoURL ? (
+                            <img src={member.photoURL} alt={member.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span>{member.fullName ? member.fullName[0].toUpperCase() : 'U'}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-extrabold text-slate-900 text-sm uppercase leading-none">{member.fullName || 'Anonymous Student'}</h4>
+                            {isExpired ? (
+                              <span className="text-[9px] bg-rose-100 text-rose-800 border border-rose-250 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">EXPIRED BADGE</span>
+                            ) : (
+                              <span className="text-[9px] bg-indigo-150 text-indigo-850 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">ACTIVE BADGE</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 font-mono font-semibold">{member.email}</p>
+                          
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1.5 text-[11px] text-slate-450 font-bold">
+                            <span>📞 WhatsApp: <strong className="text-slate-700">{member.whatsapp || 'N/A'}</strong></span>
+                            <span>🏷️ Badge ID: <strong className="text-indigo-650 font-mono">{member.membershipId || 'N/A'}</strong></span>
+                            <span>📅 Granted: <strong className="text-slate-700">{purchaseDateStr}</strong></span>
+                            <span>⌛ Expiry: <strong className="text-slate-700">{expiryDateStr}</strong></span>
+                          </div>
+
+                          <div className="pt-2">
+                            {isExpired ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-black text-rose-600 bg-rose-50 border border-rose-150 px-2.5 py-1 rounded-xl">
+                                ⚠️ Membership Ended (Expired {-daysLeft} days ago)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-150 px-2.5 py-1 rounded-xl">
+                                ⏱️ {daysLeft} Days Remaining
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Manual Revert / Suspension button */}
+                      <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
+                        <button
+                          onClick={async () => {
+                            if (window.confirm(`Are you sure you want to suspend/revoke ${member.fullName || member.email}'s badge and return them back to a basic member?`)) {
+                              try {
+                                const userRef = doc(db, 'users', member.id);
+                                await updateDoc(userRef, {
+                                  hasYearBadge: false,
+                                  badgePaymentRequestStatus: 'Revoked',
+                                  badgeExpiryDate: 0,
+                                  updatedAt: serverTimestamp()
+                                });
+
+                                // Trigger System Notification
+                                await addDoc(collection(db, 'notifications'), {
+                                  userId: member.id,
+                                  title: 'CIYA Membership Status Updated 🏷️⚠️',
+                                  message: `Your CIYA Student Pro membership badge has been suspended/returned to basic status by the administrator. Please renew your membership badge to restore access to premium features and active credentials.`,
+                                  type: 'badge_upgrade_expired',
+                                  isRead: false,
+                                  triggeredBy: 'Academy Admin Office',
+                                  createdAt: serverTimestamp()
+                                });
+
+                                await triggerSystemSignal('user_signals', member.id);
+
+                                setGradingLogs(prev => [`[SUSPEND ⚠️] Returned ${member.fullName || member.email} to basic membership status and revoked badge.`, ...prev]);
+                                alert(`Successfully returned ${member.fullName || member.email} to basic membership.`);
+                              } catch (err) {
+                                console.error("Error revoking badge membership:", err);
+                                alert("Failed to return user to basic membership. Please try again.");
+                              }
+                            }
+                          }}
+                          className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer border-0 shadow-md flex items-center gap-1.5 transition-all"
+                        >
+                          ✕ Suspend Badge
                         </button>
                       </div>
                     </div>

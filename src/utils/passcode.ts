@@ -51,9 +51,14 @@ export function verifyTimeBasedCode(
   const cleanCode = (inputCode || '').trim();
   if (!cleanCode || cleanCode.length !== 6) return false;
 
-  // STRICT check: ONLY the active current slot (offset = 0) is valid.
-  const activeCode = generateTimeBasedCode(secret, intervalMs, 0);
-  return activeCode === cleanCode;
+  // Check previous, current, and next slots to tolerate up to 30 minutes of clock drift or delivery delay (offsets [-2, -1, 0, 1, 2])
+  for (const offset of [-2, -1, 0, 1, 2]) {
+    const candidateCode = generateTimeBasedCode(secret, intervalMs, offset);
+    if (candidateCode === cleanCode) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

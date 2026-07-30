@@ -797,6 +797,52 @@ export default function UsersAdmin() {
     }
   };
 
+  const checkIsCourseCompleted = (u: any, course: any): boolean => {
+    if (!u || !course) return false;
+    
+    // Check if overridden complete by admin
+    if (Array.isArray(u.completedCoursesOverride) && u.completedCoursesOverride.includes(course.id || '')) {
+      return true;
+    }
+
+    const progressStore = u.progress?.[course.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+    if (progressStore.completedAt) {
+      return true;
+    }
+
+    const completedKeys: string[] = progressStore.watched || [];
+    const totalVideos = course.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
+    const progressRatio = totalVideos > 0 ? Math.round((completedKeys.length / totalVideos) * 100) : 0;
+    if (progressRatio === 100 && totalVideos > 0) {
+      return true;
+    }
+
+    let passedAllQuizzes = true;
+    let hasQuizzes = false;
+    const cScores = progressStore.quizScores || {};
+    const checkPassedKeys: string[] = progressStore.checkPassed || [];
+
+    (course.days || []).forEach((day: any, di: number) => {
+      (day.videos || []).forEach((v: any, vi: number) => {
+        const hasQuiz = v.checkType && v.checkType !== 'none' && v.check;
+        if (hasQuiz) {
+          hasQuizzes = true;
+          const checkKey = `${di}-${vi}`;
+          const isPassed = checkPassedKeys.includes(checkKey) || !!(cScores[checkKey] && cScores[checkKey].passed);
+          if (!isPassed) {
+            passedAllQuizzes = false;
+          }
+        }
+      });
+    });
+
+    if (hasQuizzes && passedAllQuizzes) {
+      return true;
+    }
+
+    return false;
+  };
+
   const handleSwitchCourse = async (userId: string, targetCourseId: string, clearProgress: boolean) => {
     try {
       const targetCourse = allCourses.find(c => c.id === targetCourseId);
@@ -815,13 +861,23 @@ export default function UsersAdmin() {
         updatedAt: serverTimestamp()
       };
 
+      // Maintain progress only for completed courses, removing any other non-completed course progress
+      const nextProgress: Record<string, any> = {};
       const existingProgress = userDoc.progress || {};
-      const nextProgress = {
-        ...existingProgress,
-        [targetCourseId]: clearProgress 
-          ? { watched: [], checkPassed: [], submissions: {}, quizScores: {} }
-          : (existingProgress[targetCourseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} })
-      };
+      
+      Object.keys(existingProgress).forEach(courseId => {
+        const course = allCourses.find(c => c.id === courseId);
+        if (course) {
+          if (checkIsCourseCompleted(userDoc, course)) {
+            nextProgress[courseId] = existingProgress[courseId];
+          }
+        }
+      });
+
+      // Assign progress for target course
+      nextProgress[targetCourseId] = clearProgress 
+        ? { watched: [], checkPassed: [], submissions: {}, quizScores: {} }
+        : (existingProgress[targetCourseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} });
 
       updatedFields.progress = nextProgress;
 
