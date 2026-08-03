@@ -19,6 +19,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { coursesStore } from '../../utils/coursesStore';
 import { FRONTEND_YEAR_BADGE_SETTINGS } from '../../constants/badgeSettings';
+import { rejectSubmissionMedia } from '../../lib/cloudinaryService';
 import { 
   Lock, 
   Unlock, 
@@ -130,12 +131,21 @@ export default function PortalLocksAdmin() {
   
   // Track all users for derived states (badge approvals and advanced enrollments)
   const [allUsers, setAllUsers] = useState<any[]>([]);
+
+  // Custom dialog/prompt state for badge approvals to bypass sandboxed iframe modal restrictions
+  const [badgeActionConfirm, setBadgeActionConfirm] = useState<{
+    type: 'approve' | 'disapprove' | 'suspend';
+    user: any;
+    defaultReason?: string;
+  } | null>(null);
+  const [badgeActionReasonText, setBadgeActionReasonText] = useState('');
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
   const [loadingPending, setLoadingPending] = useState(false);
 
   // Track unsaved changes to defer Firestore writes until manual Save Changes button is clicked
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const hasUnsavedChangesRef = React.useRef(false);
-  const dbStateRef = React.useRef<{ lockedSections: LockedSections; courseDaysLocks: Record<string, any>; beginnersSettings: BeginnersSettings } | null>(null);
+  const dbStateRef = React.useRef<{ lockedSections: LockedSections; courseDaysLocks: Record<string, any>; beginnersSettings: BeginnersSettings; backendUrl: string } | null>(null);
 
   // Tab 1: Portal Locks state
   const [lockedSections, setLockedSections] = useState<LockedSections>({
@@ -147,6 +157,7 @@ export default function PortalLocksAdmin() {
     kycb: false,
     blog: false,
   });
+  const [backendUrl, setBackendUrl] = useState('');
   const [courseDaysLocks, setCourseDaysLocks] = useState<Record<string, 'locked' | 'unlocked' | 'default'>>({});
   const [courses, setCourses] = useState<any[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
@@ -258,6 +269,96 @@ export default function PortalLocksAdmin() {
     } finally {
       // Remove loading indicator
       setRevokingKeys(prev => prev.filter(k => k !== key));
+    }
+  };
+
+  // Performs the actual badge queue approval/rejection/suspension
+  const executeBadgeAction = async () => {
+    if (!badgeActionConfirm) return;
+    const { type, user } = badgeActionConfirm;
+    setIsProcessingAction(true);
+    try {
+      const userRef = doc(db, 'users', user.id);
+      if (type === 'approve') {
+        const year = new Date().getFullYear();
+        const randNum = Math.floor(1000 + Math.random() * 9000);
+        const membershipId = `CIYA-PRO-${year}-${randNum}`;
+        const startDate = Date.now();
+        const expiryDate = startDate + 30 * 24 * 60 * 60 * 1000;
+
+        await updateDoc(userRef, {
+          hasYearBadge: true,
+          badgePaymentRequestStatus: 'Approved',
+          badgePurchaseDate: startDate,
+          badgeExpiryDate: expiryDate,
+          membershipId: membershipId,
+          updatedAt: serverTimestamp()
+        });
+
+        await addDoc(collection(db, 'notifications'), {
+          userId: user.id,
+          title: 'Upgraded to CIYA Student Pro! 🎖️🚀',
+          message: `Congratulations! Your payment has been approved and confirmed. You have been officially upgraded to "CIYA Student Pro" and are now a member of the elite CIYA ecosystem!\n\nYour exclusive benefits include:\n• 🏷️ Verified CIYA Badge: Displayed on your profile page.\n• 📁 Profile Photo Upload: Customize your badge with a professional photo before download.\n• 🚀 30-Day Ecosystem Membership: Valid from ${new Date(startDate).toLocaleDateString()} to ${new Date(expiryDate).toLocaleDateString()}.\n• 🎓 Advanced Syllabus Access: Access to specialized courses, assignments, and practical training templates.\n• 💻 Netlify Verified Link: Host and showcase your projects with premium support.\n\nPlease go to your profile now to see your "CIYA badge" reflected, upload your photo, and download your high-resolution badge PNG to celebrate your status!`,
+          type: 'badge_upgrade',
+          isRead: false,
+          triggeredBy: 'Academy Admin Office',
+          createdAt: serverTimestamp()
+        });
+
+        await triggerSystemSignal('user_signals', user.id);
+        setGradingLogs(prev => [`[UPGRADE ✅] Successfully approved ${user.fullName || user.email} to CIYA Student Pro member! Generated Membership ID: ${membershipId}`, ...prev]);
+        showToastMessage(`Upgraded ${user.fullName || user.email} successfully!`, 'success');
+      } else if (type === 'disapprove') {
+        const reason = badgeActionReasonText.trim() || 'Bank transfer reference not found in ledger. Please contact coordinator.';
+        await rejectSubmissionMedia(user);
+        await updateDoc(userRef, {
+          hasYearBadge: false,
+          badgePaymentRequestStatus: 'Rejected',
+          updatedAt: serverTimestamp()
+        });
+
+        await addDoc(collection(db, 'notifications'), {
+          userId: user.id,
+          title: 'Payment Verification Failed ❌',
+          message: `Your CIYA Student Pro payment verification request has been rejected by the administrator. Reason: "${reason}". Please verify your details and resubmit payment request.`,
+          type: 'badge_upgrade_rejected',
+          isRead: false,
+          triggeredBy: 'Academy Admin Office',
+          createdAt: serverTimestamp()
+        });
+
+        await triggerSystemSignal('user_signals', user.id);
+        setGradingLogs(prev => [`[REJECTED ❌] Rejected ${user.fullName || user.email}'s request. Reason: ${reason}`, ...prev]);
+        showToastMessage(`Rejected request successfully.`, 'success');
+      } else if (type === 'suspend') {
+        await updateDoc(userRef, {
+          hasYearBadge: false,
+          badgePaymentRequestStatus: 'Revoked',
+          badgeExpiryDate: 0,
+          updatedAt: serverTimestamp()
+        });
+
+        await addDoc(collection(db, 'notifications'), {
+          userId: user.id,
+          title: 'CIYA Membership Status Updated 🏷️⚠️',
+          message: `Your CIYA Student Pro membership badge has been suspended/returned to basic status by the administrator. Please renew your membership badge to restore access to premium features and active credentials.`,
+          type: 'badge_upgrade_expired',
+          isRead: false,
+          triggeredBy: 'Academy Admin Office',
+          createdAt: serverTimestamp()
+        });
+
+        await triggerSystemSignal('user_signals', user.id);
+        setGradingLogs(prev => [`[SUSPEND ⚠️] Returned ${user.fullName || user.email} to basic membership status and revoked badge.`, ...prev]);
+        showToastMessage(`Successfully returned ${user.fullName || user.email} to basic membership.`, 'success');
+      }
+      setBadgeActionConfirm(null);
+      setBadgeActionReasonText('');
+    } catch (err: any) {
+      console.error("Error executing badge action:", err);
+      showToastMessage("Failed to execute action: " + err.message, 'error');
+    } finally {
+      setIsProcessingAction(false);
     }
   };
 
@@ -391,16 +492,25 @@ export default function PortalLocksAdmin() {
           }
         };
 
+        const bUrl = data?.backendUrl || '';
+        let resolvedBackendUrl = bUrl;
+        if (typeof window !== 'undefined' && !bUrl && !window.location.hostname.includes('netlify.app')) {
+          resolvedBackendUrl = window.location.origin;
+        }
+
         dbStateRef.current = {
           lockedSections: locks,
           courseDaysLocks: courseLocks,
-          beginnersSettings: beginners
+          beginnersSettings: beginners,
+          backendUrl: resolvedBackendUrl
         };
 
         if (!hasUnsavedChangesRef.current) {
           setLockedSections(locks);
           setCourseDaysLocks(courseLocks);
           setBeginnersSettings(beginners);
+          setBackendUrl(resolvedBackendUrl);
+          setHasUnsavedChanges(false);
         }
       }
       setLoading(false);
@@ -541,6 +651,7 @@ export default function PortalLocksAdmin() {
       await setDoc(doc(db, 'settings', 'app'), {
         lockedSections,
         courseDaysLocks,
+        backendUrl,
         quizzesOverrideMode: beginnersSettings.quizzesOverrideMode,
         timezone: beginnersSettings.timezone,
         triggerTime1: beginnersSettings.triggerTime1,
@@ -584,7 +695,8 @@ export default function PortalLocksAdmin() {
       dbStateRef.current = {
         lockedSections,
         courseDaysLocks,
-        beginnersSettings
+        beginnersSettings,
+        backendUrl
       };
       
       setGradingLogs(prev => [`[SUCCESS ✅] Admin settings successfully committed to Firestore!`, ...prev]);
@@ -602,6 +714,7 @@ export default function PortalLocksAdmin() {
       setLockedSections(dbStateRef.current.lockedSections);
       setCourseDaysLocks(dbStateRef.current.courseDaysLocks);
       setBeginnersSettings(dbStateRef.current.beginnersSettings);
+      setBackendUrl(dbStateRef.current.backendUrl || '');
       setHasUnsavedChanges(false);
       hasUnsavedChangesRef.current = false;
       setGradingLogs(prev => [`[DISCARDED ↩️] Restored draft settings to current cloud database state.`, ...prev]);
@@ -1092,6 +1205,49 @@ export default function PortalLocksAdmin() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Netlify Production Backend URL Config Card */}
+          <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+            <div className="space-y-1.5">
+              <h2 className="text-sm md:text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-500 animate-pulse" />
+                Netlify Production Backend Gateway
+              </h2>
+              <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                Configure the active Cloud Run API base URL to enable secure cross-domain uploads (profile pictures, course files) from Netlify domain deployments. It is automatically synchronized whenever an administrator visits this dashboard on the live system.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 items-end">
+              <div className="flex-1 min-w-[280px]">
+                <label className="block text-[10px] uppercase font-black text-slate-500 mb-1.5 tracking-wider">Cloud Run API Endpoint URL</label>
+                <input
+                  type="text"
+                  placeholder="https://ciya-academy-cloudrun-hash.aistudio-preview.net"
+                  className="w-full bg-white border border-slate-200 text-slate-800 font-semibold text-xs rounded-xl p-3 outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={backendUrl}
+                  onChange={(e) => {
+                    setBackendUrl(e.target.value);
+                    setHasUnsavedChanges(true);
+                    hasUnsavedChangesRef.current = true;
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    setBackendUrl(window.location.origin);
+                    setHasUnsavedChanges(true);
+                    hasUnsavedChangesRef.current = true;
+                    showToastMessage("Reset draft URL to current domain: " + window.location.origin, 'success');
+                  }
+                }}
+                className="px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer whitespace-nowrap self-stretch sm:self-auto flex items-center justify-center gap-1.5"
+              >
+                Use Current Domain
+              </button>
+            </div>
           </div>
 
           {/* Course Day-Level Lock Controls */}
@@ -2291,95 +2447,16 @@ export default function PortalLocksAdmin() {
                       {/* Manual Action buttons */}
                       <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
                         <button
-                          onClick={async () => {
-                            if (window.confirm(`Approve ${pUser.fullName || pUser.email}'s payment and upgrade them to CIYA Student Pro member?`)) {
-                              try {
-                                const userRef = doc(db, 'users', pUser.id);
-                                
-                                // Generate custom membership ID
-                                const year = new Date().getFullYear();
-                                const randNum = Math.floor(1000 + Math.random() * 9000);
-                                const membershipId = `CIYA-PRO-${year}-${randNum}`;
-                                
-                                const startDate = Date.now();
-                                const expiryDate = startDate + 30 * 24 * 60 * 60 * 1000; // exactly 30 days
-                                
-                                await updateDoc(userRef, {
-                                  hasYearBadge: true,
-                                  badgePaymentRequestStatus: 'Approved',
-                                  badgePurchaseDate: startDate,
-                                  badgeExpiryDate: expiryDate,
-                                  membershipId: membershipId,
-                                  updatedAt: serverTimestamp()
-                                });
-
-                                // Trigger System Notification
-                                await addDoc(collection(db, 'notifications'), {
-                                  userId: pUser.id,
-                                  title: 'Upgraded to CIYA Student Pro! 🎖️🚀',
-                                  message: `Congratulations! Your payment has been approved and confirmed. You have been officially upgraded to "CIYA Student Pro" and are now a member of the elite CIYA ecosystem!
-
-Your exclusive benefits include:
-• 🏷️ Verified CIYA Badge: Displayed on your profile page.
-• 📁 Profile Photo Upload: Customize your badge with a professional photo before download.
-• 🚀 30-Day Ecosystem Membership: Valid from ${new Date(startDate).toLocaleDateString()} to ${new Date(expiryDate).toLocaleDateString()}.
-• 🎓 Advanced Syllabus Access: Access to specialized courses, assignments, and practical training templates.
-• 💻 Netlify Verified Link: Host and showcase your projects with premium support.
-
-Please go to your profile now to see your "CIYA badge" reflected, upload your photo, and download your high-resolution badge PNG to celebrate your status!`,
-                                  type: 'badge_upgrade',
-                                  isRead: false,
-                                  triggeredBy: 'Academy Admin Office',
-                                  createdAt: serverTimestamp()
-                                });
-
-                                await triggerSystemSignal('user_signals', pUser.id);
-
-                                setGradingLogs(prev => [`[UPGRADE ✅] Successfully approved ${pUser.fullName || pUser.email} to CIYA Student Pro member! Generated Membership ID: ${membershipId}`, ...prev]);
-                                alert(`Upgraded ${pUser.fullName || pUser.email} successfully!`);
-                              } catch (err) {
-                                console.error("Error approving student badge:", err);
-                                alert("Failed to approve student badge. Please try again.");
-                              }
-                            }
-                          }}
+                          onClick={() => setBadgeActionConfirm({ type: 'approve', user: pUser })}
                           className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer border-0 shadow-md flex items-center gap-1.5 transition-all"
                         >
                           <CheckCircle className="w-4 h-4" /> Approve & Upgrade
                         </button>
 
                         <button
-                          onClick={async () => {
-                            const reason = window.prompt(`Please provide a rejection reason for ${pUser.fullName || pUser.email}:`, 'Bank transfer reference not found in ledger. Please contact coordinator.');
-                            if (reason !== null) {
-                              try {
-                                const userRef = doc(db, 'users', pUser.id);
-                                await updateDoc(userRef, {
-                                  hasYearBadge: false,
-                                  badgePaymentRequestStatus: 'Rejected',
-                                  updatedAt: serverTimestamp()
-                                });
-
-                                // Trigger System Notification
-                                await addDoc(collection(db, 'notifications'), {
-                                  userId: pUser.id,
-                                  title: 'Payment Verification Failed ❌',
-                                  message: `Your CIYA Student Pro payment verification request has been rejected by the administrator. Reason: "${reason}". Please verify your details and resubmit payment request.`,
-                                  type: 'badge_upgrade_rejected',
-                                  isRead: false,
-                                  triggeredBy: 'Academy Admin Office',
-                                  createdAt: serverTimestamp()
-                                });
-
-                                await triggerSystemSignal('user_signals', pUser.id);
-
-                                setGradingLogs(prev => [`[REJECTED ❌] Rejected ${pUser.fullName || pUser.email}'s request. Reason: ${reason}`, ...prev]);
-                                alert(`Rejected request successfully.`);
-                              } catch (err) {
-                                console.error("Error rejecting student badge request:", err);
-                                alert("Failed to reject request. Please try again.");
-                              }
-                            }
+                          onClick={() => {
+                            setBadgeActionConfirm({ type: 'disapprove', user: pUser });
+                            setBadgeActionReasonText('Bank transfer reference not found in ledger. Please contact coordinator.');
                           }}
                           className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer border border-rose-250 flex items-center gap-1.5 transition-all"
                         >
@@ -2468,38 +2545,7 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                       {/* Manual Revert / Suspension button */}
                       <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
                         <button
-                          onClick={async () => {
-                            if (window.confirm(`Are you sure you want to suspend/revoke ${member.fullName || member.email}'s badge and return them back to a basic member?`)) {
-                              try {
-                                const userRef = doc(db, 'users', member.id);
-                                await updateDoc(userRef, {
-                                  hasYearBadge: false,
-                                  badgePaymentRequestStatus: 'Revoked',
-                                  badgeExpiryDate: 0,
-                                  updatedAt: serverTimestamp()
-                                });
-
-                                // Trigger System Notification
-                                await addDoc(collection(db, 'notifications'), {
-                                  userId: member.id,
-                                  title: 'CIYA Membership Status Updated 🏷️⚠️',
-                                  message: `Your CIYA Student Pro membership badge has been suspended/returned to basic status by the administrator. Please renew your membership badge to restore access to premium features and active credentials.`,
-                                  type: 'badge_upgrade_expired',
-                                  isRead: false,
-                                  triggeredBy: 'Academy Admin Office',
-                                  createdAt: serverTimestamp()
-                                });
-
-                                await triggerSystemSignal('user_signals', member.id);
-
-                                setGradingLogs(prev => [`[SUSPEND ⚠️] Returned ${member.fullName || member.email} to basic membership status and revoked badge.`, ...prev]);
-                                alert(`Successfully returned ${member.fullName || member.email} to basic membership.`);
-                              } catch (err) {
-                                console.error("Error revoking badge membership:", err);
-                                alert("Failed to return user to basic membership. Please try again.");
-                              }
-                            }
-                          }}
+                          onClick={() => setBadgeActionConfirm({ type: 'suspend', user: member })}
                           className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer border-0 shadow-md flex items-center gap-1.5 transition-all"
                         >
                           ✕ Suspend Badge
@@ -2667,6 +2713,84 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                 className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase tracking-wider rounded-xl border-0 cursor-pointer shadow-sm transition-colors"
               >
                 Yes, Revoke
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Badge Action Confirmation Modal */}
+      {badgeActionConfirm && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md border border-slate-200 overflow-hidden shadow-2xl p-6 space-y-5 animate-scaleUp text-left">
+            <div className={`flex items-center justify-center w-12 h-12 rounded-full mx-auto ${
+              badgeActionConfirm.type === 'approve' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+            }`}>
+              {badgeActionConfirm.type === 'approve' ? <CheckCircle2 className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
+            </div>
+            
+            <div className="space-y-2 text-center">
+              <h3 className="font-black text-slate-900 text-base tracking-tight">
+                {badgeActionConfirm.type === 'approve' && 'Approve & Upgrade Member?'}
+                {badgeActionConfirm.type === 'disapprove' && 'Disapprove Badge Payment?'}
+                {badgeActionConfirm.type === 'suspend' && 'Suspend Student Badge?'}
+              </h3>
+              <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                {badgeActionConfirm.type === 'approve' && (
+                  <>Are you sure you want to approve <strong className="text-slate-900">{badgeActionConfirm.user.fullName || badgeActionConfirm.user.email}</strong>'s payment and upgrade them to CIYA Student Pro?</>
+                )}
+                {badgeActionConfirm.type === 'disapprove' && (
+                  <>Please specify a reason for rejecting <strong className="text-slate-900">{badgeActionConfirm.user.fullName || badgeActionConfirm.user.email}</strong>'s verification request:</>
+                )}
+                {badgeActionConfirm.type === 'suspend' && (
+                  <>Are you sure you want to suspend/revoke <strong className="text-slate-900">{badgeActionConfirm.user.fullName || badgeActionConfirm.user.email}</strong>'s badge and return them back to a basic member?</>
+                )}
+              </p>
+            </div>
+
+            {badgeActionConfirm.type === 'disapprove' && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Rejection Reason</label>
+                <textarea
+                  value={badgeActionReasonText}
+                  onChange={(e) => setBadgeActionReasonText(e.target.value)}
+                  className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500 outline-none resize-none"
+                  placeholder="Enter rejection reason here..."
+                />
+              </div>
+            )}
+            
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isProcessingAction}
+                onClick={() => {
+                  setBadgeActionConfirm(null);
+                  setBadgeActionReasonText('');
+                }}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase tracking-wider rounded-xl border-0 cursor-pointer transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isProcessingAction}
+                onClick={executeBadgeAction}
+                className={`w-full py-2.5 text-white text-xs font-black uppercase tracking-wider rounded-xl border-0 cursor-pointer shadow-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+                  badgeActionConfirm.type === 'approve' 
+                    ? 'bg-emerald-600 hover:bg-emerald-700' 
+                    : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {isProcessingAction ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    {badgeActionConfirm.type === 'approve' && 'Confirm Upgrade'}
+                    {badgeActionConfirm.type === 'disapprove' && 'Reject Request'}
+                    {badgeActionConfirm.type === 'suspend' && 'Revoke Badge'}
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -2,6 +2,16 @@
 # This file is automatically read by Netlify when you deploy.
 
 [[redirects]]
+  from = "/api/cloudinary-signature"
+  to = "/.netlify/functions/cloudinary-signature"
+  status = 200
+
+[[redirects]]
+  from = "/api/delete-cloudinary"
+  to = "/.netlify/functions/delete-cloudinary"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import multer from "multer";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 
@@ -70,6 +71,24 @@ async function startServer() {
 
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ limit: '100mb', extended: true }));
+
+  // Cross-Origin Resource Sharing (CORS) support for Netlify frontend deployments
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    } else {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    }
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
 
   // Add API routes here
   app.get("/api/health", (req, res) => {
@@ -531,108 +550,299 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
     }
   });
 
-  app.post("/api/cloudinary/upload", async (req: express.Request, res: express.Response) => {
+  // Multer memoryStorage configuration for Door 1 upload routes
+  const uploadImageMulter = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit for images
+  });
+
+  const uploadVideoMulter = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit for videos
+  });
+
+  // Helper to parse Cloudinary URLs into public_id and resourceType
+  function parseServerCloudinaryUrl(url: string): { publicId: string; resourceType: 'image' | 'video' | 'raw' } | null {
+    if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return null;
     try {
-      const { file, folder: customFolder, projectId, studentId } = req.body;
-      if (!file) {
-        return res.status(400).json({ error: "No file data provided." });
+      const isVideo = url.includes('/video/');
+      const resourceType: 'image' | 'video' | 'raw' = isVideo ? 'video' : 'image';
+
+      const uploadIdx = url.indexOf('/upload/');
+      if (uploadIdx === -1) return null;
+
+      let pathAfterUpload = url.substring(uploadIdx + 8);
+      const queryIdx = pathAfterUpload.indexOf('?');
+      if (queryIdx !== -1) {
+        pathAfterUpload = pathAfterUpload.substring(0, queryIdx);
       }
 
-      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "dqrhmr7ms";
-      const apiKey = process.env.CLOUDINARY_API_KEY;
-      const apiSecret = process.env.CLOUDINARY_API_SECRET;
-      const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
-
-      if (!cloudName) {
-        return res.status(400).json({ error: "Cloudinary Cloud Name is not configured in the environment." });
+      const parts = pathAfterUpload.split('/');
+      const cleanParts: string[] = [];
+      for (const part of parts) {
+        if (/^v\d+$/.test(part)) continue;
+        if (part.includes('_') && (part.startsWith('c_') || part.startsWith('w_') || part.startsWith('h_') || part.startsWith('f_') || part.startsWith('q_') || part.startsWith('r_'))) {
+          continue;
+        }
+        cleanParts.push(part);
       }
 
-      // Automatically organize under projects/{projectId} if projectId is supplied
-      let folder = customFolder || "ciya";
-      if (projectId) {
-        folder = `projects/${projectId}`;
+      const fullPath = cleanParts.join('/');
+      const lastDotIdx = fullPath.lastIndexOf('.');
+      const publicId = lastDotIdx !== -1 ? fullPath.substring(0, lastDotIdx) : fullPath;
+
+      if (!publicId) return null;
+      return { publicId, resourceType };
+    } catch (err) {
+      return null;
+    }
+  }
+
+  // Helper to execute server-signed Cloudinary uploads
+  async function processCloudinaryUpload(
+    fileData: Buffer | string,
+    mimeType: string,
+    resourceType: 'image' | 'video',
+    options: { folder?: string; projectId?: string; studentId?: string; tags?: string }
+  ) {
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || "dqrhmr7ms";
+    const apiKey = process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET;
+    const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || process.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+    let folder = options.folder || "ciya";
+    if (options.projectId) {
+      folder = `projects/${options.projectId}`;
+    }
+
+    const tagsList: string[] = [];
+    if (options.projectId) tagsList.push(`project-${options.projectId}`);
+    if (options.studentId) tagsList.push(`student-${options.studentId}`);
+    if (options.tags) tagsList.push(...options.tags.split(','));
+    const tags = tagsList.length > 0 ? tagsList.join(",") : undefined;
+
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
+
+    let fileContent: string;
+    if (Buffer.isBuffer(fileData)) {
+      fileContent = `data:${mimeType};base64,${fileData.toString("base64")}`;
+    } else {
+      fileContent = fileData;
+    }
+
+    const formData = new URLSearchParams();
+    formData.append("file", fileContent);
+
+    if (apiKey && apiSecret) {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const params: Record<string, string> = { timestamp: String(timestamp) };
+      if (folder) params.folder = folder;
+      if (tags) params.tags = tags;
+
+      const sortedKeys = Object.keys(params).sort();
+      const paramString = sortedKeys.map((k) => `${k}=${params[k]}`).join("&");
+
+      const signature = crypto
+        .createHash("sha1")
+        .update(`${paramString}${apiSecret}`)
+        .digest("hex");
+
+      formData.append("api_key", apiKey);
+      formData.append("timestamp", String(timestamp));
+      formData.append("signature", signature);
+      if (folder) formData.append("folder", folder);
+      if (tags) formData.append("tags", tags);
+    } else if (uploadPreset) {
+      formData.append("upload_preset", uploadPreset);
+      if (folder) formData.append("folder", folder);
+      if (tags) formData.append("tags", tags);
+    } else {
+      throw new Error("Cloudinary credentials missing. Please configure CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET.");
+    }
+
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formData.toString(),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Cloudinary API error: ${errText}`);
+    }
+
+    const data = await response.json();
+    return {
+      url: data.secure_url || data.url,
+      public_id: data.public_id,
+      folder: data.folder || folder,
+      tags: data.tags || tagsList,
+      success: true,
+    };
+  }
+
+  // Door 1: POST /api/upload - handles single image file field 'image' or JSON payload
+  app.post("/api/upload", uploadImageMulter.single("image"), async (req: express.Request, res: express.Response) => {
+    try {
+      let fileData: Buffer | string | undefined = req.file?.buffer;
+      let mimeType = req.file?.mimetype || "image/jpeg";
+
+      if (!fileData && req.body?.file) {
+        fileData = req.body.file;
+        if (typeof fileData === 'string' && fileData.startsWith('data:')) {
+          const matches = fileData.match(/^data:([^;]+);base64,/);
+          if (matches) mimeType = matches[1];
+        }
       }
 
-      // Automatically tag project and student identifier tags
-      const tagsList: string[] = [];
-      if (projectId) {
-        tagsList.push(`project-${projectId}`);
+      if (!fileData) {
+        return res.status(400).json({ error: "No file provided. Upload field 'image' or body.file is required." });
       }
-      if (studentId) {
-        tagsList.push(`student-${studentId}`);
-      }
-      const tags = tagsList.length > 0 ? tagsList.join(",") : undefined;
 
-      const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+      const result = await processCloudinaryUpload(fileData, mimeType, "image", {
+        folder: req.body?.folder,
+        projectId: req.body?.projectId,
+        studentId: req.body?.studentId,
+        tags: req.body?.tags,
+      });
+
+      return res.json(result);
+    } catch (err: any) {
+      console.error("Express image upload error:", err);
+      return res.status(500).json({ error: err.message || "Failed to upload image to Cloudinary." });
+    }
+  });
+
+  // Door 1: POST /api/upload-video - handles single video file field 'video' or JSON payload
+  app.post("/api/upload-video", uploadVideoMulter.single("video"), async (req: express.Request, res: express.Response) => {
+    try {
+      let fileData: Buffer | string | undefined = req.file?.buffer;
+      let mimeType = req.file?.mimetype || "video/mp4";
+
+      if (!fileData && req.body?.file) {
+        fileData = req.body.file;
+        if (typeof fileData === 'string' && fileData.startsWith('data:')) {
+          const matches = fileData.match(/^data:([^;]+);base64,/);
+          if (matches) mimeType = matches[1];
+        }
+      }
+
+      if (!fileData) {
+        return res.status(400).json({ error: "No video file provided. Upload field 'video' or body.file is required." });
+      }
+
+      const result = await processCloudinaryUpload(fileData, mimeType, "video", {
+        folder: req.body?.folder,
+        projectId: req.body?.projectId,
+        studentId: req.body?.studentId,
+        tags: req.body?.tags,
+      });
+
+      return res.json(result);
+    } catch (err: any) {
+      console.error("Express video upload error:", err);
+      return res.status(500).json({ error: err.message || "Failed to upload video to Cloudinary." });
+    }
+  });
+
+  // Door 1: POST /api/cloudinary-signature - signature generator endpoint for Express environment
+  app.post("/api/cloudinary-signature", (req: express.Request, res: express.Response) => {
+    try {
+      const folder = req.body?.folder || "ciya";
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || "dqrhmr7ms";
+      const apiKey = process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY;
+      const apiSecret = process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET;
+
+      if (!apiKey || !apiSecret) {
+        return res.status(400).json({ error: "Cloudinary credentials not configured on Express server." });
+      }
+
+      const timestamp = Math.floor(Date.now() / 1000);
+      const params: Record<string, string> = { timestamp: String(timestamp) };
+      if (folder) params.folder = folder;
+
+      const sortedKeys = Object.keys(params).sort();
+      const paramString = sortedKeys.map((k) => `${k}=${params[k]}`).join("&");
+
+      const signature = crypto
+        .createHash("sha1")
+        .update(`${paramString}${apiSecret}`)
+        .digest("hex");
+
+      return res.json({ signature, timestamp, apiKey, cloudName, folder });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Failed to generate Cloudinary signature" });
+    }
+  });
+
+  // Door 1: POST /api/delete-cloudinary - signed deletion endpoint
+  app.post("/api/delete-cloudinary", async (req: express.Request, res: express.Response) => {
+    try {
+      const { url } = req.body;
+      if (!url) {
+        return res.status(400).json({ error: "Required 'url' parameter is missing." });
+      }
+
+      const parsed = parseServerCloudinaryUrl(url);
+      if (!parsed || !parsed.publicId) {
+        return res.status(400).json({ error: "Could not parse Cloudinary URL for public_id." });
+      }
+
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || "dqrhmr7ms";
+      const apiKey = process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY;
+      const apiSecret = process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET;
+
+      if (!apiKey || !apiSecret) {
+        return res.status(400).json({ error: "Cloudinary credentials not configured on server." });
+      }
+
+      const timestamp = Math.floor(Date.now() / 1000);
+      const { publicId, resourceType } = parsed;
+
+      const paramString = `public_id=${publicId}&timestamp=${timestamp}`;
+      const signature = crypto
+        .createHash("sha1")
+        .update(`${paramString}${apiSecret}`)
+        .digest("hex");
+
+      const destroyUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/destroy`;
       const formData = new URLSearchParams();
-      formData.append("file", file);
+      formData.append("public_id", publicId);
+      formData.append("timestamp", String(timestamp));
+      formData.append("api_key", apiKey);
+      formData.append("signature", signature);
 
-      if (apiSecret && apiKey) {
-        // Signed upload (Most secure, proxies using credentials)
-        const timestamp = Math.floor(Date.now() / 1000);
-        const params: Record<string, string> = {
-          timestamp: String(timestamp),
-        };
-        if (folder) params.folder = folder;
-        if (tags) params.tags = tags;
-
-        // Cloudinary requires signed parameters to be sorted alphabetically by key
-        const sortedKeys = Object.keys(params).sort();
-        const paramString = sortedKeys.map(key => `${key}=${params[key]}`).join("&");
-
-        const signature = crypto
-          .createHash("sha1")
-          .update(`${paramString}${apiSecret}`)
-          .digest("hex");
-
-        formData.append("api_key", apiKey);
-        formData.append("timestamp", String(timestamp));
-        formData.append("signature", signature);
-        if (folder) {
-          formData.append("folder", folder);
-        }
-        if (tags) {
-          formData.append("tags", tags);
-        }
-      } else if (uploadPreset) {
-        // Unsigned fallback
-        formData.append("upload_preset", uploadPreset);
-        if (folder) {
-          formData.append("folder", folder);
-        }
-        if (tags) {
-          formData.append("tags", tags);
-        }
-      } else {
-        return res.status(400).json({
-          error: "Cloudinary credentials missing. Please set CLOUDINARY_API_KEY & CLOUDINARY_API_SECRET or CLOUDINARY_UPLOAD_PRESET in Secrets."
-        });
-      }
-
-      const response = await fetch(url, {
+      const response = await fetch(destroyUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData.toString(),
       });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("Cloudinary upload raw error response:", errText);
-        return res.status(response.status).json({ error: `Cloudinary failed: ${errText}` });
+      const data = await response.json();
+      const result = data.result;
+
+      if (result === "ok" || result === "not_found") {
+        return res.json({ success: true, result, public_id: publicId });
       }
 
-      const data = await response.json();
-      return res.json({
-        url: data.secure_url || data.url,
-        public_id: data.public_id,
-        folder: data.folder || folder,
-        tags: data.tags || (tagsList.length > 0 ? tagsList : [])
-      });
+      return res.status(400).json({ success: false, result, error: data.error?.message || "Cloudinary deletion failed." });
     } catch (err: any) {
-      console.error("Cloudinary upload proxy error:", err);
-      return res.status(500).json({ error: err.message || "Cloudinary upload proxy failed." });
+      console.error("Express Cloudinary destroy error:", err);
+      return res.status(500).json({ error: err.message || "Failed to execute Cloudinary deletion." });
+    }
+  });
+
+  // Legacy route for backward compatibility
+  app.post("/api/cloudinary/upload", async (req: express.Request, res: express.Response) => {
+    try {
+      const { file, folder, projectId, studentId, tags } = req.body;
+      if (!file) {
+        return res.status(400).json({ error: "No file data provided." });
+      }
+      const result = await processCloudinaryUpload(file, "image/jpeg", "image", { folder, projectId, studentId, tags });
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Legacy Cloudinary upload failed." });
     }
   });
 

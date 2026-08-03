@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Download, Crown, Sparkles, Award, Mail, BookOpen, IdCard, Calendar } from 'lucide-react';
+import { Download, Crown, Award, Mail, BookOpen, IdCard, Calendar, Camera } from 'lucide-react';
 
 interface BadgeData {
   fullName: string;
@@ -14,9 +14,11 @@ interface BadgeData {
 interface CIYAMembershipBadgeProps {
   data: BadgeData;
   isSample?: boolean;
+  onPhotoUpload?: () => void;
+  uploadingPhoto?: boolean;
 }
 
-export default function CIYAMembershipBadge({ data, isSample = false }: CIYAMembershipBadgeProps) {
+export default function CIYAMembershipBadge({ data, isSample = false, onPhotoUpload, uploadingPhoto = false }: CIYAMembershipBadgeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
@@ -29,13 +31,16 @@ export default function CIYAMembershipBadge({ data, isSample = false }: CIYAMemb
   }, []);
 
   // Format expiry date beautifully
-  const displayExpiry = data.expiryDate
-    ? new Date(data.expiryDate).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    : 'Never Expires';
+  const displayExpiry = (() => {
+    if (!data.expiryDate) return '2026';
+    const d = new Date(data.expiryDate);
+    if (isNaN(d.getTime()) || d.getFullYear() <= 1970) return '2026';
+    return d.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  })();
 
   const handleDownload = async () => {
     const canvas = canvasRef.current;
@@ -358,7 +363,7 @@ export default function CIYAMembershipBadge({ data, isSample = false }: CIYAMemb
           <div className="flex justify-start items-start">
             <div className="text-left space-y-0.5">
               <h4 className="text-white font-black uppercase text-sm tracking-wider flex items-center gap-1">
-                CIY ACADEMY <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                CIY ACADEMY <Award className="w-3.5 h-3.5 text-amber-400" />
               </h4>
               <p className="text-[7.5px] text-amber-400 font-extrabold uppercase tracking-widest leading-none">CREATE IT YOURSELF ACADEMY</p>
             </div>
@@ -366,18 +371,31 @@ export default function CIYAMembershipBadge({ data, isSample = false }: CIYAMemb
 
           {/* Central Portrait Area */}
           <div className="flex flex-col items-center mt-2">
-            {/* Custom styled circular photo frame */}
-            <div className="w-26 h-26 rounded-full border-[3px] border-amber-400 p-1 bg-slate-900 shadow-md shadow-amber-500/10 relative overflow-hidden flex items-center justify-center shrink-0">
+            {/* Custom styled circular photo frame with embedded upload button */}
+            <div 
+              onClick={onPhotoUpload}
+              className={`w-26 h-26 rounded-full border-[3px] border-amber-400 p-1 bg-slate-900 shadow-md shadow-amber-500/10 relative overflow-hidden flex items-center justify-center shrink-0 ${onPhotoUpload ? 'cursor-pointer group' : ''}`}
+              title={onPhotoUpload ? "Click circular logo button to upload photo" : undefined}
+            >
               {(data.photoURL || data.avatarUrl) ? (
                 <img
                   src={data.photoURL || data.avatarUrl}
                   alt={data.fullName}
-                  className="w-full h-full rounded-full object-cover"
+                  className={`w-full h-full rounded-full object-cover ${onPhotoUpload ? 'group-hover:opacity-60 transition-opacity' : ''}`}
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center text-amber-400 font-black text-3xl uppercase">
+                <div className={`w-full h-full rounded-full bg-slate-800 flex items-center justify-center text-amber-400 font-black text-3xl uppercase ${onPhotoUpload ? 'group-hover:opacity-60 transition-opacity' : ''}`}>
                   {data.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                </div>
+              )}
+
+              {onPhotoUpload && (
+                <div className="absolute inset-0 bg-slate-950/75 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity text-amber-400 p-1">
+                  <Camera className="w-5 h-5 animate-pulse" />
+                  <span className="text-[7px] font-black uppercase tracking-wider text-white text-center leading-none mt-1">
+                    {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                  </span>
                 </div>
               )}
             </div>

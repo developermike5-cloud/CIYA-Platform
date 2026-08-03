@@ -720,8 +720,9 @@ export default function PromptsAdmin() {
     }
 
     try {
-      showToast("Uploading video/media walkthrough to Cloudinary...");
-      const publicUrl = await uploadToSupabaseStorage(file, 'prompts');
+      showToast("Compressing & uploading media to Cloudinary...");
+      const cloudRes = await uploadToCloudinary(file, 'ciya_prompts');
+      const publicUrl = cloudRes.url;
       
       if (isFull) {
         if (editingFullTemplate) {
@@ -732,25 +733,10 @@ export default function PromptsAdmin() {
           setEditingModTemplate({ ...editingModTemplate, videoUrl: publicUrl });
         }
       }
-      showToast("Video uploaded to Cloudinary successfully!");
-    } catch (err) {
-      console.warn("Cloudinary upload failed, falling back to base64 encoding:", err);
-      showToast("Storage failed, encoding to document (Warning: Large files might exceed Firestore limits)...");
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        if (isFull) {
-          if (editingFullTemplate) {
-            setEditingFullTemplate({ ...editingFullTemplate, videoUrl: base64 });
-          }
-        } else {
-          if (editingModTemplate) {
-            setEditingModTemplate({ ...editingModTemplate, videoUrl: base64 });
-          }
-        }
-        showToast("Video embedded successfully!");
-      };
-      reader.readAsDataURL(file);
+      showToast("Media uploaded to Cloudinary successfully!");
+    } catch (err: any) {
+      console.error("Cloudinary upload failed:", err);
+      showToast(`Media upload failed: ${err?.message || 'Error uploading'}`);
     }
   };
 

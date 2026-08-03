@@ -4,6 +4,7 @@ import { db, auth, triggerSystemSignal } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { CheckCircle2, XCircle, Clock, Search, FileText, Download, Check, RefreshCw, Trash2, Trash } from 'lucide-react';
 import { safeStorage } from '../../utils/safeStorage';
+import { rejectSubmissionMedia } from '../../lib/cloudinaryService';
 
 interface Submission {
   id: string;
@@ -94,6 +95,10 @@ export default function AssignmentsAdmin() {
     const subId = deleteConfirmSubId;
     setDeleteConfirmSubId(null);
     try {
+      const subToDelete = submissions.find(s => s.id === subId);
+      if (subToDelete) {
+        await rejectSubmissionMedia(subToDelete);
+      }
       await deleteDoc(doc(db, 'assignments', subId));
       showToastMsg("Assignment submission deleted successfully!", "success");
       if (selectedSub?.id === subId) {
@@ -116,6 +121,9 @@ export default function AssignmentsAdmin() {
     if (checkedSubIds.length === 0) return;
     setLoading(true);
     try {
+      const subsToDelete = submissions.filter(s => checkedSubIds.includes(s.id));
+      await Promise.allSettled(subsToDelete.map(s => rejectSubmissionMedia(s)));
+
       const batch = writeBatch(db);
       checkedSubIds.forEach(id => {
         batch.delete(doc(db, 'assignments', id));
@@ -225,6 +233,10 @@ export default function AssignmentsAdmin() {
     const newStatus = isApproved ? 'Approved' : 'Disapproved';
 
     try {
+      if (!isApproved) {
+        await rejectSubmissionMedia(sub);
+      }
+
       // 1. Update assignment state
       const subRef = doc(db, 'assignments', sub.id);
       await updateDoc(subRef, {

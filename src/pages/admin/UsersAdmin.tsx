@@ -7,6 +7,7 @@ import BrandingLogo from '../../components/BrandingLogo';
 import { Course } from '../../types';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
 import { uploadToCloudinary } from '../../utils/cloudinary';
+import { rejectSubmissionMedia } from '../../lib/cloudinaryService';
 import { coursesStore } from '../../utils/coursesStore';
 import { safeStorage } from '../../utils/safeStorage';
 
@@ -681,6 +682,10 @@ export default function UsersAdmin() {
     setDeleteConfirmId(null);
     setActionLoading(prev => ({ ...prev, [userId]: 'delete' }));
     try {
+      const userToDelete = users.find(u => u.id === userId);
+      if (userToDelete) {
+        await rejectSubmissionMedia(userToDelete);
+      }
       await deleteDoc(doc(db, 'users', userId));
       setUsers(prev => prev.filter(u => u.id !== userId));
       if (expandedUserId === userId) setExpandedUserId(null);

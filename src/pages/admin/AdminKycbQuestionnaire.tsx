@@ -44,7 +44,23 @@ export default function AdminKycbQuestionnaire({
     }
   });
 
-  const isPro = !!userProfile?.hasYearBadge;
+  const isPro = (() => {
+    if (!userProfile || !userProfile.hasYearBadge) return false;
+    if (userProfile.badgeStatus === 'revoked' || userProfile.badgeStatus === 'expired' || userProfile.badgeStatus === 'inactive') return false;
+    let expiry = userProfile.badgeExpiryDate;
+    if (typeof expiry === 'object' && expiry !== null && typeof expiry.seconds === 'number') {
+      expiry = expiry.seconds * 1000;
+    }
+    if (!expiry && userProfile.badgePurchaseDate) {
+      let pDate = userProfile.badgePurchaseDate;
+      if (typeof pDate === 'object' && pDate !== null && typeof pDate.seconds === 'number') {
+        pDate = pDate.seconds * 1000;
+      }
+      expiry = typeof pDate === 'number' ? pDate + 30 * 24 * 60 * 60 * 1000 : 0;
+    }
+    if (!expiry) return false;
+    return Date.now() <= expiry;
+  })();
 
   const [shareType, setShareType] = useState<'lp' | 'ec' | 'portfolio'>('lp');
   const [shareTitle, setShareTitle] = useState(

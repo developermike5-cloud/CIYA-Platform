@@ -14,6 +14,7 @@ import AssignmentsAdmin from './pages/admin/AssignmentsAdmin';
 import NotificationsAdmin from './pages/admin/NotificationsAdmin';
 import PortalLocksAdmin from './pages/admin/PortalLocksAdmin';
 import BlogAdmin from './pages/admin/BlogAdmin';
+import LeaderboardAdmin from './pages/admin/LeaderboardAdmin';
 import Onboarding from './pages/Onboarding';
 import WaitingOnboarding from './pages/WaitingOnboarding';
 import GetStarted from './pages/GetStarted';
@@ -115,6 +116,7 @@ export default function App() {
           <Route path="notifications" element={<NotificationsAdmin />} />
           <Route path="locks" element={<PortalLocksAdmin />} />
           <Route path="blog" element={<BlogAdmin />} />
+          <Route path="leaderboard" element={<LeaderboardAdmin />} />
           <Route path="courses/new" element={<CourseEdit />} />
           <Route path="courses/:courseId" element={<CourseEdit />} />
         </Route>

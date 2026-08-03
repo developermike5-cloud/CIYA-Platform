@@ -367,6 +367,14 @@ export default function AdminLayout() {
           </Link>
 
           <Link 
+            to="/admin/leaderboard" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/leaderboard') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+          >
+            🏆 Course Leaderboards
+          </Link>
+
+          <Link 
             to="/admin/locks" 
             onClick={() => setIsMobileMenuOpen(false)}
             className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/locks') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}

@@ -1,7 +1,14 @@
 /**
- * Utility to upload files to Cloudinary via the server-side Express proxy.
- * This secures the Cloudinary API Key and Secret on the server.
+ * Legacy compatibility wrapper for Cloudinary uploads.
+ * Delegates directly to the resilient dual-tier Cloudinary service in src/lib/cloudinaryService.ts.
  */
+import { 
+  uploadToCloudinary as serviceUploadToCloudinary, 
+  deleteFromCloudinary as serviceDeleteFromCloudinary,
+  compressImage as serviceCompressImage,
+  rejectSubmissionMedia as serviceRejectSubmissionMedia
+} from '../lib/cloudinaryService';
+
 export interface CloudinaryUploadResponse {
   url: string;
   public_id: string;
@@ -15,47 +22,20 @@ export const uploadToCloudinary = async (
   projectId?: string,
   studentId?: string
 ): Promise<CloudinaryUploadResponse> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64String = reader.result as string;
-      try {
-        const response = await fetch('/api/cloudinary/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            file: base64String,
-            folder: folder,
-            projectId: projectId,
-            studentId: studentId
-          })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || 'Failed to upload to Cloudinary');
-        }
-
-        const data = await response.json();
-        if (!data.url) {
-          throw new Error('Cloudinary response did not return a valid URL');
-        }
-        resolve({
-          url: data.url,
-          public_id: data.public_id,
-          folder: data.folder,
-          tags: data.tags
-        });
-      } catch (err: any) {
-        console.error("Cloudinary upload utility error:", err);
-        reject(err);
-      }
-    };
-    reader.onerror = () => {
-      reject(new Error('Failed to read file for upload'));
-    };
-    reader.readAsDataURL(file);
+  const res = await serviceUploadToCloudinary(file, {
+    folder,
+    projectId,
+    studentId
   });
+
+  return {
+    url: res.url,
+    public_id: res.public_id || `id-${Date.now()}`,
+    folder: res.folder || folder,
+    tags: res.tags || []
+  };
 };
+
+export const deleteFromCloudinary = serviceDeleteFromCloudinary;
+export const compressImage = serviceCompressImage;
+export const rejectSubmissionMedia = serviceRejectSubmissionMedia;

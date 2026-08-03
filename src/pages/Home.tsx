@@ -5,7 +5,7 @@ import BrandingLogo from '../components/BrandingLogo';
 import LoginModal from '../components/LoginModal';
 import InteractiveTemplatesSphere from '../components/InteractiveTemplatesSphere';
 import { 
-  Lightbulb, Gift, Bot, Wallet, Check, Smartphone, Briefcase, Zap, TrendingUp, Globe, Film, Palette, Sparkles
+  Lightbulb, Gift, Wallet, Check, Smartphone, Briefcase, Zap, TrendingUp, Globe, Film, Palette, Star, Award, Compass, Code
 } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -243,7 +243,7 @@ function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
         <a href="#mission" className="hover:text-amber-400 transition-colors">Mission</a>
         <a href="#courses" className="hover:text-amber-400 transition-colors">Courses</a>
         <Link to="/dashboard?view=prompts" className="hover:text-amber-400 transition-colors flex items-center gap-1">
-          <Sparkles className="w-3.5 h-3.5 text-amber-450" />
+          <Star className="w-3.5 h-3.5 text-amber-450 fill-amber-450" />
           <span>Prompt Generator</span>
         </Link>
         <a href="#how" className="hover:text-amber-400 transition-colors">How it works</a>
@@ -348,7 +348,7 @@ function Mission() {
           {[
             { icon: Lightbulb, title: "Learn by Doing", desc: "Practical, hands-on training that gets you results within 5 days." },
             { icon: Gift, title: "Free to Begin", desc: "Beginner courses are completely free — no barriers to entry." },
-            { icon: Bot, title: "AI-Powered", desc: "Forget difficult coding. Let AI do the heavy lifting while you create." },
+            { icon: Compass, title: "Next-Gen Tech", desc: "Forget difficult coding. Let smart tools do the heavy lifting while you create." },
             { icon: Wallet, title: "Earn or Save", desc: "Use your skills to save money or charge clients for services." },
           ].map((item, i) => (
             <MissionCard key={i} item={item} index={i} />
@@ -796,7 +796,7 @@ function HowItWorks() {
 function WhyCiya() {
   const points = [
     { icon: Gift, title: "Free Entry, Zero Barriers", desc: "The beginner course is completely free. You shouldn't have to pay to start learning skills that can change your life." },
-    { icon: Bot, title: "AI Makes it Easy", desc: "No need to learn complicated code. AI tools handle the technical complexity so you can focus on creating and delivering results." },
+    { icon: Compass, title: "Smart Automation Makes it Easy", desc: "No need to learn complicated code. Modern digital tools handle the technical complexity so you can focus on creating and delivering results." },
     { icon: Smartphone, title: "No More WhatsApp Hustle", desc: "Move your business beyond your contacts list. A proper website or branded content puts your business in front of the right audience." },
     { icon: Briefcase, title: "Create Your Own Job", desc: "Don't wait for employment. Build a freelance career or business around skills that companies and clients genuinely pay for." },
     { icon: Zap, title: "5 Days. Real Results.", desc: "We don't waste your time. In 5 focused days, you'll complete a real project and have a skill you can use immediately." },
@@ -984,7 +984,7 @@ export default function App() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md text-slate-800">
           <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-500">
-              <Sparkles className="w-8 h-8 fill-amber-500" />
+              <Star className="w-8 h-8 fill-amber-500 text-amber-500" />
             </div>
             <div className="space-y-2">
               <h3 className="text-xl font-black text-slate-800 tracking-tight">Login Popup Blocked</h3>

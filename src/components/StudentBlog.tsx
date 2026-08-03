@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../firebase';
-import { BookOpen, Calendar, User, ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+import { BookOpen, Calendar, User, ArrowLeft, Loader2, Megaphone, ExternalLink, Share2, Check } from 'lucide-react';
 import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { preprocessMarkdown, stripMarkdown } from '../utils/markdownUtils';
@@ -24,11 +22,38 @@ interface StudentBlogProps {
 }
 
 export const StudentBlog: React.FC<StudentBlogProps> = ({ isLocked = false }) => {
-  const [posts, setPosts] = useState<BlogPost[]>(() => {
-    return staticBlogs as BlogPost[];
-  });
+  // Read strictly from static blogs JSON
+  const [posts] = useState<BlogPost[]>(staticBlogs as BlogPost[]);
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Auto-select article if navigated via announcement link or stored article ID
+  useEffect(() => {
+    const checkAndSelectArticle = (targetId?: string) => {
+      const storedId = targetId || safeStorage.getItem('ciya_selected_article_id');
+      if (storedId && posts.length > 0) {
+        const match = posts.find(p => p.id === storedId || p.title.toLowerCase().includes(storedId.toLowerCase()));
+        if (match) {
+          setSelectedPost(match);
+          safeStorage.removeItem('ciya_selected_article_id');
+        }
+      }
+    };
+
+    checkAndSelectArticle();
+
+    const handleNavigateEvent = (e: any) => {
+      if (e.detail) {
+        checkAndSelectArticle(e.detail);
+      }
+    };
+
+    window.addEventListener('ciya_navigate_article', handleNavigateEvent);
+    return () => {
+      window.removeEventListener('ciya_navigate_article', handleNavigateEvent);
+    };
+  }, [posts]);
 
   const getDisplayDate = (post: BlogPost) => {
     if (post.publishedDate) {
@@ -104,17 +129,34 @@ export const StudentBlog: React.FC<StudentBlogProps> = ({ isLocked = false }) =>
           )}
 
           <div className="p-6 md:p-10 space-y-6">
-            <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-400">
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1 rounded-full text-slate-600">
-                <User className="w-3.5 h-3.5 text-teal-600" />
-                <span>By {selectedPost.author || 'CIYA Coach'}</span>
+            <div className="flex flex-wrap items-center justify-between gap-4 text-xs font-semibold text-slate-400 border-b pb-4 border-slate-100">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1 rounded-full text-slate-600">
+                  <User className="w-3.5 h-3.5 text-teal-600" />
+                  <span>By {selectedPost.author || 'CIYA Coach'}</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1 rounded-full text-slate-600">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>
+                    {getDisplayDate(selectedPost)}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1 rounded-full text-slate-600">
-                <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                <span>
-                  {getDisplayDate(selectedPost)}
-                </span>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const articleLink = `/blog?id=${selectedPost.id}`;
+                  navigator.clipboard.writeText(articleLink);
+                  setCopiedLink(true);
+                  setTimeout(() => setCopiedLink(false), 2500);
+                }}
+                className="flex items-center gap-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200/80 px-3 py-1.5 rounded-xl font-extrabold text-[11px] transition-all cursor-pointer shadow-2xs"
+                title="Copy internal article link for announcements"
+              >
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5" />}
+                <span>{copiedLink ? 'Link Copied!' : 'Copy Article Link'}</span>
+              </button>
             </div>
 
             <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
@@ -179,7 +221,7 @@ export const StudentBlog: React.FC<StudentBlogProps> = ({ isLocked = false }) =>
       <div id="blog-header-card" className="bg-gradient-to-br from-slate-900 to-teal-950 border border-slate-800 text-teal-50 rounded-3xl p-6 md:p-8 shadow-sm mb-8 relative overflow-hidden">
         <div className="absolute right-0 top-0 w-64 h-64 bg-teal-500/10 blur-[80px] rounded-full" />
         <span className="text-[10px] bg-teal-500/20 text-teal-300 border border-teal-500/30 font-black px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1 mb-3">
-          <Sparkles className="w-3 h-3" /> CIYA Knowledge Base
+          <BookOpen className="w-3 h-3" /> CIYA Knowledge Base
         </span>
         <h3 className="text-2xl md:text-3xl font-black text-white tracking-tight">📰 CIYA News & Article Desk</h3>
         <p className="text-slate-300 text-xs md:text-sm font-semibold leading-relaxed mt-2 max-w-2xl">

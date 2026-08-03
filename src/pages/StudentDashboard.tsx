@@ -22,6 +22,8 @@ import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
 import CIYAMembershipBadge from '../components/CIYAMembershipBadge';
 import { verifyTimeBasedCode, getPasscodeSecondsLeft } from '../utils/passcode';
 import { FRONTEND_YEAR_BADGE_SETTINGS } from '../constants/badgeSettings';
+import { staticLeaderboardData } from '../utils/leaderboardData';
+import staticAnnouncements from '../data/announcements.json';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -52,6 +54,232 @@ function TierBadge({ tier }: { tier: string }) {
   };
   const [c, b, t] = m[tier] || ["#64748b", "#f1f5f9", tier];
   return <Badge text={t} color={c} bg={b} />;
+}
+
+const CAROUSEL_BG_PALETTES = [
+  "bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 border-indigo-900/60",
+  "bg-gradient-to-r from-teal-950 via-emerald-950 to-slate-900 border-teal-900/60",
+  "bg-gradient-to-r from-purple-950 via-fuchsia-950 to-slate-900 border-purple-900/60",
+  "bg-gradient-to-r from-amber-950 via-rose-950 to-slate-900 border-amber-900/60",
+  "bg-gradient-to-r from-blue-950 via-cyan-950 to-slate-900 border-blue-900/60",
+];
+
+// ==========================================
+// ANNOUNCEMENT CAROUSEL CARD (Larger, No Numbers, Placed under registered courses)
+// ==========================================
+function AnnouncementCarouselCard({ onNavigateTab }: { onNavigateTab?: (tab: string, articleId?: string) => void }) {
+  const [announcements, setAnnouncements] = useState<any[]>(() => {
+    try {
+      const cached = safeStorage.getItem('ciya_cached_announcements');
+      return cached ? JSON.parse(cached) : staticAnnouncements;
+    } catch {
+      return staticAnnouncements;
+    }
+  });
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'announcements'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          setAnnouncements(data.items);
+          safeStorage.setItem('ciya_cached_announcements', JSON.stringify(data.items));
+        }
+      }
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (isHovered || announcements.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex(prev => (prev + 1) % announcements.length);
+    }, 7000);
+    return () => clearInterval(interval);
+  }, [isHovered, announcements.length]);
+
+  const handleLinkClick = (e: React.MouseEvent, link: string) => {
+    if (!link) return;
+
+    const trimmed = link.trim().toLowerCase();
+
+    // Check if link is targeting blog/article
+    if (trimmed.includes('/blog') || trimmed === 'blog' || trimmed.startsWith('#blog') || trimmed.includes('blog?')) {
+      e.preventDefault();
+
+      let articleId = '';
+      if (link.includes('?')) {
+        const params = new URLSearchParams(link.split('?')[1]);
+        articleId = params.get('id') || params.get('article') || '';
+      }
+
+      if (articleId) {
+        safeStorage.setItem('ciya_selected_article_id', articleId);
+        window.dispatchEvent(new CustomEvent('ciya_navigate_article', { detail: articleId }));
+      }
+
+      if (onNavigateTab) {
+        onNavigateTab('blog', articleId);
+      } else {
+        window.dispatchEvent(new CustomEvent('ciya_switch_tab', { detail: 'blog' }));
+      }
+      return;
+    }
+
+    // Check if link is targeting courses
+    if (trimmed.includes('/courses') || trimmed === 'courses' || trimmed.startsWith('#courses')) {
+      e.preventDefault();
+      if (onNavigateTab) {
+        onNavigateTab('courses');
+      } else {
+        window.dispatchEvent(new CustomEvent('ciya_switch_tab', { detail: 'courses' }));
+      }
+      return;
+    }
+
+    // Check if link is targeting prompts
+    if (trimmed.includes('/prompts') || trimmed === 'prompts' || trimmed.startsWith('#prompts')) {
+      e.preventDefault();
+      if (onNavigateTab) {
+        onNavigateTab('prompts');
+      } else {
+        window.dispatchEvent(new CustomEvent('ciya_switch_tab', { detail: 'prompts' }));
+      }
+      return;
+    }
+
+    // Relative links or same host
+    if (link.startsWith('/') || link.startsWith('#')) {
+      e.preventDefault();
+      if (link.includes('blog')) {
+        if (onNavigateTab) onNavigateTab('blog');
+        else window.dispatchEvent(new CustomEvent('ciya_switch_tab', { detail: 'blog' }));
+      } else {
+        window.location.href = link;
+      }
+    }
+  };
+
+  return (
+    <div 
+      className="relative overflow-hidden rounded-3xl border border-slate-800 shadow-2xl text-white my-6 text-left"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Sliding Track for Moving Carousel */}
+      <div 
+        className="flex transition-transform duration-700 ease-in-out w-full"
+        style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+      >
+        {announcements.map((ann, idx) => {
+          const bgClass = CAROUSEL_BG_PALETTES[idx % CAROUSEL_BG_PALETTES.length];
+          return (
+            <div 
+              key={ann.id || idx}
+              className={`w-full shrink-0 p-6 sm:p-7 md:p-8 flex flex-col justify-between ${bgClass}`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 min-w-0">
+                  <span className="px-3 py-1.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider shrink-0 self-start sm:self-auto shadow-xs">
+                    📢 {ann.category || 'Announcement'}
+                  </span>
+                  <p className="text-sm sm:text-base md:text-lg font-black text-slate-100 leading-snug">
+                    {ann.title}
+                  </p>
+                </div>
+
+                {ann.link && (
+                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/10">
+                    <a
+                      href={ann.link}
+                      onClick={(e) => handleLinkClick(e, ann.link)}
+                      className="text-xs font-black uppercase tracking-wider text-amber-300 hover:text-white flex items-center gap-1.5 transition-all bg-white/10 hover:bg-white/20 px-4 py-2.5 rounded-xl border border-white/20 shadow-sm cursor-pointer"
+                    >
+                      <span>Read Article →</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Slider Dots Indicator */}
+              {announcements.length > 1 && (
+                <div className="flex items-center justify-center gap-1.5 pt-4 mt-4 border-t border-white/10">
+                  {announcements.map((_, dotIdx) => (
+                    <button
+                      key={dotIdx}
+                      type="button"
+                      onClick={() => setCurrentIndex(dotIdx)}
+                      className={`h-1.5 rounded-full transition-all border-0 cursor-pointer ${
+                        dotIdx === currentIndex ? 'w-6 bg-amber-400' : 'w-1.5 bg-white/30 hover:bg-white/60'
+                      }`}
+                      title={`Slide ${dotIdx + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// COURSE LEVEL FILTER BAR
+// ==========================================
+function CourseLevelFilterBar({
+  courseLevelFilter,
+  setCourseLevelFilter
+}: {
+  courseLevelFilter: 'beginner' | 'advanced';
+  setCourseLevelFilter: (lvl: 'beginner' | 'advanced') => void;
+}) {
+  return (
+    <div className="flex items-center justify-between bg-slate-50 p-2.5 px-4 rounded-xl border border-slate-200/70">
+      <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+        <span>📚</span> Syllabus Level:
+      </span>
+
+      <select
+        value={courseLevelFilter}
+        onChange={(e) => {
+          const val = e.target.value as 'beginner' | 'advanced';
+          setCourseLevelFilter(val);
+          safeStorage.setItem('ciya_course_level_filter', val);
+        }}
+        className="bg-white border border-slate-300 text-xs font-black text-slate-800 rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer uppercase tracking-wider select-none appearance-none pr-7 shadow-xs"
+        style={{
+          backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'right 8px center',
+          backgroundSize: '12px',
+        }}
+      >
+        <option value="beginner">Beginner's Course</option>
+        <option value="advanced">Advance Course</option>
+      </select>
+    </div>
+  );
+}
+
+function CategoryBannerCarousel({
+  courseLevelFilter,
+  setCourseLevelFilter
+}: {
+  activeSkillFilter?: string;
+  setActiveSkillFilter?: (skill: string) => void;
+  courseLevelFilter: 'beginner' | 'advanced';
+  setCourseLevelFilter: (lvl: 'beginner' | 'advanced') => void;
+}) {
+  return (
+    <CourseLevelFilterBar
+      courseLevelFilter={courseLevelFilter}
+      setCourseLevelFilter={setCourseLevelFilter}
+    />
+  );
 }
 
 // ==========================================
@@ -506,13 +734,43 @@ function formatWalkthroughDescription(descText: string) {
   );
 }
 
+// Helper to parse badge expiry timestamp safely across formats
+export function getBadgeExpiryTimestamp(profile: any): number {
+  if (!profile) return 0;
+  let exp = profile.badgeExpiryDate;
+  if (!exp && profile.badgePurchaseDate) {
+    let pDate = profile.badgePurchaseDate;
+    if (typeof pDate === 'object' && pDate !== null && typeof pDate.seconds === 'number') {
+      pDate = pDate.seconds * 1000;
+    } else if (typeof pDate === 'string') {
+      pDate = new Date(pDate).getTime();
+    }
+    exp = (typeof pDate === 'number' && !isNaN(pDate)) ? pDate + 30 * 24 * 60 * 60 * 1000 : 0;
+  }
+  if (!exp) return 0;
+
+  if (typeof exp === 'object' && exp !== null && typeof exp.seconds === 'number') {
+    return exp.seconds * 1000;
+  }
+  if (typeof exp === 'string') {
+    const parsed = new Date(exp).getTime();
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  if (typeof exp === 'number') {
+    return isNaN(exp) ? 0 : exp;
+  }
+  return 0;
+}
+
 // Helper to determine if a user's Year Badge is active and not expired
-export function isBadgeActive(profile: any) {
+export function isBadgeActive(profile: any): boolean {
   if (!profile || !profile.hasYearBadge) return false;
-  const now = Date.now();
-  const expiry = profile.badgeExpiryDate || (profile.badgePurchaseDate ? profile.badgePurchaseDate + 30 * 24 * 60 * 60 * 1000 : 0);
-  if (expiry === 0) return true; // backward compatibility
-  return now <= expiry;
+  if (profile.badgeStatus === 'revoked' || profile.badgeStatus === 'expired' || profile.badgeStatus === 'inactive') {
+    return false;
+  }
+  const expiryTs = getBadgeExpiryTimestamp(profile);
+  if (expiryTs === 0) return false;
+  return Date.now() <= expiryTs;
 }
 
 // Unified day level lock validator helper function
@@ -4036,6 +4294,15 @@ export default function StudentDashboard() {
     }
   });
   const [selectedAssignCourseId, setSelectedAssignCourseId] = useState<string | null>(null);
+  const [leaderboardConfig, setLeaderboardConfig] = useState<any>(() => {
+    try {
+      const cached = safeStorage.getItem('ciya_cached_leaderboard_config');
+      return cached ? JSON.parse(cached) : { allowedCohorts: ['Cohort 3'] };
+    } catch (e) {
+      return { allowedCohorts: ['Cohort 3'] };
+    }
+  });
+  const [selectedLeaderboardCohort, setSelectedLeaderboardCohort] = useState<string>('');
 
   useEffect(() => {
     if (!currentUser) return;
@@ -4398,6 +4665,7 @@ export default function StudentDashboard() {
     let unsubRtdbProfile: (() => void) | null = null;
     // Set up a direct real-time listener on the portal locks settings doc!
     let unsubSettings: (() => void) | null = null;
+    let unsubLeaderboard: (() => void) | null = null;
 
     const startSettingsListener = () => {
       if (unsubSettings) return;
@@ -4411,6 +4679,20 @@ export default function StudentDashboard() {
         }
       }, (error) => {
         console.warn("Soft handling direct real-time settings app listener error:", error);
+      });
+    };
+
+    const startLeaderboardConfigListener = () => {
+      if (unsubLeaderboard) return;
+      unsubLeaderboard = onSnapshot(doc(db, 'settings', 'leaderboard_config'), (snapshot) => {
+        if (!isSubscribed) return;
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setLeaderboardConfig(data);
+          safeStorage.setItem('ciya_cached_leaderboard_config', JSON.stringify(data));
+        }
+      }, (error) => {
+        console.warn("Error in real-time leaderboard config listener:", error);
       });
     };
 
@@ -4529,22 +4811,38 @@ export default function StudentDashboard() {
       });
     };
 
+    let unsubLeaderboardUsers: (() => void) | null = null;
+    const startLeaderboardUsersListener = () => {
+      if (unsubLeaderboardUsers) return;
+      unsubLeaderboardUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+        if (!isSubscribed) return;
+        const list: any[] = [];
+        snapshot.forEach((d) => {
+          list.push({ id: d.id, ...d.data() });
+        });
+        setLeaderboardUsers(list);
+        safeStorage.setItem('ciya_leaderboard_users', JSON.stringify(list));
+        setLeaderboardLoading(false);
+      }, (err) => {
+        console.warn("Error in live leaderboard users listener:", err);
+        setLeaderboardLoading(false);
+      });
+    };
+
     startProfileListener();
     startSettingsListener();
+    startLeaderboardConfigListener();
+    startLeaderboardUsersListener();
 
     return () => {
       isSubscribed = false;
       if (unsubProfile) unsubProfile();
       if (unsubRtdbProfile) unsubRtdbProfile();
       if (unsubSettings) unsubSettings();
+      if (unsubLeaderboard) unsubLeaderboard();
+      if (unsubLeaderboardUsers) unsubLeaderboardUsers();
     };
   }, [currentUser]);
-
-  // Leaderboard loading is deactivated to save database egress per administrator request
-  useEffect(() => {
-    setLeaderboardUsers([]);
-    setLeaderboardLoading(false);
-  }, [currentView]);
 
   const [timeLeft, setTimeLeft] = useState('');
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
@@ -5195,15 +5493,22 @@ export default function StudentDashboard() {
   const isProfileRegisteredForCourse = (profile: any, course: any): boolean => {
     if (!profile || !course) return false;
     
-    // Check if the course is advanced/masterclass (strictly requires explicit progress entry via passcode)
-    const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || (course.level && ['advanced', 'masterclass'].includes(course.level.toLowerCase()));
-    if (isAdv) {
-      return !!(profile.progress && profile.progress[course.id] && profile.progress[course.id].accessStatus !== 'revoked');
-    }
-    
-    // Rule 1: If they have explicit progress for this course, they are registered!
+    // Check if the student has explicit progress entry for this course
     if (profile.progress && profile.progress[course.id] && profile.progress[course.id].accessStatus !== 'revoked') {
       return true;
+    }
+
+    // Check if course ID or title is in registeredCourses array
+    if (Array.isArray(profile.registeredCourses)) {
+      if (profile.registeredCourses.includes(course.id) || profile.registeredCourses.includes(course.title)) {
+        return true;
+      }
+    }
+
+    // Advanced / Masterclass courses require progress or explicit registeredCourses entry
+    const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || (course.level && ['advanced', 'masterclass'].includes(course.level.toLowerCase()));
+    if (isAdv) {
+      return false;
     }
 
     // Or if they have progress for its cloned express version, or selected express track on standard course
@@ -5215,18 +5520,18 @@ export default function StudentDashboard() {
       return true;
     }
 
-    // Rule 2: Exclude cloned courses entirely from matching onboarding selections
+    // Exclude cloned courses entirely from matching onboarding selections
     if (course.isCloned) {
       return false;
     }
 
-    // Rule 3: Fuzzy keyword matching based on onboarding path, course type and pathway selection
+    // Fuzzy keyword matching based on onboarding path, course type and pathway selection
     const courseTitle = (course.title || '').toLowerCase();
     const courseSkillPath = (course.skillPath || '').toLowerCase();
     const courseCategory = (course.category || '').toLowerCase();
 
     const recPath = (profile.recommendedPath || '').toLowerCase();
-    const courseType = (profile.courseType || '').toLowerCase();
+    const courseType = (profile.courseType || profile.course || profile.registeredCourse || profile.selectedCourse || '').toLowerCase();
     const pathwaySel = (profile.pathwaySelection || '').toLowerCase();
 
     // Portfolio Path
@@ -5384,10 +5689,21 @@ export default function StudentDashboard() {
     try {
       const uploadRes = await uploadToCloudinary(file, 'profile_photos', undefined, currentUser?.uid);
       const imageUrl = uploadRes.url;
+      
       setUserProfile((prev: any) => ({
         ...prev,
         photoURL: imageUrl
       }));
+
+      // Automatically persist to Firestore in real-time so they don't have to manually click save
+      if (currentUser?.uid) {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        await updateDoc(doc(db, 'users', currentUser.uid), {
+          photoURL: imageUrl,
+          updatedAt: serverTimestamp()
+        });
+      }
+
       alert("Profile photo uploaded successfully!");
     } catch (err) {
       console.error("Failed to upload profile photo:", err);
@@ -5913,7 +6229,7 @@ export default function StudentDashboard() {
 
       {/* Main Container */}
       <main className={`flex-1 flex flex-col items-stretch h-screen overflow-hidden transition-all duration-500 ${courseLevelFilter === 'advanced' ? 'bg-gradient-to-br from-purple-100/30 via-indigo-50/40 to-fuchsia-100/20' : 'bg-slate-50/50'}`}>
-        <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 sticky top-0 z-10 shadow-sm">
+        <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 sticky top-0 z-40 shadow-sm">
           <div className="flex items-center gap-3">
             <button 
               className="md:hidden text-slate-500 hover:text-slate-700 cursor-pointer bg-transparent border-0" 
@@ -5945,7 +6261,7 @@ export default function StudentDashboard() {
               </div>
             )}
             {!isGuest && (
-              <div className="relative">
+              <div className="relative z-50">
                 <button 
                   onClick={() => setIsNotificationsPopupOpen(!isNotificationsPopupOpen)}
                   className={`p-2.5 rounded-full cursor-pointer transition-all relative border-0 flex items-center justify-center outline-none ${
@@ -5967,12 +6283,12 @@ export default function StudentDashboard() {
                   <>
                     {/* Fixed full-screen transparent click catcher */}
                     <div 
-                      className="fixed inset-0 z-40 bg-transparent cursor-default" 
+                      className="fixed inset-0 z-[100] bg-transparent cursor-default" 
                       onClick={() => setIsNotificationsPopupOpen(false)}
                     />
                     
                     {/* Pop-up dropdown */}
-                    <div className="absolute right-[-70px] xs:right-[-64px] sm:right-0 mt-2.5 w-[280px] xs:w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 py-3.5 z-50 text-left font-sans">
+                    <div className="absolute right-[-70px] xs:right-[-64px] sm:right-0 mt-2.5 w-[280px] xs:w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 py-3.5 z-[101] text-left font-sans">
                       <div className="px-4 pb-2.5 border-b border-slate-100 flex items-center justify-between">
                         <span className="font-extrabold text-slate-800 text-sm">Notifications</span>
                         {unreadNotificationsCount > 0 && (
@@ -6102,382 +6418,485 @@ export default function StudentDashboard() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 md:p-8 max-w-2xl mx-auto shadow-sm">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-black text-slate-800">Profile Settings</h3>
-                {!editingProfile && (
-                  <button 
-                    onClick={() => setEditingProfile(true)}
-                    className="flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-700 font-extrabold bg-teal-50 px-4 py-2 border-0 rounded-full cursor-pointer"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" /> Edit Profile
-                  </button>
-                )}
-              </div>
-              
-              {editingProfile ? (
-                 <form onSubmit={handleProfileSave} className="space-y-4 text-left">
-                     {/* Photo Upload Area */}
-                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
-                       <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-indigo-500 overflow-hidden shrink-0 flex items-center justify-center font-black text-2xl text-slate-700 shadow-sm">
-                         {userProfile.photoURL ? (
-                           <img src={userProfile.photoURL} alt="Profile preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                         ) : (
-                           <span>{userProfile.fullName ? userProfile.fullName[0].toUpperCase() : 'U'}</span>
-                         )}
-                       </div>
-                       <div className="flex-1 space-y-1 text-center sm:text-left">
-                         <label className="block text-[10px] uppercase font-bold text-slate-500">Student Profile Photo</label>
-                         <input
-                           type="file"
-                           accept="image/*"
-                           onChange={handleProfilePhotoChange}
-                           disabled={uploadingProfilePhoto}
-                           id="student-profile-photo-upload-input"
-                           className="hidden"
-                         />
-                         <label
-                           htmlFor="student-profile-photo-upload-input"
-                           className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-black uppercase rounded-lg border border-indigo-200 cursor-pointer text-center inline-block"
-                         >
-                           {uploadingProfilePhoto ? 'Uploading image...' : 'Choose Profile Photo'}
-                         </label>
-                         <p className="text-[9px] text-slate-400 font-semibold">Will be embedded inside your high-fidelity membership badge!</p>
-                       </div>
-                     </div>
-
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-sans">
-                       <div>
-                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Full Name</label>
-                         <input type="text" value={userProfile.fullName || ''} onChange={e => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans" required />
-                       </div>
-                       <div>
-                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">WhatsApp Number</label>
-                         <input type="tel" value={userProfile.whatsapp || ''} onChange={e => setUserProfile({...userProfile, whatsapp: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
-                       </div>
-                     </div>
-                     <div className="text-xs">
-                       <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">State</label>
-                       <input type="text" value={userProfile.state || ''} onChange={e => setUserProfile({...userProfile, state: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
-                     </div>
-                     <div className="text-xs">
-                       <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Your Primary Goal</label>
-                       <textarea value={userProfile.goal || ''} onChange={e => setUserProfile({...userProfile, goal: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-medium leading-relaxed min-h-[100px] focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
-                     </div>
-                     <div className="flex gap-3 pt-2 text-xs">
-                       <button type="submit" disabled={profileSaving} className="flex-1 bg-teal-600 text-white font-extrabold py-3 border-0 rounded-xl hover:bg-teal-700 cursor-pointer flex items-center justify-center gap-1.5 shadow-md">
-                         {profileSaving ? 'Saving...' : <><Save className="w-4 h-4"/> Save Changes</>}
-                       </button>
-                       <button type="button" onClick={() => setEditingProfile(false)} disabled={profileSaving} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 border-0 rounded-xl hover:bg-slate-200 cursor-pointer">
-                         Cancel
-                       </button>
-                     </div>
-                  </form>
-              ) : (
-                <div className="space-y-6 text-xs md:text-sm text-left font-sans">
-                  
-                  {/* Photo & Basic details header */}
-                  <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                    <div className="w-20 h-20 rounded-full border-2 border-indigo-500 bg-slate-150 shrink-0 overflow-hidden flex items-center justify-center text-slate-700 text-2xl font-black shadow-sm">
-                      {userProfile.photoURL ? (
-                        <img src={userProfile.photoURL} alt="Profile photo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        <span>{userProfile.fullName ? userProfile.fullName[0].toUpperCase() : 'U'}</span>
-                      )}
-                    </div>
-                    <div className="space-y-1 text-center sm:text-left">
-                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                        <h4 className="text-lg font-black text-slate-900 uppercase leading-none">{userProfile.fullName || 'Anonymous Student'}</h4>
-                        {isBadgeActive(userProfile) ? (
-                          <span className="inline-block bg-indigo-600 text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">CIYA Student Pro</span>
-                        ) : (
-                          <span className="inline-block bg-rose-100 text-rose-800 border border-rose-200 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">
-                            {userProfile.hasYearBadge ? 'Membership Expired' : 'Free Tier'}
-                          </span>
-                        )}
+              <div className="max-w-4xl mx-auto space-y-6 text-left font-sans my-4">
+                
+                {/* CARD 1: PERSONAL PROFILE INFORMATION */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                        <UserIcon className="w-5 h-5" />
                       </div>
-                      <p className="text-xs text-slate-500 font-mono font-bold">{userProfile.email || currentUser?.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">Full Name</p>
-                      <p className="text-slate-800 font-extrabold text-base">{userProfile.fullName || 'Not provided'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">WhatsApp</p>
-                      <p className="text-slate-800 font-extrabold text-base font-mono">{userProfile.whatsapp || 'Not provided'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">State</p>
-                      <p className="text-slate-800 font-bold">{userProfile.state || 'Not provided'}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">Email</p>
-                      <p className="text-slate-800 font-mono font-semibold">{userProfile.email || currentUser?.email}</p>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">My Learning Goal</p>
-                      <p className="text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-lg border italic mt-1 font-medium">{userProfile.goal || 'Not provided'}</p>
-                    </div>
-                  </div>
-
-                  {/* CIYA Membership Badge Section */}
-                  <div className="sm:col-span-2 pt-6 border-t border-slate-100 text-left">
-                    <div className="flex items-center gap-2.5 mb-4">
-                      <Award className="w-5 h-5 text-indigo-600" />
                       <div>
-                        <h3 className="font-extrabold text-slate-800 text-xs tracking-tight uppercase tracking-wider text-indigo-750">Official CIYA Pro Student Badge</h3>
-                        <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-                          Your active 30-day membership badge within the CIYA Ecosystem.
-                        </p>
+                        <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Personal Profile Information</h3>
+                        <p className="text-xs text-slate-500 font-medium">Manage your contact details, location, and primary learning goal.</p>
                       </div>
                     </div>
-
-                    {userProfile.hasYearBadge ? (
-                      <div className="space-y-4">
-                        {/* Membership start and end countdown alert banner */}
-                        {(() => {
-                          const now = Date.now();
-                          const expiry = userProfile.badgeExpiryDate || (userProfile.badgePurchaseDate ? userProfile.badgePurchaseDate + 30 * 24 * 60 * 60 * 1000 : 0);
-                          const isExpired = now > expiry;
-                          const daysLeft = Math.ceil((expiry - now) / (24 * 60 * 60 * 1000));
-                          
-                          if (isExpired) {
-                            return (
-                              <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-semibold leading-relaxed space-y-3">
-                                <p>
-                                  ⚠️ <strong>Membership Expired:</strong> Your CIYA Membership ended. Please contact your administrator or purchase a new 30-day membership badge to reactivate your credentials.
-                                </p>
-                                <button
-                                  type="button"
-                                  onClick={() => setShowDashboardBadgePaymentModal(true)}
-                                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl cursor-pointer border-0 shadow-sm transition-all flex items-center gap-1.5"
-                                >
-                                  🏷️ Renew Badge Membership
-                                </button>
-                              </div>
-                            );
-                          } else if (daysLeft <= 3) {
-                            return (
-                              <div className="p-4 bg-amber-50 border border-amber-200 text-amber-850 rounded-2xl text-xs font-semibold leading-relaxed animate-pulse">
-                                ⏰ <strong>Near Expiry Alert:</strong> Your premium "CIYA Student Pro" membership status is going to end soon in <strong>{daysLeft} days</strong> (on {new Date(expiry).toLocaleDateString()}). Please renew in advance to avoid access interruption!
-                              </div>
-                            );
-                          } else {
-                            return (
-                              <div className="p-4 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-2xl text-xs font-semibold leading-relaxed">
-                                ✓ <strong>Active Pro Student Member:</strong> Your premium CIYA Student Pro membership is active. You have <strong>{daysLeft} days remaining</strong> (expires on {new Date(expiry).toLocaleDateString()}).
-                              </div>
-                            );
-                          }
-                        })()}
-
-                        {/* Interactive Badge Canvas */}
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner gap-4">
-                          <div className="w-full max-w-[390px] bg-white p-4 rounded-2xl border border-slate-150 flex flex-col sm:flex-row items-center gap-4 shadow-sm text-left">
-                            <div className="w-12 h-12 rounded-full border border-amber-500 overflow-hidden bg-slate-100 flex items-center justify-center font-extrabold text-amber-600 shrink-0 shadow-sm">
-                              {userProfile.photoURL ? (
-                                <img src={userProfile.photoURL} alt="Badge Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                              ) : (
-                                <span className="text-sm">📷</span>
-                              )}
-                            </div>
-                            <div className="flex-1 text-center sm:text-left">
-                              <h5 className="font-extrabold text-slate-805 text-xs uppercase tracking-wide">Personalize Your CIYA Badge</h5>
-                              <p className="text-[10px] text-slate-500 font-semibold mb-2">Upload your photo to embed it directly into the badge before downloading.</p>
-                              
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleProfilePhotoChange}
-                                disabled={uploadingProfilePhoto}
-                                id="student-badge-photo-upload-input"
-                                className="hidden"
-                              />
-                              <label
-                                htmlFor="student-badge-photo-upload-input"
-                                className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-black uppercase rounded-lg border border-amber-200 cursor-pointer inline-flex items-center gap-1 transition-all select-none"
-                              >
-                                {uploadingProfilePhoto ? 'Uploading Photo...' : 'Upload Badge Photo'}
-                              </label>
-                            </div>
-                          </div>
-
-                          <CIYAMembershipBadge 
-                            data={{
-                              fullName: userProfile.fullName || 'CIYA Student',
-                              email: userProfile.email || currentUser?.email || 'student@example.com',
-                              courseName: 'Advanced Website Development',
-                              membershipId: userProfile.membershipId || 'CIYA-PRO-2026-XXXX',
-                              expiryDate: userProfile.badgeExpiryDate 
-                                ? new Date(userProfile.badgeExpiryDate).toISOString() 
-                                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                              photoURL: userProfile.photoURL || ''
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-5 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-center space-y-3">
-                        <span className="text-3xl block">🔒</span>
-                        <h4 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">No Active Badge Found</h4>
-                        <p className="text-xs text-slate-500 font-semibold leading-relaxed max-w-md mx-auto">
-                          You do not currently have an active 30-day CIYA Membership Badge. Upgrade to "CIYA Student Pro" to unlock benefits and display your verified credentials.
-                        </p>
-                      </div>
+                    {!editingProfile && (
+                      <button 
+                        type="button"
+                        onClick={() => setEditingProfile(true)}
+                        className="flex items-center gap-1.5 text-xs text-indigo-700 hover:text-indigo-800 font-extrabold bg-indigo-50 hover:bg-indigo-100 px-4 py-2 border border-indigo-200/80 rounded-xl cursor-pointer transition-all shrink-0 self-start sm:self-auto"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Edit Profile
+                      </button>
                     )}
                   </div>
                   
-                  <div className="sm:col-span-2 pt-6 border-t border-slate-100">
+                  {editingProfile ? (
+                    <form onSubmit={handleProfileSave} className="space-y-4 text-left">
+                      {/* Photo Upload Area */}
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
+                        <div className="w-20 h-20 rounded-full bg-slate-100 border-2 border-indigo-500 overflow-hidden shrink-0 flex items-center justify-center font-black text-2xl text-slate-700 shadow-sm">
+                          {userProfile.photoURL ? (
+                            <img src={userProfile.photoURL} alt="Profile preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span>{userProfile.fullName ? userProfile.fullName[0].toUpperCase() : 'U'}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 space-y-1 text-center sm:text-left">
+                          <label className="block text-[10px] uppercase font-bold text-slate-500">Student Profile Photo</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleProfilePhotoChange}
+                            disabled={uploadingProfilePhoto}
+                            id="student-profile-photo-upload-input"
+                            className="hidden"
+                          />
+                          <label
+                            htmlFor="student-profile-photo-upload-input"
+                            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-black uppercase rounded-lg border border-indigo-200 cursor-pointer text-center inline-block"
+                          >
+                            {uploadingProfilePhoto ? 'Uploading image...' : 'Choose Profile Photo'}
+                          </label>
+                          <p className="text-[9px] text-slate-400 font-semibold">Will be embedded inside your high-fidelity membership badge!</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-sans">
+                        <div>
+                          <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Full Name</label>
+                          <input type="text" value={userProfile.fullName || ''} onChange={e => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans" required />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">WhatsApp Number</label>
+                          <input type="tel" value={userProfile.whatsapp || ''} onChange={e => setUserProfile({...userProfile, whatsapp: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
+                        </div>
+                      </div>
+                      <div className="text-xs">
+                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">State</label>
+                        <input type="text" value={userProfile.state || ''} onChange={e => setUserProfile({...userProfile, state: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
+                      </div>
+                      <div className="text-xs">
+                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Your Primary Goal</label>
+                        <textarea value={userProfile.goal || ''} onChange={e => setUserProfile({...userProfile, goal: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-medium leading-relaxed min-h-[100px] focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
+                      </div>
+                      <div className="flex gap-3 pt-2 text-xs">
+                        <button type="submit" disabled={profileSaving} className="flex-1 bg-teal-600 text-white font-extrabold py-3 border-0 rounded-xl hover:bg-teal-700 cursor-pointer flex items-center justify-center gap-1.5 shadow-md">
+                          {profileSaving ? 'Saving...' : <><Save className="w-4 h-4"/> Save Changes</>}
+                        </button>
+                        <button type="button" onClick={() => setEditingProfile(false)} disabled={profileSaving} className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 border-0 rounded-xl hover:bg-slate-200 cursor-pointer">
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="space-y-6 text-xs md:text-sm text-left font-sans">
+                      {/* Photo & Basic details header */}
+                      <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                        <div className="w-20 h-20 rounded-full border-2 border-indigo-500 bg-slate-150 shrink-0 overflow-hidden flex items-center justify-center text-slate-700 text-2xl font-black shadow-sm relative group cursor-pointer" title="Click badge template to upload custom photo">
+                          {userProfile.photoURL ? (
+                            <img src={userProfile.photoURL} alt="Profile photo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span>{userProfile.fullName ? userProfile.fullName[0].toUpperCase() : 'U'}</span>
+                          )}
+                        </div>
+                        <div className="space-y-1 text-center sm:text-left">
+                          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                            <h4 className="text-lg font-black text-slate-900 uppercase leading-none">{userProfile.fullName || 'Anonymous Student'}</h4>
+                            {isBadgeActive(userProfile) ? (
+                              <span className="inline-block bg-indigo-600 text-white text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">CIYA Student Pro</span>
+                            ) : (
+                              <span className="inline-block bg-slate-100 text-slate-700 border border-slate-300 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider">
+                                Basic Student
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 font-mono font-bold">{userProfile.email || currentUser?.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                          <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">Full Name</p>
+                          <p className="text-slate-800 font-extrabold text-base">{userProfile.fullName || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">WhatsApp</p>
+                          <p className="text-slate-800 font-extrabold text-base font-mono">{userProfile.whatsapp || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">State</p>
+                          <p className="text-slate-800 font-bold">{userProfile.state || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">Email</p>
+                          <p className="text-slate-800 font-mono font-semibold">{userProfile.email || currentUser?.email}</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <p className="text-slate-400 font-bold text-[10px] uppercase mb-0.5">My Primary Learning Goal</p>
+                          <p className="text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 italic mt-1 font-medium">{userProfile.goal || 'Not provided'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* CARD 2: REGISTERED COURSES & ACTIVE LEARNING */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800">
+                  <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 shrink-0">
+                      <BookOpen className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Registered Courses & Active Learning</h3>
+                      <p className="text-xs text-slate-500 font-medium">All course pathways you have registered for and are actively pursuing.</p>
+                    </div>
+                  </div>
+
+                  {registeredCoursesList && registeredCoursesList.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {registeredCoursesList.map((course, idx) => {
+                        const courseId = course.id || '';
+                        const isSelected = selectedCourseId === courseId || (!selectedCourseId && idx === 0);
+                        const progressObj = userProfile.progress?.[courseId] || {};
+                        const completedCount = progressObj.completedVideos ? Object.keys(progressObj.completedVideos).length : 0;
+                        const totalLessons = course.days ? course.days.reduce((acc: number, d: any) => acc + (d.videos?.length || 0), 0) : 0;
+                        const pct = totalLessons > 0 ? Math.min(100, Math.round((completedCount / totalLessons) * 100)) : 0;
+                        const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced';
+
+                        return (
+                          <div 
+                            key={courseId}
+                            className={`p-5 rounded-2xl border transition-all text-left flex flex-col justify-between gap-4 ${
+                              isSelected 
+                                ? 'border-teal-500 bg-teal-50/20 shadow-sm ring-1 ring-teal-500/30' 
+                                : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                                  isAdv ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-slate-200 text-slate-700'
+                                }`}>
+                                  {isAdv ? 'Advanced Course' : "Beginner's Course"}
+                                </span>
+                                
+                                {isSelected && (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[9px] font-black uppercase tracking-wider animate-pulse">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Actively Studying
+                                  </span>
+                                )}
+                              </div>
+
+                              <h4 className="font-extrabold text-sm text-slate-900 leading-snug">{course.title}</h4>
+                              <p className="text-xs text-slate-500 line-clamp-2">{course.subtitle || course.description}</p>
+                            </div>
+
+                            <div className="space-y-3 pt-2 border-t border-slate-200/60">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                                <span>Progress ({pct}%)</span>
+                                <span>{completedCount}/{totalLessons} Lessons</span>
+                              </div>
+                              <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                                <div className="h-full bg-teal-600 rounded-full transition-all duration-500" style={{ width: `${pct}%` }}></div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCourseId(courseId);
+                                  setCurrentView('courses');
+                                }}
+                                className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all shadow-sm flex items-center justify-center gap-1.5"
+                              >
+                                Study Course →
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl space-y-3">
+                      <span className="text-3xl block">📚</span>
+                      <h4 className="font-black text-slate-800 text-sm uppercase">No Registered Courses Found</h4>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto">You haven't registered for any course pathway yet. Explore our curriculum to get started!</p>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentView('courses')}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase rounded-xl cursor-pointer transition-all"
+                      >
+                        Browse Available Courses
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* CARD 3: CIYA PRO MEMBERSHIP & OFFICIAL BADGE */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800">
+                  <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                      <Award className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">CIYA Pro Membership & Official Badge</h3>
+                      <p className="text-xs text-slate-500 font-medium">Your verified 30-day membership badge within the CIYA Ecosystem.</p>
+                    </div>
+                  </div>
+
+                  {isBadgeActive(userProfile) ? (
+                    <div className="space-y-4">
+                      {/* Membership status countdown alert banner */}
+                      {(() => {
+                        const now = Date.now();
+                        const expiry = getBadgeExpiryTimestamp(userProfile);
+                        const daysLeft = expiry > 0 ? Math.ceil((expiry - now) / (24 * 60 * 60 * 1000)) : 0;
+                        const dateString = expiry > 0 ? new Date(expiry).toLocaleDateString() : '2026';
+                        
+                        if (daysLeft <= 0) {
+                          return (
+                            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-semibold leading-relaxed space-y-3">
+                              <p>
+                                ⚠️ <strong>Membership Expired:</strong> Your CIYA Membership ended on {dateString}. Please contact your administrator or purchase a new 30-day membership badge to reactivate your credentials.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => setShowDashboardBadgePaymentModal(true)}
+                                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer border-0 shadow-sm transition-all flex items-center gap-1.5"
+                              >
+                                🏷️ Renew Badge Membership
+                              </button>
+                            </div>
+                          );
+                        } else if (daysLeft <= 3) {
+                          return (
+                            <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs font-semibold leading-relaxed animate-pulse">
+                              ⏰ <strong>Near Expiry Alert:</strong> Your premium "CIYA Student Pro" membership status is going to end soon in <strong>{daysLeft} days</strong> (on {dateString}). Please renew in advance to avoid access interruption!
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs font-semibold leading-relaxed">
+                              ✓ <strong>Active Pro Student Member:</strong> Your premium CIYA Student Pro membership is active. You have <strong>{daysLeft} days remaining</strong> (expires on {dateString}).
+                            </div>
+                          );
+                        }
+                      })()}
+
+                      {/* Interactive Badge Canvas with embedded click-to-upload circular photo frame */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center shadow-inner gap-4">
+                        <p className="text-xs text-slate-500 font-bold text-center">
+                          💡 <em>Tip: Click the circular photo logo directly on the badge template to upload your custom photo!</em>
+                        </p>
+                        
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleProfilePhotoChange}
+                          disabled={uploadingProfilePhoto}
+                          id="student-badge-photo-upload-input"
+                          className="hidden"
+                        />
+
+                        <CIYAMembershipBadge 
+                          data={{
+                            fullName: userProfile.fullName || 'CIYA Student',
+                            email: userProfile.email || currentUser?.email || 'student@example.com',
+                            courseName: 'Advanced Website Development',
+                            membershipId: userProfile.membershipId || 'CIYA-PRO-2026-XXXX',
+                            expiryDate: (() => {
+                              const ts = getBadgeExpiryTimestamp(userProfile);
+                              if (ts > 0) return new Date(ts).toISOString();
+                              return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+                            })(),
+                            photoURL: userProfile.photoURL || ''
+                          }}
+                          onPhotoUpload={() => {
+                            const input = document.getElementById('student-badge-photo-upload-input');
+                            if (input) input.click();
+                          }}
+                          uploadingPhoto={uploadingProfilePhoto}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-center space-y-3">
+                      <span className="text-3xl block">🔒</span>
+                      <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">No Active Badge Found</h4>
+                      <p className="text-xs text-slate-500 font-semibold leading-relaxed max-w-md mx-auto">
+                        You do not currently have an active 30-day CIYA Membership Badge. Upgrade to "CIYA Student Pro" to unlock benefits and display your verified credentials.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowDashboardBadgePaymentModal(true)}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase rounded-xl cursor-pointer transition-all"
+                      >
+                        🏷️ Purchase Badge Membership
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* CARD 4: COURSE QUIZ SCORESHEETS & ASSIGNMENT SUBMISSIONS */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800">
+                  <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Course Quiz Scoresheets & Submissions</h3>
+                      <p className="text-xs text-slate-500 font-medium">Your verified first-attempt quiz scores and assignment submission records.</p>
+                    </div>
+                  </div>
+
+                  {/* Student Submission details card */}
+                  <div className="mb-6">
                     <SubmissionDetailsCard profile={userProfile} />
                   </div>
 
                   {/* Quizzes and Checks Score Sheet */}
-                  <div className="sm:col-span-2 pt-6 border-t border-slate-100 text-left">
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-lg">📊</span>
-                      <div>
-                        <h3 className="font-extrabold text-slate-805 text-xs tracking-tight uppercase tracking-wider text-indigo-700">Course Quizzes Score Sheet</h3>
-                        <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-                          Your first-attempt scores are securely locked in your profile to preserve leaderboard integrity.
-                        </p>
-                      </div>
-                    </div>
+                  {registeredCoursesList.some(c => userProfile.progress?.[c.id || '']?.quizScores) ? (
+                    <div className="space-y-4">
+                      {registeredCoursesList.map(course => {
+                        const courseId = course.id || '';
+                        const cScores = userProfile.progress?.[courseId]?.quizScores || {};
+                        if (Object.keys(cScores).length === 0) return null;
 
-                    {registeredCoursesList.some(c => userProfile.progress?.[c.id || '']?.quizScores) ? (
-                      <div className="space-y-4">
-                        {registeredCoursesList.map(course => {
-                          const courseId = course.id || '';
-                          const cScores = userProfile.progress?.[courseId]?.quizScores || {};
-                          if (Object.keys(cScores).length === 0) return null;
+                        return (
+                          <div key={courseId} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left">
+                            <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 mb-3">
+                              <span className="font-extrabold text-xs text-slate-900">📚 {course.title}</span>
+                            </div>
 
-                          return (
-                            <div key={courseId} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left">
-                              <div className="flex items-center justify-between border-b pb-2 mb-3">
-                                <span className="font-extrabold text-xs text-slate-900">📚 {course.title}</span>
-                              </div>
+                            <div className="space-y-2.5">
+                              {course.days.map((day, dIdx) => {
+                                const quizzes = (day.videos || []).filter(v => v.checkType && v.checkType !== 'none');
+                                if (quizzes.length === 0) return null; // Skip days with no quizzes
 
-                              <div className="space-y-2.5">
-                                {course.days.map((day, dIdx) => {
-                                  const quizzes = (day.videos || []).filter(v => v.checkType && v.checkType !== 'none');
-                                  if (quizzes.length === 0) return null; // Skip days with no quizzes
+                                const isExpanded = !!expandedDays[`${courseId}-${dIdx}`];
+                                
+                                const dayScores = quizzes.map((q) => {
+                                  const vIdx = (day.videos || []).findIndex(v => v.id === q.id);
+                                  const scoreKey = `${dIdx}-${vIdx}`;
+                                  const scoreRecord = cScores[scoreKey];
+                                  return {
+                                    video: q,
+                                    scoreRecord,
+                                    vIdx
+                                  };
+                                });
 
-                                  const isExpanded = !!expandedDays[`${courseId}-${dIdx}`];
-                                  
-                                  const dayScores = quizzes.map((q) => {
-                                    const vIdx = (day.videos || []).findIndex(v => v.id === q.id);
-                                    const scoreKey = `${dIdx}-${vIdx}`;
-                                    const scoreRecord = cScores[scoreKey];
-                                    return {
-                                      video: q,
-                                      scoreRecord,
-                                      vIdx
-                                    };
-                                  });
+                                const attemptedCount = dayScores.filter(item => item.scoreRecord).length;
+                                const passedCount = dayScores.filter(item => item.scoreRecord?.passed).length;
+                                
+                                const totalScoreSum = dayScores.reduce((sum, item) => sum + (item.scoreRecord?.score || 0), 0);
+                                const avgScore = attemptedCount > 0 ? Math.round(totalScoreSum / attemptedCount) : null;
 
-                                  const attemptedCount = dayScores.filter(item => item.scoreRecord).length;
-                                  const passedCount = dayScores.filter(item => item.scoreRecord?.passed).length;
-                                  
-                                  const totalScoreSum = dayScores.reduce((sum, item) => sum + (item.scoreRecord?.score || 0), 0);
-                                  const avgScore = attemptedCount > 0 ? Math.round(totalScoreSum / attemptedCount) : null;
+                                return (
+                                  <div key={dIdx} className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-xs">
+                                    {/* Accordion Header */}
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedDays(prev => ({
+                                        ...prev,
+                                        [`${courseId}-${dIdx}`]: !prev[`${courseId}-${dIdx}`]
+                                      }))}
+                                      className="w-full flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 transition-all text-left border-0 cursor-pointer outline-none"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-xs font-black text-slate-800">
+                                          Day {dIdx + 1}: {day.title}
+                                        </span>
+                                        <span className="text-[10px] bg-indigo-50 text-indigo-700 font-extrabold px-2 py-0.5 rounded-full">
+                                          {quizzes.length} {quizzes.length === 1 ? 'Quiz' : 'Quizzes'}
+                                        </span>
+                                      </div>
 
-                                  return (
-                                    <div key={dIdx} className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-sm">
-                                      {/* Accordion Header */}
-                                      <button
-                                        type="button"
-                                        onClick={() => setExpandedDays(prev => ({
-                                          ...prev,
-                                          [`${courseId}-${dIdx}`]: !prev[`${courseId}-${dIdx}`]
-                                        }))}
-                                        className="w-full flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 transition-all text-left border-0 cursor-pointer outline-none"
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <span className="text-xs font-black text-slate-800">
-                                            Day {dIdx + 1}: {day.title}
+                                      <div className="flex items-center gap-2.5">
+                                        {attemptedCount > 0 && (
+                                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                            passedCount === quizzes.length 
+                                              ? 'bg-emerald-50 text-emerald-700' 
+                                              : 'bg-amber-50 text-amber-700'
+                                          }`}>
+                                            {passedCount}/{quizzes.length} Cleared {avgScore !== null && `(Avg: ${avgScore}%)`}
                                           </span>
-                                          <span className="text-[10px] bg-indigo-50 text-indigo-700 font-extrabold px-2 py-0.5 rounded-full">
-                                            {quizzes.length} {quizzes.length === 1 ? 'Quiz' : 'Quizzes'}
-                                          </span>
-                                        </div>
+                                        )}
+                                        <span className="text-slate-400 text-xs font-black">
+                                          {isExpanded ? '▲' : '▼'}
+                                        </span>
+                                      </div>
+                                    </button>
 
-                                        <div className="flex items-center gap-2.5">
-                                          {attemptedCount > 0 && (
-                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                                              passedCount === quizzes.length 
-                                                ? 'bg-emerald-50 text-emerald-700' 
-                                                : 'bg-amber-50 text-amber-700'
-                                            }`}>
-                                              {passedCount}/{quizzes.length} Cleared {avgScore !== null && `(Avg: ${avgScore}%)`}
-                                            </span>
-                                          )}
-                                          <span className="text-slate-400 text-xs font-black">
-                                            {isExpanded ? '▲' : '▼'}
-                                          </span>
-                                        </div>
-                                      </button>
+                                    {/* Accordion Content */}
+                                    {isExpanded && (
+                                      <div className="p-3 divide-y divide-slate-100 bg-white border-t border-slate-100">
+                                        {dayScores.map(({ video, scoreRecord, vIdx }, idx) => {
+                                          const hasRecord = !!scoreRecord;
+                                          const score = scoreRecord?.score;
+                                          const passed = scoreRecord?.passed;
 
-                                      {/* Accordion Content */}
-                                      {isExpanded && (
-                                        <div className="p-3 divide-y divide-slate-100 bg-white border-t border-slate-100">
-                                          {dayScores.map(({ video, scoreRecord, vIdx }, idx) => {
-                                            const hasRecord = !!scoreRecord;
-                                            const score = scoreRecord?.score;
-                                            const passed = scoreRecord?.passed;
-
-                                            return (
-                                              <div key={idx} className="py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
-                                                <div className="flex items-start gap-2.5 max-w-sm">
-                                                  <span className="text-slate-400 font-black font-mono shrink-0 mt-0.5">L{vIdx + 1}</span>
-                                                  <div>
-                                                    <p className="font-extrabold text-slate-900 leading-tight">{video.title}</p>
-                                                    <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">First attempted: {scoreRecord?.answeredAt || 'Never'}</p>
-                                                  </div>
-                                                </div>
-
-                                                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-                                                  <div className="text-right">
-                                                    <span className="text-[10px] uppercase font-bold text-slate-400 block">First Attempt Score</span>
-                                                    <span className={`font-black font-mono text-sm ${hasRecord ? 'text-slate-900' : 'text-slate-400'}`}>
-                                                      {hasRecord ? `${score}%` : '—'}
-                                                    </span>
-                                                  </div>
-
-                                                  <span className={`px-2 py-1 rounded text-[9px] font-black tracking-wide border ${
-                                                    !hasRecord 
-                                                      ? 'bg-slate-50 text-slate-400 border-slate-200' 
-                                                      : passed 
-                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                                        : 'bg-rose-50 text-rose-700 border-rose-200'
-                                                  }`}>
-                                                    {!hasRecord ? 'NOT ATTEMPTED' : passed ? 'PASSED' : 'RETAKE NEEDED'}
-                                                  </span>
+                                          return (
+                                            <div key={idx} className="py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+                                              <div className="flex items-start gap-2.5 max-w-sm">
+                                                <span className="text-slate-400 font-black font-mono shrink-0 mt-0.5">L{vIdx + 1}</span>
+                                                <div>
+                                                  <p className="font-extrabold text-slate-900 leading-tight">{video.title}</p>
+                                                  <p className="text-[10px] text-slate-400 mt-0.5 font-semibold">First attempted: {scoreRecord?.answeredAt || 'Never'}</p>
                                                 </div>
                                               </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
+
+                                              <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                                                <div className="text-right">
+                                                  <span className="text-[10px] uppercase font-bold text-slate-400 block">First Attempt Score</span>
+                                                  <span className={`font-black font-mono text-sm ${hasRecord ? 'text-slate-900' : 'text-slate-400'}`}>
+                                                    {hasRecord ? `${score}%` : '—'}
+                                                  </span>
+                                                </div>
+
+                                                <span className={`px-2 py-1 rounded text-[9px] font-black tracking-wide border ${
+                                                  !hasRecord 
+                                                    ? 'bg-slate-50 text-slate-400 border-slate-200' 
+                                                    : passed 
+                                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                                                }`}>
+                                                  {!hasRecord ? 'NOT ATTEMPTED' : passed ? 'PASSED' : 'RETAKE NEEDED'}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-center p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl">
-                        <span className="text-2xl block mb-1">📋</span>
-                        <p className="text-xs text-slate-400 font-semibold leading-relaxed">No quiz or knowledge checks submitted on your profile yet. Answer checks inside lessons to view your reports!</p>
-                      </div>
-                    )}
-                  </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl">
+                      <span className="text-2xl block mb-1">📋</span>
+                      <p className="text-xs text-slate-400 font-semibold leading-relaxed">No quiz or knowledge checks submitted on your profile yet. Answer checks inside lessons to view your reports!</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
             )
           ) : currentView === 'notifications' ? (
             (!isAdmin && appSettings?.lockedSections?.notifications) ? (
@@ -6833,20 +7252,18 @@ export default function StudentDashboard() {
                                     }
                                     files.slice(0, slots).forEach(async (file) => {
                                       setUploadingImage(true);
-                                      showToast(`Uploading ${file.name} to backend storage...`);
+                                      showToast(`Compressing & uploading ${file.name} to Cloudinary...`);
                                       try {
-                                        const publicUrl = await uploadToSupabaseStorage(file, 'assignments', registeredCourse?.id, currentUser?.uid);
-                                        setUploadedImages(prev => [...prev, publicUrl]);
-                                        showToast(`Successfully uploaded ${file.name}!`);
-                                      } catch (err) {
-                                        console.warn("Supabase Storage upload failed, falling back to base64:", err);
-                                        const reader = new FileReader();
-                                        reader.onloadend = () => {
-                                          if (typeof reader.result === 'string') {
-                                            setUploadedImages(prev => [...prev, reader.result as string]);
-                                          }
-                                        };
-                                        reader.readAsDataURL(file);
+                                        const res = await uploadToCloudinary(file, 'ciya_assignments', registeredCourse?.id, currentUser?.uid);
+                                        if (res && res.url) {
+                                          setUploadedImages(prev => [...prev, res.url]);
+                                          showToast(`Successfully uploaded ${file.name} to Cloudinary!`);
+                                        } else {
+                                          showToast(`Failed to upload ${file.name}.`);
+                                        }
+                                      } catch (err: any) {
+                                        console.error("Cloudinary submission image upload error:", err);
+                                        showToast(`Error uploading ${file.name}: ${err?.message || 'Upload failed'}`);
                                       } finally {
                                         setUploadingImage(false);
                                       }
@@ -6874,20 +7291,18 @@ export default function StudentDashboard() {
                                         }
                                         files.slice(0, slots).forEach(async (file) => {
                                           setUploadingImage(true);
-                                          showToast(`Uploading ${file.name} to backend storage...`);
+                                          showToast(`Compressing & uploading ${file.name} to Cloudinary...`);
                                           try {
-                                            const publicUrl = await uploadToSupabaseStorage(file, 'assignments', registeredCourse?.id, currentUser?.uid);
-                                            setUploadedImages(prev => [...prev, publicUrl]);
-                                            showToast(`Successfully uploaded ${file.name}!`);
-                                          } catch (err) {
-                                            console.warn("Supabase Storage upload failed, falling back to base64:", err);
-                                            const reader = new FileReader();
-                                            reader.onloadend = () => {
-                                              if (typeof reader.result === 'string') {
-                                                setUploadedImages(prev => [...prev, reader.result as string]);
-                                              }
-                                            };
-                                            reader.readAsDataURL(file);
+                                            const res = await uploadToCloudinary(file, 'ciya_assignments', registeredCourse?.id, currentUser?.uid);
+                                            if (res && res.url) {
+                                              setUploadedImages(prev => [...prev, res.url]);
+                                              showToast(`Successfully uploaded ${file.name} to Cloudinary!`);
+                                            } else {
+                                              showToast(`Failed to upload ${file.name}.`);
+                                            }
+                                          } catch (err: any) {
+                                            console.error("Cloudinary submission image upload error:", err);
+                                            showToast(`Error uploading ${file.name}: ${err?.message || 'Upload failed'}`);
                                           } finally {
                                             setUploadingImage(false);
                                           }
@@ -7120,46 +7535,13 @@ export default function StudentDashboard() {
                   )}
 
                   <div className="space-y-4 text-left">
-                    <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200/60">
-                      <div className="flex flex-wrap gap-2 items-center">
-                        {Object.entries(SKILLS).map(([k, v]) => (
-                          <button
-                            key={k}
-                            onClick={() => setActiveSkillFilter(k)}
-                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                              activeSkillFilter === k
-                                ? "border-teal-600 bg-teal-50 text-teal-700 font-extrabold"
-                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-                            }`}
-                          >
-                            {v.icon} {v.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Course Level Filter Dropdown */}
-                      <div className="flex items-center gap-3 bg-white border border-slate-200/80 rounded-xl px-3 py-1.5 shadow-sm shrink-0 w-full sm:w-auto justify-between sm:justify-start">
-                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Level:</span>
-                        <select
-                          value={courseLevelFilter}
-                          onChange={(e) => {
-                            const val = e.target.value as 'beginner' | 'advanced';
-                            setCourseLevelFilter(val);
-                            safeStorage.setItem('ciya_course_level_filter', val);
-                          }}
-                          className="bg-transparent border-0 text-xs font-black text-slate-700 focus:ring-0 focus:outline-none cursor-pointer uppercase tracking-wider text-right sm:text-left select-none appearance-none pr-6"
-                          style={{
-                            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                            backgroundRepeat: 'no-repeat',
-                            backgroundPosition: 'right center',
-                            backgroundSize: '12px',
-                          }}
-                        >
-                          <option value="beginner">Beginner's Course</option>
-                          <option value="advanced">Advance Course</option>
-                        </select>
-                      </div>
-                    </div>
+                    {/* Category Banner Carousel for AI Website, AI Video, and AI Image & Graphics */}
+                    <CategoryBannerCarousel 
+                      activeSkillFilter={activeSkillFilter}
+                      setActiveSkillFilter={setActiveSkillFilter}
+                      courseLevelFilter={courseLevelFilter}
+                      setCourseLevelFilter={setCourseLevelFilter}
+                    />
 
                     {(loading && filteredCourses.length === 0) ? (
                       <div className="flex items-center justify-center py-20 bg-white rounded-3xl border">
@@ -7176,35 +7558,280 @@ export default function StudentDashboard() {
                         {/* SECTION 1: REGISTERED/ENROLLED COURSES OR LEADERBOARD */}
                         {!isGuest ? (
                           <div className="space-y-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-2 gap-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 gap-3">
                               <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2">
                                 <span>🎓</span> My Registered Course
                               </h3>
+
+                              {/* Toggle Button to Switch View Between Enrolled Courses and Leaderboard */}
+                              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200/80 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setCoursesViewTab('courses')}
+                                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer ${
+                                    coursesViewTab === 'courses'
+                                      ? 'bg-white text-slate-900 shadow-xs border border-slate-200/80'
+                                      : 'text-slate-500 hover:text-slate-900'
+                                  }`}
+                                >
+                                  📚 Enrolled Courses ({filteredRegisteredCourses.length})
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setCoursesViewTab('leaderboard')}
+                                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
+                                    coursesViewTab === 'leaderboard'
+                                      ? 'bg-amber-500 text-slate-950 shadow-xs border border-amber-400 font-extrabold'
+                                      : 'text-slate-600 hover:text-amber-800'
+                                  }`}
+                                >
+                                  <span>🏆</span> Cohort Leaderboard
+                                </button>
+                              </div>
                             </div>
- 
-                            {filteredRegisteredCourses.length === 0 ? (
-                              <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
-                                No enrolled courses in this track.
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                                {filteredRegisteredCourses.map(course => (
-                                  <CourseCard 
-                                    key={course.id} 
-                                    course={course} 
-                                    userProfile={userProfile}
-                                    isEnrolled={true}
-                                    isLocked={false} 
-                                    onSelect={() => {
-                                      handleSelectCourseId(course.id || null);
-                                    }} 
-                                    currentUser={currentUser}
-                                    appSettings={appSettings}
-                                    onCourseUnlocked={handleCourseUnlocked}
-                                  />
-                                ))}
-                              </div>
+
+                            {/* View 1: Registered Courses */}
+                            {coursesViewTab === 'courses' && (
+                              filteredRegisteredCourses.length === 0 ? (
+                                <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                                  No enrolled courses in this track.
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                                  {filteredRegisteredCourses.map(course => (
+                                    <CourseCard 
+                                      key={course.id} 
+                                      course={course} 
+                                      userProfile={userProfile}
+                                      isEnrolled={true}
+                                      isLocked={false} 
+                                      onSelect={() => {
+                                        handleSelectCourseId(course.id || null);
+                                      }} 
+                                      currentUser={currentUser}
+                                      appSettings={appSettings}
+                                      onCourseUnlocked={handleCourseUnlocked}
+                                    />
+                                  ))}
+                                </div>
+                              )
                             )}
+
+                            {/* View 2: Cohort-specific Real Leaderboard Widget (Only shown when Leaderboard button is clicked) */}
+                            {coursesViewTab === 'leaderboard' && (() => {
+                              const studentCohort = userProfile?.cohort || 'Cohort 1';
+                              const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 3'];
+                              const activeCohort = selectedLeaderboardCohort || studentCohort;
+
+                              // Filter real students by selected cohort
+                              const cohortStudents = (leaderboardUsers || []).filter(u => {
+                                const uCohort = u.cohort || 'Cohort 1';
+                                const isMatching = uCohort === activeCohort;
+                                const isNotAdmin = u.email !== 'developermike5@gmail.com' && u.role !== 'admin';
+                                return isMatching && isNotAdmin;
+                              });
+
+                              // Calculate live real scores and capped lesson counts out of 17 total lessons
+                              const liveCohortData = cohortStudents.map(student => {
+                                let lessonsCompleted = 0;
+                                let quizzesPassed = 0;
+                                let aggregateQuizScore = 0;
+
+                                const progressStore = student.progress || {};
+                                Object.keys(progressStore).forEach(courseId => {
+                                  const courseData = progressStore[courseId] || {};
+                                  if (Array.isArray(courseData.watched)) {
+                                    lessonsCompleted += courseData.watched.length;
+                                  }
+                                  if (Array.isArray(courseData.checkPassed)) {
+                                    quizzesPassed += courseData.checkPassed.length;
+                                  }
+                                  if (courseData.quizScores && typeof courseData.quizScores === 'object') {
+                                    Object.values(courseData.quizScores).forEach((val: any) => {
+                                      aggregateQuizScore += (Number(val) || 0);
+                                    });
+                                  }
+                                });
+
+                                const cappedLessons = Math.min(lessonsCompleted, 17);
+                                const score = (lessonsCompleted * 15) + (quizzesPassed * 50) + aggregateQuizScore;
+
+                                return {
+                                  uid: student.id,
+                                  rank: 0,
+                                  fullName: student.fullName || student.displayName || 'Anonymous Student',
+                                  email: student.email || 'N/A',
+                                  cohort: student.cohort || 'Cohort 1',
+                                  lessonsCompleted: cappedLessons,
+                                  quizzesPassed,
+                                  score,
+                                  progressPercent: Math.min(Math.round((cappedLessons / 17) * 100), 100)
+                                };
+                              }).sort((a, b) => {
+                                if (b.score !== a.score) return b.score - a.score;
+                                if (b.lessonsCompleted !== a.lessonsCompleted) return b.lessonsCompleted - a.lessonsCompleted;
+                                return a.fullName.localeCompare(b.fullName);
+                              }).map((entry, index) => ({
+                                ...entry,
+                                rank: index + 1
+                              }));
+
+                              return (
+                                <div className="mt-2 bg-white border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-sm max-w-5xl mx-auto space-y-6 text-left font-sans">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 border-slate-100">
+                                    <div className="space-y-1">
+                                      <h4 className="text-base font-black uppercase text-slate-900 flex items-center gap-2">
+                                        <Award className="w-5 h-5 text-amber-500" />
+                                        🏆 {activeCohort} Live Leaderboard Standings
+                                      </h4>
+                                      <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                                        Real-time student rankings calculated across all 17 core lessons and quizzes.
+                                      </p>
+                                    </div>
+
+                                    {/* Cohort Selector if multiple cohorts allowed */}
+                                    {allowedCohorts.length > 1 && (
+                                      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1.5 shrink-0">
+                                        <span className="text-[10px] font-black uppercase text-slate-400 pl-1">Cohort:</span>
+                                        {allowedCohorts.map(c => (
+                                          <button
+                                            key={c}
+                                            type="button"
+                                            onClick={() => setSelectedLeaderboardCohort(c)}
+                                            className={`px-3 py-1 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
+                                              activeCohort === c
+                                                ? 'bg-slate-900 text-white shadow-xs'
+                                                : 'text-slate-600 hover:bg-slate-200/60'
+                                            }`}
+                                          >
+                                            {c}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {liveCohortData.length === 0 ? (
+                                    <div className="text-center py-10 bg-slate-50 border border-slate-200/60 rounded-2xl p-6">
+                                      <span className="text-3xl block mb-2 select-none">📊</span>
+                                      <h5 className="text-xs font-black text-slate-700 uppercase tracking-wide">No Live Ranks in {activeCohort}</h5>
+                                      <p className="text-[11px] text-slate-500 font-semibold mt-1">Student telemetry will appear here as coursework is completed.</p>
+                                    </div>
+                                  ) : (
+                                    /* Combined Continuous Table (Top 3 with Gold, Silver, Bronze Medals) */
+                                    <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white">
+                                      <table className="w-full text-left border-collapse">
+                                        <thead>
+                                          <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                                            <th className="py-3 px-3 text-center w-20">Rank</th>
+                                            <th className="py-3 px-4">Student</th>
+                                            <th className="py-3 px-3 text-center">Lessons (17 Total)</th>
+                                            <th className="py-3 px-3 text-center">Quizzes</th>
+                                            <th className="py-3 px-4 text-right">Total Score</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {liveCohortData.map((entry) => {
+                                            const isMe = entry.email?.toLowerCase() === currentUser?.email?.toLowerCase();
+                                            const isTop1 = entry.rank === 1;
+                                            const isTop2 = entry.rank === 2;
+                                            const isTop3 = entry.rank === 3;
+
+                                            return (
+                                              <tr 
+                                                key={entry.uid}
+                                                className={`transition-colors ${
+                                                  isMe 
+                                                    ? 'bg-indigo-50/80 font-bold' 
+                                                    : isTop1
+                                                      ? 'bg-amber-50/40 hover:bg-amber-50/60'
+                                                      : isTop2
+                                                        ? 'bg-slate-50/60 hover:bg-slate-100/60'
+                                                        : isTop3
+                                                          ? 'bg-orange-50/40 hover:bg-orange-50/60'
+                                                          : 'hover:bg-slate-50/50'
+                                                }`}
+                                              >
+                                                {/* Medal Badges for Top 3 */}
+                                                <td className="py-3.5 px-3 text-center shrink-0">
+                                                  {isTop1 && (
+                                                    <span className="inline-flex items-center gap-1 bg-amber-100 border border-amber-300 text-amber-900 font-black text-[11px] px-2.5 py-1 rounded-full uppercase shadow-xs">
+                                                      🥇 1st
+                                                    </span>
+                                                  )}
+                                                  {isTop2 && (
+                                                    <span className="inline-flex items-center gap-1 bg-slate-200 border border-slate-300 text-slate-900 font-black text-[11px] px-2.5 py-1 rounded-full uppercase shadow-xs">
+                                                      🥈 2nd
+                                                    </span>
+                                                  )}
+                                                  {isTop3 && (
+                                                    <span className="inline-flex items-center gap-1 bg-orange-100 border border-orange-300 text-orange-900 font-black text-[11px] px-2.5 py-1 rounded-full uppercase shadow-xs">
+                                                      🥉 3rd
+                                                    </span>
+                                                  )}
+                                                  {!isTop1 && !isTop2 && !isTop3 && (
+                                                    <span className="font-mono text-xs font-bold text-slate-400">
+                                                      #{entry.rank}
+                                                    </span>
+                                                  )}
+                                                </td>
+
+                                                {/* Student details */}
+                                                <td className="py-3.5 px-4">
+                                                  <div>
+                                                    <div className="text-xs font-black uppercase text-slate-900 flex items-center gap-1.5">
+                                                      <span>{entry.fullName}</span>
+                                                      {isMe && (
+                                                        <span className="text-[9px] bg-indigo-600 text-white font-black px-1.5 py-0.5 rounded-full uppercase">
+                                                          You
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400 font-mono leading-none mt-0.5">
+                                                      {entry.email}
+                                                    </p>
+                                                  </div>
+                                                </td>
+
+                                                {/* Lessons completed out of 17 */}
+                                                <td className="py-3.5 px-3 text-center">
+                                                  <div className="inline-flex flex-col items-center">
+                                                    <span className="text-[11px] font-black text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200/60">
+                                                      {entry.lessonsCompleted} / 17
+                                                    </span>
+                                                    <div className="w-16 bg-slate-200 h-1 rounded-full mt-1 overflow-hidden">
+                                                      <div 
+                                                        className="bg-indigo-600 h-full rounded-full transition-all"
+                                                        style={{ width: `${entry.progressPercent}%` }}
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                </td>
+
+                                                {/* Quizzes Passed */}
+                                                <td className="py-3.5 px-3 text-center">
+                                                  <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-lg">
+                                                    ✓ {entry.quizzesPassed} Quizzes
+                                                  </span>
+                                                </td>
+
+                                                {/* Total Score */}
+                                                <td className="py-3.5 px-4 text-right font-mono">
+                                                  <span className="text-xs font-black text-indigo-600">
+                                                    {entry.score.toLocaleString()} pts
+                                                  </span>
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         ) : (
                           /* Guest Viewer */
@@ -7238,6 +7865,9 @@ export default function StudentDashboard() {
                             )}
                           </div>
                         )}
+
+                        {/* CAROUSEL ANNOUNCEMENTS BANNER CARD (Placed under registered courses before un-registered courses) */}
+                        <AnnouncementCarouselCard onNavigateTab={(tab) => setActiveTab(tab)} />
 
                         {/* SECTION 2: OTHER AVAILABLE COURSES (NOT ENROLLED) - Only show when viewing 'courses' tab */}
                         {!isAdmin && !isGuest && coursesViewTab === 'courses' && (
@@ -7549,41 +8179,29 @@ export default function StudentDashboard() {
                   const courseId = advancedPaymentCourse.id;
                   const allAvailableCourses = coursesStore.getCourses();
                   
-                  // 1. Maintain progress only for completed courses, removing any other non-completed course progress
-                  const nextProgress: Record<string, any> = {};
-                  const existingProgress = userProfile?.progress || {};
-                  
-                  Object.keys(existingProgress).forEach(existId => {
-                    const crs = allAvailableCourses.find(c => c.id === existId);
-                    if (crs) {
-                      if (isCourseCompleted(userProfile, crs)) {
-                        nextProgress[existId] = existingProgress[existId];
-                      }
-                    }
-                  });
-
-                  // 2. Assign progress for advanced course
+                  // 1. Preserve all existing course progress and add newly unlocked course
+                  const nextProgress: Record<string, any> = { ...(userProfile?.progress || {}) };
                   nextProgress[courseId] = {
+                    ...(nextProgress[courseId] || {}),
                     durationMode: 'standard',
-                    createdAt: new Date().toISOString()
+                    createdAt: nextProgress[courseId]?.createdAt || new Date().toISOString()
                   };
+
+                  const existingRegistered = Array.isArray(userProfile?.registeredCourses) ? userProfile.registeredCourses : [];
+                  const updatedRegisteredCourses = Array.from(new Set([...existingRegistered, courseId, advancedPaymentCourse.title]));
 
                   const updatedProfile = {
                     ...userProfile,
-                    recommendedPath: advancedPaymentCourse.title,
-                    courseType: advancedPaymentCourse.title,
-                    pathwaySelection: advancedPaymentCourse.title,
-                    progress: nextProgress
+                    progress: nextProgress,
+                    registeredCourses: updatedRegisteredCourses
                   };
                   setUserProfile(updatedProfile);
                   safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
                   const userRef = doc(db, 'users', currentUser.uid);
                   const dbUpdates: Record<string, any> = {
-                    recommendedPath: advancedPaymentCourse.title,
-                    courseType: advancedPaymentCourse.title,
-                    pathwaySelection: advancedPaymentCourse.title,
                     progress: nextProgress,
+                    registeredCourses: updatedRegisteredCourses,
                     updatedAt: serverTimestamp()
                   };
 
@@ -7601,10 +8219,11 @@ export default function StudentDashboard() {
                         isActivated: true,
                         isDashboardUnlocked: true,
                         cohort: 'Cohort 1',
-                        recommendedPath: advancedPaymentCourse.title,
-                        courseType: advancedPaymentCourse.title,
-                        pathwaySelection: advancedPaymentCourse.title,
+                        recommendedPath: userProfile?.recommendedPath || advancedPaymentCourse.title,
+                        courseType: userProfile?.courseType || advancedPaymentCourse.title,
+                        pathwaySelection: userProfile?.pathwaySelection || advancedPaymentCourse.title,
                         progress: nextProgress,
+                        registeredCourses: updatedRegisteredCourses,
                         createdAt: serverTimestamp(),
                         updatedAt: serverTimestamp()
                       };
