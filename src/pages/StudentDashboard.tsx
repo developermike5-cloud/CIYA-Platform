@@ -4811,28 +4811,9 @@ export default function StudentDashboard() {
       });
     };
 
-    let unsubLeaderboardUsers: (() => void) | null = null;
-    const startLeaderboardUsersListener = () => {
-      if (unsubLeaderboardUsers) return;
-      unsubLeaderboardUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-        if (!isSubscribed) return;
-        const list: any[] = [];
-        snapshot.forEach((d) => {
-          list.push({ id: d.id, ...d.data() });
-        });
-        setLeaderboardUsers(list);
-        safeStorage.setItem('ciya_leaderboard_users', JSON.stringify(list));
-        setLeaderboardLoading(false);
-      }, (err) => {
-        console.warn("Error in live leaderboard users listener:", err);
-        setLeaderboardLoading(false);
-      });
-    };
-
     startProfileListener();
     startSettingsListener();
     startLeaderboardConfigListener();
-    startLeaderboardUsersListener();
 
     return () => {
       isSubscribed = false;
@@ -4840,7 +4821,6 @@ export default function StudentDashboard() {
       if (unsubRtdbProfile) unsubRtdbProfile();
       if (unsubSettings) unsubSettings();
       if (unsubLeaderboard) unsubLeaderboard();
-      if (unsubLeaderboardUsers) unsubLeaderboardUsers();
     };
   }, [currentUser]);
 
@@ -7577,17 +7557,29 @@ export default function StudentDashboard() {
                                   📚 Enrolled Courses ({filteredRegisteredCourses.length})
                                 </button>
 
-                                <button
-                                  type="button"
-                                  onClick={() => setCoursesViewTab('leaderboard')}
-                                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
-                                    coursesViewTab === 'leaderboard'
-                                      ? 'bg-amber-500 text-slate-950 shadow-xs border border-amber-400 font-extrabold'
-                                      : 'text-slate-600 hover:text-amber-800'
-                                  }`}
-                                >
-                                  <span>🏆</span> Cohort Leaderboard
-                                </button>
+                              {/* Cohort Leaderboard button: Completely hidden for Cohort 1 & Cohort 2, and disallowed cohorts */}
+                              {(() => {
+                                const studentCohort = userProfile?.cohort || 'Cohort 3';
+                                const isCohort1Or2 = studentCohort === 'Cohort 1' || studentCohort === 'Cohort 2';
+                                const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 3'];
+                                const isLeaderboardAllowed = !isCohort1Or2 && allowedCohorts.includes(studentCohort);
+
+                                if (!isLeaderboardAllowed) return null;
+
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => setCoursesViewTab('leaderboard')}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
+                                      coursesViewTab === 'leaderboard'
+                                        ? 'bg-amber-500 text-slate-950 shadow-xs border border-amber-400 font-extrabold'
+                                        : 'text-slate-600 hover:text-amber-800'
+                                    }`}
+                                  >
+                                    <span>🏆</span> Cohort Leaderboard
+                                  </button>
+                                );
+                              })()}
                               </div>
                             </div>
 
@@ -7618,64 +7610,23 @@ export default function StudentDashboard() {
                               )
                             )}
 
-                            {/* View 2: Cohort-specific Real Leaderboard Widget (Only shown when Leaderboard button is clicked) */}
+                            {/* View 2: Static Cohort Leaderboard Widget (Cohort 1 & 2 destroyed/hidden, Cohort 3 loads strictly static JSON) */}
                             {coursesViewTab === 'leaderboard' && (() => {
-                              const studentCohort = userProfile?.cohort || 'Cohort 1';
+                              const studentCohort = userProfile?.cohort || 'Cohort 3';
+                              const isCohort1Or2 = studentCohort === 'Cohort 1' || studentCohort === 'Cohort 2';
                               const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 3'];
-                              const activeCohort = selectedLeaderboardCohort || studentCohort;
+                              const isLeaderboardAllowed = !isCohort1Or2 && allowedCohorts.includes(studentCohort);
 
-                              // Filter real students by selected cohort
-                              const cohortStudents = (leaderboardUsers || []).filter(u => {
-                                const uCohort = u.cohort || 'Cohort 1';
-                                const isMatching = uCohort === activeCohort;
-                                const isNotAdmin = u.email !== 'developermike5@gmail.com' && u.role !== 'admin';
-                                return isMatching && isNotAdmin;
-                              });
+                              if (!isLeaderboardAllowed) {
+                                return (
+                                  <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500 max-w-xl mx-auto">
+                                    The leaderboard feature is not active for your cohort.
+                                  </div>
+                                );
+                              }
 
-                              // Calculate live real scores and capped lesson counts out of 17 total lessons
-                              const liveCohortData = cohortStudents.map(student => {
-                                let lessonsCompleted = 0;
-                                let quizzesPassed = 0;
-                                let aggregateQuizScore = 0;
-
-                                const progressStore = student.progress || {};
-                                Object.keys(progressStore).forEach(courseId => {
-                                  const courseData = progressStore[courseId] || {};
-                                  if (Array.isArray(courseData.watched)) {
-                                    lessonsCompleted += courseData.watched.length;
-                                  }
-                                  if (Array.isArray(courseData.checkPassed)) {
-                                    quizzesPassed += courseData.checkPassed.length;
-                                  }
-                                  if (courseData.quizScores && typeof courseData.quizScores === 'object') {
-                                    Object.values(courseData.quizScores).forEach((val: any) => {
-                                      aggregateQuizScore += (Number(val) || 0);
-                                    });
-                                  }
-                                });
-
-                                const cappedLessons = Math.min(lessonsCompleted, 17);
-                                const score = (lessonsCompleted * 15) + (quizzesPassed * 50) + aggregateQuizScore;
-
-                                return {
-                                  uid: student.id,
-                                  rank: 0,
-                                  fullName: student.fullName || student.displayName || 'Anonymous Student',
-                                  email: student.email || 'N/A',
-                                  cohort: student.cohort || 'Cohort 1',
-                                  lessonsCompleted: cappedLessons,
-                                  quizzesPassed,
-                                  score,
-                                  progressPercent: Math.min(Math.round((cappedLessons / 17) * 100), 100)
-                                };
-                              }).sort((a, b) => {
-                                if (b.score !== a.score) return b.score - a.score;
-                                if (b.lessonsCompleted !== a.lessonsCompleted) return b.lessonsCompleted - a.lessonsCompleted;
-                                return a.fullName.localeCompare(b.fullName);
-                              }).map((entry, index) => ({
-                                ...entry,
-                                rank: index + 1
-                              }));
+                              const activeCohort = selectedLeaderboardCohort || (studentCohort !== 'Cohort 1' && studentCohort !== 'Cohort 2' ? studentCohort : 'Cohort 3');
+                              const staticCohortEntries = staticLeaderboardData[activeCohort] || staticLeaderboardData['Cohort 3'] || [];
 
                               return (
                                 <div className="mt-2 bg-white border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-sm max-w-5xl mx-auto space-y-6 text-left font-sans">
@@ -7683,64 +7634,43 @@ export default function StudentDashboard() {
                                     <div className="space-y-1">
                                       <h4 className="text-base font-black uppercase text-slate-900 flex items-center gap-2">
                                         <Award className="w-5 h-5 text-amber-500" />
-                                        🏆 {activeCohort} Live Leaderboard Standings
+                                        🏆 {activeCohort} Official Leaderboard Standings
                                       </h4>
                                       <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-                                        Real-time student rankings calculated across all 17 core lessons and quizzes.
+                                        Official student standings updated periodically by CIYA academy admin.
                                       </p>
                                     </div>
-
-                                    {/* Cohort Selector if multiple cohorts allowed */}
-                                    {allowedCohorts.length > 1 && (
-                                      <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1.5 shrink-0">
-                                        <span className="text-[10px] font-black uppercase text-slate-400 pl-1">Cohort:</span>
-                                        {allowedCohorts.map(c => (
-                                          <button
-                                            key={c}
-                                            type="button"
-                                            onClick={() => setSelectedLeaderboardCohort(c)}
-                                            className={`px-3 py-1 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
-                                              activeCohort === c
-                                                ? 'bg-slate-900 text-white shadow-xs'
-                                                : 'text-slate-600 hover:bg-slate-200/60'
-                                            }`}
-                                          >
-                                            {c}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
                                   </div>
 
-                                  {liveCohortData.length === 0 ? (
+                                  {staticCohortEntries.length === 0 ? (
                                     <div className="text-center py-10 bg-slate-50 border border-slate-200/60 rounded-2xl p-6">
                                       <span className="text-3xl block mb-2 select-none">📊</span>
-                                      <h5 className="text-xs font-black text-slate-700 uppercase tracking-wide">No Live Ranks in {activeCohort}</h5>
-                                      <p className="text-[11px] text-slate-500 font-semibold mt-1">Student telemetry will appear here as coursework is completed.</p>
+                                      <h5 className="text-xs font-black text-slate-700 uppercase tracking-wide">No Rankings Available for {activeCohort}</h5>
+                                      <p className="text-[11px] text-slate-500 font-semibold mt-1">Official standings will be posted here as training progresses.</p>
                                     </div>
                                   ) : (
-                                    /* Combined Continuous Table (Top 3 with Gold, Silver, Bronze Medals) */
                                     <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white">
                                       <table className="w-full text-left border-collapse">
                                         <thead>
                                           <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase text-slate-500 tracking-wider">
                                             <th className="py-3 px-3 text-center w-20">Rank</th>
                                             <th className="py-3 px-4">Student</th>
-                                            <th className="py-3 px-3 text-center">Lessons (17 Total)</th>
+                                            <th className="py-3 px-3 text-center">Lessons</th>
                                             <th className="py-3 px-3 text-center">Quizzes</th>
                                             <th className="py-3 px-4 text-right">Total Score</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                          {liveCohortData.map((entry) => {
+                                          {staticCohortEntries.map((entry, idx) => {
                                             const isMe = entry.email?.toLowerCase() === currentUser?.email?.toLowerCase();
-                                            const isTop1 = entry.rank === 1;
-                                            const isTop2 = entry.rank === 2;
-                                            const isTop3 = entry.rank === 3;
+                                            const rankNum = entry.rank || idx + 1;
+                                            const isTop1 = rankNum === 1;
+                                            const isTop2 = rankNum === 2;
+                                            const isTop3 = rankNum === 3;
 
                                             return (
                                               <tr 
-                                                key={entry.uid}
+                                                key={entry.email || idx}
                                                 className={`transition-colors ${
                                                   isMe 
                                                     ? 'bg-indigo-50/80 font-bold' 
@@ -7753,7 +7683,6 @@ export default function StudentDashboard() {
                                                           : 'hover:bg-slate-50/50'
                                                 }`}
                                               >
-                                                {/* Medal Badges for Top 3 */}
                                                 <td className="py-3.5 px-3 text-center shrink-0">
                                                   {isTop1 && (
                                                     <span className="inline-flex items-center gap-1 bg-amber-100 border border-amber-300 text-amber-900 font-black text-[11px] px-2.5 py-1 rounded-full uppercase shadow-xs">
@@ -7772,12 +7701,11 @@ export default function StudentDashboard() {
                                                   )}
                                                   {!isTop1 && !isTop2 && !isTop3 && (
                                                     <span className="font-mono text-xs font-bold text-slate-400">
-                                                      #{entry.rank}
+                                                      #{rankNum}
                                                     </span>
                                                   )}
                                                 </td>
 
-                                                {/* Student details */}
                                                 <td className="py-3.5 px-4">
                                                   <div>
                                                     <div className="text-xs font-black uppercase text-slate-900 flex items-center gap-1.5">
@@ -7788,35 +7716,26 @@ export default function StudentDashboard() {
                                                         </span>
                                                       )}
                                                     </div>
-                                                    <p className="text-[10px] text-slate-400 font-mono leading-none mt-0.5">
-                                                      {entry.email}
-                                                    </p>
+                                                    {entry.email && (
+                                                      <p className="text-[10px] text-slate-400 font-mono leading-none mt-0.5">
+                                                        {entry.email}
+                                                      </p>
+                                                    )}
                                                   </div>
                                                 </td>
 
-                                                {/* Lessons completed out of 17 */}
                                                 <td className="py-3.5 px-3 text-center">
-                                                  <div className="inline-flex flex-col items-center">
-                                                    <span className="text-[11px] font-black text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200/60">
-                                                      {entry.lessonsCompleted} / 17
-                                                    </span>
-                                                    <div className="w-16 bg-slate-200 h-1 rounded-full mt-1 overflow-hidden">
-                                                      <div 
-                                                        className="bg-indigo-600 h-full rounded-full transition-all"
-                                                        style={{ width: `${entry.progressPercent}%` }}
-                                                      />
-                                                    </div>
-                                                  </div>
+                                                  <span className="text-[11px] font-black text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200/60">
+                                                    {entry.lessonsCompleted} Lessons
+                                                  </span>
                                                 </td>
 
-                                                {/* Quizzes Passed */}
                                                 <td className="py-3.5 px-3 text-center">
                                                   <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-lg">
                                                     ✓ {entry.quizzesPassed} Quizzes
                                                   </span>
                                                 </td>
 
-                                                {/* Total Score */}
                                                 <td className="py-3.5 px-4 text-right font-mono">
                                                   <span className="text-xs font-black text-indigo-600">
                                                     {entry.score.toLocaleString()} pts

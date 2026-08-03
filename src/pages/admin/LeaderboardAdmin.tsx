@@ -42,13 +42,13 @@ interface LeaderboardEntry {
 export default function LeaderboardAdmin() {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
-  const [selectedCohort, setSelectedCohort] = useState<string>('Cohort 1');
+  const [selectedCohort, setSelectedCohort] = useState<string>('Cohort 3');
   const [allowedCohorts, setAllowedCohorts] = useState<string[]>(['Cohort 3']);
   const [savingConfig, setSavingConfig] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Available cohorts list (aligned with standard course cohorts)
-  const availableCohorts = useMemo(() => ['Cohort 1', 'Cohort 2', 'Cohort 3', 'Cohort 4', 'Cohort 5'], []);
+  const availableCohorts = useMemo(() => ['Cohort 3', 'Cohort 4', 'Cohort 5'], []);
 
   // Fetch users and leaderboard configurations on mount
   useEffect(() => {
