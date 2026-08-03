@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
-import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag, Mail, Lock } from 'lucide-react';
+import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { auth, db } from '../firebase';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import LoginModal from '../components/LoginModal';
 import BrandingLogo from '../components/BrandingLogo';
@@ -104,6 +104,14 @@ export default function Onboarding() {
   const [timeLeft, setTimeLeft] = useState('');
   const [creationTime, setCreationTime] = useState<number | null>(null);
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
+
+  // Onboarding Auth Choice Modal States
+  const [showAuthChoiceModal, setShowAuthChoiceModal] = useState(false);
+  const [authChoiceTab, setAuthChoiceTab] = useState<'email' | 'google'>('google');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [authModalError, setAuthModalError] = useState('');
 
   // Auto-redirect if already registered
   useEffect(() => {
@@ -401,37 +409,107 @@ export default function Onboarding() {
   const doAuthAndSave = async () => {
     if (!validateForm()) return;
     if (globalOnboardingSignInActive) return;
+
+    // If already logged in, directly save profile!
+    if (auth.currentUser) {
+      setLoading(true);
+      try {
+        await handleRegisterSuccess(auth.currentUser);
+      } catch (e: any) {
+        setFormError(e.message || 'Error saving student profile.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Otherwise, open the Auth Choice Modal so student chooses Google or Email/Password!
+    setShowAuthChoiceModal(true);
+    setAuthModalError('');
+    if (data.email) setAuthEmail(data.email);
+  };
+
+  const handleOnboardingGoogleAuth = async () => {
+    if (globalOnboardingSignInActive) return;
     setLoading(true);
+    setAuthModalError('');
     try {
       globalOnboardingSignInActive = true;
-      let user = auth.currentUser;
-      if (!user) {
-        const provider = new GoogleAuthProvider();
-        if (provider && typeof (provider as any).setCustomParameters === 'function') {
-          (provider as any).setCustomParameters({ prompt: 'select_account' });
-        }
-        const result = await signInWithPopup(auth, provider);
-        user = result.user;
+      const provider = new GoogleAuthProvider();
+      if (provider && typeof (provider as any).setCustomParameters === 'function') {
+        (provider as any).setCustomParameters({ prompt: 'select_account' });
       }
-      
-      if (!user) {
-        throw new Error('Google authentication failed. Please try again.');
-      }
-      
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      if (!user) throw new Error('Google authentication failed.');
+      setShowAuthChoiceModal(false);
       await handleRegisterSuccess(user);
     } catch (e: any) {
       console.error(e);
-      let errMsg = e.message || 'An error occurred during sign up.';
       if (e.code === 'auth/popup-blocked' || e.message?.toLowerCase().includes('popup-blocked')) {
         setShowPopupBlocked(true);
-        errMsg = 'Sign-up popup was blocked by your browser. Please enable popups and try again.';
-      } else if (e.message?.includes('offline')) {
-        errMsg = 'Network error. Please check your internet connection.';
+        setAuthModalError('Popups blocked. Please allow popups or use Email & Password below.');
+      } else {
+        setAuthModalError(e.message || 'Google authentication failed.');
       }
-      setFormError(errMsg);
-      alert(`Registration Error: ${errMsg}`);
     } finally {
       globalOnboardingSignInActive = false;
+      setLoading(false);
+    }
+  };
+
+  const handleOnboardingEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail.trim() || !authPassword) {
+      setAuthModalError('Please fill in both your email address and password.');
+      return;
+    }
+    if (authPassword.length < 6) {
+      setAuthModalError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    setLoading(true);
+    setAuthModalError('');
+
+    try {
+      let user = null;
+      try {
+        const result = await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+        user = result.user;
+      } catch (createErr: any) {
+        if (createErr.code === 'auth/email-already-in-use' || createErr.message?.toLowerCase().includes('already-in-use')) {
+          // If account exists, log in seamlessly to associate profile details
+          const loginResult = await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+          user = loginResult.user;
+        } else {
+          throw createErr;
+        }
+      }
+
+      if (user) {
+        if (data.fullName && (!user.displayName || user.displayName !== data.fullName)) {
+          try {
+            await updateProfile(user, { displayName: data.fullName });
+          } catch (pErr) {
+            console.warn("Could not update display name:", pErr);
+          }
+        }
+        setShowAuthChoiceModal(false);
+        await handleRegisterSuccess(user);
+      }
+    } catch (err: any) {
+      console.error("Onboarding Email Auth error:", err);
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setAuthModalError('Incorrect password for this email account.');
+      } else if (err.code === 'auth/weak-password') {
+        setAuthModalError('Password is too weak. Please use at least 6 characters.');
+      } else if (err.message?.includes('offline')) {
+        setAuthModalError('Network error. Please check your internet connection.');
+      } else {
+        setAuthModalError(err.message || 'Authentication failed. Please check your details.');
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -942,6 +1020,153 @@ export default function Onboarding() {
               Close
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ONBOARDING AUTH CHOICE MODAL */}
+      {showAuthChoiceModal && (
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/85 backdrop-blur-md flex justify-center items-start md:items-center p-4 py-8 md:py-16">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
+            className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col text-slate-100 my-auto"
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowAuthChoiceModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer border-0"
+            >
+              <Sparkles className="w-5 h-5 text-slate-500 hover:text-white" />
+            </button>
+
+            {/* Header */}
+            <div className="text-center mb-5 space-y-1 flex flex-col items-center">
+              <BrandingLogo size="sm" className="mb-2" />
+              <h3 className="text-2xl font-black text-white tracking-tight">Select Sign-Up Method</h3>
+              <p className="text-xs text-slate-400 font-semibold">Choose how you would like to authenticate and complete your student registration.</p>
+            </div>
+
+            {/* Method Tabs */}
+            <div className="flex bg-slate-950/80 p-1 rounded-2xl border border-slate-800 mb-5">
+              <button
+                type="button"
+                onClick={() => { setAuthChoiceTab('google'); setAuthModalError(''); }}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer ${
+                  authChoiceTab === 'google'
+                    ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+                }`}
+              >
+                Google Auth (Fast)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthChoiceTab('email'); setAuthModalError(''); }}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer ${
+                  authChoiceTab === 'email'
+                    ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+                }`}
+              >
+                Email & Password
+              </button>
+            </div>
+
+            {authModalError && (
+              <div className="p-3.5 mb-5 bg-red-950/70 border border-red-800/60 text-red-200 text-xs font-bold rounded-xl text-center">
+                {authModalError}
+              </div>
+            )}
+
+            {/* TAB: GOOGLE AUTH (FIRST) */}
+            {authChoiceTab === 'google' && (
+              <div className="space-y-4 py-2">
+                <p className="text-xs text-slate-300 leading-relaxed text-center font-medium">
+                  Use your Google account for instant 1-click authentication and student dashboard activation.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleOnboardingGoogleAuth}
+                  disabled={loading}
+                  className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-lg flex items-center justify-center gap-3 cursor-pointer border-0 uppercase tracking-wider disabled:opacity-60 hover:scale-[1.01] active:scale-[0.99]"
+                >
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12 5.04c1.64 0 3.11.56 4.27 1.67l3.19-3.19C17.51 1.7 14.99 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.79 2.94C6.18 7.37 8.86 5.04 12 5.04z" />
+                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.44c-.28 1.48-1.12 2.73-2.38 3.58l3.71 2.88c2.17-2 3.42-4.94 3.42-8.61z" />
+                    <path fill="#FBBC05" d="M5.29 14.83a7.19 7.19 0 0 1 0-4.57L1.5 7.32a11.95 11.95 0 0 0 0 10.37l3.79-2.86z" />
+                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.14 0-5.82-2.33-6.71-5.46L1.5 16.29C3.4 20.15 7.35 23 12 23z" />
+                  </svg>
+                  <span>{loading ? 'Connecting Google...' : 'Sign Up with Google (Recommended)'}</span>
+                </button>
+              </div>
+            )}
+
+            {/* TAB: EMAIL & PASSWORD (SECOND) */}
+            {authChoiceTab === 'email' && (
+              <form onSubmit={handleOnboardingEmailAuth} className="space-y-4">
+                {/* STERN WARNING NOTICE */}
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/40 rounded-2xl text-amber-300 text-xs leading-relaxed font-bold flex items-start gap-2.5">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-amber-400 uppercase tracking-wide">STERN WARNING:</strong> Please make sure you DO NOT forget your password for any reason! Store your password securely as password recovery requires admin support.
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1">Email Address *</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="email"
+                      required
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="yourname@example.com"
+                      className="w-full pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 focus:border-teal-400 rounded-xl text-xs text-white placeholder:text-slate-600 outline-none font-semibold transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1">Password *</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type={showAuthPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="At least 6 characters"
+                      className="w-full pl-9 pr-10 py-2.5 bg-slate-950 border border-slate-800 focus:border-teal-400 rounded-xl text-xs text-white placeholder:text-slate-600 outline-none font-semibold transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAuthPassword(!showAuthPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-400 p-1 bg-transparent border-0 cursor-pointer transition-colors"
+                      title={showAuthPassword ? "Hide password" : "Show password"}
+                    >
+                      {showAuthPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 bg-slate-800 hover:bg-slate-750 text-white font-black rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-700 uppercase tracking-wider disabled:opacity-60"
+                >
+                  {loading ? (
+                    <span>Registering Account...</span>
+                  ) : (
+                    <span>Complete Registration with Email</span>
+                  )}
+                </button>
+              </form>
+            )}
+          </motion.div>
         </div>
       )}
 

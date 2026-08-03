@@ -7786,7 +7786,7 @@ export default function StudentDashboard() {
                         )}
 
                         {/* CAROUSEL ANNOUNCEMENTS BANNER CARD (Placed under registered courses before un-registered courses) */}
-                        <AnnouncementCarouselCard onNavigateTab={(tab) => setActiveTab(tab)} />
+                        <AnnouncementCarouselCard onNavigateTab={(tab) => { if (tab === 'courses' || tab === 'leaderboard') setCoursesViewTab(tab); }} />
 
                         {/* SECTION 2: OTHER AVAILABLE COURSES (NOT ENROLLED) - Only show when viewing 'courses' tab */}
                         {!isAdmin && !isGuest && coursesViewTab === 'courses' && (

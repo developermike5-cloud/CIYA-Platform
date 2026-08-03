@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
-import { Mail, Lock, X, Sparkles, ArrowRight, User, Phone, MapPin, ChevronDown } from 'lucide-react';
+import { Mail, Lock, X, Sparkles, ArrowRight, User, Phone, MapPin, ChevronDown, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { auth, db } from '../firebase';
 import BrandingLogo from './BrandingLogo';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
 interface LoginModalProps {
@@ -25,6 +25,14 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
+
+  // Password Visibility Toggle State
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Password Reset States
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSuccess, setResetSuccess] = useState('');
 
   // Sign In States
   const [signInEmail, setSignInEmail] = useState('');
@@ -88,6 +96,34 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         setError('Network error. Please check your internet connection.');
       } else {
         setError(err.message || 'An error occurred during sign in.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Password Reset Email
+  const handleSendPasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      setError('Please enter your email address to receive password reset instructions.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setResetSuccess('');
+
+    try {
+      await sendPasswordResetEmail(auth, resetEmail.trim());
+      setResetSuccess(`Password reset email sent! Please check ${resetEmail.trim()} (inbox and spam folder) for the reset link.`);
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      if (err.code === 'auth/user-not-found' || err.message?.toLowerCase().includes('user-not-found')) {
+        setError('No registered user was found under this email address.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
+      } else {
+        setError(err.message || 'Failed to send password reset email. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -270,50 +306,182 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               {/* Header */}
               <div className="text-center mb-6 space-y-1 flex flex-col items-center">
                 <BrandingLogo size="sm" className="mb-2" />
-                <h3 className="text-2xl font-black text-white tracking-tight">CIYA Portal</h3>
-                <p className="text-xs text-teal-300 font-semibold">Join thousands of Nigerian youths learning high-income digital skills.</p>
+                <h3 className="text-2xl font-black text-white tracking-tight">
+                  {isResetMode ? 'Reset Password' : 'CIYA Portal Sign In'}
+                </h3>
+                <p className="text-xs text-teal-300 font-semibold">
+                  {isResetMode 
+                    ? 'Receive a secure reset link in your email to recover your account.' 
+                    : 'Welcome back! Sign in to access your dashboard and courses.'}
+                </p>
               </div>
 
               {error && (
-                <div className="p-3.5 mb-6 bg-red-950/50 border border-red-800/40 text-red-200 text-xs font-bold rounded-xl text-center">
+                <div className="p-3.5 mb-5 bg-red-950/70 border border-red-800/60 text-red-200 text-xs font-bold rounded-xl text-center">
                   {error}
                 </div>
               )}
 
-              {/* Google Only Login Button */}
-              <div className="space-y-6">
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                  className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-xl text-sm transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-3 cursor-pointer border-0 uppercase tracking-wider hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
-                  id="login_google_btn"
-                >
-                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5.04c1.64 0 3.11.56 4.27 1.67l3.19-3.19C17.51 1.7 14.99 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.79 2.94C6.18 7.37 8.86 5.04 12 5.04z" />
-                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.44c-.28 1.48-1.12 2.73-2.38 3.58l3.71 2.88c2.17-2 3.42-4.94 3.42-8.61z" />
-                    <path fill="#FBBC05" d="M5.29 14.83a7.19 7.19 0 0 1 0-4.57L1.5 7.32a11.95 11.95 0 0 0 0 10.37l3.79-2.86z" />
-                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.14 0-5.82-2.33-6.71-5.46L1.5 16.29C3.4 20.15 7.35 23 12 23z" />
-                  </svg>
-                  <span>{loading ? 'Connecting...' : 'Continue with Google'}</span>
-                </button>
+              {/* FORGOT PASSWORD RESET VIEW */}
+              {isResetMode ? (
+                <form onSubmit={handleSendPasswordReset} className="space-y-4">
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-300 text-xs leading-relaxed font-semibold flex items-start gap-2.5">
+                    <KeyRound className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      Enter your registered email address below. A password reset link will be sent to your email box.
+                    </div>
+                  </div>
 
-                <div className="text-center border-t border-teal-900/40 pt-5">
-                  <p className="text-xs text-teal-400 font-semibold">
-                    New to CIYA Academy?{' '}
+                  {resetSuccess && (
+                    <div className="p-3.5 bg-emerald-950/80 border border-emerald-800 text-emerald-200 text-xs font-bold rounded-xl text-center leading-relaxed">
+                      {resetSuccess}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300 mb-1">Account Email Address *</label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-teal-400" />
+                      <input
+                        type="email"
+                        required
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        placeholder="yourname@example.com"
+                        className="w-full pl-9 pr-4 py-2.5 bg-teal-950/80 border border-teal-850 focus:border-amber-400 rounded-xl text-xs text-white placeholder:text-teal-600 outline-none font-semibold transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-xl text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer border-0 uppercase tracking-wider disabled:opacity-60"
+                  >
+                    <span>{loading ? 'Sending Reset Email...' : 'Send Password Reset Link'}</span>
+                  </button>
+
+                  <div className="text-center pt-2">
                     <button
+                      type="button"
                       onClick={() => {
-                        onClose();
-                        navigate('/waitingonboarding');
+                        setIsResetMode(false);
+                        setError('');
+                        setResetSuccess('');
                       }}
-                      className="text-amber-400 hover:text-amber-300 font-black underline bg-transparent border-0 cursor-pointer p-0 ml-1 inline-flex items-center gap-1 hover:translate-x-0.5 transition-transform"
-                      id="login_signup_redirect_btn"
+                      className="text-xs text-teal-400 hover:text-white font-bold underline bg-transparent border-0 cursor-pointer p-0"
                     >
-                      Start Guided Onboarding <ArrowRight className="w-3 h-3" />
+                      ← Back to Sign In
                     </button>
-                  </p>
+                  </div>
+                </form>
+              ) : (
+                /* SIGN IN FORM & GOOGLE AUTH */
+                <div className="space-y-4">
+                  {/* Primary Google Auth Button (First Option) */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={loading}
+                    className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-xl text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2.5 cursor-pointer border-0 uppercase tracking-wider hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
+                    id="login_google_btn"
+                  >
+                    <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                      <path fill="#EA4335" d="M12 5.04c1.64 0 3.11.56 4.27 1.67l3.19-3.19C17.51 1.7 14.99 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.79 2.94C6.18 7.37 8.86 5.04 12 5.04z" />
+                      <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.44c-.28 1.48-1.12 2.73-2.38 3.58l3.71 2.88c2.17-2 3.42-4.94 3.42-8.61z" />
+                      <path fill="#FBBC05" d="M5.29 14.83a7.19 7.19 0 0 1 0-4.57L1.5 7.32a11.95 11.95 0 0 0 0 10.37l3.79-2.86z" />
+                      <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.14 0-5.82-2.33-6.71-5.46L1.5 16.29C3.4 20.15 7.35 23 12 23z" />
+                    </svg>
+                    <span>{loading ? 'Connecting Google...' : 'Sign In with Google (Recommended)'}</span>
+                  </button>
+
+                  <div className="relative flex py-1 items-center">
+                    <div className="flex-grow border-t border-teal-900/60"></div>
+                    <span className="flex-shrink mx-3 text-[10px] uppercase font-black text-teal-500">Or sign in with Email</span>
+                    <div className="flex-grow border-t border-teal-900/60"></div>
+                  </div>
+
+                  <form onSubmit={handleEmailSignIn} className="space-y-3.5">
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300 mb-1">Email Address</label>
+                      <div className="relative">
+                        <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-teal-400" />
+                        <input
+                          type="email"
+                          required
+                          value={signInEmail}
+                          onChange={(e) => setSignInEmail(e.target.value)}
+                          placeholder="yourname@example.com"
+                          className="w-full pl-9 pr-4 py-2.5 bg-teal-950/80 border border-teal-850 focus:border-amber-400 rounded-xl text-xs text-white placeholder:text-teal-600 outline-none font-semibold transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300">Password</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsResetMode(true);
+                            setError('');
+                            setResetSuccess('');
+                            if (signInEmail) setResetEmail(signInEmail);
+                          }}
+                          className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline bg-transparent border-0 cursor-pointer p-0"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-teal-400" />
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          value={signInPassword}
+                          onChange={(e) => setSignInPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full pl-9 pr-10 py-2.5 bg-teal-950/80 border border-teal-850 focus:border-amber-400 rounded-xl text-xs text-white placeholder:text-teal-600 outline-none font-semibold transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-teal-400 hover:text-amber-400 p-1 bg-transparent border-0 cursor-pointer transition-colors"
+                          title={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3 bg-slate-900 hover:bg-slate-850 text-white border border-teal-800/80 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider disabled:opacity-60"
+                      id="login_email_signin_btn"
+                    >
+                      <span>{loading ? 'Signing In...' : 'Sign In with Email & Password'}</span>
+                    </button>
+                  </form>
+
+                  <div className="text-center pt-3 border-t border-teal-900/40">
+                    <p className="text-[11px] text-teal-400 font-semibold">
+                      Don't have an account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          navigate('/waitingonboarding');
+                        }}
+                        className="text-amber-400 hover:text-amber-300 font-black underline bg-transparent border-0 cursor-pointer p-0 ml-1 inline-flex items-center gap-1"
+                        id="login_signup_redirect_btn"
+                      >
+                        Start Guided Onboarding <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </motion.div>
           ) : (
             /* Popup Blocked Mode Helper */
