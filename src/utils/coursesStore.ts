@@ -415,29 +415,38 @@ if (typeof window !== 'undefined') {
               standardMap.set(c.id!, c);
             }
           } else {
-            // Apply smart Day 4/5 merging
-            const localDay4 = c.days?.find(d => d.dayNumber === 4);
-            const serverDay4 = existing.days?.find(d => d.dayNumber === 4);
-            const localDay4IsPlaceholder = !localDay4 || localDay4.title.toLowerCase().includes('core fundamentals') || !localDay4.description;
-            const serverDay4IsReal = serverDay4 && serverDay4.title.toLowerCase().includes('prompt engineering');
-            if (localDay4IsPlaceholder && serverDay4IsReal && c.days) {
-              c.days = c.days.map(d => d.dayNumber === 4 ? serverDay4 : d);
-              c.updatedAt = new Date().toISOString();
-            }
+            // Compare video completeness
+            const serverVideoCount = existing.days?.reduce((acc, d) => acc + (d.videos?.length || 0), 0) || 0;
+            const localVideoCount = c.days?.reduce((acc, d) => acc + (d.videos?.length || 0), 0) || 0;
 
-            const localDay5 = c.days?.find(d => d.dayNumber === 5);
-            const serverDay5 = existing.days?.find(d => d.dayNumber === 5);
-            const localDay5IsPlaceholder = !localDay5 || localDay5.title.toLowerCase().includes('core fundamentals') || !localDay5.description;
-            const serverDay5IsReal = serverDay5 && serverDay5.title.toLowerCase().includes('branding');
-            if (localDay5IsPlaceholder && serverDay5IsReal && c.days) {
-              c.days = c.days.map(d => d.dayNumber === 5 ? serverDay5 : d);
-              c.updatedAt = new Date().toISOString();
-            }
+            if (serverVideoCount > localVideoCount) {
+              // Server has richer video content - retain server course
+              standardMap.set(c.id!, existing);
+            } else {
+              // Apply smart Day 4/5 merging if needed
+              const localDay4 = c.days?.find(d => d.dayNumber === 4);
+              const serverDay4 = existing.days?.find(d => d.dayNumber === 4);
+              const localDay4IsPlaceholder = !localDay4 || localDay4.title.toLowerCase().includes('core fundamentals') || !localDay4.description;
+              const serverDay4IsReal = serverDay4 && serverDay4.title.toLowerCase().includes('prompt engineering');
+              if (localDay4IsPlaceholder && serverDay4IsReal && c.days) {
+                c.days = c.days.map(d => d.dayNumber === 4 ? serverDay4 : d);
+                c.updatedAt = new Date().toISOString();
+              }
 
-            const localTime = new Date(c.updatedAt || 0).getTime();
-            const serverTime = new Date(existing.updatedAt || 0).getTime();
-            if (localTime > serverTime) {
-              standardMap.set(c.id!, c);
+              const localDay5 = c.days?.find(d => d.dayNumber === 5);
+              const serverDay5 = existing.days?.find(d => d.dayNumber === 5);
+              const localDay5IsPlaceholder = !localDay5 || localDay5.title.toLowerCase().includes('core fundamentals') || !localDay5.description;
+              const serverDay5IsReal = serverDay5 && serverDay5.title.toLowerCase().includes('branding');
+              if (localDay5IsPlaceholder && serverDay5IsReal && c.days) {
+                c.days = c.days.map(d => d.dayNumber === 5 ? serverDay5 : d);
+                c.updatedAt = new Date().toISOString();
+              }
+
+              const localTime = new Date(c.updatedAt || 0).getTime();
+              const serverTime = new Date(existing.updatedAt || 0).getTime();
+              if (localTime > serverTime) {
+                standardMap.set(c.id!, c);
+              }
             }
           }
         }
