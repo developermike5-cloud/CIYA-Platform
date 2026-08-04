@@ -605,7 +605,7 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
     resourceType: 'image' | 'video',
     options: { folder?: string; projectId?: string; studentId?: string; tags?: string }
   ) {
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || "dqrhmr7ms";
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || "di4dlnd5x";
     const apiKey = process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET;
     const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || process.env.VITE_CLOUDINARY_UPLOAD_PRESET;
@@ -749,7 +749,7 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
   app.post("/api/cloudinary-signature", (req: express.Request, res: express.Response) => {
     try {
       const folder = req.body?.folder || "ciya";
-      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || "dqrhmr7ms";
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || "di4dlnd5x";
       const apiKey = process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY;
       const apiSecret = process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET;
 
@@ -788,7 +788,7 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
         return res.status(400).json({ error: "Could not parse Cloudinary URL for public_id." });
       }
 
-      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || "dqrhmr7ms";
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || "di4dlnd5x";
       const apiKey = process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY;
       const apiSecret = process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET;
 

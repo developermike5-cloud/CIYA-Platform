@@ -313,12 +313,12 @@ export async function uploadToCloudinary(
     (typeof process !== 'undefined' && process.env?.VITE_CLOUDINARY_UPLOAD_PRESET) ||
     (typeof process !== 'undefined' && process.env?.CLOUDINARY_UPLOAD_PRESET) ||
     (import.meta.env && import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET) ||
-    'unsigned_preset';
+    'ciya_academy';
 
   const cloudName =
     (typeof process !== 'undefined' && process.env?.CLOUDINARY_CLOUD_NAME) ||
     (import.meta.env && import.meta.env.VITE_CLOUDINARY_CLOUD_NAME) ||
-    'dqrhmr7ms';
+    'di4dlnd5x';
 
   if (preset && cloudName) {
     try {
