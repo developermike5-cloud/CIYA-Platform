@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Course } from '../../types';
-import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy } from 'lucide-react';
+import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy, Download, Upload } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
@@ -54,8 +54,111 @@ export default function CoursesAdmin() {
   const [cloneDialogName, setCloneDialogName] = useState<string>('');
   const [deleteDialogCourse, setDeleteDialogCourse] = useState<Course | null>(null);
   const [isPerformingAction, setIsPerformingAction] = useState(false);
+  const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const navigate = useNavigate();
+
+  // Export ALL Beginner/Standard courses as courses.json
+  const handleExportAll = () => {
+    try {
+      const standardList = coursesStore.getStandardCoursesOnly();
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(standardList, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "courses.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      setImportStatus({
+        type: 'success',
+        message: 'Successfully exported courses.json file! You can keep this as a backup.'
+      });
+      setTimeout(() => setImportStatus(null), 6000);
+    } catch (err: any) {
+      setImportStatus({
+        type: 'error',
+        message: `Failed to export courses: ${err.message}`
+      });
+    }
+  };
+
+  // Export a SINGLE Beginner/Standard course as JSON
+  const handleExportSingle = (c: Course) => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify([c], null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      const slug = c.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      downloadAnchor.setAttribute("download", `beginner_course_${slug || 'syllabus'}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      setImportStatus({
+        type: 'success',
+        message: `Successfully exported individual course: "${c.title}" as "beginner_course_${slug || 'syllabus'}.json"!`
+      });
+      setTimeout(() => setImportStatus(null), 6000);
+    } catch (err: any) {
+      setImportStatus({
+        type: 'error',
+        message: `Failed to export course: ${err.message}`
+      });
+    }
+  };
+
+  // Import JSON file for beginner courses
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+
+        const coursesToImport = Array.isArray(parsed) ? parsed : [parsed];
+
+        const validated = coursesToImport.map((c: any) => {
+          if (!c.title) {
+            throw new Error("Each course in the imported array must have a title.");
+          }
+          return {
+            ...c,
+            id: c.id || `imported_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            tier: c.tier || 'beginner',
+            level: c.level || 'Beginner'
+          };
+        });
+
+        const currentStandard = coursesStore.getStandardCoursesOnly();
+        const map = new Map<string, Course>();
+        currentStandard.forEach(c => { if (c.id) map.set(c.id, c); });
+        validated.forEach(c => map.set(c.id, c as Course));
+
+        for (const item of validated) {
+          coursesStore.saveCourse(item as Course);
+        }
+
+        setImportStatus({
+          type: 'success',
+          message: `Successfully imported ${validated.length} course(s)!`
+        });
+        setTimeout(() => setImportStatus(null), 6000);
+      } catch (err: any) {
+        console.error("Error importing JSON file:", err);
+        setImportStatus({
+          type: 'error',
+          message: `Failed to import JSON file: ${err.message}`
+        });
+      } finally {
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Load courses in real-time by subscribing to coursesStore updates
   useEffect(() => {
@@ -167,9 +270,19 @@ export default function CoursesAdmin() {
         ))}
       </div>
 
+      {/* Import/Export Status Feedback Banner */}
+      {importStatus && (
+        <div className={`p-4 rounded-xl border font-semibold text-xs flex items-center justify-between ${
+          importStatus.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          <span>{importStatus.message}</span>
+          <button type="button" onClick={() => setImportStatus(null)} className="text-slate-400 hover:text-slate-700 font-bold ml-2">✕</button>
+        </div>
+      )}
+
       {/* Control panel and filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
           <div>
             <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Filter by Skill</label>
             <select
@@ -209,13 +322,33 @@ export default function CoursesAdmin() {
           </div>
         </div>
 
-        <Link
-          to="/admin/courses/new"
-          className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-lg shadow-md hover:-translate-y-0.5 transition-all cursor-pointer text-xs flex items-center gap-1.5 self-start sm:self-auto border-0"
-        >
-          <Plus className="w-4 h-4 shrink-0" />
-          Create New Course
-        </Link>
+        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
+          {/* Export JSON Button */}
+          <button
+            type="button"
+            onClick={handleExportAll}
+            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-lg transition-all cursor-pointer text-xs flex items-center gap-1.5 border border-slate-300"
+            title="Download courses.json backup"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-600" />
+            Download JSON
+          </button>
+
+          {/* Import JSON Button */}
+          <label className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-lg transition-all cursor-pointer text-xs flex items-center gap-1.5 border border-slate-300">
+            <Upload className="w-3.5 h-3.5 text-slate-600" />
+            Import JSON
+            <input type="file" accept=".json" onChange={handleImportFile} className="hidden" />
+          </label>
+
+          <Link
+            to="/admin/courses/new"
+            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-lg shadow-md hover:-translate-y-0.5 transition-all cursor-pointer text-xs flex items-center gap-1.5 border-0"
+          >
+            <Plus className="w-4 h-4 shrink-0" />
+            Create New Course
+          </Link>
+        </div>
       </div>
 
       {/* Courses table / view card */}
@@ -348,6 +481,14 @@ export default function CoursesAdmin() {
                         >
                           Edit
                         </Link>
+                        <button
+                          type="button"
+                          onClick={() => handleExportSingle(c)}
+                          className="p-1.5 text-slate-600 hover:text-teal-700 hover:bg-teal-50 hover:border-teal-200 border border-transparent rounded-lg transition-all cursor-pointer"
+                          title="Export single course JSON"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => setDeleteDialogCourse(c)}
