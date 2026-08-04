@@ -1153,5 +1153,379 @@
     "updatedAt": "2026-08-04T08:18:06.694Z",
     "id": "najnq9llx",
     "createdAt": "2026-06-29T09:57:02.000Z"
+  },
+  {
+    "id": "psw96tm5o",
+    "title": "Building a Converting Landing Page",
+    "subtitle": "Master High-Converting Landing Page Design with AI.",
+    "tagline": "Master High-Converting Landing Page Design with AI.",
+    "thumbnail": "https://res.cloudinary.com/di4dlnd5x/image/upload/v1782725084/ChatGPT_Image_Jun_28_2026_06_27_11_PM_t7hyik.png",
+    "description": "📖 Course Overview\n\nWelcome to the CIYA Converting Landing Page Course. Learn how to build high-converting, single-page landing pages designed to generate leads, drive sales, and capture customer attention using modern AI tools.",
+    "overview": "📖 Course Overview\n\nWelcome to the CIYA Converting Landing Page Course. Learn how to build high-converting, single-page landing pages designed to generate leads, drive sales, and capture customer attention using modern AI tools.",
+    "category": "AI Website Class",
+    "skill": "web",
+    "subskill": "Frontend Development",
+    "skillPath": "Landing Page",
+    "durationMode": "standard",
+    "level": "Beginner",
+    "tier": "beginner",
+    "price": 0,
+    "instructor": "CIYA Team",
+    "outcomes": "🎯 Learning Outcomes\n\nUnderstand conversion rate optimization principles.\nBuild responsive landing pages using AI prompts.\nStructure compelling call-to-action sections.",
+    "requirements": "🛠 Requirements / Recommendations\nNo coding experience needed.\nSmartphone, tablet, or laptop.\nInternet connection.",
+    "publish_status": "Published",
+    "status": "published",
+    "isLocked": false,
+    "createdAt": "2026-06-29T09:57:02.000Z",
+    "updatedAt": "2026-08-04T11:31:44.959Z",
+    "days": [
+      {
+        "dayNumber": 1,
+        "title": "DAY 1: INTRODUCTION TO HIGH-CONVERTING LANDING PAGES",
+        "description": "Understand what makes a landing page convert visitors into paying clients or leads.",
+        "assignment": {
+          "prompt": "Watch the Day 1 video on our YouTube channel, subscribe, and follow the instructions to create your landing page wireframe.",
+          "dueNote": "Submission deadline is 12:00 noon of Day 2."
+        },
+        "videos": [
+          {
+            "id": "lp-day1-v1",
+            "title": "LANDING PAGE FUNDAMENTALS",
+            "video_url": "https://youtu.id/E2RFE4wdIgE",
+            "url": "https://youtu.id/E2RFE4wdIgE",
+            "duration": "08:00 min",
+            "description": "Overview of high-converting landing page layouts and key structural components.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "statement": "A landing page should focus on a single primary call to action (CTA).",
+                "answer": true,
+                "explanation": "High-converting landing pages minimize distractions by driving traffic toward one clear goal."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Landing pages with a single CTA can increase conversion rates by up to 37%."
+            }
+          }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "title": "DAY 2: LANDING PAGE COPYWRITING & AI PROMPTING",
+        "description": "Learn how to generate compelling headlines, benefits, and call-to-actions with AI.",
+        "assignment": {
+          "prompt": "Use ChatGPT to craft headline options for your business landing page and submit the screenshots.",
+          "dueNote": "Submission deadline is 12:00 noon of Day 3."
+        },
+        "videos": [
+          {
+            "id": "lp-day2-v1",
+            "title": "AI COPYWRITING FOR LANDING PAGES",
+            "video_url": "https://youtu.id/E2RFE4wdIgE",
+            "url": "https://youtu.id/E2RFE4wdIgE",
+            "duration": "10:00 min",
+            "description": "How to write persuasive web copy using proven conversion frameworks like AIDA and PAS.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "statement": "Headlines are the most critical text element on a landing page.",
+                "answer": true,
+                "explanation": "8 out of 10 visitors will read your headline before deciding whether to scroll down."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Clear headlines outperform clever headlines by over 200% in conversion tests."
+            }
+          }
+        ]
+      },
+      {
+        "dayNumber": 3,
+        "title": "DAY 3: BUILDING THE HERO & CTA SECTIONS",
+        "description": "Assemble your hero banner, lead headline, subheadings, and primary action buttons.",
+        "assignment": {
+          "prompt": "Build your Hero section following the video guide and submit your project preview link and screenshots.",
+          "dueNote": "Submission deadline is 12:00 noon of Day 4."
+        },
+        "videos": [
+          {
+            "id": "lp-day3-v1",
+            "title": "HERO SECTION MASTERY",
+            "video_url": "https://youtu.id/E2RFE4wdIgE",
+            "url": "https://youtu.id/E2RFE4wdIgE",
+            "duration": "12:00 min",
+            "description": "Designing above-the-fold content that captures immediate visitor interest.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "statement": "The Hero section is the first screen visitors see when loading your landing page.",
+                "answer": true,
+                "explanation": "The Hero section determines visitor first impressions within the first 3 seconds."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Users form an opinion about your website in less than 50 milliseconds."
+            }
+          }
+        ]
+      },
+      {
+        "dayNumber": 4,
+        "title": "DAY 4: ADDING LEAD GENERATION, FORMS & SOCIAL PROOF",
+        "description": "Integrate contact forms, testimonials, and trust badges to boost credibility.",
+        "assignment": {
+          "prompt": "Incorporate a contact/lead form and at least 3 testimonial cards on your landing page.",
+          "dueNote": "Submission deadline is 12:00 noon of Day 5."
+        },
+        "videos": [
+          {
+            "id": "lp-day4-v1",
+            "title": "LEAD FORMS & SOCIAL PROOF",
+            "video_url": "https://youtu.id/E2RFE4wdIgE",
+            "url": "https://youtu.id/E2RFE4wdIgE",
+            "duration": "09:00 min",
+            "description": "Leveraging social proof and frictionless forms to maximize lead capture.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "statement": "Adding customer testimonials increases visitor trust and conversion rates.",
+                "answer": true,
+                "explanation": "Social proof reassures potential buyers that others have had a positive experience."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Displaying reviews can increase conversion rates by up to 270%."
+            }
+          }
+        ]
+      },
+      {
+        "dayNumber": 5,
+        "title": "DAY 5: LAUNCHING, DOMAIN SETUP & ANALYTICS",
+        "description": "Publish your high-converting landing page to a live domain and connect lead channels.",
+        "assignment": {
+          "prompt": "Publish your finished Landing Page live on Netlify / Vercel and submit your public URL in the assignment portal.",
+          "dueNote": "Final course project submission."
+        },
+        "videos": [
+          {
+            "id": "lp-day5-v1",
+            "title": "PUBLISHING & LAUNCH",
+            "video_url": "https://youtu.id/E2RFE4wdIgE",
+            "url": "https://youtu.id/E2RFE4wdIgE",
+            "duration": "11:00 min",
+            "description": "Final checklist for launching your live landing page to the public.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "statement": "A custom domain name makes your landing page appear more professional.",
+                "answer": true,
+                "explanation": "Branded domain names build authority and trust with visitors."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "You can launch a fully functional landing page in under an hour using modern AI builders."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qlpspor4hm",
+    "title": "Premium E-Commerce Website Development",
+    "subtitle": "Create Scalable Online Stores and E-Commerce Platforms.",
+    "tagline": "Create Scalable Online Stores and E-Commerce Platforms.",
+    "thumbnail": "https://res.cloudinary.com/di4dlnd5x/image/upload/v1782725084/ChatGPT_Image_Jun_28_2026_06_27_11_PM_t7hyik.png",
+    "description": "📖 Course Overview\n\nWelcome to the CIYA E-Commerce Website Development Course. Learn how to design, build, and deploy full e-commerce online store websites with product catalogs, shopping carts, and payment integrations.",
+    "overview": "📖 Course Overview\n\nWelcome to the CIYA E-Commerce Website Development Course. Learn how to design, build, and deploy full e-commerce online store websites with product catalogs, shopping carts, and payment integrations.",
+    "category": "AI Website Class",
+    "skill": "web",
+    "subskill": "Frontend Development",
+    "skillPath": "E-Commerce",
+    "durationMode": "standard",
+    "level": "Beginner",
+    "tier": "beginner",
+    "price": 0,
+    "instructor": "CIYA Team",
+    "outcomes": "🎯 Learning Outcomes\n\nUnderstand online store architecture.\nBuild interactive product catalogs with filters.\nIntegrate cart drawers and checkout flows.",
+    "requirements": "🛠 Requirements / Recommendations\nNo coding experience needed.\nSmartphone, tablet, or laptop.\nInternet connection.",
+    "publish_status": "Published",
+    "status": "published",
+    "isLocked": false,
+    "createdAt": "2026-06-29T09:57:02.000Z",
+    "updatedAt": "2026-08-04T11:31:44.959Z",
+    "days": [
+      {
+        "dayNumber": 1,
+        "title": "DAY 1: INTRODUCTION TO E-COMMERCE WEBSITES & DIGITAL STORES",
+        "description": "Learn the fundamentals of modern e-commerce stores, product listings, and digital sales funnels.",
+        "assignment": {
+          "prompt": "Watch the Day 1 video on our YouTube channel and define your e-commerce store niche and product line.",
+          "dueNote": "Submission deadline is 12:00 noon of Day 2."
+        },
+        "videos": [
+          {
+            "id": "ec-day1-v1",
+            "title": "E-COMMERCE ESSENTIALS",
+            "video_url": "https://youtu.id/E2RFE4wdIgE",
+            "url": "https://youtu.id/E2RFE4wdIgE",
+            "duration": "09:00 min",
+            "description": "Core components of high-performing e-commerce storefronts.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "statement": "E-commerce websites allow customers to browse and purchase products online 24/7.",
+                "answer": true,
+                "explanation": "Online stores operate continuously, enabling global sales around the clock."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Global e-commerce sales exceed 5 trillion dollars annually."
+            }
+          }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "title": "DAY 2: PRODUCT CATALOG STRUCTURE & AI INVENTORY SETUP",
+        "description": "Set up product grids, categories, pricing, descriptions, and high-quality product images.",
+        "assignment": {
+          "prompt": "Generate product descriptions for 3 items using AI and upload product images to your catalog store.",
+          "dueNote": "Submission deadline is 12:00 noon of Day 3."
+        },
+        "videos": [
+          {
+            "id": "ec-day2-v1",
+            "title": "BUILDING PRODUCT CATALOGS",
+            "video_url": "https://youtu.id/E2RFE4wdIgE",
+            "url": "https://youtu.id/E2RFE4wdIgE",
+            "duration": "11:00 min",
+            "description": "Organizing product inventory and creating compelling product pages.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "statement": "High-quality product images are critical for online purchasing decisions.",
+                "answer": true,
+                "explanation": "Visual clarity builds confidence when shoppers cannot physically touch products."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "75% of online shoppers rely on product photos when making a buying decision."
+            }
+          }
+        ]
+      },
+      {
+        "dayNumber": 3,
+        "title": "DAY 3: SHOPPING CART, CHECKOUT & PAYMENT GATEWAY INTEGRATION",
+        "description": "Implement shopping carts, instant checkout drawers, and payment links (e.g. Paystack / Flutterwave).",
+        "assignment": {
+          "prompt": "Build the shopping cart drawer and connect payment/WhatsApp checkout links for your store.",
+          "dueNote": "Submission deadline is 12:00 noon of Day 4."
+        },
+        "videos": [
+          {
+            "id": "ec-day3-v1",
+            "title": "CARTS & CHECKOUT FLOWS",
+            "video_url": "https://youtu.id/E2RFE4wdIgE",
+            "url": "https://youtu.id/E2RFE4wdIgE",
+            "duration": "13:00 min",
+            "description": "Reducing cart abandonment with frictionless payment options.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "statement": "A simple checkout process reduces cart abandonment rate.",
+                "answer": true,
+                "explanation": "Complicated checkout flows cause over 18% of shoppers to abandon their purchases."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Offering one-click or direct WhatsApp checkout can double conversion rates for local stores."
+            }
+          }
+        ]
+      },
+      {
+        "dayNumber": 4,
+        "title": "DAY 4: E-COMMERCE MARKETING & TRUST ELEMENTS",
+        "description": "Add customer reviews, security badges, shipping calculators, and refund policies.",
+        "assignment": {
+          "prompt": "Incorporate customer reviews, shipping policy badges, and trust icons into your store product pages.",
+          "dueNote": "Submission deadline is 12:00 noon of Day 5."
+        },
+        "videos": [
+          {
+            "id": "ec-day4-v1",
+            "title": "STORE TRUST & CONVERSION BOOSTER",
+            "video_url": "https://youtu.id/E2RFE4wdIgE",
+            "url": "https://youtu.id/E2RFE4wdIgE",
+            "duration": "10:00 min",
+            "description": "Building trust elements that assure buyers their transactions are safe.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "statement": "Clear refund and shipping policies increase shopper trust.",
+                "answer": true,
+                "explanation": "Transparent policies reassure first-time buyers."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "67% of shoppers check return policies before making a purchase."
+            }
+          }
+        ]
+      },
+      {
+        "dayNumber": 5,
+        "title": "DAY 5: LAUNCHING YOUR ONLINE STORE & ORDER MANAGEMENT",
+        "description": "Publish your complete e-commerce website live and test placing real orders.",
+        "assignment": {
+          "prompt": "Publish your finished E-Commerce website to Netlify / Vercel and submit your store link in the assignment portal.",
+          "dueNote": "Final course project submission."
+        },
+        "videos": [
+          {
+            "id": "ec-day5-v1",
+            "title": "ONLINE STORE LAUNCH",
+            "video_url": "https://youtu.id/E2RFE4wdIgE",
+            "url": "https://youtu.id/E2RFE4wdIgE",
+            "duration": "12:00 min",
+            "description": "Final walkthrough for going live with your e-commerce store.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "statement": "Testing the order placement flow before launching is essential.",
+                "answer": true,
+                "explanation": "Verifying checkout functionality prevents lost customer orders on launch day."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "You can manage a profitable online store entirely from your smartphone."
+            }
+          }
+        ]
+      }
+    ]
   }
 ]
