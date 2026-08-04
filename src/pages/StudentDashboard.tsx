@@ -787,7 +787,9 @@ function isDayUnlockedUnified(
   // Determine student's existing progress or organic unlocking for this day di
   const hasSubmissionsForThisDay = dbSubmissions.some((sub: any) => sub.dayIndex >= di);
   const dayVideos = days[di]?.videos || [];
-  const hasCompletedVideosForThisDay = dayVideos.length > 0 && dayVideos.some((v: any) => completedKeys.includes(v.id || v.youtubeId));
+  const hasCompletedVideosForThisDay = dayVideos.length > 0 && dayVideos.some((v: any, vi: number) => 
+    completedKeys.includes(`${di}-${vi}`) || completedKeys.includes(v.id) || completedKeys.includes(v.youtubeId)
+  );
   
   const progressStore = userProfile?.progress?.[courseId || ''] || {};
   const quizScores = progressStore.quizScores || {};
@@ -795,7 +797,9 @@ function isDayUnlockedUnified(
 
   const precedingApproved = di > 0 && dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
   const precedingVideos = di > 0 ? (days[di - 1]?.videos || []) : [];
-  const precedingVideosCompleted = di > 0 && precedingVideos.length > 0 && precedingVideos.every((v: any) => completedKeys.includes(v.id || v.youtubeId));
+  const precedingVideosCompleted = di > 0 && precedingVideos.length > 0 && precedingVideos.every((v: any, vi: number) => 
+    completedKeys.includes(`${di - 1}-${vi}`) || completedKeys.includes(v.id) || completedKeys.includes(v.youtubeId)
+  );
   const precedingQuizScores = di > 0 && Object.keys(quizScores).some(key => key.startsWith(`${di-1}-`));
 
   const hasActivityOnThisDayOrLater = hasSubmissionsForThisDay || hasCompletedVideosForThisDay || hasQuizScoresForThisDay;
@@ -1298,56 +1302,75 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
     setHasPassed(passesQuiz);
     setSubmitted(true);
 
-    if (isExpress) {
-      // Bypasses storing the score in the user profile document for express courses, but unlocks next parts locally
-      if (passesQuiz) {
-        showToast(`Quiz completed: ${finalPct}%! 🎉 (Progress not recorded for Express Track)`);
-        onSuccess();
-      }
-      return;
-    }
-
     try {
       const dbScores = userProfile?.progress?.[courseId]?.quizScores || {};
       const existingScoreRecord = dbScores[checkKey];
 
-      // Optimistic update of local userProfile state and safeStorage cache!
-      if (setUserProfile) {
-        const currentProgress = userProfile?.progress?.[courseId] || {};
-        const currentScores = currentProgress.quizScores || {};
-        let updatedScores = { ...currentScores };
-        
-        if (!existingScoreRecord) {
+      const currentProgress = userProfile?.progress?.[courseId] || {};
+      const currentScores = currentProgress.quizScores || {};
+      let updatedScores = { ...currentScores };
+      
+      if (!existingScoreRecord) {
+        updatedScores[checkKey] = {
+          score: finalPct,
+          passed: passesQuiz,
+          answeredAt: new Date().toLocaleString(),
+          firstAttemptRecorded: true
+        };
+      } else {
+        if (passesQuiz && !existingScoreRecord.passed) {
           updatedScores[checkKey] = {
-            score: finalPct,
-            passed: passesQuiz,
-            answeredAt: new Date().toLocaleString(),
-            firstAttemptRecorded: true
+            ...existingScoreRecord,
+            passed: true
           };
-        } else {
-          if (passesQuiz && !existingScoreRecord.passed) {
-            updatedScores[checkKey] = {
-              ...existingScoreRecord,
-              passed: true
-            };
+        }
+      }
+
+      const currentPassed = currentProgress.checkPassed || [];
+      const updatedPassed = passesQuiz 
+        ? Array.from(new Set([...currentPassed, checkKey]))
+        : currentPassed;
+
+      const updatedProfile = {
+        ...userProfile,
+        progress: {
+          ...(userProfile?.progress || {}),
+          [courseId]: {
+            ...currentProgress,
+            quizScores: updatedScores,
+            checkPassed: updatedPassed
           }
         }
+      };
 
-        const updatedProfile = {
-          ...userProfile,
-          progress: {
-            ...(userProfile?.progress || {}),
-            [courseId]: {
-              ...currentProgress,
-              quizScores: updatedScores
-            }
-          }
-        };
+      if (setUserProfile) {
         setUserProfile(updatedProfile);
         safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
       }
 
-      // Buffer quiz score locally in the localDayProgress buffer in localStorage
+      // Real-time Cloud Firestore synchronization
+      if (currentUser?.uid) {
+        try {
+          const userRef = doc(db, 'users', currentUser.uid);
+          const updatePayload: any = {
+            [`progress.${courseId}.quizScores.${checkKey}`]: {
+              score: finalPct,
+              passed: passesQuiz,
+              answeredAt: new Date().toLocaleString(),
+              firstAttemptRecorded: true
+            },
+            updatedAt: serverTimestamp()
+          };
+          if (passesQuiz) {
+            updatePayload[`progress.${courseId}.checkPassed`] = updatedPassed;
+          }
+          await setDoc(userRef, updatePayload, { merge: true });
+        } catch (dbSyncErr) {
+          console.warn("Firestore quiz sync deferred, cached locally:", dbSyncErr);
+        }
+      }
+
+      // Buffer quiz score locally in localStorage as offline fallback
       try {
         const activeDayIdx = parseInt(checkKey.split('-')[0]) || 0;
         const stored = localStorage.getItem(`ciya_local_day_progress_${courseId}`);
@@ -1368,16 +1391,16 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
         localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(currentLocal));
         
         if (!existingScoreRecord) {
-          showToast(`First Attempt recorded: ${finalPct}%! 🎉 (Progress buffered locally)`);
+          showToast(`First Attempt recorded: ${finalPct}%! 🎉 (Synced to Cloud)`);
         } else if (passesQuiz && !existingScoreRecord.passed) {
-          showToast(`Module updated as passed! (Progress buffered locally)`);
+          showToast(`Module updated as passed! (Synced to Cloud)`);
         }
       } catch (dbErr) {
         console.warn("Database sync deferred (buffered), progress saved to local cache:", dbErr);
         if (!existingScoreRecord) {
-          showToast(`First Attempt recorded: ${finalPct}%! 🎉 (Cached Offline)`);
+          showToast(`First Attempt recorded: ${finalPct}%! 🎉`);
         } else if (passesQuiz && !existingScoreRecord.passed) {
-          showToast(`Module updated as passed! (Cached Offline)`);
+          showToast(`Module updated as passed!`);
         }
       }
 
@@ -1955,14 +1978,17 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     }
   }, [courseId]);
 
-  const progressStore = isExpress 
-    ? {
+  const progressStore = useMemo(() => {
+    if (isExpress) {
+      return {
         ...dbProgressStore,
-        watched: localExpressProgress.watched,
-        checkPassed: localExpressProgress.checkPassed,
-        quizScores: {} // No quiz scores saved in Firestore profile for express courses
-      }
-    : dbProgressStore;
+        watched: Array.from(new Set([...(dbProgressStore.watched || []), ...(localExpressProgress.watched || [])])),
+        checkPassed: Array.from(new Set([...(dbProgressStore.checkPassed || []), ...(localExpressProgress.checkPassed || [])])),
+        quizScores: dbProgressStore.quizScores || {}
+      };
+    }
+    return dbProgressStore;
+  }, [dbProgressStore, isExpress, localExpressProgress]);
   
   const dbSubmissions = useMemo(() => {
     if (!allMySubmissions) return [];
@@ -2090,23 +2116,48 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     if (hasCheck && !isCheckPassed && !isQuizBypassed) {
       setShowQuizModal(true);
     } else {
-      const updatedWatched = [...completedKeys];
-      if (!updatedWatched.includes(checkKey)) {
-        updatedWatched.push(checkKey);
-      }
+      const updatedWatched = Array.from(new Set([...completedKeys, checkKey]));
       
+      const updatedProfile = {
+        ...userProfile,
+        progress: {
+          ...(userProfile?.progress || {}),
+          [courseId]: {
+            ...(userProfile?.progress?.[courseId] || {}),
+            watched: updatedWatched
+          }
+        }
+      };
+      setUserProfile(updatedProfile);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
       if (isExpress) {
-        // Save to localStorage
         const newProgress = { watched: updatedWatched, checkPassed: checkPassedKeys };
         localStorage.setItem(`ciya_express_progress_${courseId}`, JSON.stringify(newProgress));
         setLocalExpressProgress(newProgress);
-        showToast("Lesson marked as completed! ✓ (Progress saved locally)");
-        return;
+      }
+
+      // Real-time Cloud Firestore synchronization
+      if (currentUser?.uid) {
+        try {
+          const userRef = doc(db, 'users', currentUser.uid);
+          const updatePayload: any = {
+            [`progress.${courseId}.watched`]: updatedWatched,
+            updatedAt: serverTimestamp()
+          };
+          await setDoc(userRef, updatePayload, { merge: true });
+          showToast("Lesson marked as completed! ✓ Progress synced to Cloud! 🚀");
+        } catch (dbErr) {
+          console.error("Firestore sync failed on mark complete:", dbErr);
+          showToast("Lesson marked as completed! ✓ (Saved offline)");
+        }
+      } else {
+        showToast("Lesson marked as completed! ✓");
       }
 
       // Check if this completes the entire day's lessons
       const dayKeys = videos.map((_, vi) => `${activeDayIdx}-${vi}`);
-      const isDayFinishedWithThis = dayKeys.every(k => k === checkKey || completedKeys.includes(k));
+      const isDayFinishedWithThis = dayKeys.every(k => updatedWatched.includes(k));
 
       // Check if all checks of the day are also passed
       const allChecksPassed = appSettings?.quizzesOverrideMode === 'bypassed' || videos.every((v, vi) => {
@@ -2118,215 +2169,71 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       const dayFullyCompleted = isDayFinishedWithThis && allChecksPassed;
 
       if (dayFullyCompleted) {
-        // Retrieve buffered quiz scores for this day
-        let dayQuizScores: Record<string, any> = {};
-        try {
-          const storedLocal = localStorage.getItem(`ciya_local_day_progress_${courseId}`);
-          const localData = storedLocal ? JSON.parse(storedLocal) : {};
-          const dayData = localData[activeDayIdx] || { quizScores: {} };
-          dayQuizScores = dayData.quizScores || {};
-        } catch (e) {
-          console.warn("Error reading local day progress scores:", e);
-        }
-
-        // Synced write to Firestore!
-        try {
-          const finalWatched = Array.from(new Set([...(userProfile?.progress?.[courseId]?.watched || []), ...updatedWatched]));
-          
-          const updatedProfile = {
-            ...userProfile,
-            progress: {
-              ...(userProfile?.progress || {}),
-              [courseId]: {
-                ...(userProfile?.progress?.[courseId] || {}),
-                watched: finalWatched
-              }
-            }
-          };
-          setUserProfile(updatedProfile);
-          safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
-
-          const userRef = doc(db, 'users', currentUser.uid);
-          const updatePayload: any = {
-            [`progress.${courseId}.watched`]: finalWatched,
-            updatedAt: serverTimestamp()
-          };
-
-          // Merge buffered quiz scores into the Firestore update payload
-          Object.keys(dayQuizScores).forEach((scoreKey) => {
-            updatePayload[`progress.${courseId}.quizScores.${scoreKey}`] = dayQuizScores[scoreKey];
-          });
-
-          await updateDoc(userRef, updatePayload);
-
-          // Remove day buffer
-          const updatedLocalDayProgress = { ...localDayProgress };
-          delete updatedLocalDayProgress[activeDayIdx];
-          localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(updatedLocalDayProgress));
-          setLocalDayProgress(updatedLocalDayProgress);
-
-          showToast(`Full Day ${activeDayIdx + 1} Completed! Progress synced to Cloud Firestore! 🎓🚀`);
-          checkAndMarkCourseCompleted(updatedProfile, course, currentUser, setUserProfile, showToast);
-        } catch (dbErr) {
-          console.error("Database sync failed on day completion:", dbErr);
-          showToast(`Full Day ${activeDayIdx + 1} Completed! (Progress saved offline)`);
-        }
-      } else {
-        // Buffer locally!
-        const currentDayLocal = localDayProgress[activeDayIdx] || { watched: [], checkPassed: [], quizScores: {} };
-        const updatedLocalDayProgress = {
-          ...localDayProgress,
-          [activeDayIdx]: {
-            ...currentDayLocal,
-            watched: Array.from(new Set([...currentDayLocal.watched, checkKey]))
-          }
-        };
-        localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(updatedLocalDayProgress));
-        setLocalDayProgress(updatedLocalDayProgress);
-
-        // Update local profile state immediately so UI changes reactively
-        const updatedProfile = {
-          ...userProfile,
-          progress: {
-            ...(userProfile?.progress || {}),
-            [courseId]: {
-              ...(userProfile?.progress?.[courseId] || {}),
-              watched: Array.from(new Set([...(userProfile?.progress?.[courseId]?.watched || []), checkKey]))
-            }
-          }
-        };
-        setUserProfile(updatedProfile);
-        safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
-
-        showToast("Lesson completed! ✓ (Progress saved in browser buffer until entire Day is finished)");
+        checkAndMarkCourseCompleted(updatedProfile, course, currentUser, setUserProfile, showToast);
       }
     }
   };
 
   const handleCheckCompletion = async () => {
-    const updatedWatched = [...completedKeys];
-    if (!updatedWatched.includes(checkKey)) {
-      updatedWatched.push(checkKey);
-    }
+    const updatedWatched = Array.from(new Set([...completedKeys, checkKey]));
+    const updatedPassed = Array.from(new Set([...checkPassedKeys, checkKey]));
 
-    const updatedPassed = [...checkPassedKeys];
-    if (!updatedPassed.includes(checkKey)) {
-      updatedPassed.push(checkKey);
-    }
+    const updatedProfile = {
+      ...userProfile,
+      progress: {
+        ...(userProfile?.progress || {}),
+        [courseId]: {
+          ...(userProfile?.progress?.[courseId] || {}),
+          watched: updatedWatched,
+          checkPassed: updatedPassed
+        }
+      }
+    };
+    setUserProfile(updatedProfile);
+    safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
     if (isExpress) {
-      // Save to localStorage
       const newProgress = { watched: updatedWatched, checkPassed: updatedPassed };
       localStorage.setItem(`ciya_express_progress_${courseId}`, JSON.stringify(newProgress));
       setLocalExpressProgress(newProgress);
-      setShowQuizModal(false);
-      showToast("Comprehension check passed! Lesson unlocked! 🎉 (Progress saved locally)");
-      return;
+    }
+
+    setShowQuizModal(false);
+
+    // Real-time Cloud Firestore synchronization
+    if (currentUser?.uid) {
+      try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const updatePayload: any = {
+          [`progress.${courseId}.watched`]: updatedWatched,
+          [`progress.${courseId}.checkPassed`]: updatedPassed,
+          updatedAt: serverTimestamp()
+        };
+        await setDoc(userRef, updatePayload, { merge: true });
+        showToast("Comprehension check passed! Lesson unlocked! 🎉 Synced to Cloud! 🚀");
+      } catch (dbErr) {
+        console.error("Firestore sync failed on check complete:", dbErr);
+        showToast("Comprehension check passed! Lesson unlocked! 🎉 (Saved offline)");
+      }
+    } else {
+      showToast("Comprehension check passed! Lesson unlocked! 🎉");
     }
 
     // Check if this completes the entire day's lessons
     const dayKeys = videos.map((_, vi) => `${activeDayIdx}-${vi}`);
-    const isDayFinishedWithThis = dayKeys.every(k => k === checkKey || completedKeys.includes(k));
+    const isDayFinishedWithThis = dayKeys.every(k => updatedWatched.includes(k));
 
     // Check if all checks of the day are also passed
     const allChecksPassed = videos.every((v, vi) => {
       const k = `${activeDayIdx}-${vi}`;
       const hasQuiz = !!(v && v.checkType && v.checkType !== 'none' && v.check);
-      return !hasQuiz || k === checkKey || checkPassedKeys.includes(k);
+      return !hasQuiz || updatedPassed.includes(k);
     });
 
     const dayFullyCompleted = isDayFinishedWithThis && allChecksPassed;
 
     if (dayFullyCompleted) {
-      // Retrieve buffered quiz scores for this day
-      let dayQuizScores: Record<string, any> = {};
-      try {
-        const storedLocal = localStorage.getItem(`ciya_local_day_progress_${courseId}`);
-        const localData = storedLocal ? JSON.parse(storedLocal) : {};
-        const dayData = localData[activeDayIdx] || { quizScores: {} };
-        dayQuizScores = dayData.quizScores || {};
-      } catch (e) {
-        console.warn("Error reading local day progress scores:", e);
-      }
-
-      // Synced write to Firestore!
-      try {
-        const finalWatched = Array.from(new Set([...(userProfile?.progress?.[courseId]?.watched || []), ...updatedWatched]));
-        const finalPassed = Array.from(new Set([...(userProfile?.progress?.[courseId]?.checkPassed || []), ...updatedPassed]));
-
-        const updatedProfile = {
-          ...userProfile,
-          progress: {
-            ...(userProfile?.progress || {}),
-            [courseId]: {
-              ...(userProfile?.progress?.[courseId] || {}),
-              watched: finalWatched,
-              checkPassed: finalPassed
-            }
-          }
-        };
-        setUserProfile(updatedProfile);
-        safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
-
-        const userRef = doc(db, 'users', currentUser.uid);
-        const updatePayload: any = {
-          [`progress.${courseId}.watched`]: finalWatched,
-          [`progress.${courseId}.checkPassed`]: finalPassed,
-          updatedAt: serverTimestamp()
-        };
-
-        // Merge buffered quiz scores into the Firestore update payload
-        Object.keys(dayQuizScores).forEach((scoreKey) => {
-          updatePayload[`progress.${courseId}.quizScores.${scoreKey}`] = dayQuizScores[scoreKey];
-        });
-
-        await updateDoc(userRef, updatePayload);
-
-        // Remove day buffer
-        const updatedLocalDayProgress = { ...localDayProgress };
-        delete updatedLocalDayProgress[activeDayIdx];
-        localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(updatedLocalDayProgress));
-        setLocalDayProgress(updatedLocalDayProgress);
-
-        setShowQuizModal(false);
-        showToast(`Full Day ${activeDayIdx + 1} Completed! Progress synced to Cloud Firestore! 🎓🚀`);
-        checkAndMarkCourseCompleted(updatedProfile, course, currentUser, setUserProfile, showToast);
-      } catch (dbErr) {
-        console.error("Database sync failed on day completion:", dbErr);
-        setShowQuizModal(false);
-        showToast(`Full Day ${activeDayIdx + 1} Completed! (Progress saved offline)`);
-      }
-    } else {
-      // Buffer locally!
-      const currentDayLocal = localDayProgress[activeDayIdx] || { watched: [], checkPassed: [], quizScores: {} };
-      const updatedLocalDayProgress = {
-        ...localDayProgress,
-        [activeDayIdx]: {
-          ...currentDayLocal,
-          watched: Array.from(new Set([...currentDayLocal.watched, checkKey])),
-          checkPassed: Array.from(new Set([...currentDayLocal.checkPassed, checkKey]))
-        }
-      };
-      localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(updatedLocalDayProgress));
-      setLocalDayProgress(updatedLocalDayProgress);
-
-      // Update local profile state immediately so UI changes reactively
-      const updatedProfile = {
-        ...userProfile,
-        progress: {
-          ...(userProfile?.progress || {}),
-          [courseId]: {
-            ...(userProfile?.progress?.[courseId] || {}),
-            watched: Array.from(new Set([...(userProfile?.progress?.[courseId]?.watched || []), checkKey])),
-            checkPassed: Array.from(new Set([...(userProfile?.progress?.[courseId]?.checkPassed || []), checkKey]))
-          }
-        }
-      };
-      setUserProfile(updatedProfile);
-      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
-
-      setShowQuizModal(false);
-      showToast("Comprehension check passed! Lesson unlocked! ✓ (Progress buffered in browser until entire Day is completed)");
+      checkAndMarkCourseCompleted(updatedProfile, course, currentUser, setUserProfile, showToast);
     }
   };
 
