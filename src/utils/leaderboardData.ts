@@ -12,11 +12,17 @@ export interface LeaderboardEntry {
 
 // Cohort 1 and Cohort 2 leaderboards are permanently removed/destroyed.
 // Only static JSON for Cohort 3 (and future active cohorts) is served.
-export const staticCohort3Leaderboard: LeaderboardEntry[] = (staticLeaderboardJson as any[]).map((item, idx) => ({
+const rawEntries: any[] = Array.isArray(staticLeaderboardJson)
+  ? staticLeaderboardJson
+  : Array.isArray((staticLeaderboardJson as any)?.rankings)
+  ? (staticLeaderboardJson as any).rankings
+  : [];
+
+export const staticCohort3Leaderboard: LeaderboardEntry[] = rawEntries.map((item, idx) => ({
   rank: item.rank || idx + 1,
   fullName: item.fullName || item.name || 'Student',
   email: item.email || '',
-  score: item.score || item.totalScore || 0,
+  score: item.totalScore ?? item.score ?? 0,
   lessonsCompleted: item.lessonsCompleted || 0,
   quizzesPassed: item.quizzesPassed || 0,
   cohort: item.cohort || 'Cohort 3'
