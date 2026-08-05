@@ -762,6 +762,76 @@ export function getBadgeExpiryTimestamp(profile: any): number {
   return 0;
 }
 
+// Helper to normalize user profile progress maps and repair flat dotted keys
+export function normalizeProfileData(profile: any): any {
+  if (!profile || typeof profile !== 'object') return profile;
+  const normalized = { ...profile };
+
+  if (!normalized.progress || typeof normalized.progress !== 'object') {
+    normalized.progress = {};
+  } else {
+    normalized.progress = { ...normalized.progress };
+  }
+
+  // Fold any top-level "progress.courseId.something" keys into normalized.progress[courseId]
+  Object.keys(profile).forEach((key) => {
+    if (key.startsWith('progress.')) {
+      const parts = key.split('.');
+      if (parts.length >= 3) {
+        const cId = parts[1];
+        const subProp = parts[2];
+        const val = profile[key];
+
+        if (!normalized.progress[cId] || typeof normalized.progress[cId] !== 'object') {
+          normalized.progress[cId] = { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
+        } else {
+          normalized.progress[cId] = { ...normalized.progress[cId] };
+        }
+
+        if (subProp === 'watched' && Array.isArray(val)) {
+          const existingWatched = normalized.progress[cId].watched || [];
+          normalized.progress[cId].watched = Array.from(new Set([...existingWatched, ...val]));
+        } else if (subProp === 'checkPassed' && Array.isArray(val)) {
+          const existingPassed = normalized.progress[cId].checkPassed || [];
+          normalized.progress[cId].checkPassed = Array.from(new Set([...existingPassed, ...val]));
+        } else if (subProp === 'quizScores') {
+          const existingScores = { ...(normalized.progress[cId].quizScores || {}) };
+          if (parts.length >= 4) {
+            const checkKey = parts.slice(3).join('.');
+            existingScores[checkKey] = val;
+          } else if (val && typeof val === 'object') {
+            Object.assign(existingScores, val);
+          }
+          normalized.progress[cId].quizScores = existingScores;
+        }
+      }
+    }
+  });
+
+  // Ensure every course in normalized.progress merges quizScores into checkPassed if passed: true
+  Object.keys(normalized.progress).forEach((cId) => {
+    const cStore = { ...normalized.progress[cId] };
+    const watched = Array.isArray(cStore.watched) ? cStore.watched : [];
+    const checkPassed = Array.isArray(cStore.checkPassed) ? [...cStore.checkPassed] : [];
+    const quizScores = cStore.quizScores || {};
+
+    Object.keys(quizScores).forEach((ck) => {
+      if (quizScores[ck] && quizScores[ck].passed && !checkPassed.includes(ck)) {
+        checkPassed.push(ck);
+      }
+    });
+
+    normalized.progress[cId] = {
+      ...cStore,
+      watched: Array.from(new Set(watched)),
+      checkPassed: Array.from(new Set(checkPassed)),
+      quizScores
+    };
+  });
+
+  return normalized;
+}
+
 // Helper to determine if a user's Year Badge is active and not expired
 export function isBadgeActive(profile: any): boolean {
   if (!profile || !profile.hasYearBadge) return false;
@@ -987,7 +1057,8 @@ function isLessonUnlockedUnified(
     const hasQuiz = vItem.checkType && vItem.checkType !== 'none' && vItem.check;
     if (hasQuiz) {
       const key = `${di}-${v}`;
-      const isPassed = checkPassedKeys.includes(key);
+      const cScores = userProfile?.progress?.[courseId || '']?.quizScores || {};
+      const isPassed = checkPassedKeys.includes(key) || !!(cScores[key] && cScores[key].passed);
       if (!isPassed) {
         return false;
       }
@@ -1343,28 +1414,30 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
         }
       };
 
+      const normalizedProfile = normalizeProfileData(updatedProfile);
+
       if (setUserProfile) {
-        setUserProfile(updatedProfile);
-        safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+        setUserProfile(normalizedProfile);
+        safeStorage.setItem('ciya_cached_profile', JSON.stringify(normalizedProfile));
       }
 
       // Real-time Cloud Firestore synchronization
       if (currentUser?.uid) {
         try {
           const userRef = doc(db, 'users', currentUser.uid);
-          const updatePayload: any = {
-            [`progress.${courseId}.quizScores.${checkKey}`]: {
-              score: finalPct,
-              passed: passesQuiz,
-              answeredAt: new Date().toLocaleString(),
-              firstAttemptRecorded: true
+          const existingCourseStore = userProfile?.progress?.[courseId] || {};
+          const updatedCourseStore = {
+            ...existingCourseStore,
+            quizScores: updatedScores,
+            checkPassed: updatedPassed,
+            updatedAt: new Date().toISOString()
+          };
+          await setDoc(userRef, {
+            progress: {
+              [courseId]: updatedCourseStore
             },
             updatedAt: serverTimestamp()
-          };
-          if (passesQuiz) {
-            updatePayload[`progress.${courseId}.checkPassed`] = updatedPassed;
-          }
-          await setDoc(userRef, updatePayload, { merge: true });
+          }, { merge: true });
         } catch (dbSyncErr) {
           console.warn("Firestore quiz sync deferred, cached locally:", dbSyncErr);
         }
@@ -1919,11 +1992,12 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   // Merge standard DB progress with any local day-level buffered progress
   const mergedUserProfile = useMemo(() => {
     if (!userProfile) return null;
-    const originalProgressStore = userProfile.progress?.[courseId] || {};
+    const normalized = normalizeProfileData(userProfile);
+    const originalProgressStore = normalized.progress?.[courseId] || {};
     const tempDurationMode = originalProgressStore.durationMode || course.durationMode || 'standard';
-    if (tempDurationMode === 'express' || !!course.isCloned) return userProfile;
+    if (tempDurationMode === 'express' || !!course.isCloned) return normalized;
 
-    const progress = { ...(userProfile.progress || {}) };
+    const progress = { ...(normalized.progress || {}) };
     const dbStore = progress[courseId] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
 
     const watchedSet = new Set<string>(dbStore.watched || []);
@@ -1941,6 +2015,12 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       }
     });
 
+    Object.keys(mergedQuizScores).forEach((ck) => {
+      if (mergedQuizScores[ck] && mergedQuizScores[ck].passed) {
+        checkPassedSet.add(ck);
+      }
+    });
+
     progress[courseId] = {
       ...dbStore,
       watched: Array.from(watchedSet),
@@ -1949,7 +2029,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     };
 
     return {
-      ...userProfile,
+      ...normalized,
       progress
     };
   }, [userProfile, localDayProgress, course, courseId]);
@@ -2117,17 +2197,20 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       setShowQuizModal(true);
     } else {
       const updatedWatched = Array.from(new Set([...completedKeys, checkKey]));
-      
-      const updatedProfile = {
+      const existingCourseStore = userProfile?.progress?.[courseId] || {};
+      const updatedCourseStore = {
+        ...existingCourseStore,
+        watched: updatedWatched
+      };
+
+      const updatedProfile = normalizeProfileData({
         ...userProfile,
         progress: {
           ...(userProfile?.progress || {}),
-          [courseId]: {
-            ...(userProfile?.progress?.[courseId] || {}),
-            watched: updatedWatched
-          }
+          [courseId]: updatedCourseStore
         }
-      };
+      });
+
       setUserProfile(updatedProfile);
       safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
@@ -2135,17 +2218,28 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         const newProgress = { watched: updatedWatched, checkPassed: checkPassedKeys };
         localStorage.setItem(`ciya_express_progress_${courseId}`, JSON.stringify(newProgress));
         setLocalExpressProgress(newProgress);
+      } else {
+        try {
+          const stored = localStorage.getItem(`ciya_local_day_progress_${courseId}`);
+          const currentLocal = stored ? JSON.parse(stored) : {};
+          const dayLocal = currentLocal[activeDayIdx] || { watched: [], checkPassed: [], quizScores: {} };
+          dayLocal.watched = Array.from(new Set([...(dayLocal.watched || []), checkKey]));
+          currentLocal[activeDayIdx] = dayLocal;
+          localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(currentLocal));
+          setLocalDayProgress(currentLocal);
+        } catch (e) {}
       }
 
       // Real-time Cloud Firestore synchronization
       if (currentUser?.uid) {
         try {
           const userRef = doc(db, 'users', currentUser.uid);
-          const updatePayload: any = {
-            [`progress.${courseId}.watched`]: updatedWatched,
+          await setDoc(userRef, {
+            progress: {
+              [courseId]: updatedCourseStore
+            },
             updatedAt: serverTimestamp()
-          };
-          await setDoc(userRef, updatePayload, { merge: true });
+          }, { merge: true });
           showToast("Lesson marked as completed! ✓ Progress synced to Cloud! 🚀");
         } catch (dbErr) {
           console.error("Firestore sync failed on mark complete:", dbErr);
@@ -2178,17 +2272,21 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     const updatedWatched = Array.from(new Set([...completedKeys, checkKey]));
     const updatedPassed = Array.from(new Set([...checkPassedKeys, checkKey]));
 
-    const updatedProfile = {
+    const existingCourseStore = userProfile?.progress?.[courseId] || {};
+    const updatedCourseStore = {
+      ...existingCourseStore,
+      watched: updatedWatched,
+      checkPassed: updatedPassed
+    };
+
+    const updatedProfile = normalizeProfileData({
       ...userProfile,
       progress: {
         ...(userProfile?.progress || {}),
-        [courseId]: {
-          ...(userProfile?.progress?.[courseId] || {}),
-          watched: updatedWatched,
-          checkPassed: updatedPassed
-        }
+        [courseId]: updatedCourseStore
       }
-    };
+    });
+
     setUserProfile(updatedProfile);
     safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
@@ -2196,6 +2294,17 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       const newProgress = { watched: updatedWatched, checkPassed: updatedPassed };
       localStorage.setItem(`ciya_express_progress_${courseId}`, JSON.stringify(newProgress));
       setLocalExpressProgress(newProgress);
+    } else {
+      try {
+        const stored = localStorage.getItem(`ciya_local_day_progress_${courseId}`);
+        const currentLocal = stored ? JSON.parse(stored) : {};
+        const dayLocal = currentLocal[activeDayIdx] || { watched: [], checkPassed: [], quizScores: {} };
+        dayLocal.watched = Array.from(new Set([...(dayLocal.watched || []), checkKey]));
+        dayLocal.checkPassed = Array.from(new Set([...(dayLocal.checkPassed || []), checkKey]));
+        currentLocal[activeDayIdx] = dayLocal;
+        localStorage.setItem(`ciya_local_day_progress_${courseId}`, JSON.stringify(currentLocal));
+        setLocalDayProgress(currentLocal);
+      } catch (e) {}
     }
 
     setShowQuizModal(false);
@@ -2204,12 +2313,12 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     if (currentUser?.uid) {
       try {
         const userRef = doc(db, 'users', currentUser.uid);
-        const updatePayload: any = {
-          [`progress.${courseId}.watched`]: updatedWatched,
-          [`progress.${courseId}.checkPassed`]: updatedPassed,
+        await setDoc(userRef, {
+          progress: {
+            [courseId]: updatedCourseStore
+          },
           updatedAt: serverTimestamp()
-        };
-        await setDoc(userRef, updatePayload, { merge: true });
+        }, { merge: true });
         showToast("Comprehension check passed! Lesson unlocked! 🎉 Synced to Cloud! 🚀");
       } catch (dbErr) {
         console.error("Firestore sync failed on check complete:", dbErr);
@@ -3922,7 +4031,15 @@ export default function StudentDashboard() {
     const cachedProfile = safeStorage.getItem('ciya_cached_profile');
     if (cachedProfile) {
       try {
-        return JSON.parse(cachedProfile);
+        const parsed = normalizeProfileData(JSON.parse(cachedProfile));
+        const cachedAutoApprove = safeStorage.getItem('ciya_auto_approval_enabled');
+        if (cachedAutoApprove !== 'false' && (parsed.approvalStatus === 'Pending' || !parsed.approvalStatus)) {
+          parsed.approvalStatus = 'Approved';
+          parsed.isDashboardUnlocked = true;
+          parsed.isActivated = true;
+          safeStorage.setItem('ciya_cached_profile', JSON.stringify(parsed));
+        }
+        return parsed;
       } catch (e) {}
     }
     const cachedUser = safeStorage.getItem('ciya_cached_user');
@@ -4583,6 +4700,7 @@ export default function StudentDashboard() {
           const data = snapshot.data();
           setAppSettings(data);
           safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
+          safeStorage.setItem('ciya_auto_approval_enabled', data.autoApprovalEnabled !== false ? 'true' : 'false');
         }
       }, (error) => {
         console.warn("Soft handling direct real-time settings app listener error:", error);
@@ -4603,12 +4721,39 @@ export default function StudentDashboard() {
       });
     };
 
+    const autoApproveIfNeeded = (profile: any) => {
+      if (!profile) return profile;
+      const cachedAutoApprove = safeStorage.getItem('ciya_auto_approval_enabled');
+      const isAutoApproveOn = cachedAutoApprove !== 'false';
+      if (isAutoApproveOn && (profile.approvalStatus === 'Pending' || !profile.approvalStatus) && profile.role !== 'super_admin') {
+        const approvedProfile = {
+          ...profile,
+          approvalStatus: 'Approved',
+          isDashboardUnlocked: true,
+          isActivated: true
+        };
+        if (activeUid) {
+          setDoc(doc(db, 'users', activeUid), {
+            approvalStatus: 'Approved',
+            isDashboardUnlocked: true,
+            isActivated: true,
+            updatedAt: serverTimestamp()
+          }, { merge: true }).catch(err => {
+            console.warn("Could not sync auto-approval status to Firestore:", err);
+          });
+        }
+        return approvedProfile;
+      }
+      return profile;
+    };
+
     const startProfileListener = () => {
       if (unsubProfile) return;
       unsubProfile = onSnapshot(doc(db, 'users', activeUid), (snapshot) => {
         if (!isSubscribed) return;
         if (snapshot.exists()) {
-          const profileData = snapshot.data();
+          let profileData = normalizeProfileData(snapshot.data());
+          profileData = autoApproveIfNeeded(profileData);
           setUserProfile(profileData);
           safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
           if (!cleanupPerformedRef.current) {
@@ -4665,7 +4810,8 @@ export default function StudentDashboard() {
           const snapshot = await getDoc(docRef);
           if (!isSubscribed) return;
           if (snapshot.exists()) {
-            const profileData = snapshot.data();
+            let profileData = normalizeProfileData(snapshot.data());
+            profileData = autoApproveIfNeeded(profileData);
             setUserProfile(profileData);
             safeStorage.setItem('ciya_cached_profile', JSON.stringify(profileData));
             if (!cleanupPerformedRef.current) {

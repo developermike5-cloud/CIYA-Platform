@@ -282,8 +282,12 @@ export default function Onboarding() {
 
     let isActivated = false;
     let activeCohort = 'Cohort 1';
-    let autoApprovalEnabled = false;
+    let autoApprovalEnabled = true;
     try {
+      const cachedAutoApprove = safeStorage.getItem('ciya_auto_approval_enabled');
+      if (cachedAutoApprove === 'false') {
+        autoApprovalEnabled = false;
+      }
       const cohortsSnap = await getDoc(doc(db, 'settings', 'cohorts'));
       if (cohortsSnap.exists()) {
         activeCohort = cohortsSnap.data().activeCohort || 'Cohort 1';
@@ -296,7 +300,9 @@ export default function Onboarding() {
       const appSettingsSnap = await getDoc(doc(db, 'settings', 'app'));
       if (appSettingsSnap.exists()) {
         const appData = appSettingsSnap.data();
-        if (appData && appData.autoApprovalEnabled === true) {
+        if (appData && appData.autoApprovalEnabled === false) {
+          autoApprovalEnabled = false;
+        } else if (appData && appData.autoApprovalEnabled === true) {
           autoApprovalEnabled = true;
         }
       }

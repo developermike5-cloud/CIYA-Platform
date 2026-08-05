@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { Mail, Lock, X, Sparkles, ArrowRight, User, Phone, MapPin, ChevronDown, Eye, EyeOff, KeyRound } from 'lucide-react';
-import { auth, db } from '../firebase';
+import { auth, db, safeGetItem, safeSetItem } from '../firebase';
 import BrandingLogo from './BrandingLogo';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -168,9 +168,31 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           console.warn("Could not fetch active cohort settings during direct signup:", cohortErr);
         }
 
-        // Save detailed profile document so they are fully registered right away
-        const docRef = doc(db, 'users', user.uid);
-        await setDoc(docRef, {
+        let autoApprovalEnabled = true;
+        try {
+          const cachedAutoApprove = safeGetItem('ciya_auto_approval_enabled');
+          if (cachedAutoApprove === 'false') {
+            autoApprovalEnabled = false;
+          }
+          const appSettingsSnap = await getDoc(doc(db, 'settings', 'app'));
+          if (appSettingsSnap.exists()) {
+            const appData = appSettingsSnap.data();
+            if (appData && appData.autoApprovalEnabled === false) {
+              autoApprovalEnabled = false;
+            } else if (appData && appData.autoApprovalEnabled === true) {
+              autoApprovalEnabled = true;
+            }
+          }
+        } catch (appErr) {
+          console.warn("Could not fetch app settings during direct signup:", appErr);
+        }
+
+        const finalApprovalStatus = autoApprovalEnabled ? 'Approved' : 'Pending';
+        const finalDashboardUnlocked = autoApprovalEnabled ? true : false;
+        const finalActivated = autoApprovalEnabled ? true : false;
+
+        const generatedAdminCode = `CIYA-${Math.floor(100000 + Math.random() * 900000)}`;
+        const freshProfile = {
           email: user.email,
           fullName: signUpFullName,
           gender: signUpGender,
@@ -180,16 +202,30 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           experience: 'Beginner',
           courseType: 'Landing Pages',
           recommendedPath: 'Landing Page Foundations',
-          isActivated: false,
+          isActivated: finalActivated,
           referralsCount: 0,
-          approvalStatus: 'Pending',
-          isDashboardUnlocked: false,
+          approvalStatus: finalApprovalStatus,
+          isDashboardUnlocked: finalDashboardUnlocked,
           myReferralCode: userCode,
           referralCode: referralCode.trim() || '',
-          adminCode: `CIYA-${Math.floor(100000 + Math.random() * 900000)}`,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          adminCode: generatedAdminCode,
           cohort: activeCohort
+        };
+
+        // Cache profile locally immediately so dashboard is unlocked right away
+        safeSetItem('ciya_cached_profile', JSON.stringify(freshProfile));
+        safeSetItem('ciya_cached_user', JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: signUpFullName
+        }));
+
+        // Save detailed profile document so they are fully registered right away
+        const docRef = doc(db, 'users', user.uid);
+        await setDoc(docRef, {
+          ...freshProfile,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
         });
 
         // Update referrals tracking if a code is provided

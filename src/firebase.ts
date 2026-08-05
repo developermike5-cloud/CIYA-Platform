@@ -365,8 +365,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   const errorStrLower = errInfo.error.toLowerCase();
-  if (errorStrLower.includes('offline') || errorStrLower.includes('unavailable') || !navigator.onLine) {
-    console.warn('Firestore Error (offline/unavailable): ', JSON.stringify(errInfo));
+  if (
+    errorStrLower.includes('offline') || 
+    errorStrLower.includes('unavailable') || 
+    errorStrLower.includes('fetching auth token failed') || 
+    errorStrLower.includes('network-request-failed') || 
+    !navigator.onLine
+  ) {
+    console.warn('Firestore Error (offline/unavailable/network): ', JSON.stringify(errInfo));
   } else {
     console.error('Firestore Error: ', JSON.stringify(errInfo));
   }
@@ -429,11 +435,31 @@ if (typeof window !== 'undefined') {
 
   window.addEventListener('error', (event) => {
     const msg = event.message || (event.error && event.error.message) || '';
+    const lowerMsg = msg.toLowerCase();
+    if (
+      lowerMsg.includes('network-request-failed') ||
+      lowerMsg.includes('fetching auth token failed') ||
+      lowerMsg.includes('could not reach cloud firestore backend')
+    ) {
+      console.warn("Soft handling global network/auth notice:", msg);
+      event.preventDefault();
+      return;
+    }
     handleDatabaseError(msg);
   });
 
   window.addEventListener('unhandledrejection', (event) => {
     const msg = event.reason?.message || String(event.reason || '');
+    const lowerMsg = msg.toLowerCase();
+    if (
+      lowerMsg.includes('network-request-failed') ||
+      lowerMsg.includes('fetching auth token failed') ||
+      lowerMsg.includes('could not reach cloud firestore backend')
+    ) {
+      console.warn("Soft handling unhandled rejection for network/auth notice:", msg);
+      event.preventDefault();
+      return;
+    }
     handleDatabaseError(msg);
   });
 }
