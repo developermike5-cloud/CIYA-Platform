@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
-import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock } from 'lucide-react';
+import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock, X } from 'lucide-react';
 import { safeStorage } from '../../utils/safeStorage';
 import LpQuestionnaireForm from '../../components/LpQuestionnaireForm';
 import EcQuestionnaireForm from '../../components/EcQuestionnaireForm';
@@ -487,6 +487,39 @@ export default function AdminKycbQuestionnaire({
   };
 
   const [copied, setCopied] = useState(false);
+  const [showInstructionalModal, setShowInstructionalModal] = useState(false);
+  const [instructionalCopied, setInstructionalCopied] = useState(false);
+
+  const INSTRUCTIONAL_PROMPT_TEXT = `Act as a Senior AI Web Development Specialist and Master Prompt Engineer.
+
+I am providing you with TWO inputs below:
+1. MY BUSINESS KYC & BRAND SPECIFICATIONS (Contains my actual business details, target audience, brand colors, logo preferences, service descriptions, address, phone number, pricing, testimonials, and unique selling points).
+2. A WEBSITE PROMPT TEMPLATE (Contains structural layout guidelines, HTML/CSS rules, section frameworks, animations, and technical requirements).
+
+YOUR GOAL:
+Combine the two inputs above by replacing every single placeholder, business name, brand color, logo instruction, service description, contact detail, tagline, and custom requirement in the WEBSITE PROMPT TEMPLATE with my actual data from MY BUSINESS KYC & BRAND SPECIFICATIONS.
+
+STRICT INSTRUCTIONAL RULES:
+1. Maintain 100% of the original structure, section hierarchy, layout rules, interactive features, CSS styling guidelines, and technical code directives from the WEBSITE PROMPT TEMPLATE.
+2. Replace all placeholder business names, logos, primary/secondary colors, service lists, phone numbers, email addresses, physical locations, target demographics, and brand tones with my exact KYC values.
+3. If the template requests specific visual sections (e.g., hero video/image, services grid, testimonials slider, contact form, pricing tables), adapt those sections to directly display my KYC business offerings and media preferences.
+4. Output the complete, fully merged, customized master prompt ready to generate my specific business website or application.
+
+==================================================
+INPUT 1: MY BUSINESS KYC & BRAND SPECIFICATIONS
+==================================================
+[PASTE YOUR COPIED BUSINESS KYC DETAILS HERE]
+
+==================================================
+INPUT 2: WEBSITE PROMPT TEMPLATE
+==================================================
+[PASTE YOUR COPIED WEBSITE PROMPT TEMPLATE HERE]`;
+
+  const handleCopyInstructionalPrompt = () => {
+    navigator.clipboard.writeText(INSTRUCTIONAL_PROMPT_TEXT);
+    setInstructionalCopied(true);
+    setTimeout(() => setInstructionalCopied(false), 2000);
+  };
 
   const generatePromptText = () => {
     let text = `========================================================================\n`;
@@ -2107,11 +2140,10 @@ export default function AdminKycbQuestionnaire({
 
             <button
               type="button"
-              onClick={handleDownload}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#1A3C6E]/5 hover:bg-[#1A3C6E]/10 border border-[#1A3C6E]/20 text-[#1A3C6E] rounded-xl text-xs font-extrabold cursor-pointer shadow-sm transition-all"
+              onClick={() => setShowInstructionalModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black cursor-pointer shadow-md shadow-indigo-950/20 transition-all"
             >
-              <Download className="w-4 h-4 text-[#1A3C6E]" />
-              Download Prompt File
+              Instructional Prompt
             </button>
           </div>
 
@@ -2141,10 +2173,94 @@ export default function AdminKycbQuestionnaire({
               className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-950/10 cursor-pointer disabled:opacity-50"
             >
               <Save className="w-4 h-4 text-emerald-300 animate-pulse" />
-              {saving ? 'Saving...' : (currentId ? 'Apply Updates' : 'Sync & Save Cloud')}
+              {saving ? 'Saving...' : 'Save'}
             </button>
           </div>
         </div>
+
+        {/* Instructional Prompt Modal */}
+        {showInstructionalModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              {/* Modal Header */}
+              <div className="p-5 md:p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <div>
+                  <h3 className="font-black text-sm md:text-base text-white tracking-tight flex items-center gap-2">
+                    Instructional Prompt
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">
+                      KYC + Template Converter
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    Instructions for AI chatbots (ChatGPT, Gemini, Claude, Cursor, v0) to merge your KYC with any Website Prompt Template.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowInstructionalModal(false)}
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-5 md:p-6 overflow-y-auto space-y-5 flex-1 text-slate-700">
+                {/* How To Steps */}
+                <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-2xl p-4 space-y-2.5">
+                  <h4 className="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Check className="w-4 h-4 text-indigo-600" /> Workflow Steps
+                  </h4>
+                  <ol className="text-xs text-indigo-900 font-medium space-y-1.5 list-decimal list-inside leading-relaxed">
+                    <li>
+                      <strong>1. Copy your KYC:</strong> Click <span className="px-2 py-0.5 rounded bg-white text-indigo-900 font-bold border border-indigo-200">Copy Prompt Text</span> at the bottom of the KYCB page.
+                    </li>
+                    <li>
+                      <strong>2. Copy a Prompt Template:</strong> Go to the <strong>Prompt Generator</strong>, pick any template, and copy its prompt text.
+                    </li>
+                    <li>
+                      <strong>3. Copy & Combine:</strong> Click <span className="px-2 py-0.5 rounded bg-indigo-600 text-white font-bold">Copy Instructional Prompt</span> below, paste all 3 parts into your AI chatbot, and run it!
+                    </li>
+                  </ol>
+                </div>
+
+                {/* Prompt Preview Box */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                      Instructional Blueprint Text
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      Auto-swaps all brand & business details into your template
+                    </span>
+                  </div>
+                  <pre className="p-4 bg-slate-950 text-slate-200 rounded-2xl text-xs font-mono leading-relaxed whitespace-pre-wrap border border-slate-800 select-all max-h-64 overflow-y-auto">
+{INSTRUCTIONAL_PROMPT_TEXT}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowInstructionalModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyInstructionalPrompt}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-950/20 transition-all cursor-pointer"
+                >
+                  <Copy className="w-4 h-4 text-amber-300" />
+                  {instructionalCopied ? 'Instructional Prompt Copied! ✓' : 'Copy Instructional Prompt'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

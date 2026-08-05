@@ -629,6 +629,10 @@ export default function PromptGenerator({
   const remainingCopies = Math.max(0, 3 - currentDayCopies.length);
   const hasExceededLimit = currentDayCopies.length >= 3;
 
+  // Check if currently selected template is among the first 3 templates in currentTabTemplates (free for everyone)
+  const selectedTemplateIndexInTab = currentTabTemplates.findIndex(t => t.id === selectedTemplate?.id);
+  const isFreeTemplate = selectedTemplateIndexInTab >= 0 && selectedTemplateIndexInTab < 3;
+
   // Synchronize selection when tabs, category, or templates change
   useEffect(() => {
     if (filteredTemplates.length > 0) {
@@ -681,12 +685,12 @@ export default function PromptGenerator({
   const handleCopyText = async () => {
     if (!selectedTemplate) return;
 
-    // Safety check: basic members cannot copy
-    if (!hasYearBadge) {
+    // Safety check: basic members can copy if it's a free template (first 3) OR if they have a year badge
+    if (!hasYearBadge && !isFreeTemplate) {
       if (onTriggerBadgePurchase) {
         onTriggerBadgePurchase();
       } else {
-        alert("Please request your badge to unlock copying.");
+        alert("Please request your badge to unlock copying for premium templates.");
       }
       return;
     }
@@ -862,11 +866,15 @@ export default function PromptGenerator({
                     }}
                     className="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-3 py-2.5 outline-none text-xs md:text-sm font-black cursor-pointer text-center truncate focus:border-indigo-500 transition-all"
                   >
-                    {filteredTemplates.map((tpl) => (
-                      <option key={tpl.id} value={tpl.id} className="bg-slate-900 text-white text-xs md:text-sm font-semibold text-left">
-                        {tpl.name}
-                      </option>
-                    ))}
+                    {filteredTemplates.map((tpl) => {
+                      const tabIdx = currentTabTemplates.findIndex(t => t.id === tpl.id);
+                      const isFree = tabIdx >= 0 && tabIdx < 3;
+                      return (
+                        <option key={tpl.id} value={tpl.id} className="bg-slate-900 text-white text-xs md:text-sm font-semibold text-left">
+                          {isFree ? `🌟 ${tpl.name} (Free Access)` : tpl.name}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
@@ -876,10 +884,21 @@ export default function PromptGenerator({
                 <div className="p-6 md:p-8 rounded-2xl border-2 border-indigo-100 bg-indigo-50/10 hover:border-indigo-400 transition-all duration-300 flex flex-col justify-between gap-5 shadow-sm">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center border-b border-indigo-50/50 pb-3">
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 items-center">
                         <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-indigo-50 border border-indigo-150 text-indigo-700">
                           {selectedTemplate.category}
                         </span>
+                        {isFreeTemplate ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold">
+                            🌟 Free Access Template
+                          </span>
+                        ) : (
+                          !hasYearBadge && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                              🔒 Badge Required
+                            </span>
+                          )
+                        )}
                         {selectedTemplate.industry && (
                           <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-slate-100 text-slate-700">
                             <Briefcase className="w-3.5 h-3.5" /> {selectedTemplate.industry}
@@ -991,7 +1010,7 @@ export default function PromptGenerator({
                   
                   {/* VIEW 1: TEXT TEMPLATE MODE (Activated by Open button) */}
                   {isShowingText ? (
-                    !hasYearBadge ? (
+                    (!hasYearBadge && !isFreeTemplate) ? (
                       <div className="absolute inset-0 bg-slate-950 p-6 pt-12 flex flex-col items-center justify-center text-center text-white z-10 animate-in fade-in duration-300">
                         <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center mb-5 text-amber-400 border border-amber-500/20">
                           <Sparkles className="w-7 h-7 animate-pulse" />
@@ -1002,7 +1021,7 @@ export default function PromptGenerator({
                         </h3>
                         
                         <p className="text-[10px] text-slate-400 mt-2.5 leading-relaxed max-w-[190px] mx-auto font-medium">
-                          Prompt templates copying is restricted to Pro members. Kindly request your membership badge to unlock full access to copyable prompt blueprints and resources!
+                          The first 3 prompt templates are free for everyone! Full access to all remaining prompt blueprints requires a CIYA Pro Badge.
                         </p>
 
                         <div className="mt-6 w-full max-w-[200px] space-y-2">
