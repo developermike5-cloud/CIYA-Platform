@@ -360,6 +360,26 @@ export async function uploadToCloudinary(
     };
   }
 
+  if (processedInput instanceof File) {
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(processedInput as File);
+      });
+      return {
+        url: dataUrl,
+        public_id: `fallback-${Date.now()}`,
+        folder,
+        tags: tagsList,
+        success: true,
+      };
+    } catch (e) {
+      console.warn("Data URL fallback failed:", e);
+    }
+  }
+
   throw new Error("Cloudinary upload failed across all 3 tier strategies.");
 }
 

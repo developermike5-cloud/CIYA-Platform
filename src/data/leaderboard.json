@@ -1,33 +1,121 @@
 {
   "cohort": "Cohort 3",
-  "calculatedAt": "2026-08-05T09:34:44.868Z",
-  "totalStudentsCount": 23,
+  "calculatedAt": "2026-08-20T17:20:42.967Z",
+  "totalStudentsCount": 26,
   "rankings": [
     {
-      "uid": "nbErD5NKByUdBCAHeQp34rPn0q82",
+      "uid": "HLGJoS4nwsdPx17yKzJacsmb6M53",
       "rank": 1,
-      "fullName": "Adeboye Yusuf",
-      "email": "yusufadeboye79@gmail.com",
+      "fullName": "Anyanwu Christiana ",
+      "email": "anyanwusomaga@gmail.com",
       "cohort": "Cohort 3",
-      "lessonsCompleted": 5,
-      "quizzesPassed": 5,
-      "totalScore": 325,
+      "lessonsCompleted": 17,
+      "quizzesPassed": 22,
+      "totalScore": 1355,
       "currentCourse": "AI E-commerce Website Creation"
     },
     {
-      "uid": "NIFRYFy4fySRVQMp2DQUc0Je6KN2",
+      "uid": "nbErD5NKByUdBCAHeQp34rPn0q82",
       "rank": 2,
-      "fullName": "Anifowose Micheal Happiness",
-      "email": "anifowosemicheal0@gmail.com",
+      "fullName": "Adeboye Yusuf",
+      "email": "yusufadeboye79@gmail.com",
       "cohort": "Cohort 3",
-      "lessonsCompleted": 5,
-      "quizzesPassed": 5,
-      "totalScore": 325,
+      "lessonsCompleted": 16,
+      "quizzesPassed": 17,
+      "totalScore": 1090,
+      "currentCourse": "AI E-commerce Website Creation"
+    },
+    {
+      "uid": "wtAuXCBtI2NtmMuz9SUSi6tEzgC2",
+      "rank": 3,
+      "fullName": "Naseebah Bashiru",
+      "email": "oxytocincreatives@gmail.com",
+      "cohort": "Cohort 3",
+      "lessonsCompleted": 10,
+      "quizzesPassed": 17,
+      "totalScore": 1000,
       "currentCourse": "AI Portfolio Website Creation"
     },
     {
+      "uid": "8rODH8wLpMhLmn4e7pcHxq4N2Zg2",
+      "rank": 4,
+      "fullName": "Dolapo Adesanya",
+      "email": "adesanyadolapo69@gmail.com",
+      "cohort": "Cohort 3",
+      "lessonsCompleted": 13,
+      "quizzesPassed": 14,
+      "totalScore": 895,
+      "currentCourse": "AI Landing Page Creation"
+    },
+    {
+      "uid": "NIFRYFy4fySRVQMp2DQUc0Je6KN2",
+      "rank": 5,
+      "fullName": "Anifowose Micheal Happiness",
+      "email": "anifowosemicheal0@gmail.com",
+      "cohort": "Cohort 3",
+      "lessonsCompleted": 13,
+      "quizzesPassed": 13,
+      "totalScore": 845,
+      "currentCourse": "AI Portfolio Website Creation"
+    },
+    {
+      "uid": "mzvr44jotkgzIPaijuNRWQLodgB3",
+      "rank": 6,
+      "fullName": "Idris Ghaniyyah",
+      "email": "idrisghaniyyah@gmail.com",
+      "cohort": "Cohort 3",
+      "lessonsCompleted": 13,
+      "quizzesPassed": 13,
+      "totalScore": 845,
+      "currentCourse": "AI Portfolio Website Creation"
+    },
+    {
+      "uid": "R5wXoiO8eLQWx8NbkhCsCbfGuZJ3",
+      "rank": 7,
+      "fullName": "SAMUEL COMFORT ",
+      "email": "samayomide925@gmail.com",
+      "cohort": "Cohort 3",
+      "lessonsCompleted": 11,
+      "quizzesPassed": 13,
+      "totalScore": 815,
+      "currentCourse": "AI E-commerce Website Creation"
+    },
+    {
+      "uid": "BbcoigJjO7dNx85WtebptfQlef73",
+      "rank": 8,
+      "fullName": "Felix",
+      "email": "amatomic679@gmail.com",
+      "cohort": "Cohort 3",
+      "lessonsCompleted": 5,
+      "quizzesPassed": 11,
+      "totalScore": 625,
+      "currentCourse": "AI Portfolio Website Creation"
+    },
+    {
+      "uid": "Q2wBoEtdemdgeXMK1A4JRCEc2UJ2",
+      "rank": 9,
+      "fullName": "GODFREY OJONUMI ALIKE",
+      "email": "jppaul404@gmail.com",
+      "cohort": "Cohort 3",
+      "lessonsCompleted": 8,
+      "quizzesPassed": 10,
+      "totalScore": 620,
+      "currentCourse": "AI Landing Page Creation"
+    },
+    {
+      "uid": "2ASqAymMs3YlMfeIIloKzR0Tsls2",
+      "rank": 10,
+      "fullName": "Tijani Halima ",
+      "email": "tijanihalima483@gmail.com",
+      "cohort": "Cohort 3",
+      "lessonsCompleted": 8,
+      "quizzesPassed": 8,
+      "totalScore": 520,
+      "currentCourse": "AI Landing Page Creation"
+    },
+    {
       "uid": "WFzsNz1wF1U6if9gJ3g0H54IlIA3",
-      "rank": 3,
+      "rank": 11,
       "fullName": "David Bassey",
       "email": "idaboskidaboske@gmail.com",
       "cohort": "Cohort 3",
@@ -37,30 +125,19 @@
       "currentCourse": "AI E-commerce Website Creation"
     },
     {
-      "uid": "wtAuXCBtI2NtmMuz9SUSi6tEzgC2",
-      "rank": 4,
-      "fullName": "Naseebah Bashiru",
-      "email": "oxytocincreatives@gmail.com",
+      "uid": "goi8MYk9iMVZQDkdge8RCCtwL8C3",
+      "rank": 12,
+      "fullName": "Adisa fawaz Ayinde",
+      "email": "adisafawazayinde1@gmail.com",
       "cohort": "Cohort 3",
-      "lessonsCompleted": 5,
-      "quizzesPassed": 5,
-      "totalScore": 325,
-      "currentCourse": "AI Portfolio Website Creation"
-    },
-    {
-      "uid": "R5wXoiO8eLQWx8NbkhCsCbfGuZJ3",
-      "rank": 5,
-      "fullName": "SAMUEL COMFORT ",
-      "email": "samayomide925@gmail.com",
-      "cohort": "Cohort 3",
-      "lessonsCompleted": 5,
-      "quizzesPassed": 5,
-      "totalScore": 325,
-      "currentCourse": "AI E-commerce Website Creation"
+      "lessonsCompleted": 2,
+      "quizzesPassed": 2,
+      "totalScore": 130,
+      "currentCourse": "AI Landing Page Creation"
     },
     {
       "uid": "rBJGIohSsvdU4nkQOs4Aa0gZbQw1",
-      "rank": 6,
+      "rank": 13,
       "fullName": "Ndifreke Udofot",
       "email": "udofotndifreke@gmail.com",
       "cohort": "Cohort 3",
@@ -71,7 +148,7 @@
     },
     {
       "uid": "K4JdOdoRPIYX7LOoSBcWD8tMmCJ3",
-      "rank": 7,
+      "rank": 14,
       "fullName": "Adebayo Ahmad",
       "email": "ahmadislamic453tv@gmail.com",
       "cohort": "Cohort 3",
@@ -81,8 +158,19 @@
       "currentCourse": "AI E-commerce Website Creation"
     },
     {
+      "uid": "rznQYqcODTW4BgxtXlrJPNAeHwf1",
+      "rank": 15,
+      "fullName": "Adeola Akinwunmi",
+      "email": "adeolamisturah1@gmail.com",
+      "cohort": "Cohort 3",
+      "lessonsCompleted": 0,
+      "quizzesPassed": 0,
+      "totalScore": 0,
+      "currentCourse": "AI E-commerce Website Creation"
+    },
+    {
       "uid": "L6QY5f7XQuPklfTC4DrUD6H2GVG2",
-      "rank": 8,
+      "rank": 16,
       "fullName": "Ajibola Sa'ad ",
       "email": "saadolaniyii@gmail.com",
       "cohort": "Cohort 3",
@@ -92,19 +180,8 @@
       "currentCourse": "AI E-commerce Website Creation"
     },
     {
-      "uid": "HLGJoS4nwsdPx17yKzJacsmb6M53",
-      "rank": 9,
-      "fullName": "Anyanwu Christiana ",
-      "email": "anyanwusomaga@gmail.com",
-      "cohort": "Cohort 3",
-      "lessonsCompleted": 0,
-      "quizzesPassed": 0,
-      "totalScore": 0,
-      "currentCourse": "AI E-commerce Website Creation"
-    },
-    {
       "uid": "mZPWwu3FlvaNrOM3EhhkNIrG3nU2",
-      "rank": 10,
+      "rank": 17,
       "fullName": "Buhari Kamaldeen",
       "email": "kamaldeenbuhari2@gmail.com",
       "cohort": "Cohort 3",
@@ -114,10 +191,10 @@
       "currentCourse": "AI Portfolio Website Creation"
     },
     {
-      "uid": "8rODH8wLpMhLmn4e7pcHxq4N2Zg2",
-      "rank": 11,
-      "fullName": "Dolapo Adesanya",
-      "email": "adesanyadolapo69@gmail.com",
+      "uid": "37kMALZcRIZk1BJP4qsBLi7Fq712",
+      "rank": 18,
+      "fullName": "Chibua Emmanuel",
+      "email": "echibua01@gmail.com",
       "cohort": "Cohort 3",
       "lessonsCompleted": 0,
       "quizzesPassed": 0,
@@ -126,7 +203,7 @@
     },
     {
       "uid": "WphTfeGPIFVoZ7HWJCaM6O51OwH2",
-      "rank": 12,
+      "rank": 19,
       "fullName": "Dollyp David",
       "email": "dollypdavid63@gmail.com",
       "cohort": "Cohort 3",
@@ -137,7 +214,7 @@
     },
     {
       "uid": "jSXNDJ3uatOurHoQhmyPuc6KTw72",
-      "rank": 13,
+      "rank": 20,
       "fullName": "Favour Emoghene",
       "email": "great.emoghene@educ.uniben.edu",
       "cohort": "Cohort 3",
@@ -147,30 +224,8 @@
       "currentCourse": "AI E-commerce Website Creation"
     },
     {
-      "uid": "BbcoigJjO7dNx85WtebptfQlef73",
-      "rank": 14,
-      "fullName": "Felix",
-      "email": "amatomic679@gmail.com",
-      "cohort": "Cohort 3",
-      "lessonsCompleted": 0,
-      "quizzesPassed": 0,
-      "totalScore": 0,
-      "currentCourse": "AI Portfolio Website Creation"
-    },
-    {
-      "uid": "Q2wBoEtdemdgeXMK1A4JRCEc2UJ2",
-      "rank": 15,
-      "fullName": "GODFREY OJONUMI ALIKE",
-      "email": "jppaul404@gmail.com",
-      "cohort": "Cohort 3",
-      "lessonsCompleted": 0,
-      "quizzesPassed": 0,
-      "totalScore": 0,
-      "currentCourse": "AI Landing Page Creation"
-    },
-    {
       "uid": "HSqgt8N8hYYqpURZWcorLzEWJqn2",
-      "rank": 16,
+      "rank": 21,
       "fullName": "Hamburger ",
       "email": "michaelogunnaike2002@gmail.com",
       "cohort": "Cohort 3",
@@ -180,19 +235,8 @@
       "currentCourse": "AI E-commerce Website Creation"
     },
     {
-      "uid": "mzvr44jotkgzIPaijuNRWQLodgB3",
-      "rank": 17,
-      "fullName": "Idris Ghaniyyah",
-      "email": "idrisghaniyyah@gmail.com",
-      "cohort": "Cohort 3",
-      "lessonsCompleted": 0,
-      "quizzesPassed": 0,
-      "totalScore": 0,
-      "currentCourse": "AI Portfolio Website Creation"
-    },
-    {
       "uid": "tWGCBRen1bYjPapRy8f0CcYJwUb2",
-      "rank": 18,
+      "rank": 22,
       "fullName": "Jamila Daud",
       "email": "jamiladaud73@gmail.com",
       "cohort": "Cohort 3",
@@ -203,7 +247,7 @@
     },
     {
       "uid": "RAbm2AzYQwcJogHmtqJRDj5hWVg2",
-      "rank": 19,
+      "rank": 23,
       "fullName": "Kaka Olalekan",
       "email": "djkakaworldwide@gmail.com",
       "cohort": "Cohort 3",
@@ -214,7 +258,7 @@
     },
     {
       "uid": "yqx7bb1WOJgYYgnxulDgs53OpKl1",
-      "rank": 20,
+      "rank": 24,
       "fullName": "OGUNOLA ENOCH ",
       "email": "deycallmejemmylay@gmail.com",
       "cohort": "Cohort 3",
@@ -225,7 +269,7 @@
     },
     {
       "uid": "ytf5yNeRTQXGYJW1puVVawwt3R92",
-      "rank": 21,
+      "rank": 25,
       "fullName": "Osofisan Elizabeth Mofiyinfoluwa ",
       "email": "elizabethosofisan232@gmail.com",
       "cohort": "Cohort 3",
@@ -235,19 +279,8 @@
       "currentCourse": "AI E-commerce Website Creation"
     },
     {
-      "uid": "2ASqAymMs3YlMfeIIloKzR0Tsls2",
-      "rank": 22,
-      "fullName": "Tijani Halima ",
-      "email": "tijanihalima483@gmail.com",
-      "cohort": "Cohort 3",
-      "lessonsCompleted": 0,
-      "quizzesPassed": 0,
-      "totalScore": 0,
-      "currentCourse": "AI Landing Page Creation"
-    },
-    {
       "uid": "ZN1yfjqwE7b6dkrkKppvzenA7yU2",
-      "rank": 23,
+      "rank": 26,
       "fullName": "Yusuf Azeez Olamiposi ",
       "email": "olamiposi007@gmail.com",
       "cohort": "Cohort 3",
