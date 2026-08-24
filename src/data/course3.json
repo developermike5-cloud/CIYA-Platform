@@ -1,0 +1,1154 @@
+{
+  "title": "PREMIUM E-COMMERCE WEBSITE DEVELOPMENT",
+  "subtitle": "Learn how to build modern e-commerce websites with AI, launch digital storefronts, and create income opportunities — even from your smartphone.",
+  "tagline": "Learn how to build modern e-commerce websites with AI, launch digital storefronts, and create income opportunities — even from your smartphone.",
+  "thumbnail": "https://res.cloudinary.com/di4dlnd5x/image/upload/v1781820687/ChatGPT_Image_Jun_18_2026_11_11_08_PM_mvqdpz.png",
+  "description": "📖 Course Overview\nWelcome to the CIYA E-commerce Accelerator, a practical and beginner-friendly program designed to teach you how to build modern online stores powered by AI and today's best digital tools.\nE-commerce has transformed the way businesses operate, allowing anyone to sell products and services beyond physical locations and reach customers anywhere in the world.\nIn this course, you'll learn how online stores work, why businesses depend on them, and how to create beautiful, professional e-commerce experiences without spending years learning traditional programming.\nUsing CIYA's proven 5-Layer Website Development Framework, you'll learn how to think like an e-commerce strategist, communicate effectively with AI, generate storefronts, customize shopping experiences, and prepare stores for launch.",
+  "overview": "📖 Course Overview\nWelcome to the CIYA E-commerce Accelerator, a practical and beginner-friendly program designed to teach you how to build modern online stores powered by AI and today's best digital tools.\nE-commerce has transformed the way businesses operate, allowing anyone to sell products and services beyond physical locations and reach customers anywhere in the world.\nIn this course, you'll learn how online stores work, why businesses depend on them, and how to create beautiful, professional e-commerce experiences without spending years learning traditional programming.\nUsing CIYA's proven 5-Layer Website Development Framework, you'll learn how to think like an e-commerce strategist, communicate effectively with AI, generate storefronts, customize shopping experiences, and prepare stores for launch.",
+  "category": "AI Website Class",
+  "skill": "web",
+  "subskill": "Frontend Development",
+  "skillPath": "E-Commerce",
+  "durationMode": "standard",
+  "level": "Beginner",
+  "tier": "beginner",
+  "price": 0,
+  "instructor": "CIYA Team",
+  "outcomes": "🎯 Learning Outcomes\n\nBy the end of this course, you'll be able to:\n\nExplain what e-commerce websites are and why they matter in today's digital economy.\nIdentify different types of e-commerce business models.\nUnderstand how successful online stores are structured.\nExplain every component of a high-converting e-commerce website.\nUnderstand product pages, collections, carts, checkout systems, and trust mechanisms.\nUnderstand frontend, backend, hosting, domains, and how they power e-commerce experiences.\nExplain traditional coding, CMS platforms, and AI-assisted store development.\nUnderstand CIYA's 5-Layer Website Development Framework.\nConduct professional client discovery using the CIYA Business Clarity Questionnaire.\nApply Prompt Engineering techniques for online store planning.\nUse ChatGPT and other AI thinking tools to generate e-commerce project prompts.\nImprove stores through iteration and advanced prompting techniques.\nUse text prompts, voice prompts, file references, and URL references to refine stores.\nAdd products, categories, images, videos, and branding materials.\nUnderstand how to monetize e-commerce development as a freelance or agency service.\nBuild confidence creating online stores using desktops or smartphones.",
+  "requirements": "🛠 Requirements / Recommendations\nNo coding experience is required.\nNo prior e-commerce knowledge is needed.\nA smartphone, tablet, or laptop is recommended.\nStable internet access is recommended.\nA Google account is recommended.\nAccess to ChatGPT is recommended.\nStudents should be willing to practice and experiment.\nStudents should be prepared to complete practical store-building exercises.\nJoining CIYA communities is encouraged for support and updates.",
+  "publish_status": "Published",
+  "status": "published",
+  "isLocked": false,
+  "days": [
+    {
+      "dayNumber": 1,
+      "title": "DAY 1: INTRODUCTION TO E-COMMERCE WEBSITE & DIGITAL STORE",
+      "description": "Today, you'll discover how e-commerce transformed global business and why millions of companies now rely on online stores to generate revenue.\n\nYou'll learn about the history and evolution of e-commerce, explore different business models such as B2C, B2B, D2C, C2C, and subscription commerce, and study successful examples from Nigeria and around the world.\n\nYou'll also understand the opportunities and challenges of e-commerce in Africa and how this skill can become a valuable career path.\n\nBy the end of today, you'll understand the role online stores play in the digital economy and how you can participate in this growing industry.",
+      "assignment": {
+        "prompt": "Today's assignment is waiting for you on our Youtube channel.\n\nFollow this link, https://youtu.be/CeMmJ5Qg0_8?si=ih7lMJ4nx-WkyXEl, subscribe to the channel and watch the assignment video\n\nFollow all the steps in the video and do as the presenter did by \n1.Going to your Google Map\n2. Take the necessary screenshots\n3. Follow the steps on Chatgpt and copy the screenshot texts\n4. And submit both the screenshots and the Chatgpt texts via your \"My Assignments\" section on your dashoard.",
+        "dueNote": "Failure to do this means you won't have access to the next day class lessons. Submission deadline is 12:00 noon of day 2."
+      },
+      "videos": [
+        {
+          "id": "sayme4q",
+          "title": "PREMIUM E-COMMERCE STORE INTRODUCTION",
+          "video_url": "https://youtu.be/jGN_N04oSJ8",
+          "url": "https://youtu.be/jGN_N04oSJ8",
+          "duration": "10:49 min",
+          "description": "Five-Point Summary\n\n[00:14 - 00:55] The presenter introduced the Create It Yourself Academy (CIYA) 5-day e-commerce website creation training, emphasizing that participants will step out of the consumer crowd to learn how to build and manage modern online stores.\n\n[01:59 - 02:45] The massive financial leverage of learning digital architecture was highlighted, noting that a single e-commerce website project can market from 150,000 to over 2 million Naira, making it a highly valuable skill for both business owners and freelancers.\n\n[04:39 - 05:27] The training curriculum was outlined around three distinct structural pillars—visual branding, user experience, and structural logic—which together teach participants how to establish customer trust rather than just designing random pages.\n\n[05:27 - 06:00] Reassurance was given that no coding or professional programming background is required to master e-commerce platforms, and intimidating terms like Shopify, domains, integrations, and conversions will become second nature by day five.\n\n[07:20 - 08:22] It was explained that finishing the course unlocks the CIYA Badge of participation, granting access to remote job boards, an exclusive learning platform, continuous AI tool updates, premium PDF materials, and a structured 30-day challenge period.",
+          "resources": "",
+          "checkType": "tf",
+          "check": [
+            {
+              "answer": true,
+              "explanation": "The presenter notes that knowing how to handle your own site saves money, increases operational speed, and prevents third-party costs from adding up.",
+              "statement": "According to the video, learning to build your own online store allows a business owner to eliminate recurring developer fees for basic tasks like fixing layouts or uploading new products.",
+              "type": "tf"
+            },
+            {
+              "answer": true,
+              "type": "tf",
+              "explanation": "The video explicitly states this range to show the true financial value of mastering digital architecture.",
+              "statement": "A single professional e-commerce website project can command a market value ranging between 150,000 Naira to over 2 million Naira depending on its specific features."
+            },
+            {
+              "type": "tf",
+              "explanation": "The presenter explicitly reassures attendees that they do not need to be programmers or memorize code to build successful stores.",
+              "answer": false,
+              "statement": "The CIYA e-commerce system requires students to memorize over 5,000 lines of code during the first night of training to keep up with the modules."
+            },
+            {
+              "statement": "Good visual design alone is the only factor required to keep an e-commerce platform successfully running and growing every day.",
+              "answer": false,
+              "type": "tf",
+              "explanation": "While good design grabs initial attention, the video emphasizes that solid structural logic and customer trust are what keep a store running over the long term."
+            },
+            {
+              "explanation": "The presenter outlines this exact daily structure to ensure students are taking practical steps rather than just watching static tutorials.",
+              "type": "tf",
+              "statement": "The training structure incorporates interactive video quizzes, practical assignments, and daily 30-minute Google Meet sessions to answer student questions and clarify concepts.",
+              "answer": true
+            }
+          ],
+          "funFact": {
+            "body": "A single professional e-commerce storefront can command up to 2 million Naira in the digital market, yet anyone can learn to architect, build, and deploy one in just five days without typing a single line of code.",
+            "headline": "Did you know?"
+          }
+        },
+        {
+          "id": "rx0br62",
+          "title": "WHAT IS A WEBSITE?",
+          "video_url": "https://youtu.be/c6UvqFb-1VE",
+          "url": "https://youtu.be/c6UvqFb-1VE",
+          "duration": "07:21 min",
+          "description": "Five-Point Summary\n\n[00:00:05 - 00:45] The presenter introduced the core mechanics of how websites function, highlighting a massive shift toward mobile traffic globally and specifically within Nigeria's mobile-first ecosystem.\n\n[00:01:42 - 00:02:16] To demystify complex technical concepts, the presenter introduced the analogy of a \"digital house,\" explaining that every online platform requires a street address, land, building materials, and a specific purpose.\n\n[00:02:17 - 00:03:27] The foundational mechanics of web addresses were broken down, outlining how domain names act as rented street addresses, while the Domain Name System (DNS) serves as a translator or GPS connecting friendly names to numeric IP addresses.\n\n[00:03:28 - 00:05:24] Web hosting was described as renting physical server land, while the structural building blocks of the house itself were broken into three components: HTML for the skeleton, CSS for the interior styling, and JavaScript for the plumbing and interactivity.\n\n[00:05:25 - 00:07:21] The distinction between static \"brochure\" websites and dynamic, database-driven marketplaces like Jumia was explored, concluding with an encouraging push for creators to use these fundamentals to claim their own piece of digital property.",
+          "resources": "",
+          "checkType": "mcq",
+          "check": [
+            {
+              "question": "Question 1: What core building material acts as the \"skeleton\" or foundational structure of a website?",
+              "type": "mcq",
+              "correct": 2,
+              "explanation": "HTML provides the essential concrete block foundation and structural layout (headings, paragraphs, images) before any styling or interactive elements are applied.",
+              "options": [
+                "CSS",
+                "JavaScript",
+                "HTML",
+                "DNS"
+              ]
+            },
+            {
+              "explanation": "A domain name is a one-of-a-kind digital address that you never truly own forever; instead, you rent or lease it continuously via recurring annual payments.",
+              "options": [
+                "You own it permanently after a one-time purchase.",
+                "You lease or rent it, similar to paying an annual land charge.",
+                "It is entirely free if you buy hosting land.",
+                "The government owns and manages it for you."
+              ],
+              "correct": 1,
+              "question": "Question 2: How does the video describe the ownership of a website's domain name?",
+              "type": "mcq"
+            },
+            {
+              "explanation": "Computers communicate using numbers called IP addresses. The DNS acts as the backend translator, instantly matching names like Google.com to the coordinates a computer needs.",
+              "correct": 3,
+              "question": "Question 3: Which component acts as the \"internet's GPS\" by translating human-readable website names into numeric IP addresses?",
+              "options": [
+                "HTML",
+                "CSS",
+                "Web Server",
+                "DNS (Domain Name System)"
+              ]
+            },
+            {
+              "correct": 1,
+              "explanation": "Static websites behave like fixed digital brochures, whereas dynamic sites function like a bustling marketplace (e.g., Jumia), changing layout and content based on user data.",
+              "type": "mcq",
+              "question": "Question 4: What is the primary difference between a static website and a dynamic website?",
+              "options": [
+                "Static websites require a computer to view, while dynamic ones only work on phones.",
+                "Static websites display fixed information to everyone, while dynamic websites pull from databases to show live, personalized content.",
+                "Static websites do not use HTML at all.",
+                "Dynamic websites are completely free to host."
+              ]
+            },
+            {
+              "options": [
+                "Around 45%",
+                "Around 50%",
+                "Around 62%",
+                "Around 85%"
+              ],
+              "explanation": "The presenter noted that roughly 62% of all global web traffic originates from mobile devices, a number that scales even higher in mobile-first regions like Nigeria.",
+              "correct": 2,
+              "type": "mcq",
+              "question": "Question 5: According to the video, what percentage of global internet traffic is generated through mobile phones?"
+            }
+          ],
+          "funFact": {
+            "body": "Computers cannot understand a single word or letter of website names like Jumia.com, so an invisible backend system must instantly translate those words into numbers every single time you tap your screen.",
+            "headline": "Did you know?"
+          }
+        },
+        {
+          "id": "awapmoe",
+          "title": "EIGHT TYPES OF WEBSITES YOU SHOULD KNOW",
+          "video_url": "https://youtu.be/cYWxh9aJAlY",
+          "url": "https://youtu.be/cYWxh9aJAlY",
+          "duration": "05:39 min",
+          "description": "Five-Point Summary\n\n[00:00:12 - 00:01:08] The presenter introduced the concept of acting as a digital architect, explaining that every big idea or business needs an optimal online home built on the right structural blueprint.\n\n[00:01:09 - 00:01:46] The classic business website was highlighted as a company's digital lobby, where the absolute core objective is to establish professional credibility and handshake with the local community to build trust.\n\n[00:01:47 - 00:02:30] The e-commerce blueprint was broken down as a 24/7 store requiring three non-negotiable engines to survive: a product catalog, a shopping cart, and a highly secure payment processor.\n\n[00:02:40 - 00:03:58] A major contrast was drawn between content-heavy blogs and laser-focused landing pages, with the latter explained as a single-page specialist completely stripped of menus to drive pure persuasion and one clear call to action.\n\n[00:04:18 - 00:05:29] The overview concluded by detailing social media networks driven entirely by user interaction alongside exclusive membership sites, before prompting viewers to use the provided cheat sheet to select their ideal project layout.",
+          "resources": "",
+          "checkType": "mcq",
+          "check": [
+            {
+              "type": "mcq",
+              "explanation": "The speaker explicitly labels a product catalog, a shopping cart, and a secure payment gateway as non-negotiable elements under the hood to build customer confidence and process continuous sales.",
+              "options": [
+                "A blog, an image gallery, and a contact form",
+                "A product catalog, a shopping cart, and a secure payment gateway",
+                "A domain name, an interior decorator, and social media icons",
+                "A landing page, a bio link, and a newsletter sign-up"
+              ],
+              "question": "What are the three non-negotiable backend components required for an e-commerce website to function?",
+              "correct": 1
+            },
+            {
+              "options": [
+                "Uploading every single piece of work you have ever created",
+                "Using complex animations and custom JavaScript",
+                "Careful curation to showcase only your absolute best work",
+                "Hiding your contact information behind a membership wall"
+              ],
+              "correct": 2,
+              "explanation": "For visual creators, a portfolio serves as a digital resume where curation is key; it is about highlighting your finest projects rather than crowding the page with everything.",
+              "type": "mcq",
+              "question": "What is the secret to creating a highly effective portfolio website according to the video?"
+            },
+            {
+              "question": "How does a landing page structurally differ from a traditional blog?",
+              "correct": 2,
+              "type": "mcq",
+              "explanation": "Unlike a blog that uses numerous pages to slowly build an audience over time, a landing page is a single-page layout engineered with zero distractions to achieve pure, focused persuasion.",
+              "options": [
+                "A landing page contains multiple nested navigation menus.",
+                "A landing page is an extensive collection of articles updated weekly.",
+                "A landing page is a single page with no extra menus, laser-focused on one specific call to action.",
+                "A landing page can only be viewed on desktop computers."
+              ]
+            },
+            {
+              "options": [
+                "The daily articles posted by the website owner",
+                "Content creation and interactive sharing directly from its users",
+                "Selling products through a secure payment system",
+                "Providing structured academic courses and graded quizzes"
+              ],
+              "question": "What is the defining lifeblood of a social media website blueprint?",
+              "explanation": "A social media blueprint relies completely on community interaction and user-generated content, meaning the platform functions based on what users share with each other rather than the creator's posts.",
+              "type": "mcq",
+              "correct": 1
+            },
+            {
+              "correct": 3,
+              "question": "Which website blueprint focuses on exclusivity by keeping premium content or a private community behind a paying system?",
+              "type": "mcq",
+              "explanation": "The membership model uses a paywall structure to gate exclusive materials or communities, creating a reliable stream of recurring revenue from dedicated followers.",
+              "options": [
+                "Business Website",
+                "Educational Website",
+                "Portfolio Website",
+                "Membership Website"
+              ]
+            }
+          ],
+          "funFact": {
+            "body": "People swipe through WhatsApp Statuses casually for entertainment, often skipping right past your products. A dedicated online store removes the distractions of personal chats, instantly focusing your customer's attention solely on making a purchase.",
+            "headline": "Did you know?"
+          }
+        },
+        {
+          "id": "lrud2q1",
+          "title": "WHAT IS AN E-COMMERCE WEBSITE?",
+          "video_url": "https://youtu.be/qf9ojocch3M",
+          "url": "https://youtu.be/qf9ojocch3M",
+          "duration": "06:30 min",
+          "description": "[00:01 - 01:15] The presenter opens by introducing e-commerce websites as the ultimate engine for unlocking online income, explaining how millions of people browse and buy products like clothes, phones, and gadgets online every day.\n\n[01:16 - 02:30] It is highlighted that traditional physical stores face high rent costs and limited operating hours, whereas an online e-commerce website allows business owners to display items to a global audience 24/7 without needing an expensive brick-and-mortar space.\n\n[02:31 - 03:50] The discussion shifts to the incredible flexibility of modern tools, proving that anyone can manage and launch a fully functional, professional online shop entirely from a mobile phone, successfully breaking down the barrier that an expensive laptop is required to start.\n\n[03:51 - 05:05] The presenter explains that an e-commerce platform automates the repetitive parts of running a business, such as calculating order amounts, collecting customer delivery details, and processing payments seamlessly while the business owner sleeps.\n\n[05:06 - 06:30] The video concludes by encouraging aspiring digital entrepreneurs to master the art of building these storefronts, noting that the skill can be monetized either by launching a personal retail brand or by offering web creation services to local businesses looking to go digital.",
+          "resources": "",
+          "checkType": "tf",
+          "check": [
+            {
+              "type": "tf",
+              "answer": false,
+              "statement": "1. Statement: Operating a physical retail shop generally offers lower overhead costs and wider opening hours than running an e-commerce website.",
+              "explanation": "E-commerce websites bypass expensive physical rent and remain open 24/7 to a global market, making them much more cost-effective."
+            },
+            {
+              "type": "tf",
+              "explanation": "Modern mobile-first digital solutions make it entirely possible to set up and control an e-commerce storefront using just a smartphone.",
+              "statement": "2. Statement: You must own a high-end laptop or desktop computer to design, launch, and manage a professional online store.",
+              "answer": false
+            },
+            {
+              "explanation": "Automation handles these manual business tasks systematically, allowing the store to run efficiently even when the owner is offline.",
+              "statement": "3. Statement: An e-commerce website helps business owners save time by automating order compilation, gathering customer shipping details, and organizing payment collections.",
+              "answer": true,
+              "type": "tf"
+            },
+            {
+              "answer": false,
+              "explanation": "Learning how to build online stores creates an immediate opportunity to offer high-value creation services to small and medium local businesses.",
+              "statement": "4. Statement: Building e-commerce platforms is a skill solely reserved for large tech corporations and cannot be monetized for freelance client work.",
+              "type": "tf"
+            },
+            {
+              "answer": true,
+              "explanation": "Unlike a local physical shop, a web-based store can be accessed by anyone with an internet connection across different regions and countries.",
+              "type": "tf",
+              "statement": "5. Statement: The global nature of e-commerce allows an online storefront to display products and attract buyers far beyond the local neighborhood or city it operates from."
+            }
+          ],
+          "funFact": {
+            "headline": "Did you know?",
+            "body": "Your e-commerce website functions as a tireless, 24-hour virtual employee that processes orders, collects payments, and captures customer data simultaneously around the clock—even while you are completely asleep!"
+          }
+        },
+        {
+          "id": "i9a3lu8",
+          "title": "COMPONENT SECTIONS OF AN E-COMMERCE WEBSITE",
+          "video_url": "https://youtu.be/54Qz9Njz0MI",
+          "url": "https://youtu.be/54Qz9Njz0MI",
+          "duration": "06:52 min",
+          "description": "[00:08 - 01:07] The presenter explains that a high-converting e-commerce website is not built on luck, but on structure. Instead of just creating a digital catalog, business owners must engineer a system where every image, button, and word makes the buyer's journey as smooth as humanly possible.\n\n[01:08 - 02:20] It is highlighted that a website has roughly 5 seconds to capture a visitor's attention. This is achieved through a coordinated \"one-two-three punch\" at the top of the page: the announcement bar creates urgency, the header acts as a GPS map, and the hero section serves as a compelling book cover that keeps them scrolling.\n\n[02:21 - 03:14] The video emphasizes the importance of clear product organization and layout. Just like a chaotic supermarket drives customers away, unstructured websites create massive friction—and frustrated users simply do not buy.\n\n[03:15 - 04:34] The product page is identified as the ultimate make-or-break moment for a sale. A high-converting product page requires five critical pillars: multi-angle images, benefit-focused descriptions, clear pricing, an obvious call-to-action button, and strong social proof (reviews) to crush customer doubt.\n\n[04:35 - 06:45] The presenter reveals that a complicated checkout process is the number one killer of online sales. By using trust signals like security badges, clear return policies, and explicit AI prompts to build these structures, creators can master a highly marketable skill to help businesses stop cart abandonment.",
+          "resources": "",
+          "checkType": "tf",
+          "check": [
+            {
+              "explanation": "The video states you have about 5 seconds to create instant clarity and convince a visitor not to hit the back button.",
+              "statement": "1. Statement: A visitor's decision to stay on an e-commerce website or leave is usually decided within the first 5 seconds of landing on the page.",
+              "answer": true,
+              "type": "tf"
+            },
+            {
+              "statement": "2. Statement: The main purpose of a product listing page is to immediately finalize the financial checkout transaction.",
+              "explanation": "The only goal of the product listing page is to spark enough initial curiosity to get the user to click for more details.",
+              "answer": false,
+              "type": "tf"
+            },
+            {
+              "type": "tf",
+              "statement": "3. Statement: Product descriptions are most effective when they focus entirely on technical specifications and features rather than the actual benefits to the buyer.",
+              "explanation": "A strong product page requires a description that sells the practical benefits of the product, not just its raw features.",
+              "answer": false
+            },
+            {
+              "type": "tf",
+              "explanation": "Advertising traffic is useless if the website framework doesn't convert; ads only bring people to the front door, but the store's structure closes the sale.",
+              "statement": "4. Statement: Spending a large fortune on digital marketing ads guarantees high sales even if the store's structural layout is complicated and confusing.",
+              "answer": false
+            },
+            {
+              "explanation": "Knowing the exact blueprint prevents vague prompts and allows you to command an AI to generate higher-performing storefront sections.",
+              "answer": true,
+              "statement": "5. Statement: Understanding specific structural components—like trust signals and social proof—allows you to give highly effective, precise development prompts to AI tools.",
+              "type": "tf"
+            }
+          ],
+          "funFact": {
+            "headline": "Did you know?",
+            "body": "No matter how much money you pour into expensive social media advertisements to drive massive traffic to your store, every single dime is completely wasted if your website structure lacks basic trust signals and clear navigation to convert those visitors!"
+          }
+        }
+      ]
+    },
+    {
+      "dayNumber": 2,
+      "title": "DAY 2: FUNDAMENTAL BUILDING BLOCK OF A WEBSITE",
+      "description": "Today, you'll dive deeper into how websites actually work behind the scenes. You'll learn frontend fundamentals, backend concepts, hosting systems, domains, servers, and internet infrastructure in ways that are simple and practical. You'll understand the difference between traditional coding, CMS platforms, and AI-assisted VibeCoding. We'll introduce you to the tools modern creators use to build websites and explain why CIYA focuses on AI-powered workflows that lower barriers to entry. You'll also discover the CIYA Five-Layer Website Development Framework that will guide every project you build throughout your journey.",
+      "assignment": {
+        "prompt": "Congrats for making it here!!!\n\nToday's assignment is pretty straight forward\n\nGo to the Play Store or Appstore and download Chatgpt, Claude AI and Gemini  apps on your mobile phone.\n\nIf you find it difficult to download Gemini on your phone, try accessing it by searching for Gemini on Google and sign up there.\n\nYou must screenshot the three apps' interfaces and send it via your assignment console dashboard for approval.\n\nFailure to to do would deny you access to the next day class",
+        "dueNote": "Submission deadline is 12:00 noon of the next day"
+      },
+      "videos": [
+        {
+          "id": "r7vmovg",
+          "title": "FRONTEND BASICS",
+          "video_url": "https://youtu.be/08Zgd2GApPk",
+          "url": "https://youtu.be/08Zgd2GApPk",
+          "duration": "06:54 min",
+          "description": "Five-Point Summary\n\n[00:00:09 - 00:54] The presenter explains that underneath their vastly different designs, massive global platforms like Instagram, Jumia, and Flutterwave all share the exact same genetic DNA composed of just three core frontend technologies.\n\n[00:01:01 - 00:01:47] Frontend development is defined as everything a user physically sees and interacts with on a website—such as buttons, colors, and menus—acting exactly like the visible paint, furniture, and windows of a house.\n\n[00:01:52 - 00:03:08] A website's frontend is constructed using HTML to establish the barebone structural frame, CSS to design the colors and layout, and JavaScript to act as the electricity that powers animations and interactive features.\n\n[00:03:08 - 00:04:02] Web technologies have dramatically evolved from ugly text documents used by scientists into mobile-friendly, sophisticated systems capable of running complex, AI-powered features directly inside a smartphone browser.\n\n[00:04:08 - 00:04:48] Aspiring web creators do not need expensive computers to begin because free mobile applications like Acode or Spck Editor make it completely possible to write code, test projects, and build digital assets entirely on a smartphone.",
+          "resources": "",
+          "checkType": "tf",
+          "check": [
+            {
+              "explanation": "Frontend is everything you can visually see, touch, and interact with directly on a website, matching the visual elements of a house rather than the hidden plumbing.",
+              "type": "tf",
+              "answer": false,
+              "statement": "The term \"frontend\" refers to the hidden backend code, database infrastructure, and plumbing networks that run behind the scenes of a server."
+            },
+            {
+              "type": "tf",
+              "answer": true,
+              "explanation": "HTML acts as the absolute skeleton and foundation of a webpage, defining where headers, paragraphs, and buttons belong.",
+              "statement": "Without HTML, a browser wouldn't have any structural instructions and a website would essentially be just an empty plot of land."
+            },
+            {
+              "answer": false,
+              "explanation": "CSS only handles the visual styling, paint, and design layout; JavaScript is the \"electricity\" responsible for adding functionality and interactivity.",
+              "statement": "CSS is the programming tool responsible for turning on the lights and processing interactive popup forms when a user clicks a button.",
+              "type": "tf"
+            },
+            {
+              "statement": "In the earliest days of the internet, HTML was primarily used by scientists to share plain, simple text files.",
+              "explanation": "The web started as a basic tool for academics to exchange text documents before CSS and JavaScript were invented to add style and action.",
+              "type": "tf",
+              "answer": true
+            },
+            {
+              "explanation": "You can easily get started writing and testing HTML, CSS, and JavaScript using free mobile apps right from the phone in your pocket.",
+              "statement": "You must own a high-end laptop or a professional desktop computer with specialized software like VS Code to start writing and testing web code.",
+              "answer": false,
+              "type": "tf"
+            }
+          ],
+          "funFact": {
+            "headline": "Did you know?",
+            "body": "The multi-billion-dollar global social media networks we depend on daily are all built using the exact same three basic frontend technologies: HTML, CSS and Java Script."
+          }
+        },
+        {
+          "id": "oc92yhw",
+          "title": "BACKEND BASICS",
+          "video_url": "https://youtu.be/wmk5vRqwyHs",
+          "url": "https://youtu.be/wmk5vRqwyHs",
+          "duration": "06:51 min",
+          "description": "Five-Point Summary\n\n[00:00:10 - 00:58] The presenter introduces the backend as the invisible system running behind the scenes to perform the heavy lifting that makes seamless online activities—like instant banking transfers and food ordering—completely possible.\n\n[00:01:10 - 00:01:56] The backend operates as the brain of an application with three critical jobs: managing data (user accounts, photos, and posts), handling the core logical instructions, and communicating with powerful remote computers called servers.\n\n[00:01:56 - 00:02:40] Without a backend system, a website cannot support user logins, process online payments, or save any user data, meaning it remains a basic, static webpage rather than a real, functional digital product.\n\n[00:03:24 - 00:03:57] Every background interaction happens in a fraction of a second through a rapid three-step workflow: the frontend sends a user request, the backend processes that request against a database, and a response is instantly returned to update the screen.\n\n[00:05:26 - 00:06:10] Aspiring developers do not need expensive laptops to learn backend engineering because they can start building solid foundational concepts and practicing with powerful cloud services like Firebase directly on a smartphone.",
+          "resources": "",
+          "checkType": "mcq",
+          "check": [
+            {
+              "correct": 1,
+              "explanation": "The backend acts as the brain of an operation by managing data, handling app logic, and interacting directly with servers.",
+              "options": [
+                "Color themes, button placement, and visual animations",
+                "Data management, logic processing, and server communication",
+                "Typing content, choosing fonts, and cropping photos",
+                "Graphic design, domain registration, and writing blog text"
+              ],
+              "type": "mcq",
+              "question": "Question 1: What are the three core jobs handled by a website or application's backend infrastructure?"
+            },
+            {
+              "explanation": "Without a backend, an application cannot store records, handle data transactions, or execute logic, remaining a simple static site.",
+              "correct": 2,
+              "question": "Question 2: What happens if a web platform is built entirely without any backend infrastructure?"
+            },
+            {
+              "options": [
+                "Local Host Servers",
+                "Desktop VS Code",
+                "Firebase",
+                "Physical Hard Drives"
+              ],
+              "question": "Question 3: Which cloud platform is explicitly highlighted as a tool that beginners can use to practice backend concepts entirely on a phone?",
+              "explanation": "The video notes that you can practice and build a rock-solid foundation using powerful cloud services like Firebase directly from a mobile device."
+              },
+            {
+              "options": [
+                "A multi-vendor e-commerce store like Jumia",
+                "A social media application with millions of users",
+                "A school portal used to check exam grades and track records",
+                "A simple personal portfolio or basic informational business page"
+              ],
+              "correct": 3,
+              "question": "Question 4: According to the presenter, which type of website can be built successfully using only frontend tools without needing a backend system?",
+              "type": "mcq",
+              "explanation": "Simple pages that only display static text and information without capturing or storing user data do not require backend infrastructure."
+            },
+            {
+              "type": "mcq",
+              "question": "Question 5: What is the correct order of the backend workflow that takes place in a fraction of a second when interacting with an app?",
+              "options": [
+                "Response → Request → Processing",
+                "Request → Processing → Response",
+                "Processing → Response → Request",
+                "Request → Response → Processing"
+              ],
+              "explanation": "A user action on the frontend triggers a request, the backend's brain handles the processing, and it immediately sends a response back to the screen.",
+              "correct": 1
+            }
+          ],
+          "funFact": {
+            "body": "When you log into an Instagram account, the backend system scans and isolates your unique personal profile from a massive database of more than one billion global accounts in just a blink of an eye!",
+            "headline": "Did you know?"
+          }
+        },
+        {
+          "id": "unfz2la",
+          "title": "THE INFRASTRUCTURE LINKING FRONTEND INTO BACKEND",
+          "video_url": "https://youtu.be/0e59N-q9wDQ",
+          "url": "https://youtu.be/0e59N-q9wDQ",
+          "duration": "06:19 min",
+          "description": "Five-Point Summary\n[00:00:53 - 00:01:16] The presenter explains that the internet is essentially a massive, global network of connected computers that communicate with each other to transfer files, acting as a digital highway for sharing information.\n\n[00:01:22 - 00:02:03] A website lives on a server, which is a powerful computer running 24/7 to hold raw files (HTML, CSS, images), while a web browser acts as the tool that requests these files and beautifully assembles them for the user.\n\n[00:02:09 - 00:02:33] Because computers communicate using complex numbers called IP addresses rather than words, the Domain Name System (DNS) serves as the internet's phone book, instantly translating human-friendly names like google.com into numerical addresses.\n\n[00:03:24 - 00:03:46] To launch a website successfully, creators must understand that a domain acts as a unique street address (e.g., yourbrand.com) while hosting represents the physical house where all the website files live.\n\n[00:04:30 - 00:05:01] Taking a project live does not require a fancy setup or laptop, as modern deployment platforms like Netlify and Vercel allow developers to upload files, connect domains, and manage web assets completely from a smartphone.",
+          "resources": "",
+          "checkType": "mcq",
+          "check": [
+            {
+              "type": "mcq",
+              "options": [
+                "The Web Browser",
+                "The Server",
+                "The Domain Name",
+                "The Smartphone app"
+              ],
+              "question": "Question 1: Which core component of the internet acts as a 24/7 computer responsible for storing your raw website files and sending them out to visitors?",
+              "explanation": "A server is a high-powered computer that remains online 24/7 strictly to house a website's assets and deliver them whenever requested.",
+              "correct": 1
+            },
+            {
+              "correct": 1,
+              "options": [
+                "It designs the color layout, graphic elements, and typography of the page.",
+                "It acts as a phone book that translates human-readable web domains into numerical IP addresses.",
+                "It processes credit card payments and manages secure checkouts for online stores.",
+                "It connects a user's smartphone hardware to local mobile networks."
+              ],
+              "explanation": "Computers read locations using numerical IP addresses, so the DNS acts as a central index to map standard text domain names into numbers.",
+              "question": "Question 2: What is the primary function of the Domain Name System (DNS) during a web request?",
+              "type": "mcq"
+            },
+            {
+              "options": [
+                "The unique street address people type into a browser bar.",
+                "The visual font style used on the main header.",
+                "The physical house where all the website's files and documents actually live.",
+                "The internet service provider supplying data to the area."
+              ],
+              "type": "mcq",
+              "correct": 2,
+              "explanation": "While the domain is compared to a street address, the hosting is the actual physical house where your web data sits.",
+              "question": "Question 3: In the analogy used by the presenter, what does the website's \"hosting\" represent?"
+            },
+            {
+              "explanation": "The video references Netlify and Vercel as modern hosting providers that simplify the file uploading and connection process.",
+              "options": [
+                "Python and JavaScript",
+                "Google and Safari",
+                "Netlify and Vercel",
+                "NameCheap and GoDaddy"
+              ],
+              "question": "Question 4: Which of the following companies are explicitly highlighted as platforms that make uploading files and managing web hosting incredibly easy for beginners?",
+              "correct": 2,
+              "type": "mcq"
+            },
+            {
+              "options": [
+                "Server processes files → Browser assembles code → DNS searches name",
+                "Browser sends request → DNS finds IP address → Server returns files → Browser assembles page",
+                "Hosting purchases domain → Browser builds HTML → DNS updates server",
+                "DNS creates files → Server runs browser → Request generates address"
+              ],
+              "explanation": "A web transaction begins with a browser request, uses DNS to look up the server destination, fetches the raw files from that server, and finishes with the browser rendering the interface.",
+              "type": "mcq",
+              "question": "Question 5: What is the correct breakdown of the rapid chain reaction that occurs immediately after you type a web address and hit enter?",
+              "correct": 1
+            }
+          ],
+          "funFact": {
+            "body": "Computers cannot naturally read human letters or website names like \"google.com\"—they navigate the entire internet using massive strings of hidden numbers known as IP addresses.",
+            "headline": "Did you know?"
+          }
+        },
+        {
+          "id": "8oaw4zd",
+          "title": "TWO METHODS OF CREATING A WEBSITE",
+          "video_url": "https://youtu.be/kb9YUP8dBFo",
+          "url": "https://youtu.be/kb9YUP8dBFo",
+          "duration": "06:00 min",
+          "description": "Five-Point Summary\n\n[00:00:09 - 00:40] The presenter introduces the digital fork in the road where all modern web creators face a fundamental choice between learning the language of the machine through coding or using tools that communicate on their behalf.\n\n[00:01:04 - 00:01:47] No-code platforms function exactly like digital Legos, allowing creators to visually drag, drop, and click elements into place using powerful, pre-built web systems like WordPress, Webflow, Shopify, and Wix.\n\n[00:01:53 - 00:02:43] Choosing traditional coding is like paving your own road from scratch, giving you total and complete control over the three core pillars of web application development: the frontend interface, the backend logic, and the database memory.\n\n[00:02:58 - 00:03:39] The core trade-off between the two paths is a battle of speed versus raw power, where no-code allows you to build a lovely home out of a pre-made kit while coding gives you an empty plot of land to design an limitless, sprawling castle.\n\n[00:04:40 - 00:05:06] Aspiring creators do not need an expensive laptop to start their engineering journey because modern digital tools make it completely possible to learn, practice, and build coding projects entirely from a mobile phone.",
+          "resources": "",
+          "checkType": "tf",
+          "check": [
+            {
+              "statement": "No-code platforms require users to write complex text instructions and syntax configurations from scratch to build a webpage.",
+              "explanation": "No-code development is entirely visual, functioning like digital Legos where you drag, drop, and click components into place without typing code.",
+              "type": "tf",
+              "answer": false
+            },
+            {
+              "statement": "WordPress is an example of a massive no-code ecosystem that powers a major portion of the entire internet.",
+              "explanation": "The video explicitly notes WordPress as a major no-code player alongside systems like Shopify, Webflow, and Wix.",
+              "answer": true,
+              "type": "tf"
+            },
+            {
+              "statement": "Learning to code gives a developer full independence and prevents third-party software platforms from changing rules or raising subscription prices on their skills.",
+              "type": "tf",
+              "explanation": "Traditional coding is a foundational skill that belongs to the creator forever, removing dependency on any single platform's changing rules or prices.",
+              "answer": true
+            },
+            {
+              "statement": "A database serves as the visual layout and button design that users see and tap when visiting a modern web application.",
+              "type": "tf",
+              "explanation": "The visual, interactive elements are part of the frontend; the database serves as the app's structural memory where information is saved.",
+              "answer": false
+            },
+            {
+              "statement": "You are required to purchase an expensive, specialized laptop computer before you can legally log in and start learning how to code at CIYA.",
+              "type": "tf",
+              "answer": false,
+              "explanation": "The presenter clarifies that you can start learning, practicing syntax, and building your digital portfolio using the mobile phone in your hand."
+            }
+          ],
+          "funFact": {
+            "body": "Both coding and no-code platforms can be leveraged to generate real income.",
+            "headline": "Did you know?"
+          }
+        },
+        {
+          "id": "wgaat7b",
+          "title": "MANUAL CODING VS AI-ASSISTED CODING: WHICH SHOULD YOU GO FOR?",
+          "video_url": "https://youtu.be/tKfaHfQox5A",
+          "url": "https://youtu.be/tKfaHfQox5A",
+          "duration": "07:15 min",
+          "description": "Five-Point Summary\n[00:00:10 - 00:00:53] Traditional web development historically felt like climbing Mount Everest, requiring months or years to learn coding basics. Today, AI-assisted development turns that timeline upside down, allowing beginners to guide the creation process in days rather than months.\n\n[00:01:12 - 00:02:20] Traditional coding combines the roles of architect and craftsman, moving historically from structural HTML to stylistic CSS and interactive JavaScript. Achieving full-stack developer status requires mastering a massive mountain of systems, including frontends, backends, databases, and servers.\n\n[00:02:27 - 00:03:16] AI-assisted development introduces a new mindset called \"vibe coding.\" Instead of facing a blank screen, creators describe what they want in plain English; the AI generates the code, transforming the developer's role from a bricklayer into a creative director.\n\n[00:03:23 - 00:04:12] The CIA stack (\"Code Yourself Accelerated\") simplifies the modern toolset by pairing AI generation engines like Google AI Studio with robust backend tools like Firebase, allowing creators to learn on the job while building functional software.\n\n[00:06:03 - 00:06:49] The barrier to entry for modern web creation has been completely demolished. Beginners no longer need six months of theoretical study or an expensive laptop; they can immediately start building professional landing pages, portfolios, and e-commerce apps directly on a smartphone.",
+          "resources": "",
+          "checkType": "tf",
+          "check": [
+            {
+              "explanation": "The video traces the progression of web design from simple text structures to modern, highly interactive web systems using these three key layers.",
+              "answer": true,
+              "statement": "Traditional software engineering historically evolved through a sequential building process, adding HTML for skeleton structure, CSS for visual styling, and JavaScript for user interactivity.",
+              "type": "tf"
+            },
+            {
+              "answer": false,
+              "explanation": "Vibe coding is a modern, AI-assisted mindset where developers describe their project intent in plain English and let AI handle the heavy code generation.",
+              "statement": "\"Vibe coding\" means the developer must manually type out every single brick and semicolon of logic to build software without any external system support.",
+              "type": "tf"
+            },
+            {
+              "answer": false,
+              "statement": "Traditional development routes offer immediate, high-speed project deployment, whereas AI-assisted paths are inherently much slower to set up.",
+              "type": "tf",
+              "explanation": "The video shows that traditional development has a steep learning curve and is slower to start, while AI tools allow creators to build and deploy applications rapidly."
+            },
+            {
+              "explanation": "The presentation outlines these specific platforms as part of an streamlined modern stack to get from an idea to a finished product quickly.",
+              "type": "tf",
+              "answer": true,
+              "statement": "The CIA stack specifically utilizes engines like Google AI Studio for code generation and platforms like Firebase to manage complex backend systems."
+            },
+            {
+              "statement": "Creators can use modern AI toolsets to build real, client-ready business landing pages and e-commerce apps completely on a mobile phone without a high-end computer.",
+              "type": "tf",
+              "answer": true,
+              "explanation": "The presenter highlights that modern accessible tools have removed the need for a powerful laptop, allowing full web creation to begin right on a smartphone."
+            }
+          ],
+          "funFact": {
+            "body": "Traditional coding and AI vibe coding are on the same team, sharing the ultimate goal of solving human problems and generating income.",
+            "headline": "Did you know?"
+          }
+        },
+        {
+          "id": "o5e4f8t",
+          "title": "CIYA FIVE LAYERS OF WEBSITE DEVELOPMENT",
+          "video_url": "https://youtu.be/5P9Jf7oDlkc",
+          "url": "https://youtu.be/5P9Jf7oDlkc",
+          "duration": "06:38 min",
+          "description": "Five-Point Summary\n\n[00:01:06 - 00:01:58] Layer 1: Thinking focuses on the shift toward prompt engineering—the skill of communicating precisely with large language models like ChatGPT, Gemini, or Claude. Treating AI as a strategic partner allows creators to plan web features, design user navigation routes, and write clean technical specifications.\n\n[00:02:03 - 00:02:47] Layer 2: Building transitions the raw concept into a working interface through the use of AI agents. Using advanced tools like Cursor (which embeds AI into the code editor) or Replit (which sets up entire coding environments in a browser), the AI acts as a digital co-developer to generate app files and crush bugs quickly.\n\n[00:02:53 - 00:03:31] Layer 3: The Back End acts as the dynamic \"brain\" of the website, executing behind-the-scenes logic such as secure user logins, account profiles, and database storage. Modern platforms like Firebase and Supabase simplify this historically messy step, transforming complex data routing into a clean, pre-configured framework.\n\n[00:03:38 - 00:04:34] Layer 4: Infrastructure (Hosting) provides the physical digital real estate that keeps websites online and running 24/7. Major cloud ecosystems like Google Cloud, Vercel, and AWS ensure global speed and security, with platforms like Google Cloud frequently offering hundreds of dollars in free startup credits to offset early infrastructure costs.\n\n[00:04:40 - 00:05:18] Layer 5: The Domain establishes the website's professional public identity by replacing confusing, autogenerated system URLs with a clean, memorable address like yourbrand.com. Using registration services like Namecheap or GoDaddy to claim a custom domain builds instant user trust and serves as a digital storefront sign.",
+          "resources": "",
+          "checkType": "mcq",
+          "check": [
+            {
+              "question": "Question 1: What is the main focus of Layer 1 (Thinking) in the modern digital landscape?",
+              "options": [
+                "Writing manual code line-by-line",
+                "Purchasing expensive web servers",
+                "Communicating effectively with AI via prompt engineering",
+                "Designing graphic logos"
+              ],
+              "explanation": "Layer 1 focuses on clear communication with large language models, a skill called prompt engineering, to plan features and map out user navigation.",
+              "type": "mcq",
+              "correct": 2
+            },
+            {
+              "correct": 1,
+              "type": "mcq",
+              "explanation": "Cursor and Replit are highlighted as modern development platforms designed to speed up the process of turning an idea into a working product using AI.",
+              "options": [
+                "WordPress and Wix",
+                "Cursor and Replit",
+                "Photoshop and Illustrator",
+                "Firebase and Supabase"
+              ],
+              "question": "Question 2: Which tools are mentioned in the video as powerful browser-based environments or code editors driven by AI co-developers?"
+            },
+            {
+              "correct": 2,
+              "type": "mcq",
+              "explanation": "The back end acts as the application's brain, handling behind-the-scenes logic, databases, and secure user logins.",
+              "question": "Question 3: What role does Layer 3 (The Back End) play in building an application?",
+              "options": [
+                "It chooses the color scheme of the home page",
+                "It registers the final .com name for the business",
+                "It serves as the \"brain,\" managing user accounts, data, and secure logins",
+                "It tracks user analytics and marketing campaigns"
+              ]
+            },
+            {
+              "type": "mcq",
+              "question": "Question 4: According to the presenter, how can beginners minimize their initial setup costs during Layer 4 (Infrastructure)?",
+              "correct": 1,
+              "explanation": "Major cloud providers offer hundreds of dollars in startup credits, creating a free runway for creators to focus entirely on building their product.",
+              "options": [
+                "By building their own physical hardware servers",
+                "By using startup credits offered by major cloud platforms like Google Cloud",
+                "By charging users money before the website is built",
+                "By skipping the hosting layer completely"
+              ]
+            },
+            {
+              "type": "mcq",
+              "options": [
+                "AWS and Vercel",
+                "ChatGPT and Claude",
+                "Firebase and Supabase",
+                "Namecheap and GoDaddy"
+              ],
+              "explanation": "Namecheap and GoDaddy are specified as simple services used to register unique domain names that replace long, autogenerated web addresses.",
+              "question": "Question 5: Which services are recommended in Layer 5 for finding and registering a professional website name?",
+              "correct": 3
+            }
+          ],
+          "funFact": {
+            "headline": "Did you know?",
+            "body": "Building a digital product no longer requires mastering a dozen complex tools from scratch; instead, you take on the role of a \"movie director,\" guiding AI agents that can generate whole applications and squash bugs for you."
+          }
+        }
+      ]
+    },
+    {
+      "dayNumber": 3,
+      "title": "DAY 3: THE THINKING AND THE BUILDING LAYERS: PLANNING YOUR ONLINE STORE",
+      "description": "Today, you'll enter the Thinking Layer of CIYA's framework.\n\nYou'll learn how professional agencies gather business information and translate it into actionable project plans.\n\nYou'll use the CIYA Business Clarity Questionnaire to identify:\n\nBusiness details\nBrand identity\nProduct catalogs\nCategories\nCustomer personas\nDelivery methods\nPayment preferences\nReturn policies\nMarketing goals\n\nYou'll also learn Prompt Engineering and discover how to transform business ideas into detailed prompts that AI can execute.\n\nBy the end of today, you'll know how to think like an e-commerce strategist.",
+      "assignment": {
+        "prompt": "Following the steps of today's lesson videos, use your first-day assignment business to build an e-commerce website for your first client\n\nAll details you need to generate an in-depth, full prompt are detailed in the ChatGPT texts. assignment\n\nBuild your first client project with the following steps:\n\n1. Go to the KYCB section on your dashboard and fill out the form as a freelancer.\n\n2. Copy the answer at the bottom after answering all questions.\n\n3. Go to the prompt template section on your dashboard and select any of the e-commerce templates you like by copying it.\n\n4. Go to Claude and paste both KYCB answers and the e-commerce templates.\n\n5. And use the \"Instruction prompt\" that will guide Claude to modify your selected template to fit your client details as generated from the KYCB.\n\nUse the link below as a guide and then submit the link of your project as the assignment in order to proceed to day 4.\n\nhttps://www.tiktok.com/@ciya15522/video/7670570712385457429?\n",
+        "dueNote": "Submission deadline is next day at 12:00 noon"
+      },
+      "videos": [
+        {
+          "id": "fg1olt8",
+          "title": "THE THINKING LAYER TOOLS",
+          "video_url": "https://youtu.be/EuGtRIcnhJA",
+          "url": "https://youtu.be/EuGtRIcnhJA",
+          "duration": "13:14 min",
+          "description": "Video Summary (Five Points)\n[00:13 - 01:29] The presenter explains that a solid \"thinking layer\" relies on business clarity and client information forms. He introduces Claude AI as a highly reliable, professional chatbot available via the web or mobile stores to help engineers review and refine project briefs before moving to the development stage.\n\n[00:13:0 - 02:20] The difference between weak and strong prompts is broken down. Because free AI website builders operate with strict daily token limits that reset every 24 hours, creators must be highly direct and minimal in their chats to avoid wasting tokens on repetitive prompting.\n\n[02:21 - 03:34] A weak prompt is demonstrated using a hypothetical Nigerian retail store. Even if a prompt is long, it is considered weak if it only mentions basic business names and locations while failing to specify crucial website architecture like footers, product categories, testimonials, and FAQs.\n\n[03:35 - 05:05] A strong prompt is showcased, containing granular details about brand direction, specific target goals, and layout requirements (such as primary call-to-action buttons, checkout pages, and UX specifications). Since typing this out manually is exhausting, the presenter highlights a built-in tool that automates the process.\n\n[05:06 - 06:45] The presenter demonstrates the CIYA website’s prompt generator, where users simply fill out a basic form with business details (such as products, location, inventory, and brand colors). In under 5 minutes, the system converts these fields into a massive, highly detailed 256-line prompt optimized for the AI builder.",
+          "resources": "",
+          "checkType": "mcq",
+          "check": [
+            {
+              "question": "Question 1: Why is a prompt that only explains a business's background and location considered \"weak\" for an AI website builder?",
+              "options": [
+                "It uses too many words.",
+                "It fails to specify the required sections and layout of the e-commerce website.",
+                "It mentions multiple city locations.",
+                "It does not include a direct link to the business."
+              ],
+              "explanation": "A prompt is weak if it fails to explicitly lay out the structural sections of the website (such as the header, collection pages, testimonial sections, and FAQs) required by the AI builder to construct a professional page.",
+              "type": "mcq",
+              "correct": 1
+            },
+            {
+              "explanation": "The free AI builder tool has token limits that reset every 24 hours, which makes concise, direct prompting critical to avoid running out of daily generations.",
+              "question": "Question 2: What happens to the tokens on the free AI website builder tool?",
+              "correct": 2,
+              "type": "mcq",
+              "options": [
+                "They expire after 1 hour of inactivity.",
+                "They must be purchased with a local card.",
+                "They reset automatically every 24 hours.",
+                "They accumulate infinitely if you do not use them."
+              ]
+            },
+            {
+              "options": [
+                "WordPress Admin",
+                "Claude AI",
+                "Wix Builder",
+                "Google Sheets"
+              ],
+              "question": "Question 3: Which primary tool is recommended in the video for hosting the initial prompt conversation and refining its specific details?",
+              "type": "mcq",
+              "correct": 1,
+              "explanation": "Claude AI is highlighted as a highly reliable, professional conversational AI chatbot used to review, adjust, and optimize prompts before feeding them into an AI web creator."
+            },
+            {
+              "options": [
+                "Setting the language to French",
+                "Setting the default shipping to South America",
+                "Setting the product currency to US Dollars ($) instead of Naira (₦)",
+                "Disabling mobile responsiveness"
+              ],
+              "explanation": "Because most major AI tools are built by American companies, their default output automatically lists product prices in dollars, requiring users to explicitly instruct the AI to swap the currency to Naira.",
+              "type": "mcq",
+              "correct": 2,
+              "question": "Question 4: What default setting do most global AI chatbot tools use that requires manual refinement for a local Nigerian e-commerce site?"
+            },
+            {
+              "type": "mcq",
+              "correct": 1,
+              "options": [
+                "At least 2 hours",
+                "Within 5 minutes",
+                "Approximately 1 full day",
+                "45 minutes"
+              ],
+              "explanation": "The CIYA website prompt generator simplifies the process entirely, turning standard form answers into a massive structural prompt within 5 minutes",
+              "question": "Question 5: How long does it typically take to generate a complete, heavy-duty structural prompt using the CIYA website's built-in generator?"
+            }
+          ],
+          "funFact": {
+            "body": "The entire e-commerce website shown in the video—including the header navigation, hero text, categorized layout grids, client testimonials, written FAQ content, and even the product images—was generated autonomously by an AI builder purely from a single copied text prompt!",
+            "headline": "Did you know?"
+          }
+        },
+        {
+          "id": "0fbwqj0",
+          "title": "THE BUILDING LAYER TOOLS",
+          "video_url": "https://youtu.be/ZPWrFehp9DU",
+          "url": "https://youtu.be/ZPWrFehp9DU",
+          "duration": "19:13 min",
+          "description": "Five-Point Video Summary\n[00:00:45 - 00:01:56] The presenter introduced Google AI Studio as the comprehensive building layer ecosystem used to autonomously generate React code, images, and videos (via specialized built-in modules like Gemini 3, Flash, LIIA, TTS, and Veo).\n\n[00:03:50 - 00:04:42] It was stressed that because Google AI Studio operates on free daily credits that reset every 24 hours, creators must avoid treating the interface like a casual text-chat app; structured, finalized prompts must be used immediately to prevent exhausting daily limits.\n\n[00:04:48 - 00:05:24] Crucial backend setup steps were demonstrated, instructing viewers to navigate to the settings icon before initiating a build to switch the default AI brain to the highly advanced Gemini 1.5 Pro (preview) while leaving the development framework set to React.\n\n[00:06:10 - 00:07:03] The presenter highlighted a real-world EdTech/business scenario featuring \"Aura Sparkle,\" a jewelry brand owner suffering from mental fatigue due to the 24-hour disappearance cycle of daily WhatsApp status updates, prompting her transition to a permanent e-commerce storefront.\n\n[00:10:59 - 00:12:08] The building phase was showcased where the AI chatbot actively requested layout choices (such as Geometric Balance), completely handled the complex underlying HTML, CSS, and JavaScript, and outputted a fully functional, mobile-responsive boutique application in just a few minutes.",
+          "resources": "",
+          "checkType": "mcq",
+          "check": [
+            {
+              "type": "mcq",
+              "options": [
+                "Gemini Flash 1.0",
+                "LIIA Audio Gen",
+                "Gemini 1.5 Pro (preview)",
+                "Veo Video 2.0"
+              ],
+              "question": "Question 1: Which AI model is explicitly recommended in the settings icon dropdown for driving the main website build?",
+              "correct": 2,
+              "explanation": "The presenter instructs viewers to specifically change the Gemini module settings to \"1.5 Pro preview\" as it is the most capable model available for generating the website structures."
+            },
+            {
+              "type": "mcq",
+              "correct": 1,
+              "question": "Question 2: According to the video, what primary pain point forced the jewelry business owner to build a permanent website?",
+              "options": [
+                "High delivery fees outside Lagos",
+                "Exhaustion from the unending 24-hour disappearance cycle of WhatsApp status updates",
+                "An inability to accept card payments",
+                "Broken image links on social media profiles"
+              ],
+              "explanation": "The business owner suffered from daily stress and mental fatigue because her WhatsApp status posts vanished every 24 hours, forcing her to constantly re-upload product listings to remind customers."
+            },
+            {
+              "correct": 2,
+              "type": "mcq",
+              "explanation": "The interface settings require selecting a framework, and the presenter explicitly states to keep the default framework set to React.",
+              "question": "Question 3: What coding framework does the presenter leave selected by default in Google AI Studio's settings panel?",
+              "options": [
+                "Angular",
+                "Vue.js",
+                "React",
+                "Vanilla HTML/CSS"
+              ]
+            },
+            {
+              "correct": 2,
+              "options": [
+                "Sophisticated Dark Theme",
+                "Editorial Aesthetic",
+                "Geometric Balance",
+                "Clean Minimalism"
+              ],
+              "type": "mcq",
+              "explanation": "When Google AI Studio provided layout template options in the chat panel, the presenter selected \"Geometric Balance\" to generate the final interface.",
+              "question": "Question 4: What design layout theme was explicitly chosen from the AI's chat panel suggestions during the website build?"
+            },
+            {
+              "correct": 2,
+              "explanation": "To share the preview link publicly, the creator must click the share button, change the drop-down restriction to \"Public,\" and copy the \"Shared URL\" from the integrations tab.",
+              "question": "Question 5: How do you make a completed Google AI Studio project visible to friends or clients without email restrictions?",
+              "options": [
+                "Upgrading to a paid Pro account",
+                "Downloading the source files to a phone",
+                "Changing the project access setting from \"Restricted\" to \"Public\" and copying the Shared URL",
+                "Syncing the app directly to an active Instagram account"
+              ],
+              "type": "mcq"
+            }
+          ],
+          "funFact": {
+            "headline": "Did you know?",
+            "body": "Without writing a single line of manual HTML, CSS, or JavaScript code, a user can build a completely responsive e-commerce application equipped with a dynamic banner layout, multi-category navigation tab filters, an active shopping cart, and pre-written customer FAQ panels using just one refined text prompt inside Google AI Studio!"
+          }
+        }
+      ]
+    },
+    {
+      "dayNumber": 4,
+      "title": "DAY 4: PROMPT ENGINEERING 2.0",
+      "description": "You'll explore Prompt Engineering Part 2, learning how to improve projects using:\n\nText prompts\nVoice prompts\nFile-based prompts\nURL-based prompts\n\nBy the end of today, you'll understand how professionals iterate and refine online stores to improve user experience and conversions.",
+      "assignment": {
+        "prompt": "Submit your refined project link as your assignment. The following will be evaluated and compared against your first sketch:\n\n1. Use of file and URL prompt engineering: (Add the screenshots evidence of any website that inspired your use of file and URL prompt.)\n\n2. Overall aesthetic feature of your project: it must be better than the previous version",
+        "dueNote": "Submit before midnight to unlock next day course lessons"
+      },
+      "videos": [
+        {
+          "id": "61ox08t",
+          "title": "How To Refine Your E-commerce Website",
+          "video_url": "https://youtu.be/fuvtMZVFcSc",
+          "url": "https://youtu.be/fuvtMZVFcSc",
+          "duration": "19:26 min",
+          "description": "Five-Point Video Summary\n[00:00:35 - 00:01:45] The presenter introduced Prompt Engineering 2.0, moving beyond standard typing to reveal that creators can simultaneously utilize four direct prompting methods: text-based, voice-based, file-based, and URL link-based commands.\n\n[00:01:53 - 00:02:55] A text-based prompt was applied to completely restructure the live website's hero banner, successfully commanding the AI to remove the layout grid and swap it for a clean, background-enveloping asset while maintaining the brand's text.\n\n[00:04:12 - 00:07:36] Using voice-to-text input, the presenter dictated complex business logic to rebuild a generic chat bubble into an official WhatsApp button, instantly deploying options for customers to submit custom manufacturing requests or load jewelry resale information.\n\n[00:09:21 - 00:12:42] A file-based prompt was demonstrated by uploading a visual screenshot of a blog section from an external website, commanding the AI agent to replicate that layout format perfectly between the existing FAQ page and the Instagram feeds.\n\n[00:14:46 - 00:18:46] The presenter deployed URL link-based prompting by submitting an external web address, commanding the AI to scrape and replicate the precise drop-down mega menu layout structure for navigation menus without manually defining layout values.",
+          "resources": "",
+          "checkType": "mcq",
+          "check": [
+            {
+              "correct": 1,
+              "explanation": "Prompt Engineering 2.0 moves past just text by combining four distinct interaction channels: text-based prompts, voice-based inputs, file uploads (screenshots), and URL links.",
+              "options": [
+                "HTML, CSS, JavaScript, and React",
+                "Text, Voice, File uploads, and URLs",
+                "Instagram, Tik Tok, WhatsApp, and Google Drive",
+                "Desktop view, Mobile view, Full screen, and Code View"
+              ],
+              "question": "Question 1: What four input mediums make up the core of Prompt Engineering 2.0 as demonstrated in the video?",
+              "type": "mcq"
+            },
+            {
+              "options": [
+                "Mobile phones cannot parse text-based code prompts.",
+                "It bypasses the tedious and time-consuming process of typing long instruction sets on small smartphone keyboards.",
+                "Voice prompts do not use any daily token credits.",
+                "It automatically updates the layout into a mobile view."
+              ],
+              "explanation": "Typing highly specific, long structural details on a phone is difficult; voice-to-text transcribes complex instructions cleanly and quickly.",
+              "type": "mcq",
+              "question": "Question 2: Why was a voice-based prompt highly recommended for creators working on mobile devices?",
+              "correct": 1
+            },
+            {
+              "correct": 1,
+              "type": "mcq",
+              "question": "Question 3: What two specialized functionalities were added to the upgraded interactive WhatsApp button?",
+              "options": [
+                "A credit card portal and an automated receipt printer",
+                "A custom jewelry design request form and a jewelry resale collection panel",
+                "An active Instagram photo link and a TikTok short video player",
+                "A coupon code generator and a live currency converter to Dollars"
+              ],
+              "explanation": "The custom voice instruction added a dual-purpose panel letting users either request a bespoke custom jewelry item or submit their own pre-owned jewelry to resell to the brand."
+            },
+            {
+              "correct": 1,
+              "explanation": "The presenter uploaded a visual screenshot (file-based prompt) and directed the AI agent to duplicate the style and structural layout directly into a specific location on the page.",
+              "question": "Question 4: How did the presenter add a completely new blog layout block to the website without explaining the structural placement with code?",
+              "options": [
+                "By pasting a link to an active WordPress database",
+                "By uploading a screenshot image of a blog design they liked and prompting the AI to copy its style",
+                "By manually writing an inline CSS div container",
+                "By selecting a default theme from the playground settings bar"
+              ],
+              "type": "mcq"
+            },
+            {
+              "correct": 2,
+              "explanation": "The AI agent is advanced enough to go directly to the attached URL, scrape its frontend components, and recreate the exact interactive menu hover behaviors on the user's site.",
+              "question": "Question 5: What occurs when a creator submits an external website URL to the AI agent?",
+              "type": "mcq",
+              "options": [
+                "The AI simply links to that external page via a text hyperlink.",
+                "The AI crashes due to cross-origin security protocols.",
+                "The AI parses, scrapes, and analyzes the structural design of that URL to copy behaviors like hover drop-down menus.",
+                "The AI automatically upgrades the user's free daily credit account."
+              ]
+            }
+          ],
+          "funFact": {
+            "body": "True digital building in this era requires pure creativity rather than syntax knowledge.",
+            "headline": "Did you know?"
+          }
+        }
+      ]
+    },
+    {
+      "dayNumber": 5,
+      "title": "DAY 5: FULL BRANDING WITH CUSTOM MEDIA",
+      "description": "Today, you'll personalize your e-commerce project.\n\nYou'll learn how to:\n\nUpload product images\nAdd product descriptions\nOrganize collections\nCustomize brand colors\nInsert logos\nEmbed promotional videos\nConfigure trust elements\nImprove product storytelling\n\nYou'll also discover techniques used by successful online brands to create memorable shopping experiences.\n\nBy the end of today, you'll have a polished, professional online store ready for showcasing, testing, or future deployment.",
+      "assignment": {
+        "prompt": "Congratulations on completing this course; you've not only made us proud, but you've also achieved a feat few can boast of. Congrats once again.\n\nSubmit your project link as your assignment; the following will be evaluated before you can claim your badge:\n\n1. Replacement of all AI images with new custom images\n2. Use of Youtube video\n3. Use of WebM video",
+        "dueNote": "Submission and approval grants you your CIYA badge. You can go to your profile after to download it."
+      },
+      "videos": [
+        {
+          "id": "yv1gvp6",
+          "title": "How To Add Custom Images To Your E-commerce Website",
+          "video_url": "https://youtu.be/auSeU8u9ZKA",
+          "url": "https://youtu.be/auSeU8u9ZKA",
+          "duration": "08:14 min",
+          "description": "Five-Point Video Summary\n[00:00:18 - 00:00:56] The presenter highlighted the immense value of visual asset placement for driving e-commerce conversions, warning creators that while a storefront should contain professional photos and up to two or three strategic videos, overloading a page with media degrades user experience.\n\n[00:01:03 - 00:01:47] It was explained that while initial design templates utilize placeholder AI-generated images, a real business must replace them with authentic product imagery; structurally, the backend hosting parameters for static media and code frameworks are kept entirely separate.\n\n[00:02:00 - 00:02:50] The presenter reviewed a static grid-based customer review block and demonstrated how an unstructured testimonial section can cause passive scrolling drops, emphasizing the need to convert static reviews into dynamic, attention-grabbing interactive assets.\n\n[00:03:13 - 00:04:13] Utilizing a verbal voice prompt, the creator instructed the AI agent to completely redesign the layout of the testimonial section, transforming it from a static block into a completely autonomous, horizontal auto-scrolling loop moving right-to-left.\n\n[00:05:05 - 00:07:53] The manual image replacement process was demonstrated using a front-facing visual selection tool, where the user paused the active auto-scroll loop, utilized a pen-shaped edit tool, uploaded custom customer files from a local storage gallery, and clicked submit to update the live UI.",
+          "resources": "",
+          "checkType": "mcq",
+          "check": [
+            {
+              "correct": 1,
+              "type": "mcq",
+              "question": "Question 1: According to the video, what is the maximum number of product videos recommended for a high-converting storefront page before it becomes overloaded?",
+              "options": [
+                "Exactly 10 videos",
+                "Up to 2 or 3 videos",
+                "No videos at all—only text descriptions",
+                "Over 15 short loops"
+              ],
+              "explanation": "The presenter notes that while quality product videos assist conversions, overloading the page with too many media assets slows down or complicates the layout, making 2 to 3 videos the sweet spot."
+            },
+            {
+              "options": [
+                "Images are typed directly into the JavaScript files as binary code.",
+                "The frontend architecture and backend media hosting platforms operate separately.",
+                "Media files cannot be hosted on cloud servers.",
+                "All custom images delete themselves when the server resets."
+              ],
+              "explanation": "The video explains that media files are hosted on separate cloud infrastructures, meaning your frontend UI layout code and your actual asset/backend databases run distinct pipelines.",
+              "type": "mcq",
+              "correct": 1,
+              "question": "Question 2: What structural software architecture fact does the presenter share regarding how media files are handled compared to frontend code?"
+            },
+            {
+              "type": "mcq",
+              "correct": 1,
+              "question": "Question 3: What exact visual behavior change was applied to the customer reviews section using a voice prompt?",
+              "explanation": "The voice command explicitly directed the AI agent to take the testimonial block and make it scroll horizontally from right to left completely automatically, removing the requirement for users to swipe manually.",
+              "options": [
+                "It was hidden inside a secret drop-down menu.",
+                "It was forced to scroll horizontally from right to left automatically without any manual dragging.",
+                "It was converted into a multi-choice feedback questionnaire form.",
+                "It was removed entirely from the home page."
+              ]
+            },
+            {
+              "correct": 2,
+              "type": "mcq",
+              "explanation": "Hovering over the active review panel and selecting the designated media asset reveals a pen-shaped icon tool, which acts as the path to drop into local device storage and choose a new image file.",
+              "options": [
+                "A trash can icon",
+                "A gear/settings wheel",
+                "A pen-shaped edit icon",
+                "A floating WhatsApp bubble"
+              ],
+              "question": "Question 4: Which icon on the page editing panel must a user click to replace a broken or placeholder AI testimonial photo with a real client photo?"
+            },
+            {
+              "correct": 1,
+              "type": "mcq",
+              "explanation": "The presenter hints that true conversion excellence happens when social media accounts link dynamically to the site architecture, pulling verified, living client comments directly onto the page as organic social proof.",
+              "options": [
+                "Buying them from international data providers",
+                "Linking the website directly to active social media handles to pull organic posts and comments",
+                "Forcing every buyer to take a mandatory phone quiz",
+                "Re-typing customer WhatsApp chats into a text prompt"
+              ],
+              "question": "Question 5: In future modules regarding advanced marketing, how does the presenter propose gathering real, non-AI organic client reviews?"
+            }
+          ],
+          "funFact": {
+            "body": "High-converting design is driven by clear images placed exactly where they resolve a buyer's doubt.",
+            "headline": "Did you know?"
+          }
+        },
+        {
+          "id": "pw55lpi",
+          "title": "How To Add Custom Videos To Your E-commerce Website",
+          "video_url": "https://youtu.be/Xt4XlUfq-N0",
+          "url": "https://youtu.be/Xt4XlUfq-N0",
+          "duration": "08:57 min",
+          "description": "Five-Point Video Summary\n\n[00:00:11 - 00:00:39] The presenter broke down the two primary media integration formats used in modern e-commerce web applications: embedded streaming options (like YouTube links) and automated background loops (WebM format) that load directly into layout backgrounds.\n\n[00:01:00 - 00:01:54] To embed a YouTube player block, a creator must first upload their media to a business-branded channel, grab the public share link, and instruct the AI builder to compile an iframe container precisely beneath the blog grid.\n\n[00:03:36 - 00:04:18] The marketing value of utilizing embedded YouTube blocks was highlighted, explaining how hosting videos natively off-site keeps web bundles lightweight while driving traffic back to the brand’s social channels to build long-term follower bases.\n\n[00:04:31 - 00:05:53] For videos that must play silently and automatically without user interaction, the presenter demonstrated navigating to the backend code panel, uploading a raw video file using the global file integration utility, and saving the media directly into the app workspace.\n\n[00:06:20 - 00:07:44] Using a vocal voice command, the presenter mapped the uploaded file directly into the homepage hero section, completely masking the hero banner template into an auto-looping silent header background capable of instantly hooking scrolling buyers.",
+          "resources": "",
+          "checkType": "mcq",
+          "check": [
+            {
+              "options": [
+                "AVI",
+                "WebM",
+                "MP3",
+                "WAV"
+              ],
+              "question": "Question 1: What specific file type does the presenter name that allows high-fidelity background loops to play on a website automatically without sound?",
+              "type": "mcq",
+              "correct": 1,
+              "explanation": "The video explains that WebM is a highly effective, modern web video format utilized to build silent, looping, auto-playing video components within web layouts."
+            },
+            {
+              "options": [
+                "A local WhatsApp status page",
+                "A public or brand-owned YouTube channel",
+                "An external Google Drive folder",
+                "A temporary text prompt"
+              ],
+              "type": "mcq",
+              "explanation": "For standard on-demand play buttons, the video instructs users to upload the content to YouTube, copy that link, and provide it to the AI agent to frame out an embedded block.",
+              "question": "Question 2: Where must a raw video asset first be uploaded if a user wants to build a standard embedded video playback block on their page?",
+              "correct": 1
+            },
+            {
+              "explanation": "To upload a local file directly into the workspace repository, the user clicks into the \"Code\" view tab and hits the circular plus button to upload images, PDFs, or raw video media.",
+              "correct": 2,
+              "options": [
+                "The Marketing Dashboard",
+                "The Client Form Template Section",
+                "The Code Section (via the global plus-sign upload utility)",
+                "The Device Mobile View Panel"
+              ],
+              "type": "mcq",
+              "question": "Question 3: Under which operational panel on the dashboard must a user navigate to upload a raw background video file directly into their server workspace?"
+            },
+            {
+              "question": "Question 4: What critical tip does the presenter give regarding text management when an auto-playing video is added to the main hero banner?",
+              "type": "mcq",
+              "options": [
+                "Change all text fields into automated voice-overs.",
+                "Translate all layout headers into American English.",
+                "Minimize or remove excessive text layers that block the absolute visual view of the moving video background.",
+                "Change the currency layout back to default US dollars."
+              ],
+              "correct": 2,
+              "explanation": "Because heavy text overlays block the visual impact of an auto-playing video asset, the video suggests removing crowded, excessive text modules so the background video remains cleanly visible."
+            },
+            {
+              "type": "mcq",
+              "question": "Question 5: What unique user behavior distinguishes WebM background video banners from standard embedded YouTube links?",
+              "options": [
+                "WebM videos require a user to pass an interactive security check.",
+                "Users cannot pause, stop, or mute a WebM file by default; it plays continuously on layout load.",
+                "WebM links automatically redirect users to a separate mobile browser.",
+                "WebM formats only load on high-end laptops and computers."
+              ],
+              "explanation": "Unlike standard YouTube embeds that require a user to actively tap a play icon, a WebM video layout module forces an automated, continuous, silent background loop that cannot be paused or altered by standard user mouse behavior.",
+              "correct": 1
+            }
+          ],
+          "funFact": {
+            "body": "Adding a standard YouTube link forces a buyer to manually press a play button to see your products, but swapping that container for an automated WebM asset strips away user control entirely, forcing them to watch your product loops the microsecond your web page loads!",
+            "headline": "Did you know?"
+          }
+        },
+        {
+          "id": "dqsw3uw",
+          "title": "E-commerce Website Training Recap",
+          "video_url": "https://youtu.be/s4K-gBoibqw",
+          "url": "https://youtu.be/s4K-gBoibqw",
+          "duration": "08:44 min",
+          "description": "Five-Point Video Summary\n[00:00:17 - 00:00:46] The presenter opened the final course recap by celebrating the students' evolution from analyzing rough blueprint layouts to successfully launching fully functional, polished aesthetic storefronts using non-coding web architectures.\n\n[00:01:18 - 00:02:17] The foundational 5-day curriculum was reviewed, highlighting that students moved completely past stagnant theory by mastering store layouts, AI-assisted visual refinement tools, live host activation parameters, and core platform structures.\n\n[00:02:56 - 00:03:59] The presenter unlocked the next professional phase by detailing the CIA badge upgrade, explaining that while standard free tiers leave students as isolated solo creators with base files, the badge connects them to advanced update prompts and expert systems.\n\n[00:04:25 - 00:05:12] The specialized features of the 30-Day Blueprint Challenge were broken down, outlining a self-sustaining loop that provides direct senior mentorship access, real-time technical problem-solving assistance, and immediate marketplace application objectives.\n\n[00:05:55 - 00:07:44] The video concluded by mapping out high-earning career roles—including Independent Freelance Specialist, Brand Architect, and E-commerce Founder—while defining the educational growth pipeline that moves from initial curiosity to ultimate market transformation.",
+          "resources": "",
+          "checkType": "tf",
+          "check": [
+            {
+              "type": "tf",
+              "statement": "The primary focus of the standard foundation course layer relies entirely on solo project creation using public exercise files without access to senior community mentorship.",
+              "explanation": "The presenter states that before unlocking the specialized academy badge, standard students work as solo creators using standard files, with support limited to past exercise videos.",
+              "answer": true
+            },
+            {
+              "statement": "Securing a CIA Badge shifts a creator's educational focus away from introductory theory and directly toward marketplace monetization and advanced AI tool workflows.",
+              "type": "tf",
+              "answer": true,
+              "explanation": "The transition to becoming a badge holder directly upgrades the student's resources to advanced prompts, monetization strategies, and direct expert project backing."
+            },
+            {
+              "explanation": "The academy sets up a fast-paced \"30-day blueprint challenge\" specifically engineered to activate skills and help students immediately start pitching their e-commerce capabilities in the global marketplace.",
+              "statement": "The video outlines a 90-day blueprint timeline before a student is allowed to pitch or deploy their skills on freelancing networks like Fiverr or Upwork.",
+              "type": "tf",
+              "answer": false
+            },
+            {
+              "statement": "Learning to host an e-commerce website live on the web and configuring deep custom branding assets are covered in the beginner foundation class modules.",
+              "type": "tf",
+              "answer": false,
+              "explanation": "Web hosting, database configurations, and deeper branding integrations are explicitly reserved for the upcoming CIA advanced class modules."
+            },
+            {
+              "statement": "The transformation phase is described as the very first stage of learning where an individual asks open-ended questions out of curiosity.",
+              "answer": false,
+              "type": "tf",
+              "explanation": "Curiosity is designated as Phase 1; Transformation is the final Phase 4, occurring when technical expertise becomes a real-world service, business asset, or lifelong career."
+            }
+          ],
+          "funFact": {
+            "headline": "Did you know?",
+            "body": "You don't need a laptop or a tech background to build a real business website anymore; simply using your voice to guide advanced AI layout engines lets you transform from a solo browser into a professional platform builder in just 5 days."
+          }
+        }
+      ]
+    }
+  ],
+  "updatedAt": "2026-08-20T17:38:50.197Z",
+  "id": "qlpspor4hm",
+  "createdAt": "2026-05-23T12:45:09.000Z"
+}

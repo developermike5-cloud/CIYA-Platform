@@ -646,67 +646,740 @@
         "dayNumber": 2,
         "title": "DAY 2: FIREBASE SETUP",
         "description": "",
-        "assignment": null,
+        "assignment": {
+          "prompt": "The assignment is coming once all of this module's lessons are completed.",
+          "dueNote": "Submit before midnight to stay eligible for direct coaching verification."
+        },
         "videos": [
           {
             "id": "f7lg9j8",
-            "title": "",
-            "video_url": "",
-            "url": "",
-            "duration": "10 min",
-            "description": "",
+            "title": "INTRO TO  ALL FIREBASE FEATURES",
+            "video_url": "https://youtu.be/ti0953TvM_E",
+            "url": "https://youtu.be/ti0953TvM_E",
+            "duration": "09:24 min",
+            "description": " Foundational Required Knowledge Points\nThe Evolution of Backend Infrastructure (The \"Backend Problem\")\n\nEarly websites were static pages, but as web apps grew interactive (requiring logins, data storage, and dashboards), developers were forced to spend immense time manually building, configuring, and scaling servers from scratch before even touching application features.\n\nBackend as a Service (BaaS) Paradigm Shift\n\n BaaS platforms eliminate manual backend plumbing by providing pre-built, cloud-managed infrastructure—such as databases, authentication systems, and cloud functions—allowing developers to focus entirely on frontend features and user experience without managing physical or virtual servers.\n\nFirebase as a Multi-Tool Ecosystem\n\nFirebase is not just a database; it is a modular suite of tools that includes Firebase Authentication, Cloud Firestore (a NoSQL document database), Cloud Functions (serverless logic execution), Storage, and Hosting that seamlessly integrate with modern web frameworks like React.",
             "resources": "",
-            "checkType": "none",
-            "check": null,
-            "funFact": null
+            "checkType": "tf",
+            "check": [
+              {
+                "type": "tf",
+                "statement": "1. Statement: Firebase is strictly a NoSQL database platform and does not offer other backend services.",
+                "answer": false,
+                "explanation": "Firebase is a full Backend-as-a-Service (BaaS) ecosystem offering authentication, serverless functions, file storage, hosting, and analytics alongside its Cloud Firestore database [04:40]."
+              },
+              {
+                "type": "tf",
+                "statement": "2. Statement: Before BaaS tools existed, developers used frameworks like Node.js, Django, and Laravel to help streamline server-side development, though server deployment and scaling still required manual oversight.",
+                "answer": true,
+                "explanation": "Backend frameworks sped up coding logic, but developers were still burdened with server maintenance, deployment configuration, and traffic scaling panics [02:44]."
+              },
+              {
+                "type": "tf",
+                "statement": "3. Statement: Firebase was originally created by Google in 2011 to handle cloud computing for enterprise databases.",
+                "answer": false,
+                "explanation": "Firebase was created independently in 2011 by Andrew Lee and James Tamplin to build real-time apps before being acquired by Google in 2014 [04:00]."
+              },
+              {
+                "type": "tf",
+                "statement": "4. Statement: Competitors like Supabase differ fundamentally from Firebase by using relational PostgreSQL databases instead of Firebase’s NoSQL document structure.",
+                "answer": true,
+                "explanation": "Supabase offers a BaaS alternative structured around relational Postgres tables rather than Firebase's document-based NoSQL architecture [06:15]."
+              },
+              {
+                "type": "tf",
+                "statement": "5. Statement: To keep data clean and maintain app security, developers should bundle multiple separate projects (e.g., an e-commerce platform and a learning portal) under a single Firebase project workspace.",
+                "answer": false,
+                "explanation": "Best practices dictate creating separate, isolated Firebase projects for each application to ensure clear database separation, maintain security, and keep data organized [08:03]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Before platforms like Firebase automated backend plumbing, developers often spent months building login security, database connections, and server infrastructure before they could even write a single line of code for their actual application"
+            }
           },
           {
             "id": "lpb768q",
-            "title": "",
-            "video_url": "",
-            "url": "",
-            "duration": "10 min",
-            "description": "",
+            "title": "DIFFERENTIATING FIREBASE FROM GOOGLE CLOUD",
+            "video_url": "https://youtu.be/e3jbbXFugiU",
+            "url": "https://youtu.be/e3jbbXFugiU",
+            "duration": "29:55 min",
+            "description": "Prior Foundational Required Knowledge Points\nThe Origin and Relationship Between Google Cloud and Firebase\n\nGoogle Cloud Platform (GCP) was launched by Google in 2008 as a broad enterprise cloud computing suite, whereas Firebase was originally founded independently in 2011 as a single-service real-time tool \n\n\nGoogle Cloud acts like the underlying operating system (similar to Android), while individual Firebase tools (Authentication, Firestore, Hosting, Cloud Functions) act like default pre-installed Google applications (e.g., Gmail, Google Chrome, Play Store) \n\nBuilding custom backend servers requires manual vulnerability patching, server upkeep, and scaling management—exposing apps to exploits (like database leaks and payment API vulnerabilities).",
             "resources": "",
-            "checkType": "none",
-            "check": null,
-            "funFact": null
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What core relationship between Google Cloud and Firebase is highlighted in the video?",
+                "options": [
+                  "Firebase was developed by Google Cloud in 2008 to replace traditional Linux servers",
+                  "Google Cloud and Firebase are completely separate competing platforms owned by different companies",
+                  "Firebase is built on top of Google Cloud's infrastructure, functioning like managed built-in services within the larger Google ecosystem",
+                  "Google Cloud is a front-end UI design tool, whereas Firebase is strictly a database storage engine"
+                ],
+                "correct": 2,
+                "explanation": "The video explains that Firebase runs directly on Google Cloud infrastructure; Google Cloud acts as the underlying platform while Firebase provides user-friendly BaaS tools on top of it [13:51, 27:45]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: Which historical timeline regarding the creation and acquisition of Firebase and Google Cloud is accurate?",
+                "options": [
+                  "Google Cloud launched in 2008, Firebase was founded in 2011, and Google acquired Firebase in 2014",
+                  "Firebase was launched in 2005, acquired by Google in 2008, and renamed Google Cloud in 2014",
+                  "Firebase was launched by Apple in 2008 and sold to Google Cloud in 2011",
+                  "Both Firebase and Google Cloud were created simultaneously by Google engineers in 2014"
+                ],
+                "correct": 0,
+                "explanation": "Google Cloud was launched in 2008, Firebase was founded by two developers in 2011, and Google subsequently acquired and integrated Firebase into Google Cloud in 2014 [15:25, 28:53]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How does the video explain the comparison between Android smartphones and Google Cloud?",
+                "options": [
+                  "Google Cloud can only be accessed by developers who own Android mobile devices",
+                  "Google Cloud is like the underlying Android OS, while individual Firebase tools are like default Google",
+                  "Android smartphones manage hardware servers, whereas Google Cloud builds hardware components",
+                  "Google Cloud replaced the Android operating system on all modern web applications"
+                ],
+                "correct": 1,
+                "explanation": "The instructor uses the analogy that Google Cloud is like the Android operating system, while Firebase's tools are like default customized Google apps built into that ecosystem [18:28, 20:17]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What primary developer advantage is gained by choosing Firebase over self-managing a backend server?",
+                "options": [
+                  "Developers can avoid paying for domain names and Internet services permanently",
+                  "Developers do not have to write any front-end HTML or CSS code",
+                  "Google handles the complex server management, underlying security, and backend scaling automatically",
+                  "Firebase guarantees that applications can run offline without any database connection"
+                ],
+                "correct": 2,
+                "explanation": "Using Firebase delegates the stress of manually configuring servers, managing backends, and handling server scaling directly to Google's engineering team [11:02, 11:56]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: Which two major real-world companies are specifically cited in the lesson as relying on Firebase for their application backends?",
+                "options": [
+                  "Netflix and Amazon",
+                  "Spotify and Duolingo",
+                  "Facebook and WhatsApp",
+                  "Uber and TikTok"
+                ],
+                "correct": 1,
+                "explanation": "The video specifically points out that world-class popular platforms like Spotify (music streaming) and Duolingo (language learning) rely on Firebase for their backends [11:26, 11:36]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "When Firebase was first created independently in 2011, it offered only a single core service, but after Google acquired it in 2014, it was expanded into a massive suite powering over 20 integrated cloud services running directly on Google Cloud infrastructure"
+            }
           },
           {
             "id": "ykfhcbk",
-            "title": "",
-            "video_url": "",
-            "url": "",
-            "duration": "10 min",
-            "description": "",
+            "title": "HOW TO SETUP A FIREBASE ACCOUNT MANUALLY",
+            "video_url": "https://youtu.be/v7gF4yQIzRw",
+            "url": "https://youtu.be/v7gF4yQIzRw",
+            "duration": "24:30 min",
+            "description": "\nTo understand the setup process covered in this video, a learner should be familiar with the following core concepts:\n\nFrontend vs. Backend Roles: Knowing the difference between the user interface (frontend) and the underlying infrastructure (backend) that powers data storage, hosting, and application logic.\n\nGoogle Account Security & 2-Step Verification: Familiarity with managing a Gmail/Google account, including how 2-Step Verification (2SV) / Multi-Factor Authentication works to secure accounts from unauthorized access.\n\nGoogle Ecosystem Awareness: Basic awareness that Google offers developer services like Google Cloud and Firebase, and understanding how a single Google login acts as a unified credential across these tools.",
             "resources": "",
-            "checkType": "none",
-            "check": null,
-            "funFact": null
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: How does the video explain the fundamental relationship between Firebase and Google Cloud?",
+                "options": [
+                  "Google Cloud and Firebase are completely unrelated platforms created by different competing companies.",
+                  "Google Cloud was built on top of Firebase to make complex backend programming simpler for beginners.",
+                  "Firebase was built on Google Cloud infrastructure so non-coders can easily access cloud services without dealing with complex developer tools.",
+                  "Firebase is strictly designed for desktop computers, while Google Cloud only handles mobile devices."
+                ],
+                "correct": 2,
+                "explanation": "The presenter highlights that Google Cloud is tailored for advanced software developers, whereas Google built Firebase on top of Google Cloud so users can harness cloud services without needing deep coding expertise [01:16]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What security measure does Firebase require when creating or accessing an account manually on a new Gmail profile?",
+                "options": [
+                  "Typing a 50-character custom secret passphrase manually on every page reload.",
+                  "Enabling Two-Step Verification (2SV) / Multi-Factor Authentication on the linked Google account.",
+                  "Uploading a government-issued identity card photo directly inside the project console.",
+                  "Purchasing a paid enterprise security license key from Google Cloud."
+                ],
+                "correct": 1,
+                "explanation": "When setting up an account with a new Gmail, Firebase flags weak security protocols and requires the user to enable Two-Step Verification (2SV) before gaining full access to the console [11:50]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: What benefit or credit offer is presented to a newly registered Gmail account on the Firebase console?",
+                "options": [
+                  "A lifetime unlimited free storage key with zero usage restrictions.",
+                  "A $300 credit offer to unlock and spend on Firebase and Google Cloud features.",
+                  "A free hardware laptop delivered directly to developer addresses.",
+                  "A 100% discount on all Google AI Studio software subscriptions for five years."
+                ],
+                "correct": 1,
+                "explanation": "Switching to a brand-new Gmail account reveals a trial offer granting $300 in credit to spend on hosting, storage, and other services across Firebase and Google Cloud [06:05]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: Why does the presenter recommend toggling off Google Analytics during the initial manual project creation?",
+                "options": [
+                  "Google Analytics costs $500 immediately upon initial account creation.",
+                  "Turning it off deletes all project setup files from the device storage.",
+                  "Keeping it on redirects the user into setting up tracking parameters before completing the basic project setup.",
+                  "Google Analytics permanently disables Gemini AI integration inside the project workspace."
+                ],
+                "correct": 2,
+                "explanation": "Disabling Google Analytics lets the user directly hit \"Create Project\" without being diverted to additional configuration steps intended for performance tracking [19:38]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What primary advantage does manually creating a Firebase project have over letting Google AI Studio automatically create one?",
+                "options": [
+                  "Automated AI creation permanently blocks access to mobile phone screens.",
+                  "Manual setup lets you give your project a clear custom name, whereas Google AI Studio generates generic numbers and random strings.",
+                  "Manual setup makes the database immune to all internet connectivity losses.",
+                  "Google AI Studio requires a paid monthly subscription to generate any backend connection."
+                ],
+                "correct": 1,
+                "explanation": "The presenter notes that creating a project manually allows for clear custom naming (like \"s advanced course training\"), whereas automatic AI connections generate random alphanumeric names that can confuse developers [23:35]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Because Firebase infrastructure is directly owned, managed, and secured by Google's global security systems, storing user credentials or database information on Firebase provides the same enterprise-level protection as saving passwords inside Google Chrome or using Gmail"
+            }
           },
           {
             "id": "t027cm3",
-            "title": "",
-            "video_url": "",
-            "url": "",
-            "duration": "10 min",
-            "description": "",
+            "title": "FIREBASE FEATURES AND PLAN TYPES",
+            "video_url": "https://youtu.be/MA-RrDRqIbc",
+            "url": "https://youtu.be/MA-RrDRqIbc",
+            "duration": "29:46 min",
+            "description": "To understand the core concepts covered in this video lesson, a learner should be familiar with the following foundational topics:\n\nFrontend vs. Backend Roles: Understanding that a web application is split into a user interface (frontend) and underlying infrastructure (backend) that manages databases, storage, and authentication.\n\nDatabase Types (SQL vs. NoSQL): Basic awareness of structured tabular databases (SQL) versus document-based/flexible databases (NoSQL) like Firestore and Realtime Database.\n\nCloud Billing & Payment Mechanisms: Understanding how pay-as-you-go cloud pricing works, including prepayment requirements, credit usage, and international card payments.",
             "resources": "",
-            "checkType": "none",
-            "check": null,
-            "funFact": null
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: In the Firebase ecosystem, what term is used to describe any client project connected to the backend?",
+                "options": [
+                  "Terminal",
+                  "App",
+                  "Node",
+                  "Container"
+                ],
+                "correct": 1,
+                "explanation": "In Firebase, all projects regardless of whether they are websites, iOS apps, or Android applications are grouped and added under the term \"App\""
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What is the primary operational difference between the Firebase Spark Plan and the Blaze Plan?",
+                "options": [
+                  "Spark Plan allows unlimited database storage, while Blaze Plan caps storage at 1 GB.",
+                  "Spark Plan is a $0/month free tier, whereas Blaze Plan is a pay-as-you-go subscription for scaling services",
+                  "Spark Plan only works on Apple devices, while Blaze Plan only works on Android devices.",
+                  "Spark Plan requires a physical server setup, whereas Blaze Plan runs entirely offline."
+                ],
+                "correct": 1,
+                "explanation": "The presenter explains that the default Spark Plan costs $0 per month with usage limits, while the Blaze Plan functions on a pay-as-you-go model"
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: Why does the presenter advise against using Firebase Storage on the free Spark Plan for serious projects?",
+                "options": [
+                  "Firebase Storage files are automatically converted into low-resolution images.",
+                  "Firebase Storage features are not applicable/accessible under the Spark Plan and require upgrading to Blaze",
+                  "Firebase Storage can only accept plain text files, not images or videos.",
+                  "Uploading to Firebase Storage permanently locks the developer's computer."
+                ],
+                "correct": 1,
+                "explanation": "The video demonstrates that cloud storage is marked as \"not applicable\" on the Spark Plan comparison table, meaning users must upgrade to the Blaze plan to access Firebase storage services"
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: How long does the $300 Google Cloud/Firebase promotional credit remain valid once activated on a new account?",
+                "options": [
+                  "30 days",
+                  "90 days (3 months)",
+                  "1 full year",
+                  "It never expires as long as the account remains active"
+                ],
+                "correct": 1,
+                "explanation": "The presenter clarifies that even if you only use a fraction of the $300 credit, any remaining unused credit automatically expires after 90 days (3 months)"
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What restriction has Google applied to billing setup for users in specific regions like Nigeria when upgrading to the Blaze Plan?",
+                "options": [
+                  "Users must pass an in-person physical coding interview at a local Google office.",
+                  "Local Naira cards are rejected, requiring dollar-denominated payment cards along with upfront prepayment .",
+                  "Upgrading can only be completed between 12:00 AM and 1:00 AM local time.",
+                  "Google requires a written recommendation letter signed by a university professor."
+                ],
+                "correct": 1,
+                "explanation": "The presenter explains that Google blacklisted simple free credit activation for certain regions, requiring users to make a dollar-denominated prepayment using USD cards"
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Although Google advertises $300 in \"free credit\" to attract new cloud users, any unused portion of the credit automatically expires after exactly 90 days, regardless of how little money was actually spent"
+            }
           },
           {
             "id": "euvd0x2",
-            "title": "",
-            "video_url": "",
-            "url": "",
-            "duration": "10 min",
-            "description": "",
+            "title": "MANUAL & AUTOMATED WAYS OF CREATING A FIREBASE BACKEND PROJECT",
+            "video_url": "https://youtu.be/2WtMNpxA3_s",
+            "url": "https://youtu.be/2WtMNpxA3_s",
+            "duration": "26:21 min",
+            "description": "To follow along smoothly with this lesson, you should be comfortable with three key concepts:\n\nThe Difference Between Front-End and Back-End: Understanding that a website interface (front-end) and a database server (back-end) cannot function in isolation—they must be explicitly connected to pass data back and forth.\n\nFirebase Platform Navigation: Basic familiarity with creating a project inside the Firebase Console dashboard and navigating to project settings to manage connected applications.\n\nAPI Keys & SDK Configuration: Knowing what software credentials (SDK snippets and public API keys) look like and how they act as the \"bridge\" allowing your app to talk to database services.",
             "resources": "",
-            "checkType": "none",
-            "check": null,
-            "funFact": null
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What major distinction is given between setting up a Firebase backend manually versus using an automated AI setup?",
+                "options": [
+                  "Automated setups only work on mobile devices, while manual setups only work on desktop screens",
+                  "Manual setup gives you custom project names and full control, whereas automated setup generates generic auto-provisioned names (like gen-client-xxx) that cause long-term project confusion",
+                  "Manual setup takes several weeks to complete, while automated setup finishes in one second",
+                  "Manual setups automatically delete all web browser app history cache records"
+                ],
+                "correct": 1,
+                "explanation": "The presenter highlights that auto-provisioned AI setups repeatedly name resources with generic handles like gen-client, making it difficult to manage professional client projects compared to clear manual naming."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What warning does the presenter share regarding using automated AI coding agents for client projects?",
+                "options": [
+                  "Automated setups should only be used for practice/training projects because they grant less configuration control and create messy naming conventions",
+                  "The AI agent will cause the entire application server to crash permanently",
+                  "Embedded players will automatically delete your WhatsApp booking form fields",
+                  "AI agents refuse to read text prompts written in English"
+                ],
+                "correct": 0,
+                "explanation": "The video explicitly advises using AI automated setup strictly for learning or practice, recommending manual setup for paid client deliverables to maintain clean organization and full technical control."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How are the Firebase SDK credentials properly transferred into the front-end project layout?",
+                "options": [
+                  "By pasting a public TikTok sharing URL link directly into the main chat window",
+                  "By restarting the local internet router network",
+                  "By manually typing out thousands of lines of JavaScript binary codes without using tools",
+                  "By copying the configuration block from Firebase and supplying it to Google AI Studio to create a dedicated Firebase app configuration file"
+                ],
+                "correct": 3,
+                "explanation": "The presentation demonstrates copying the generated SDK setup snippet from Firebase and pasting it into the AI prompt window so Google AI Studio automatically wires up the configuration file."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: Where can you retrieve your SDK configuration snippet in Firebase if you forget to copy it during initial registration?",
+                "options": [
+                  "Inside your computer's hidden system download folder",
+                  "Inside the desktop recycle bin folder",
+                  "By navigating to Project Settings under the General tab in the Firebase Console",
+                  "By contacting Google support via email"
+                ],
+                "correct": 2,
+                "explanation": "The video shows that if you close the prompt without copying the credentials, you can easily access them anytime under the General section of Project Settings."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: How can a creator set up automatic Firebase integration directly inside Google AI Studio?",
+                "options": [
+                  "By writing a completely new initial prompt from scratch using raw machine code",
+                  "By clicking the Integrations tab in settings or enabling the Firebase pop-up prompt within the workspace",
+                  "By deleting the device's web browser app history cache records",
+                  "By leaving a feedback complaint ticket inside a chat support panel"
+                ],
+                "correct": 1,
+                "explanation": "The presenter walks through enabling Firebase either through the interactive prompt modal or by going to workspace Settings under the Integration tab."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Every time you let an AI automatically provision a Firebase backend for you, it creates generic backend names starting with \"gen-client\"—meaning if you build 50 AI projects, they will all share identical generic naming structures unless you manually configure them yourself!"
+            }
+          },
+          {
+            "id": "mf5thy5",
+            "title": "HOW TO SETUP EMAIL & PASSWORD AUTHENTICATION",
+            "video_url": "https://youtu.be/Ll2PKUodkBA",
+            "url": "https://youtu.be/Ll2PKUodkBA",
+            "duration": "23:55 min",
+            "description": "Basic Understanding of Web Authentication Concepts: Familiarity with how users sign in and authenticate on web platforms (e.g., using email/password vs. social sign-in providers like Google or Facebook).\n\nFirebase Console Fundamentals: Basic awareness of Firebase services, specifically navigating product categories such as the Authentication dashboard and managing backend database settings.\n\nWeb Hosting & Sandbox Preview Environments: Understanding the difference between static production hosting (requiring code commits via GitHub) and interactive development preview sandboxes (like Google AI Studio preview links).",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What core distinction is highlighted between using native Email & Password authentication versus Google Sign-In?",
+                "options": [
+                  "Email and password sign-in costs extra licensing fees, whereas Google Sign-In is completely free",
+                  "Google Sign-In relies on existing mobile/browser device authentication, reducing password-related vulnerabilities and forgotten password friction",
+                  "Email and password authentication only works on desktop browsers, while Google Sign-In is mobile-only",
+                  "Google Sign-In automatically changes the primary language of the website"
+                ],
+                "correct": 1,
+                "explanation": "The video explains that Google Sign-In leverages the user's active device session, eliminating password fatigue and reducing security risks associated with weak or forgotten credentials."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What security recommendation does the presenter share regarding standalone Email & Password sign-ups for production applications?",
+                "options": [
+                  "Email and password systems automatically crash the website server if more than ten users sign up",
+                  "Developers should layer extra security like Multi-Factor Authentication (MFA/SMS verification) to protect against unauthorized access and account vulnerabilities",
+                  "Standard password forms automatically delete user database records after 24 hours",
+                  "Firebase does not allow email and password sign-ups without a paid enterprise plan"
+                ],
+                "correct": 1,
+                "explanation": "The presenter notes that because basic email and password setups lack external verification layers, adding multi-factor authentication (such as SMS verification codes) is critical for protecting sensitive actions and user data."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How does the presenter quickly generate and test user registration without creating real permanent email accounts?",
+                "options": [
+                  "By entering fake phone numbers directly into the browser URL bar",
+                  "By restarting the local internet router network to force a new IP address",
+                  "By using a temporary disposable email generator service (Temp Mail) to create temporary test mailboxes",
+                  "By manually typing thousands of lines of random JavaScript code into the console"
+                ],
+                "correct": 2,
+                "explanation": "The presentation demonstrates using a disposable email service (Temp Mail) to rapidly generate temporary addresses with set lifetimes, allowing seamless sign-up testing without cluttering real inboxes."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What key distinction is made between live static Firebase hosting and the Google AI Studio preview link during development?",
+                "options": [
+                  "Live Firebase hosting updates automatically without pushing code, while AI Studio requires manual server reboots",
+                  "Firebase hosting requires users to pay per click, whereas AI Studio is restricted to mobile devices",
+                  "GitHub repositories cannot connect to live Firebase hosting environments",
+                  "Changes made in the AI Studio environment reflect immediately via its cloud sandbox, whereas live Firebase hosting requires code to be pushed to GitHub to display updates"
+                ],
+                "correct": 3,
+                "explanation": "The video highlights that AI Studio sandbox links provide real-time express backend updates, whereas static production hosting relies on GitHub deployment pipelines to display code revisions."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: How can an administrator manage or restrict a user who is performing suspicious activity on the platform?",
+                "options": [
+                  "By navigating to the Firebase Authentication dashboard to disable the user's account, delete their entry, or trigger a password reset flow using their unique UID",
+                  "By deleting the device's web browser cache files locally",
+                  "By changing the color scheme of the front-end login button",
+                  "By writing a completely new initial text prompt in the chat box"
+                ],
+                "correct": 0,
+                "explanation": "The presenter shows that every registered user receives a unique User ID (UID) in the Firebase console, allowing administrators to delete, disable, or reset access for specific accounts directly from the management panel."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "When you register a user with Firebase, Google automatically generates a completely unique User ID (UID) for that individual, which acts as the core security foundation determining exactly what data that specific user is authorized to see or modify across your entire application platform!"
+            }
+          },
+          {
+            "id": "j5bhdk2",
+            "title": "SETTING UP EMAIL & PASSWORD AUTH VERIFICATION LINK",
+            "video_url": "https://youtu.be/tiwm1lPZJAc",
+            "url": "https://youtu.be/tiwm1lPZJAc",
+            "duration": "24:22 min",
+            "description": "Basic Understanding of Authentication Workflows: Students should understand the core difference between account registration (sign-up), identity verification, and user session authorization (logging in).\n\nFundamental Web Application Security Principles: Familiarity with sensitive user data handling, such as preventing the public exposure of unique backend identifiers (user.uid) and enforcing security protocols before allowing account dashboard access.\n\nDomain Name & DNS Fundamentals: Basic knowledge of how domains, custom URLs, and DNS records operate so that dynamic system emails can be configured with proper sender branding and clean action links.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What major security flaw does the presenter highlight when testing an unverified user account sign-up?",
+                "options": [
+                  "The password is automatically emailed to the user in plain text.",
+                  "The application lets unverified users access the account dashboard without clicking the verification link first.",
+                  "Firebase charges a fee every time an email verification link is sent.",
+                  "The sign-up form causes the entire application server to crash."
+                ],
+                "correct": 1,
+                "explanation": "The presenter points out that allowing unverified users to enter the account dashboard defeats the purpose of sending an email verification link in the first place."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: Why is displaying the raw user.uid string on the front-end interface considered bad practice?",
+                "options": [
+                  "It exposes sensitive internal backend identifiers that should never be shown to the user.",
+                  "It prevents the web application from sending password reset emails.",
+                  "It changes the primary language and styling of the website.",
+                  "It automatically locks the user out of their browser session."
+                ],
+                "correct": 0,
+                "explanation": "The presenter stresses that internal user IDs (uid) are sensitive backend system data and should be cleaned up or removed from user-facing screens to protect security and interface quality."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: Why should a developer configure a resend cooldown timer on email verification buttons?",
+                "options": [
+                  "To prevent users from clicking the link repeatedly and generating excessive email requests or system abuse.",
+                  "Because Firebase restricts verification emails to only one per month.",
+                  "To force the browser to restart after every sign-up attempt.",
+                  "To automatically convert email links into local WebM video files."
+                ],
+                "correct": 0,
+                "explanation": "The presenter explains that without a countdown timer (such as 30 or 60 seconds), users can continuously spam verification requests, causing potential system rate-limiting issues."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What is the primary purpose of adding standard sender details like \"Support\" and using a \"no-reply\" email address in Firebase email templates?",
+                "options": [
+                  "To make dynamic verification emails look clean and official while preventing unnecessary user replies.",
+                  "To ensure that verification links automatically open in a mobile app rather than a browser.",
+                  "To bypass all domain name connection and DNS setup requirements.",
+                  "To allow users to reply directly to the database administrator."
+                ],
+                "correct": 0,
+                "explanation": "Setting official sender names (e.g., CR Support) and leaving the address as no-reply gives system emails a professional look and prevents users from replying to automated templates."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What must be done before a standard email verification link displays your actual web application's URL instead of a default Firebase handler link?",
+                "options": [
+                  "You must rewrite the entire frontend codebase in C++.",
+                  "You must connect your custom domain name and configure its corresponding DNS records.",
+                  "You must delete the user's authentication profile from the console.",
+                  "You must send a physical letter to the domain registrar."
+                ],
+                "correct": 1,
+                "explanation": "The tutorial explains that custom domains must be connected and verified via DNS records so that action links seamlessly direct users back to your official brand website."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Default automated backends generated by AI tools can inadvertently leak sensitive database user keys and grant unverified accounts full access to internal dashboards unless a human developer actively audits and enforces custom security rules."
+            }
+          },
+          {
+            "id": "e5bwre8",
+            "title": "FIREBASE AUTHENTICATION FEATURE SETTINGS & PASSWORD RESET LINK",
+            "video_url": "https://youtu.be/6kHUEgy-3xk",
+            "url": "https://youtu.be/6kHUEgy-3xk",
+            "duration": "25:24 min",
+            "description": "User Identity & State Management: Understanding how a web application tracks user login states (e.g., authenticated vs. unauthenticated users) and handles user identifier session tokens.\n\nPassword Recovery Mechanics: Basic knowledge of how self-service account recovery workflows operate, specifically how a secure, single-use token or link is generated and sent via email to verify identity before granting access to set a new password.\n\nFirebase Console Navigation & Auth Settings: Familiarity with the Firebase Authentication dashboard, including standard email provider configurations, security settings, and action code templates for password resets.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What is the primary purpose of configuring the Password Reset Link settings in Firebase Authentication?",
+                "options": [
+                  "To automatically erase all user accounts from the database every 30 days",
+                  "To allow users to securely reset forgotten passwords through a verified email link without exposing raw user data",
+                  "To eliminate the need for users to ever enter a password when logging into the application",
+                  "To force every user to re-register their account with a new email address"
+                ],
+                "correct": 1,
+                "explanation": "Password reset settings in Firebase allow users to request an automated recovery link via email, verifying identity safely before updating the user credentials in the database."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: Why should custom email templates for password resets be customized with your brand's support details?",
+                "options": [
+                  "To prevent standard recovery emails from looking like suspicious spam and to ensure users trust the link",
+                  "Because Firebase prevents password reset links from delivering if the brand name exceeds 5 characters",
+                  "To bypass all email provider anti-spam rules permanently without needing DNS records",
+                  "To convert the email body text automatically into an interactive video file"
+                ],
+                "correct": 0,
+                "explanation": "Customizing the sender name and template context ensures that password reset requests appear professional and recognizable, reducing the likelihood that users ignore or flag them as phishing attempts."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How does the application handle a password reset request when a user submits their registered email address?",
+                "options": [
+                  "It generates a unique action code link and dispatches an automated recovery message to the user's inbox",
+                  "It immediately displays the user's old password on the public screen for convenience",
+                  "It deletes the associated user record and creates a brand-new profile automatically",
+                  "It sends a physical text code to the user's home landline telephone"
+                ],
+                "correct": 0,
+                "explanation": "Triggering a password reset generates an action code link via Firebase Auth services, which is emailed to the user so they can securely enter a new password on your app."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What security feature prevents malicious scripts from spamming password reset email requests for a single account?",
+                "options": [
+                  "Enforcing rate-limiting and request cooldown timers on the password reset submission form",
+                  "Disabling the password reset feature permanently for all users",
+                  "Requiring users to type their password before requesting a password reset",
+                  "Forcing users to solve 50 manual math equations before sending an email"
+                ],
+                "correct": 0,
+                "explanation": "Implementing cooldown periods and rate-limiting prevents automated abuse of reset request endpoints, protecting both the application's email quota and the user's inbox from spamming."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What happens when a user opens a valid password reset link delivered to their email?",
+                "options": [
+                  "They are automatically logged into every web application stored on their web browser",
+                  "They are directed to a secure action page where they can enter and confirm their new password credentials",
+                  "The browser re-routes them to a blank search engine page with no confirmation",
+                  "The application permanently locks their IP address from future visits"
+                ],
+                "correct": 1,
+                "explanation": "The action link routes the user to a secure verification handler where they input their new password, updating their credentials in Firebase backend storage upon submission."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Automated password reset flows don't just send a link—they execute temporary, single-use cryptographic tokens that automatically expire, guaranteeing that even if a reset link is intercepted later, it cannot be reused to compromise an account."
+            }
+          },
+          {
+            "id": "zbg30em",
+            "title": "HOW TO SETUP FIREBASE GOOGLE AUTH PART 1",
+            "video_url": "https://youtu.be/dW1Cohu6dY8",
+            "url": "https://youtu.be/dW1Cohu6dY8",
+            "duration": "24:15 min",
+            "description": "OAuth 2.0 & Third-Party Sign-In Concepts: Basic understanding of federated authentication—how users log in using external identity providers (like Google) without creating a new password.\n\nFirebase Auth Provider Management: Familiarity with enabling and configuring sign-in methods within the Firebase Console under the Authentication menu.\n\nApplication Client ID & OAuth Consent Credentials: Basic awareness of how web applications verify identity with Google Cloud services using client IDs and project support emails.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What primary advantage does enabling Google Sign-In offer over traditional email/password authentication?",
+                "options": [
+                  "It allows users to log in with a single click using their existing Google account, removing password creation friction.",
+                  "It automatically pays the developer a commission every time a user signs up.",
+                  "It forces users to upload five profile pictures before accessing the dashboard.",
+                  "It completely eliminates the need to host the web application on a server."
+                ],
+                "correct": 0,
+                "explanation": "Google Auth acts as a OAuth provider that lets users authenticate seamlessly with one click using credentials they already possess, streamlining registration."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What essential step must be performed in the Firebase Console before Google Authentication will function on the front end?",
+                "options": [
+                  "Disabling all other login methods, including email and password authentication.",
+                  "Enabling the Google Sign-In provider under authentication sign-in methods and assigning a project support email.",
+                  "Buying a paid Google Workspace enterprise plan for every prospective website visitor.",
+                  "Formatting the web application's main CSS style file into raw JSON format."
+                ],
+                "correct": 1,
+                "explanation": "Before Google Auth works in code, it must be toggled on in the Firebase Authentication console and configured with a designated project support email address."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: Why is configuring Authorized Domains inside Firebase Auth settings critical during Google Sign-In setup?",
+                "options": [
+                  "It prevents unauthorized third-party websites from using your Firebase credentials to log users into their own apps.",
+                  "It converts standard Google login buttons into animated WebM background videos.",
+                  "It automatically deletes inactive user accounts after 24 hours.",
+                  "It forces all mobile app visitors to download a desktop web browser."
+                ],
+                "correct": 0,
+                "explanation": "Authorized Domains act as a security whitelist, ensuring that Google Sign-In popups only execute when requested from domains approved by the project owner."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: How does Firebase communicate with the front end during a Google authentication attempt?",
+                "options": [
+                  "By opening a secure Google popup or redirect window that returns an authentication token and user profile object.",
+                  "By sending a physical SMS text message to the developer's personal mobile phone.",
+                  "By restarting the user's web browser automatically without saving progress.",
+                  "By requiring the developer to manually approve each user in the console in real time."
+                ],
+                "correct": 0,
+                "explanation": "Firebase handles the Google OAuth flow via popups or redirects, returning standard user profile objects (email, display name, photo URL) directly to the web app upon success."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What happens when a user signs up with Google using an email that matches an unverified account created via password?",
+                "options": [
+                  "Firebase links or handles the identity credentials according to project account-linking security rules to prevent duplicate profiles.",
+                  "The database crashes and wipes all stored user records instantly.",
+                  "Google automatically charges the user a account migration fee.",
+                  "The application permanently locks out both email addresses from future logins."
+                ],
+                "correct": 0,
+                "explanation": "Firebase Authentication automatically manages identity provider collisions and account linking based on your security preferences to ensure clean user state management."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Integrating Google Auth doesn't just simplify sign-in—it completely offloads user password security to Google's multi-billion dollar infrastructure, virtually protecting your application from brute-force password breaches on day one."
+            }
+          },
+          {
+            "id": "qembd7i",
+            "title": "HOW TO SETUP FIREBASE GOOGLE AUTH PART",
+            "video_url": "https://youtu.be/tspeHhKmFFQ",
+            "url": "https://youtu.be/tspeHhKmFFQ",
+            "duration": "11:05 min",
+            "description": "Authorized Domain Whitelisting in Firebase: Understanding how Firebase blocks authentication calls unless the requesting web URL (preview link, development domain, or custom domain) is explicitly registered in the Auth security settings.\n\nAutomated vs. Manual Backend Provisioning: Familiarity with the trade-offs of letting AI tools auto-create backend infrastructure versus manually configuring Firebase and Google Cloud project settings.\n\nGoogle Cloud OAuth Consent Configuration: Basic awareness of how app names, support emails, and brand logos are set up in the Google Cloud Console to display properly inside login popups.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What major distinction does the presenter highlight between auto-generated AI backends and manually created Firebase backends?",
+                "options": [
+                  "Auto-generated backends cost extra money per login attempt, whereas manual backends are free.",
+                  "Auto-generated backends display messy, default project names in the Google OAuth popup, whereas manual setup lets you customize your brand name.",
+                  "Auto-generated backends only function on desktop browsers, while manual backends only work on mobile devices.",
+                  "Auto-generated backends completely disable Google Sign-In for all users."
+                ],
+                "correct": 1,
+                "explanation": "The presenter demonstrates that letting AI tools auto-create backends leaves users seeing generic, unbranded app IDs in the Google login popup, making manual project setup necessary for professional branding."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: Why did the Google Sign-In attempt initially fail when testing on the development link?",
+                "options": [
+                  "The development preview URL had not been added to the Authorized Domains list inside Firebase Authentication settings.",
+                  "The web browser lost its internet connection during the login popup load.",
+                  "Google Sign-In was permanently banned on all development environments by Firebase.",
+                  "The presenter entered an incorrect password for the test Gmail account."
+                ],
+                "correct": 0,
+                "explanation": "The video shows that Google Auth popup calls get blocked by Firebase until the exact development or preview URL domain is whitelisted in the Authorized Domains console panel."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How does Firebase distinguish accounts created through Google Sign-In from standard email/password accounts in its dashboard?",
+                "options": [
+                  "It stores Google Sign-In users in a completely separate database file.",
+                  "It automatically deletes email/password accounts whenever a Google user signs up.",
+                  "It displays a distinct provider icon (such as the Google logo badge) next to the user entry in the Authentication table.",
+                  "It converts all Google user accounts into anonymous guest sessions."
+                ],
+                "correct": 2,
+                "explanation": "Inside the Firebase Auth console user table, each registered user displays their specific provider badge (Google icon vs. email envelope) to clarify how they authenticated."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What warning does the presenter share regarding browser popup behavior during Google authentication?",
+                "options": [
+                  "Browser popup blockers can stop the Google OAuth window from appearing, making popup handling crucial for smooth sign-ins.",
+                  "Popups automatically leak the user's private credit card records to the website owner.",
+                  "Google popups force the web browser app history cache to wipe clean.",
+                  "Popups rewrite the application codebase into raw database strings."
+                ],
+                "correct": 0,
+                "explanation": "The presenter notes that strict popup settings in user browsers can intercept the Google OAuth window, so developers must account for popups or fallback redirects."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: Why does implementing Google Authentication require less custom security programming compared to standard password forms?",
+                "options": [
+                  "Google handles identity verification, credential hashing, and security checks directly through its own secure infrastructure.",
+                  "Google Auth completely disables all database security rules automatically.",
+                  "Users who log in with Google are legally prohibited from logging out.",
+                  "Google Auth automatically converts website code into encrypted text."
+                ],
+                "correct": 0,
+                "explanation": "The video explains that leveraging Google OAuth offloads complex security tasks like password storage and identity verification directly to Google's battle-tested security system."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Allowing an AI to auto-generate your Firebase backend exposes ugly, auto-generated backend IDs directly to your users inside the Google Sign-In popup—proving that real branding still demands manual human developer setup in the console."
+            }
           }
         ]
       },
@@ -855,7 +1528,7 @@
         ]
       }
     ],
-    "updatedAt": "2026-07-22T09:52:07.850Z",
+    "updatedAt": "2026-08-24T14:19:30.428Z",
     "id": "advanced-ai-mastery",
     "createdAt": "2026-07-16T03:00:00.000Z"
   }

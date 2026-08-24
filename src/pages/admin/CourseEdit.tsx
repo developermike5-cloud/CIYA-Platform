@@ -1091,9 +1091,11 @@ export default function CourseEdit() {
 
   const addVideoToDay = (dayIdx: number) => {
     setForm(prev => {
+      const isAdv = prev.tier === 'advanced' || prev.tier === 'masterclass' || prev.level === 'Advanced' || prev.level === 'Masterclass' || prev.id?.startsWith('adv-') || prev.id?.startsWith('adv_');
+      const maxLimit = isAdv ? 20 : 20;
       const updatedDays = [...(prev.days || DAYS_RANGE.map(d => emptyDay(d)))];
       const videos = [...(updatedDays[dayIdx].videos || [])];
-      if (videos.length >= 10) return prev;
+      if (videos.length >= maxLimit) return prev;
       videos.push(emptyVideo());
       updatedDays[dayIdx] = {
         ...updatedDays[dayIdx],
@@ -1613,7 +1615,7 @@ export default function CourseEdit() {
                 >
                   <div className="text-[10px] uppercase tracking-wider">{unitLabel} {dayNum}</div>
                   <div className="text-[9px] text-slate-400 font-extrabold mt-0.5">
-                    {(currentDayObj.videos || []).length}/10 Lessons
+                    {(currentDayObj.videos || []).length}/20 Lessons
                   </div>
                 </button>
               );
@@ -1660,7 +1662,7 @@ export default function CourseEdit() {
               <button
                 type="button"
                 onClick={() => addVideoToDay(activeDayIdx)}
-                disabled={((form.days || [])[activeDayIdx]?.videos || []).length >= 10}
+                disabled={((form.days || [])[activeDayIdx]?.videos || []).length >= 20}
                 className="text-xs font-bold px-3.5 py-1.5 border border-dashed border-teal-600 rounded-lg hover:bg-teal-50 text-teal-700 transition-all cursor-pointer bg-transparent disabled:opacity-40"
               >
                 + Add Lesson Link
@@ -1670,7 +1672,7 @@ export default function CourseEdit() {
             {((form.days || [])[activeDayIdx]?.videos || []).length === 0 ? (
               <div className="text-center py-12 text-slate-400">
                 <div className="text-2xl mb-1.5">🎬</div>
-                <p className="text-xs font-bold">No videos or lessons configured for Day {activeDayIdx + 1} yet.</p>
+                <p className="text-xs font-bold">No videos or lessons configured for {unitLabel} {activeDayIdx + 1} yet.</p>
                 <p className="text-[10px] text-slate-405 mt-0.5">Click "Add Lesson Link" in the top-right to register video material.</p>
               </div>
             ) : (
