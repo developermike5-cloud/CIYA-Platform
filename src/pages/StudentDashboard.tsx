@@ -2877,8 +2877,8 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       )}
 
       {!viewingSyllabus && effectiveIsEnrolled && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left animate-fade-in -mx-6 md:mx-0 rounded-none md:rounded-3xl border-x-0 md:border-x">
-          <div className="border-b pb-3 flex items-center justify-between">
+        <div className="bg-white md:border md:border-slate-200 rounded-none md:rounded-3xl p-2 sm:p-5 md:p-8 md:shadow-sm space-y-5 md:space-y-6 text-left animate-fade-in -mx-4 sm:-mx-6 md:mx-0">
+          <div className="border-b pb-3 flex items-center justify-between px-1 sm:px-0">
             <div className="space-y-0.5">
               <span className="text-xs font-black uppercase text-indigo-700 tracking-wider">Course Syllabus Navigation</span>
               <h4 className="text-base md:text-lg font-black text-slate-900">🗓️ Guided Training {isCourseAdvanced ? 'Module' : 'Daily'} Schedule</h4>
@@ -2920,7 +2920,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
               if (!isDayCoveredOrUnlocked) {
                 return (
-                  <div key={`day-locked-view-${di}`} className="rounded-3xl border-2 border-slate-200 bg-slate-50/50 p-6 text-center space-y-4 shadow-sm text-slate-800">
+                  <div key={`day-locked-view-${di}`} className="rounded-2xl md:rounded-3xl border-2 border-slate-200 bg-slate-50/50 p-6 text-center space-y-4 shadow-sm text-slate-800">
                     <div className="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
                       <Lock className="w-6 h-6" />
                     </div>
@@ -2937,9 +2937,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
               return (
                 <div
                   key={`day-active-${di}`}
-                  className="rounded-3xl border-2 border-indigo-300 bg-indigo-50/20 ring-4 ring-indigo-500/5 p-5 md:p-6 transition-all flex flex-col justify-between"
+                  className="rounded-none md:rounded-3xl border-0 md:border-2 md:border-indigo-300 bg-transparent md:bg-indigo-50/20 md:ring-4 md:ring-indigo-500/5 p-0 sm:p-4 md:p-6 transition-all flex flex-col justify-between"
                 >
-                  <div className="space-y-2 mb-4 text-left">
+                  <div className="space-y-2 mb-4 text-left px-1 sm:px-0">
                     <div className="flex items-center justify-between font-sans">
                       <span className="text-xs md:text-sm font-black text-indigo-700 tracking-wider uppercase flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping" />
@@ -2953,7 +2953,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                     {d.description && <p className="text-xs md:text-sm text-slate-700 leading-relaxed font-semibold">{d.description}</p>}
                   </div>
 
-                  <div className="space-y-2 text-left">
+                  <div className="space-y-3 sm:space-y-2 text-left">
                     {(d.videos || []).map((vid, vi) => {
                        const currentKey = `${di}-${vi}`;
                        const isVidCurrent = activeDayIdx === di && activeVideoIdx === vi && !showAssignment;
@@ -2965,7 +2965,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                         <div 
                           key={vid.id || vi} 
                           id={isVidCurrent ? 'active-lesson-container' : `lesson-card-${vi}`}
-                          className="space-y-3 bg-slate-50/40 p-2 rounded-2xl border border-slate-100 shadow-sm"
+                          className="space-y-3 bg-transparent sm:bg-slate-50/40 p-0 sm:p-2 rounded-xl sm:rounded-2xl border-0 sm:border sm:border-slate-100 shadow-none sm:shadow-sm"
                         >
                           <button
                             type="button"
@@ -2977,7 +2977,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                               }
                             }}
                             disabled={!isUnlocked}
-                            className={`w-full rounded-xl p-4 md:p-5 flex items-center justify-between text-xs md:text-sm transition-all pointer-events-auto cursor-pointer border ${
+                            className={`w-full rounded-xl p-3.5 sm:p-4 md:p-5 flex items-center justify-between text-xs md:text-sm transition-all pointer-events-auto cursor-pointer border ${
                               isVidCurrent
                                 ? 'bg-indigo-600 text-white border-indigo-600 font-extrabold shadow-md'
                                 : isUnlocked
@@ -2985,14 +2985,14 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                                   : 'bg-slate-200 text-slate-600 border-slate-300 font-extrabold opacity-75 cursor-not-allowed'
                             }`}
                           >
-                            <div className="flex items-center gap-4 text-inherit min-w-0 flex-1">
-                              <span className={`w-8 h-8 rounded-full flex items-center justify-center font-black shrink-0 text-xs md:text-sm ${
+                            <div className="flex items-center gap-3 sm:gap-4 text-inherit min-w-0 flex-1">
+                              <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black shrink-0 text-xs md:text-sm ${
                                 isVidCurrent ? 'bg-white text-indigo-950 shadow-sm' : 'bg-slate-200 text-slate-800'
                               }`}>
                                 {vi + 1}
                               </span>
                               <div className="flex-1 min-w-0 flex flex-col gap-1 text-left">
-                                <span className="font-extrabold text-sm md:text-base leading-snug whitespace-normal break-words">
+                                <span className="font-extrabold text-xs sm:text-sm md:text-base leading-snug whitespace-normal break-words">
                                   {vid.title || `Lesson ${vi+1}`}
                                 </span>
                                 {vid.duration && (
@@ -3029,9 +3029,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}
                               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                              className="overflow-hidden space-y-4 px-1 pb-2 pt-1.5"
+                              className="overflow-hidden space-y-4 px-0 sm:px-1 pb-2 pt-1.5"
                             >
-                              {/* 1. Cinematic Video Frame FIRST (very tall aspect-ratio on mobile, aspect-video on desktop with secure secure masking templates) */}
+                              {/* 1. Cinematic Video Frame FIRST (full-width on mobile with secure masking) */}
                               <SecureYoutubePlayer 
                                 url={vid.video_url || vid.url || ""} 
                                 title={vid.title || "Lesson Video"} 
@@ -3039,7 +3039,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                               />
 
                               {/* 2. Walkthrough outline & resources SECOND */}
-                              <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm space-y-4 text-left text-slate-900">
+                              <div className="bg-white border border-slate-200 rounded-xl md:rounded-2xl p-3.5 sm:p-4 md:p-5 shadow-sm space-y-4 text-left text-slate-900 w-full">
                                 <div>
                                   <h4 className="font-extrabold text-slate-900 text-sm md:text-base uppercase tracking-wider">📖 Walkthrough Outline</h4>
                                   {vid.description ? (() => {
@@ -6496,7 +6496,7 @@ export default function StudentDashboard() {
         </header>
         
         {/* Core content scroll container */}
-        <div className="flex-1 overflow-auto p-6 md:p-8">
+        <div className="flex-1 overflow-auto p-3 sm:p-6 md:p-8">
           {currentView === 'blog' ? (
             <StudentBlog isLocked={!isAdmin && appSettings?.lockedSections?.blog} />
           ) : currentView === 'kycb' ? (

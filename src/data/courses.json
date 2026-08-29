@@ -2441,7 +2441,8 @@
                   "CSS",
                   "Web Server",
                   "DNS (Domain Name System)"
-                ]
+                ],
+                "type": "mcq"
               },
               {
                 "correct": 1,
@@ -2658,7 +2659,7 @@
             "video_url": "https://youtu.be/08Zgd2GApPk",
             "url": "https://youtu.be/08Zgd2GApPk",
             "duration": "06:54 min",
-            "description": "Five-Point Summary\n\n[00:00:09 - 00:54] The presenter explains that underneath their vastly different designs, massive global platforms like Instagram, Jumia, and Flutterwave all share the exact same genetic DNA composed of just three core frontend technologies.\n\n[00:01:01 - 00:01:47] Frontend development is defined as everything a user physically sees and interacts with on a website—such as buttons, colors, and menus—acting exactly like the visible paint, furniture, and windows of a house.\n\n[00:01:52 - 00:03:08] A website's frontend is constructed using HTML to establish the barebone structural frame, CSS to design the colors and layout, and JavaScript to act as the electricity that powers animations and interactive features.\n\n[00:03:08 - 00:04:02] Web technologies have dramatically evolved from ugly text documents used by scientists into mobile-friendly, sophisticated systems capable of running complex, AI-powered features directly inside a smartphone browser.\n\n[00:04:08 - 00:04:48] Aspiring web creators do not need expensive computers to begin because free mobile applications like Acode or Spck Editor make it completely possible to write code, test projects, and build digital assets entirely on a smartphone.",
+            "description": "Five-Point Summary\n\n[00:00:09 - 00:54] The presenter explains that underneath their vastly different designs, massive global platforms like Instagram, Jumia, and Flutterwave all share the exact same genetic DNA composed of just three core frontend technologies.\n\n[01:01 - 01:47] Frontend development is defined as everything a user physically sees and interacts with on a website—such as buttons, colors, and menus—acting exactly like the visible paint, furniture, and windows of a house.\n\n[01:52 - 03:08] A website's frontend is constructed using HTML to establish the barebone structural frame, CSS to design the colors and layout, and JavaScript to act as the electricity that powers animations and interactive features.\n\n[03:08 - 04:02] Web technologies have dramatically evolved from ugly text documents used by scientists into mobile-friendly, sophisticated systems capable of running complex, AI-powered features directly inside a smartphone browser.\n\n[04:08 - 04:48] Aspiring web creators do not need expensive computers to begin because free mobile applications like Acode or Spck Editor make it completely possible to write code, test projects, and build digital assets entirely on a smartphone.",
             "resources": "",
             "checkType": "tf",
             "check": [
@@ -2704,7 +2705,7 @@
             "video_url": "https://youtu.be/wmk5vRqwyHs",
             "url": "https://youtu.be/wmk5vRqwyHs",
             "duration": "06:51 min",
-            "description": "Five-Point Summary\n\n[00:00:10 - 00:58] The presenter introduces the backend as the invisible system running behind the scenes to perform the heavy lifting that makes seamless online activities—like instant banking transfers and food ordering—completely possible.\n\n[00:01:10 - 00:01:56] The backend operates as the brain of an application with three critical jobs: managing data (user accounts, photos, and posts), handling the core logical instructions, and communicating with powerful remote computers called servers.\n\n[00:01:56 - 00:02:40] Without a backend system, a website cannot support user logins, process online payments, or save any user data, meaning it remains a basic, static webpage rather than a real, functional digital product.\n\n[00:03:24 - 00:03:57] Every background interaction happens in a fraction of a second through a rapid three-step workflow: the frontend sends a user request, the backend processes that request against a database, and a response is instantly returned to update the screen.\n\n[00:05:26 - 00:06:10] Aspiring developers do not need expensive laptops to learn backend engineering because they can start building solid foundational concepts and practicing with powerful cloud services like Firebase directly on a smartphone.",
+            "description": "Five-Point Summary\n\n[00:00:10 - 00:58] The presenter introduces the backend as the invisible system running behind the scenes to perform the heavy lifting that makes seamless online activities—like instant banking transfers and food ordering—completely possible.\n\n[01:10 - 01:56] The backend operates as the brain of an application with three critical jobs: managing data (user accounts, photos, and posts), handling the core logical instructions, and communicating with powerful remote computers called servers.\n\n[01:56 - 02:40] Without a backend system, a website cannot support user logins, process online payments, or save any user data, meaning it remains a basic, static webpage rather than a real, functional digital product.\n\n[03:24 - 03:57] Every background interaction happens in a fraction of a second through a rapid three-step workflow: the frontend sends a user request, the backend processes that request against a database, and a response is instantly returned to update the screen.\n\n[05:26 - 06:10] Aspiring developers do not need expensive laptops to learn backend engineering because they can start building solid foundational concepts and practicing with powerful cloud services like Firebase directly on a smartphone.",
             "resources": "",
             "checkType": "mcq",
             "check": [
@@ -2723,7 +2724,13 @@
               {
                 "explanation": "Without a backend, an application cannot store records, handle data transactions, or execute logic, remaining a simple static site.",
                 "correct": 2,
-                "question": "Question 2: What happens if a web platform is built entirely without any backend infrastructure?"
+                "question": "Question 2: What happens if a web platform is built entirely without any backend infrastructure?",
+                "options": [
+                  "It cannot load on mobile devices or smartphones.",
+                  "It will completely lose its visual styling, colors, and layout templates.",
+                  "It cannot support user login accounts, process secure payments, or save user data.",
+                  "It will run too quickly for standard internet browsers to display properly."
+                ]
               },
               {
                 "options": [
@@ -2733,7 +2740,9 @@
                   "Physical Hard Drives"
                 ],
                 "question": "Question 3: Which cloud platform is explicitly highlighted as a tool that beginners can use to practice backend concepts entirely on a phone?",
-                "explanation": "The video notes that you can practice and build a rock-solid foundation using powerful cloud services like Firebase directly from a mobile device."
+                "explanation": "The video notes that you can practice and build a rock-solid foundation using powerful cloud services like Firebase directly from a mobile device.",
+                "type": "mcq",
+                "correct": 2
               },
               {
                 "options": [
@@ -3471,7 +3480,7 @@
         ]
       }
     ],
-    "updatedAt": "2026-08-20T17:38:50.197Z",
+    "updatedAt": "2026-08-29T11:00:38.187Z",
     "id": "qlpspor4hm",
     "createdAt": "2026-05-23T12:45:09.000Z"
   }

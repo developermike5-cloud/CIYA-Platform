@@ -109,7 +109,7 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
       className={`mx-auto overflow-hidden bg-black relative group transition-all duration-300 w-full select-none ${
         isFullscreen 
           ? 'fixed inset-0 z-[99999] w-full h-full border-none rounded-none' 
-          : 'rounded-2xl md:rounded-3xl shadow-2xl border-2 md:border-4 border-slate-200/90 aspect-[9/16] sm:aspect-video'
+          : 'rounded-xl sm:rounded-2xl md:rounded-3xl shadow-md sm:shadow-2xl border-0 sm:border-2 md:border-4 border-slate-200/90 aspect-[9/16] sm:aspect-video'
       }`}
     >
       {/* 1. Seamless YouTube Iframe Embed */}
