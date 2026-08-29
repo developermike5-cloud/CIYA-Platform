@@ -411,7 +411,7 @@
               ],
               "question": "Question 3: Which cloud platform is explicitly highlighted as a tool that beginners can use to practice backend concepts entirely on a phone?",
               "explanation": "The video notes that you can practice and build a rock-solid foundation using powerful cloud services like Firebase directly from a mobile device."
-              },
+            },
             {
               "options": [
                 "A multi-vendor e-commerce store like Jumia",

@@ -82,6 +82,7 @@ interface UserProfile {
   educationLevel?: string;
   learningTool?: string;
   cohort?: string;
+  registeredCourses?: string[];
   completedCoursesOverride?: string[];
   progress?: any;
   manualDayUnlock?: {
@@ -585,7 +586,28 @@ export default function UsersAdmin() {
   }, [users]);
 
   const uniqueStates = Array.from(new Set(users.map(u => u.state).filter(Boolean))).sort() as string[];
-  const uniqueCourses = Array.from(new Set(users.map(u => u.courseType || u.pathwaySelection).filter(Boolean))).sort() as string[];
+  const uniqueCourses = useMemo(() => {
+    const courseSet = new Set<string>();
+    try {
+      const allStoreCourses = coursesStore.getCourses();
+      allStoreCourses.forEach(c => {
+        if (c.title) courseSet.add(c.title);
+      });
+    } catch {}
+
+    users.forEach(u => {
+      if (u.courseType) courseSet.add(u.courseType);
+      if (u.pathwaySelection) courseSet.add(u.pathwaySelection);
+      if (u.recommendedPath) courseSet.add(u.recommendedPath);
+      if (Array.isArray(u.registeredCourses)) {
+        u.registeredCourses.forEach((rc: any) => {
+          if (typeof rc === 'string' && rc.trim()) courseSet.add(rc);
+        });
+      }
+    });
+
+    return Array.from(courseSet).filter(Boolean).sort();
+  }, [users]);
 
   // Action methods
   const handleApprove = async (userId: string) => {
@@ -964,7 +986,19 @@ export default function UsersAdmin() {
       );
 
       const matchesState = filterState ? u.state === filterState : true;
-      const matchesCourse = filterCourse ? (u.courseType === filterCourse || u.pathwaySelection === filterCourse) : true;
+      const matchesCourse = filterCourse ? (
+        u.courseType === filterCourse || 
+        u.pathwaySelection === filterCourse ||
+        u.recommendedPath === filterCourse ||
+        (Array.isArray(u.registeredCourses) && (
+          u.registeredCourses.includes(filterCourse) || 
+          u.registeredCourses.some((rc: any) => typeof rc === 'string' && rc.toLowerCase() === filterCourse.toLowerCase())
+        )) ||
+        (u.progress && (
+          u.progress[filterCourse] || 
+          Object.keys(u.progress).some(k => k.toLowerCase() === filterCourse.toLowerCase())
+        ))
+      ) : true;
       const matchesStatus = filterStatus === 'activated' ? u.isActivated : filterStatus === 'pending' ? !u.isActivated : true;
       const matchesGender = filterGender ? (u.gender?.toLowerCase() === filterGender.toLowerCase()) : true;
       
@@ -1438,13 +1472,55 @@ export default function UsersAdmin() {
                         </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex px-2 py-0.5 text-xs font-bold rounded bg-slate-100 text-slate-800">
-                            {u.recommendedPath || '-'}
+                            {u.recommendedPath || u.courseType || u.pathwaySelection || 'Standard Path'}
                           </span>
-                          <div className="text-slate-500 text-xs mt-1">
-                            <span className="font-semibold text-slate-700">{u.courseType || ''}</span>
-                            {u.courseType && u.pathwaySelection ? ' - ' : ''}
-                            {u.pathwaySelection || ''}
-                          </div>
+                          {u.courseType && u.courseType !== u.recommendedPath && (
+                            <div className="text-slate-500 text-xs mt-1">
+                              <span className="font-semibold text-slate-700">{u.courseType}</span>
+                              {u.pathwaySelection && u.pathwaySelection !== u.courseType ? ` - ${u.pathwaySelection}` : ''}
+                            </div>
+                          )}
+                          {Array.isArray(u.registeredCourses) && u.registeredCourses.length > 0 && (() => {
+                            const renderedSet = new Set<string>();
+                            const displayCourses: { title: string; isAdv: boolean }[] = [];
+                            
+                            u.registeredCourses.forEach((rc: string) => {
+                              if (!rc || typeof rc !== 'string' || !rc.trim()) return;
+                              const lower = rc.trim().toLowerCase();
+                              const matched = allCourses.find(c =>
+                                (c.id && String(c.id).toLowerCase() === lower) ||
+                                (c.title && String(c.title).toLowerCase() === lower)
+                              );
+                              const displayTitle = matched?.title || rc;
+                              const key = displayTitle.toLowerCase().trim();
+                              if (!renderedSet.has(key)) {
+                                renderedSet.add(key);
+                                const isAdv = matched 
+                                  ? (matched.tier === 'advanced' || matched.tier === 'masterclass' || matched.level === 'Advanced' || matched.level === 'Masterclass')
+                                  : (lower.includes('adv') || lower.includes('masterclass'));
+                                displayCourses.push({ title: displayTitle, isAdv });
+                              }
+                            });
+
+                            if (displayCourses.length === 0) return null;
+
+                            return (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {displayCourses.map((dc, idx) => (
+                                  <span
+                                    key={idx}
+                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
+                                      dc.isAdv
+                                        ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                        : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                                    }`}
+                                  >
+                                    {dc.isAdv ? '⚡' : '📘'} {dc.title}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {u.approvalStatus === 'Approved' ? (

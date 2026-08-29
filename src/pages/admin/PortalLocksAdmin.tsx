@@ -42,7 +42,12 @@ import {
   ToggleRight,
   ChevronRight,
   Zap,
-  Activity
+  Activity,
+  Search,
+  MessageCircle,
+  ExternalLink,
+  GraduationCap,
+  Filter
 } from 'lucide-react';
 
 import { uploadToCloudinary } from '../../utils/cloudinary';
@@ -206,40 +211,315 @@ export default function PortalLocksAdmin() {
     return list;
   }, [allUsers]);
 
-  // Derived advanced course student list
+  // Search & Filter state for Advanced Students list
+  const [advancedSearchTerm, setAdvancedSearchTerm] = useState('');
+  const [advancedFilterCourse, setAdvancedFilterCourse] = useState('all');
+
+  // Load all users on demand when activeTab is advanced or approvals, with local storage caching
+  const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
+  const fetchAdminUsers = React.useCallback(async (force = false) => {
+    const cacheKey = 'ciya_admin_cached_portallocks_users';
+    if (!force) {
+      const cached = safeStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setAllUsers(parsed);
+            return;
+          }
+        } catch (e) {
+          console.warn("Failed to parse cached portal lock users:", e);
+        }
+      }
+    }
+
+    setLoadingPending(true);
+    if (force) setIsRefreshingUsers(true);
+    try {
+      const snapshot = await getDocs(query(collection(db, 'users')));
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setAllUsers(list);
+      safeStorage.setItem(cacheKey, JSON.stringify(list));
+      if (force) {
+        showToastMessage("Student and approval directory synchronized.", "success");
+      }
+    } catch (error) {
+      console.error("Error loading users list:", error);
+    } finally {
+      setLoadingPending(false);
+      setIsRefreshingUsers(false);
+    }
+  }, []);
+
+  // Fetch users only when switching to Advanced or Approvals tabs
+  useEffect(() => {
+    if (activeTab === 'advanced' || activeTab === 'approvals') {
+      if (allUsers.length === 0) {
+        fetchAdminUsers(false);
+      }
+    }
+  }, [activeTab, allUsers.length, fetchAdminUsers]);
+
+  // Helper function to extract numerical millisecond timestamp from various Firestore / ISO date formats
+  const getFirestoreTime = (timestamp: any): number => {
+    if (!timestamp) return 0;
+    try {
+      if (typeof timestamp.toDate === 'function') {
+        return timestamp.toDate().getTime();
+      }
+      if (typeof timestamp.toMillis === 'function') {
+        return timestamp.toMillis();
+      }
+      if (typeof timestamp === 'object' && timestamp.seconds !== undefined) {
+        return timestamp.seconds * 1000 + (timestamp.nanoseconds ? Math.floor(timestamp.nanoseconds / 1000000) : 0);
+      }
+      if (typeof timestamp === 'number') {
+        return timestamp;
+      }
+      if (typeof timestamp === 'string') {
+        const parsed = Date.parse(timestamp);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+    } catch {
+      return 0;
+    }
+    return 0;
+  };
+
+  // Helper to format date cleanly
+  const formatFirestoreDateTime = (timestamp: any): string => {
+    const ms = getFirestoreTime(timestamp);
+    if (!ms) return 'Recently Enrolled';
+    try {
+      return new Date(ms).toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'Recently Enrolled';
+    }
+  };
+
+  // Helper to identify if a course or identifier is an advanced / masterclass track
+  const isAdvancedIdentifier = (idOrTitle: string, allStoreCourses: any[]): boolean => {
+    if (!idOrTitle) return false;
+    const lower = String(idOrTitle).trim().toLowerCase();
+    if (
+      lower.startsWith('adv-') || 
+      lower.startsWith('adv_') || 
+      lower.includes('advance') || 
+      lower.includes('masterclass') || 
+      lower.includes('fullstack') ||
+      lower.includes('full-stack')
+    ) {
+      return true;
+    }
+    const matched = allStoreCourses.find(c => 
+      (c.id && String(c.id).toLowerCase() === lower) || 
+      (c.title && String(c.title).toLowerCase() === lower)
+    );
+    if (matched) {
+      const tier = String(matched.tier || '').toLowerCase();
+      const level = String(matched.level || '').toLowerCase();
+      const title = String(matched.title || '').toLowerCase();
+      const id = String(matched.id || '').toLowerCase();
+      return (
+        tier === 'advanced' || 
+        tier === 'masterclass' || 
+        level === 'advanced' || 
+        level === 'masterclass' || 
+        id.startsWith('adv-') || 
+        id.startsWith('adv_') || 
+        title.includes('advance') || 
+        title.includes('masterclass') ||
+        (matched.price && Number(matched.price) > 0)
+      );
+    }
+    return false;
+  };
+
+  // Helper to get formatted display title for an advanced course
+  const getAdvancedCourseTitle = (idOrTitle: string, allStoreCourses: any[]): string => {
+    if (!idOrTitle) return 'Advanced Course Mastery';
+    const lower = String(idOrTitle).trim().toLowerCase();
+    const matched = allStoreCourses.find(c => 
+      (c.id && String(c.id).toLowerCase() === lower) || 
+      (c.title && String(c.title).toLowerCase() === lower)
+    );
+    if (matched && matched.title) return matched.title;
+    if (idOrTitle.length > 5 && idOrTitle.includes(' ')) return idOrTitle;
+    return idOrTitle;
+  };
+
+  // Derived advanced course student list with multi-source fallback and strict deduplication
   const advancedStudents = React.useMemo(() => {
     const allStoreCourses = coursesStore.getCourses();
-    const advCourseIds = new Set(
-      allStoreCourses
-        .filter(c => c.tier === 'advanced' || c.tier === 'masterclass' || c.level === 'Advanced' || c.level === 'Masterclass')
-        .map(c => c.id)
-    );
-    
-    const list: { studentId: string, name: string, email: string, courseId: string, courseTitle: string, unlockedAt: string }[] = [];
-    
+    const seenMap = new Map<string, {
+      studentId: string;
+      name: string;
+      email: string;
+      whatsapp?: string;
+      cohort?: string;
+      courseId: string;
+      courseTitle: string;
+      unlockedAt: any;
+    }>();
+
+    const isStudentRevokedForCourse = (u: any, courseIdentifier: string) => {
+      if (!u || !u.progress || typeof u.progress !== 'object') return false;
+      if (u.progress[courseIdentifier]?.accessStatus === 'revoked') return true;
+
+      const foundCourse = allStoreCourses.find(c => 
+        c.id === courseIdentifier || 
+        c.title?.toLowerCase() === courseIdentifier.toLowerCase()
+      );
+
+      const targetIdLower = (foundCourse?.id || courseIdentifier).toLowerCase().trim();
+      const targetTitleLower = (foundCourse?.title || '').toLowerCase().trim();
+
+      for (const key of Object.keys(u.progress)) {
+        const keyLower = key.toLowerCase().trim();
+        if (
+          (targetIdLower && keyLower === targetIdLower) ||
+          (targetTitleLower && (keyLower === targetTitleLower || keyLower.includes(targetTitleLower)))
+        ) {
+          if (u.progress[key]?.accessStatus === 'revoked') {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
     allUsers.forEach(u => {
-      if (u.progress) {
-        Object.keys(u.progress).forEach(cId => {
-          if (advCourseIds.has(cId)) {
-            const course = allStoreCourses.find(c => c.id === cId);
-            const progressData = u.progress[cId];
-            if (progressData && progressData.accessStatus !== 'revoked') {
-              list.push({
-                studentId: u.id || u.uid,
-                name: u.fullName || u.displayName || 'Unnamed Student',
-                email: u.email || 'No email',
-                courseId: cId,
-                courseTitle: course?.title || 'Unknown Advanced Course',
-                unlockedAt: progressData?.createdAt || progressData?.unlockedAt || ''
-              });
-            }
+      const studentId = u.id || u.uid;
+      if (!studentId) return;
+      const studentName = u.fullName || u.displayName || u.email?.split('@')[0] || 'Unnamed Student';
+      const studentEmail = u.email || 'No email';
+      const studentWhatsApp = u.whatsapp || '';
+      const studentCohort = u.cohort || 'Cohort 1';
+
+      // Normalized student identity to prevent duplicate rows for the same student
+      const studentKey = (studentEmail && studentEmail !== 'No email' && studentEmail.includes('@'))
+        ? studentEmail.trim().toLowerCase()
+        : String(studentId).trim().toLowerCase();
+
+      const registerAdvancedEntry = (identifier: string, pData?: any) => {
+        if (!identifier || typeof identifier !== 'string' || !identifier.trim()) return;
+        if (!isAdvancedIdentifier(identifier, allStoreCourses)) return;
+        if (isStudentRevokedForCourse(u, identifier)) return;
+
+        const courseTitle = getAdvancedCourseTitle(identifier, allStoreCourses);
+        const titleLower = courseTitle.toLowerCase().trim();
+
+        // Locate canonical course from store to get proper ID
+        const matched = allStoreCourses.find(c => 
+          (c.id && String(c.id).toLowerCase() === identifier.toLowerCase().trim()) || 
+          (c.title && String(c.title).toLowerCase() === titleLower)
+        );
+        const canonicalCourseId = matched?.id || identifier;
+
+        // Key by student identity + canonical course title to strictly prevent duplicate entries
+        const dedupeKey = `${studentKey}__${titleLower}`;
+        const unlockTime = pData?.unlockedAt || pData?.createdAt || u.progress?.[canonicalCourseId]?.unlockedAt || u.progress?.[identifier]?.unlockedAt || u.updatedAt || u.createdAt || null;
+
+        if (!seenMap.has(dedupeKey)) {
+          seenMap.set(dedupeKey, {
+            studentId,
+            name: studentName,
+            email: studentEmail,
+            whatsapp: studentWhatsApp,
+            cohort: studentCohort,
+            courseId: canonicalCourseId,
+            courseTitle,
+            unlockedAt: unlockTime
+          });
+        } else {
+          // If already encountered from another progress or registeredCourses key, preserve the best data
+          const existing = seenMap.get(dedupeKey)!;
+          if (!existing.unlockedAt && unlockTime) {
+            existing.unlockedAt = unlockTime;
+          }
+          if ((!existing.whatsapp || existing.whatsapp === '') && studentWhatsApp) {
+            existing.whatsapp = studentWhatsApp;
+          }
+          if (existing.name === 'Unnamed Student' && studentName !== 'Unnamed Student') {
+            existing.name = studentName;
+          }
+        }
+      };
+
+      // 1. Check progress map
+      if (u.progress && typeof u.progress === 'object') {
+        Object.entries(u.progress).forEach(([cId, pData]: [string, any]) => {
+          if (pData?.accessStatus === 'revoked') return;
+          registerAdvancedEntry(cId, pData);
+        });
+      }
+
+      // 2. Check registeredCourses array
+      if (Array.isArray(u.registeredCourses)) {
+        u.registeredCourses.forEach((rc: any) => {
+          if (typeof rc === 'string') {
+            registerAdvancedEntry(rc, u.progress?.[rc]);
           }
         });
       }
+
+      // 3. Check recommendedPath / courseType / pathwaySelection
+      const possibleAdvancedPaths = [u.recommendedPath, u.courseType, u.pathwaySelection].filter(Boolean);
+      possibleAdvancedPaths.forEach((pathStr: string) => {
+        if (typeof pathStr === 'string') {
+          registerAdvancedEntry(pathStr, u.progress?.[pathStr]);
+        }
+      });
     });
-    
+
+    const list = Array.from(seenMap.values());
+    // Sort newest unlocked first
+    list.sort((a, b) => {
+      const timeA = getFirestoreTime(a.unlockedAt);
+      const timeB = getFirestoreTime(b.unlockedAt);
+      return timeB - timeA;
+    });
+
     return list;
-  }, [allUsers]);
+  }, [allUsers, courses]);
+
+  // Filtered advanced students list based on search term & selected course filter
+  const filteredAdvancedStudents = React.useMemo(() => {
+    return advancedStudents.filter(student => {
+      const term = advancedSearchTerm.toLowerCase().trim();
+      const matchesSearch = !term || (
+        student.name.toLowerCase().includes(term) ||
+        student.email.toLowerCase().includes(term) ||
+        (student.whatsapp || '').toLowerCase().includes(term) ||
+        student.courseTitle.toLowerCase().includes(term) ||
+        student.courseId.toLowerCase().includes(term) ||
+        student.studentId.toLowerCase().includes(term)
+      );
+
+      const matchesCourse = advancedFilterCourse === 'all' || 
+        student.courseId === advancedFilterCourse || 
+        student.courseTitle === advancedFilterCourse;
+
+      return matchesSearch && matchesCourse;
+    });
+  }, [advancedStudents, advancedSearchTerm, advancedFilterCourse]);
+
+  // Unique list of advanced courses present among enrolled students
+  const enrolledAdvancedCourseOptions = React.useMemo(() => {
+    const set = new Set<string>();
+    advancedStudents.forEach(s => set.add(s.courseTitle));
+    return Array.from(set).sort();
+  }, [advancedStudents]);
 
   // Revoke advanced course access handler (triggers the modal)
   const handleRevokeAdvancedAccess = (studentId: string, courseId: string, studentName: string, courseTitle: string) => {
@@ -259,13 +539,69 @@ export default function PortalLocksAdmin() {
     
     try {
       const userRef = doc(db, 'users', studentId);
-      await updateDoc(userRef, {
-        [`progress.${courseId}.accessStatus`]: 'revoked'
-      });
+      const snap = await getDoc(userRef);
+      const data = snap.exists() ? snap.data() : {};
+      const currentRegistered = Array.isArray(data.registeredCourses) ? data.registeredCourses : [];
+      const updatedRegistered = currentRegistered.filter((rc: string) => 
+        rc !== courseId && 
+        rc !== courseTitle && 
+        rc.toLowerCase() !== courseId.toLowerCase() && 
+        rc.toLowerCase() !== courseTitle.toLowerCase()
+      );
+
+      const updates: Record<string, any> = {
+        [`progress.${courseId}.accessStatus`]: 'revoked',
+        registeredCourses: updatedRegistered,
+        updatedAt: serverTimestamp()
+      };
+
+      if (courseTitle && courseTitle !== courseId) {
+        updates[`progress.${courseTitle}.accessStatus`] = 'revoked';
+      }
+
+      // Check all progress keys for any matches
+      if (data.progress && typeof data.progress === 'object') {
+        Object.keys(data.progress).forEach((pKey) => {
+          const pKeyLower = pKey.toLowerCase().trim();
+          if (
+            pKeyLower === courseId.toLowerCase().trim() ||
+            pKeyLower === courseTitle.toLowerCase().trim() ||
+            (courseTitle && pKeyLower.includes(courseTitle.toLowerCase().trim())) ||
+            (courseId && pKeyLower.includes(courseId.toLowerCase().trim()))
+          ) {
+            updates[`progress.${pKey}.accessStatus`] = 'revoked';
+          }
+        });
+      }
+
+      // Reset recommendedPath, courseType, pathwaySelection if matching the revoked course
+      if (data.recommendedPath && (
+        data.recommendedPath.toLowerCase().trim() === courseId.toLowerCase().trim() || 
+        data.recommendedPath.toLowerCase().trim() === courseTitle.toLowerCase().trim()
+      )) {
+        updates.recommendedPath = '';
+      }
+      if (data.courseType && (
+        data.courseType.toLowerCase().trim() === courseId.toLowerCase().trim() || 
+        data.courseType.toLowerCase().trim() === courseTitle.toLowerCase().trim()
+      )) {
+        updates.courseType = '';
+      }
+      if (data.pathwaySelection && (
+        data.pathwaySelection.toLowerCase().trim() === courseId.toLowerCase().trim() || 
+        data.pathwaySelection.toLowerCase().trim() === courseTitle.toLowerCase().trim()
+      )) {
+        updates.pathwaySelection = '';
+      }
+
+      await updateDoc(userRef, updates);
+
+      // Signal update for student
+      await triggerSystemSignal('user_signals', studentId);
       showToastMessage(`Successfully revoked ${studentName}'s access to "${courseTitle}".`, 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error revoking advanced access:", err);
-      showToastMessage(`Failed to revoke access. Please try again.`, 'error');
+      showToastMessage(`Failed to revoke access: ${err.message || 'Please check connection.'}`, 'error');
     } finally {
       // Remove loading indicator
       setRevokingKeys(prev => prev.filter(k => k !== key));
@@ -532,26 +868,10 @@ export default function PortalLocksAdmin() {
       }
     });
 
-    // Real-time user list listener from users collection
-    setLoadingPending(true);
-    const usersQuery = query(collection(db, 'users'));
-    const usersUnsubscribe = onSnapshot(usersQuery, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      setAllUsers(list);
-      setLoadingPending(false);
-    }, (error) => {
-      console.error("Error loading users list:", error);
-      setLoadingPending(false);
-    });
-
     return () => {
       authUnsubscribe();
       unsubscribe();
       coursesUnsubscribe();
-      usersUnsubscribe();
     };
   }, []);
 
@@ -2302,72 +2622,162 @@ export default function PortalLocksAdmin() {
 
           {/* List of active advanced course students */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6 text-left">
-            <h2 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2 border-b pb-3 border-slate-100">
-              <Sparkles className="w-4 h-4 text-purple-600" />
-              2. Advanced Course Enrolled Students ({advancedStudents.length})
-            </h2>
-            <p className="text-[11px] text-slate-500 font-semibold leading-relaxed max-w-3xl">
-              This list shows all students who verified the correct passcode and unlocked access to begin the Advanced Courses. Administrators can review their details or revoke access instantly.
-            </p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 border-slate-100">
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-600" />
+                  2. Advanced Course Enrolled Students ({advancedStudents.length})
+                </h2>
+                <p className="text-[11px] text-slate-500 font-semibold leading-relaxed mt-1 max-w-2xl">
+                  Real-time directory of all students who enrolled or unlocked access to Advanced & Masterclass tracks.
+                </p>
+              </div>
+
+              {advancedStudents.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={advancedSearchTerm}
+                      onChange={(e) => setAdvancedSearchTerm(e.target.value)}
+                      placeholder="Search name, email, WhatsApp..."
+                      className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all w-48 sm:w-56"
+                    />
+                  </div>
+
+                  {enrolledAdvancedCourseOptions.length > 1 && (
+                    <select
+                      value={advancedFilterCourse}
+                      onChange={(e) => setAdvancedFilterCourse(e.target.value)}
+                      className="py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                    >
+                      <option value="all">All Tracks ({advancedStudents.length})</option>
+                      {enrolledAdvancedCourseOptions.map((title) => (
+                        <option key={title} value={title}>
+                          {title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={isRefreshingUsers}
+                    onClick={() => fetchAdminUsers(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingUsers ? 'animate-spin' : ''}`} />
+                    <span>{isRefreshingUsers ? 'Syncing...' : 'Sync Live'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
             {advancedStudents.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <span className="text-3xl block mb-2">🎓</span>
+                <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">No student has unlocked an advanced course yet</p>
+                <p className="text-[11px] text-slate-400 font-medium mt-1">When students complete passcode verification or are enrolled in an advanced track, they will appear here automatically.</p>
+              </div>
+            ) : filteredAdvancedStudents.length === 0 ? (
               <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <span className="text-2xl block mb-2">🎓</span>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">No student has unlocked an advanced course yet.</p>
+                <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-xs font-bold text-slate-600">No matching students found</p>
+                <p className="text-[11px] text-slate-400 font-medium mt-1">Try adjusting your search terms or course filter.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdvancedSearchTerm('');
+                    setAdvancedFilterCourse('all');
+                  }}
+                  className="mt-3 text-xs font-black text-purple-600 hover:text-purple-700 underline cursor-pointer"
+                >
+                  Clear search filters
+                </button>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                      <th className="p-4">Student Details</th>
-                      <th className="p-4">Unlocked Course</th>
-                      <th className="p-4">Unlock Date</th>
-                      <th className="p-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-150 text-xs font-semibold text-slate-700">
-                    {advancedStudents.map((student, idx) => (
-                      <tr key={`${student.studentId}_${student.courseId}_${idx}`} className="hover:bg-slate-50/50">
-                        <td className="p-4">
-                          <div className="font-extrabold text-slate-900">{student.name}</div>
-                          <div className="text-[10px] text-slate-400">{student.email}</div>
-                          <div className="text-[8px] font-mono text-slate-400 select-all mt-0.5">UID: {student.studentId}</div>
-                        </td>
-                        <td className="p-4">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[10px] font-black uppercase">
-                            <Sparkles className="w-3 h-3" />
-                            {student.courseTitle}
-                          </span>
-                        </td>
-                        <td className="p-4 font-mono text-slate-500 text-[10px]">
-                          {student.unlockedAt ? new Date(student.unlockedAt).toLocaleString() : 'N/A'}
-                        </td>
-                        <td className="p-4 text-right">
-                          <button
-                            type="button"
-                            disabled={revokingKeys.includes(`${student.studentId}_${student.courseId}`)}
-                            onClick={() => handleRevokeAdvancedAccess(student.studentId, student.courseId, student.name, student.courseTitle)}
-                            className={`px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl shadow-sm transition-all cursor-pointer select-none border-0 inline-flex items-center gap-1.5 ${
-                              revokingKeys.includes(`${student.studentId}_${student.courseId}`)
-                                ? 'bg-rose-400 text-rose-100 cursor-not-allowed'
-                                : 'bg-rose-600 hover:bg-rose-700 text-white'
-                            }`}
-                          >
-                            {revokingKeys.includes(`${student.studentId}_${student.courseId}`) ? (
-                              <>
-                                <RefreshCw className="w-3 h-3 animate-spin" />
-                                Revoking...
-                              </>
-                            ) : (
-                              'Revoke Access'
-                            )}
-                          </button>
-                        </td>
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold text-slate-400">
+                  Showing {filteredAdvancedStudents.length} of {advancedStudents.length} enrolled {advancedStudents.length === 1 ? 'student' : 'students'}
+                </div>
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                        <th className="p-4">Student Details</th>
+                        <th className="p-4">Cohort</th>
+                        <th className="p-4">Unlocked Course Track</th>
+                        <th className="p-4">Enrollment Date</th>
+                        <th className="p-4 text-right">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-150 text-xs font-semibold text-slate-700">
+                      {filteredAdvancedStudents.map((student, idx) => {
+                        const cleanPhone = (student.whatsapp || '').replace(/[^0-9]/g, '');
+                        return (
+                          <tr key={`${student.studentId}_${student.courseId}_${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="p-4">
+                              <div className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                                {student.name}
+                              </div>
+                              <div className="text-[11px] text-slate-500 font-normal">{student.email}</div>
+                              {student.whatsapp ? (
+                                <a
+                                  href={`https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hello ${student.name}, welcome to the CIYA Advanced Course: ${student.courseTitle}!`)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 mt-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 hover:border-emerald-200 transition-colors"
+                                >
+                                  <MessageCircle className="w-3 h-3" />
+                                  <span>{student.whatsapp}</span>
+                                  <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                                </a>
+                              ) : (
+                                <span className="text-[9px] text-slate-400 font-mono select-all block mt-0.5">UID: {student.studentId}</span>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              <span className="inline-flex items-center px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold">
+                                {student.cohort || 'Cohort 1'}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-lg text-[10px] font-black uppercase">
+                                <Sparkles className="w-3 h-3 shrink-0" />
+                                <span>{student.courseTitle}</span>
+                              </span>
+                            </td>
+                            <td className="p-4 font-mono text-slate-500 text-[10px]">
+                              {formatFirestoreDateTime(student.unlockedAt)}
+                            </td>
+                            <td className="p-4 text-right">
+                              <button
+                                type="button"
+                                disabled={revokingKeys.includes(`${student.studentId}_${student.courseId}`)}
+                                onClick={() => handleRevokeAdvancedAccess(student.studentId, student.courseId, student.name, student.courseTitle)}
+                                className={`px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl shadow-sm transition-all cursor-pointer select-none border-0 inline-flex items-center gap-1.5 ${
+                                  revokingKeys.includes(`${student.studentId}_${student.courseId}`)
+                                    ? 'bg-rose-400 text-rose-100 cursor-not-allowed'
+                                    : 'bg-rose-600 hover:bg-rose-700 text-white'
+                                }`}
+                              >
+                                {revokingKeys.includes(`${student.studentId}_${student.courseId}`) ? (
+                                  <>
+                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                    Revoking...
+                                  </>
+                                ) : (
+                                  'Revoke Access'
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -2859,14 +3269,20 @@ export function AdminPasscodeConsole({ secret }: { secret: string }) {
           <div className="flex gap-2">
             <input
               type="text"
-              maxLength={6}
+              maxLength={64}
               value={testCode}
               onChange={(e) => {
-                setTestCode(e.target.value.replace(/[^0-9]/g, ''));
+                setTestCode(e.target.value);
                 setTestResult('idle');
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleVerify();
+                }
+              }}
               className="w-full bg-slate-800 border border-slate-700 text-teal-300 font-mono font-bold text-xs rounded-lg px-2.5 py-1.5 outline-none focus:border-teal-500"
-              placeholder="Enter 6 digits"
+              placeholder="Enter code or secret key"
             />
             <button
               type="button"
@@ -2878,12 +3294,12 @@ export function AdminPasscodeConsole({ secret }: { secret: string }) {
           </div>
           {testResult === 'success' && (
             <p className="text-[10px] text-teal-400 font-bold mt-1">
-              ✅ MATCH! Valid passcode for current 15-min window.
+              ✅ MATCH! Valid passcode or access key.
             </p>
           )}
           {testResult === 'fail' && (
             <p className="text-[10px] text-rose-400 font-bold mt-1">
-              ❌ INVALID! Does not match the active current 15-minute slot.
+              ❌ INVALID! Does not match active rotation slots or secret key.
             </p>
           )}
         </div>

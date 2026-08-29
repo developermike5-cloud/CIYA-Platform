@@ -57,7 +57,7 @@ service cloud.firestore {
 
     // Entity Validation: UserProfile
     function isValidUserProfile(data) {
-      return data.keys().hasAll(['email', 'createdAt', 'updatedAt'])
+      return data.keys().hasAll(['email'])
         && data.email is string && data.email.size() <= 200
         && (data.get('intent', '') is string && data.get('intent', '').size() <= 5000)
         && (data.get('experience', '') is string && data.get('experience', '').size() <= 5000)
@@ -75,19 +75,34 @@ service cloud.firestore {
         && (data.get('educationLevel', '') is string && data.get('educationLevel', '').size() <= 500)
         && (data.get('whatsapp', '') is string && data.get('whatsapp', '').size() <= 500)
         && (data.get('state', '') is string && data.get('state', '').size() <= 500)
+        && (data.get('country', '') is string && data.get('country', '').size() <= 200)
+        && (data.get('cohort', '') is string && data.get('cohort', '').size() <= 200)
         && (data.get('referralCode', '') is string && data.get('referralCode', '').size() <= 500)
         && (data.get('myReferralCode', '') is string && data.get('myReferralCode', '').size() <= 500)
         && (data.get('isActivated', false) is bool)
         && (data.get('referralsCount', 0) is int || data.get('referralsCount', 0) is float)
         && (data.get('approvalStatus', 'Pending') is string && data.get('approvalStatus', 'Pending') in ['Pending', 'Approved', 'Disapproved'])
         && (data.get('isDashboardUnlocked', false) is bool)
-        && (data.get('adminCode', '') is string)
-        && (data.get('badgePaymentRequestStatus', '') is string)
+        && (data.get('adminCode', '') is string && data.get('adminCode', '').size() <= 200)
+        && (data.get('membershipId', '') is string && data.get('membershipId', '').size() <= 200)
+        && (data.get('badgePaymentRequestStatus', '') is string && data.get('badgePaymentRequestStatus', '').size() <= 200)
         && (data.get('hasYearBadge', false) is bool)
+        && (data.get('badgeExpiresAt', '') is string && data.get('badgeExpiresAt', '').size() <= 200)
+        && (data.get('badgeStatus', '') is string && data.get('badgeStatus', '').size() <= 200)
+        && (data.get('badgePlan', '') is string && data.get('badgePlan', '').size() <= 200)
+        && (data.get('badgePrice', 0) is int || data.get('badgePrice', 0) is float)
+        && (data.get('badgeApprovedAt', '') is string && data.get('badgeApprovedAt', '').size() <= 200)
+        && (data.get('badgeTxRef', '') is string && data.get('badgeTxRef', '').size() <= 500)
+        && (data.get('paymentReference', '') is string && data.get('paymentReference', '').size() <= 500)
         && (data.get('promptCopies', []) is list)
+        && (data.get('registeredCourses', []) is list)
+        && (data.get('congratulatedCourses', []) is list)
+        && (data.get('completedCoursesOverride', []) is list)
         && (data.get('progress', {}) is map)
-        && (data.get('photoURL', '') is string)
-        && (data.get('avatarUrl', '') is string);
+        && (data.get('manualDayUnlock', {}) is map)
+        && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 5000)
+        && (data.get('avatarUrl', '') is string && data.get('avatarUrl', '').size() <= 5000)
+        && (data.get('role', '') is string && data.get('role', '').size() <= 100);
     }
     
     // Entity Validation: KycbQuestionnaire
@@ -173,30 +188,36 @@ service cloud.firestore {
       allow read: if true;
       allow list: if true;
       allow create: if isSignedIn() 
-                    && request.auth.uid == userId 
+                    && (request.auth.uid == userId || isAdmin())
                     && isValidUserProfile(incoming())
-                    && incoming().email == request.auth.token.email
-                    && incoming().createdAt == request.time
-                    && incoming().updatedAt == request.time;
+                    && (
+                      isAdmin() ||
+                      (
+                        (request.auth.token.email != null && incoming().email.lower() == request.auth.token.email.lower())
+                        && (incoming().createdAt == request.time || !('createdAt' in incoming()))
+                        && (incoming().updatedAt == request.time || !('updatedAt' in incoming()))
+                      )
+                    );
       allow update: if isSignedIn() 
                     && (
                       isAdmin()
                       ||
                       (request.auth.uid == userId 
                        && isValidUserProfile(incoming())
-                       && incoming().email == existing().email
-                       && incoming().createdAt == existing().createdAt
-                       && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt)
+                       && (
+                         !('email' in existing()) || incoming().email.lower() == existing().email.lower()
+                       )
+                       && (
+                         !('createdAt' in existing()) || incoming().createdAt == existing().createdAt || incoming().createdAt == request.time
+                       )
+                       && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt || !('updatedAt' in incoming()))
                        && incoming().diff(existing()).affectedKeys().hasOnly([
-                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'isDashboardUnlocked', 'adminCode', 'progress', 'congratulatedCourses', 'updatedAt', 'badgePaymentRequestStatus', 'hasYearBadge', 'promptCopies', 'photoURL', 'avatarUrl'
+                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'country', 'cohort', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'approvalStatus', 'isDashboardUnlocked', 'adminCode', 'progress', 'registeredCourses', 'congratulatedCourses', 'completedCoursesOverride', 'manualDayUnlock', 'updatedAt', 'badgePaymentRequestStatus', 'hasYearBadge', 'badgeExpiresAt', 'badgeStatus', 'badgePlan', 'badgePrice', 'badgeApprovedAt', 'badgeTxRef', 'paymentReference', 'membershipId', 'promptCopies', 'photoURL', 'avatarUrl'
                        ])
                       )
                       ||
                       (
                        isValidUserProfile(incoming())
-                       && incoming().email == existing().email
-                       && incoming().createdAt == existing().createdAt
-                       && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt)
                        && incoming().diff(existing()).affectedKeys().hasOnly(['isActivated', 'referralsCount', 'updatedAt'])
                        && incoming().isActivated == true
                        && incoming().referralsCount == existing().get('referralsCount', 0) + 1

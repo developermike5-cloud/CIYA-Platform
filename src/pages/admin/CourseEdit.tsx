@@ -1092,7 +1092,7 @@ export default function CourseEdit() {
   const addVideoToDay = (dayIdx: number) => {
     setForm(prev => {
       const isAdv = prev.tier === 'advanced' || prev.tier === 'masterclass' || prev.level === 'Advanced' || prev.level === 'Masterclass' || prev.id?.startsWith('adv-') || prev.id?.startsWith('adv_');
-      const maxLimit = isAdv ? 20 : 20;
+      const maxLimit = isAdv ? 100 : 50;
       const updatedDays = [...(prev.days || DAYS_RANGE.map(d => emptyDay(d)))];
       const videos = [...(updatedDays[dayIdx].videos || [])];
       if (videos.length >= maxLimit) return prev;
@@ -1615,7 +1615,7 @@ export default function CourseEdit() {
                 >
                   <div className="text-[10px] uppercase tracking-wider">{unitLabel} {dayNum}</div>
                   <div className="text-[9px] text-slate-400 font-extrabold mt-0.5">
-                    {(currentDayObj.videos || []).length}/20 Lessons
+                    {(currentDayObj.videos || []).length} Lessons
                   </div>
                 </button>
               );
@@ -1662,7 +1662,7 @@ export default function CourseEdit() {
               <button
                 type="button"
                 onClick={() => addVideoToDay(activeDayIdx)}
-                disabled={((form.days || [])[activeDayIdx]?.videos || []).length >= 20}
+                disabled={((form.days || [])[activeDayIdx]?.videos || []).length >= 100}
                 className="text-xs font-bold px-3.5 py-1.5 border border-dashed border-teal-600 rounded-lg hover:bg-teal-50 text-teal-700 transition-all cursor-pointer bg-transparent disabled:opacity-40"
               >
                 + Add Lesson Link

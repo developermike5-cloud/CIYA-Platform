@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
-import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where, limit } from 'firebase/firestore';
 import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock, X } from 'lucide-react';
 import { safeStorage } from '../../utils/safeStorage';
 import LpQuestionnaireForm from '../../components/LpQuestionnaireForm';
@@ -1051,9 +1051,9 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
     try {
       let qSnap;
       if (isAdminMode) {
-        qSnap = await getDocs(collection(db, 'kycb_questionnaires'));
+        qSnap = await getDocs(query(collection(db, 'kycb_questionnaires'), limit(200)));
       } else if (userId) {
-        qSnap = await getDocs(query(collection(db, 'kycb_questionnaires'), where('userId', '==', userId)));
+        qSnap = await getDocs(query(collection(db, 'kycb_questionnaires'), where('userId', '==', userId), limit(50)));
       } else {
         setSavedForms([]);
         setLoading(false);

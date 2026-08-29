@@ -305,16 +305,17 @@ function AdvancedCoursePasscodeSection({
 
   const handlePasscodeVerify = () => {
     setErrorMsg(null);
-    if (!passcodeVal || passcodeVal.length !== 6) {
-      setErrorMsg("Please enter a valid 6-digit passcode.");
+    const cleanInput = passcodeVal.trim();
+    if (!cleanInput) {
+      setErrorMsg("Please enter your classroom passcode or access code.");
       return;
     }
 
-    const isValid = verifyTimeBasedCode(passcodeVal, secret);
+    const isValid = verifyTimeBasedCode(cleanInput, secret);
     if (isValid) {
       onVerifySuccess();
     } else {
-      setErrorMsg("Invalid access code or passcode and check with admin support.");
+      setErrorMsg("Invalid access code or passcode. Please verify or check with admin support.");
     }
   };
 
@@ -329,24 +330,30 @@ function AdvancedCoursePasscodeSection({
           🔑 Advanced Course Verification
         </h4>
         <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
-          Enter the tuition access code or passcode below to unlock your premium classroom.
+          Enter the tuition access code or 6-digit active passcode below to unlock your premium classroom.
         </p>
       </div>
 
       <div className="space-y-2">
         <label className="block text-xs font-black text-slate-755 uppercase tracking-wide">
-          Enter 6-Digit Verification Code
+          Enter Access Code / Passcode
         </label>
         <div className="flex gap-2">
           <input
             type="text"
-            maxLength={6}
+            maxLength={64}
             value={passcodeVal}
             onChange={(e) => {
-              setPasscodeVal(e.target.value.replace(/[^0-9]/g, ''));
+              setPasscodeVal(e.target.value);
               setErrorMsg(null);
             }}
-            placeholder="e.g. 123456"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handlePasscodeVerify();
+              }
+            }}
+            placeholder="Enter 6-digit code or access key"
             className="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm font-bold font-mono tracking-widest text-center rounded-xl p-3 outline-none focus:ring-1 focus:ring-purple-500"
           />
           <button
@@ -1761,6 +1768,33 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
 }
 
 // Full-width classroom viewer with responsive layout
+function isCourseAccessRevoked(profile: any, course: any): boolean {
+  if (!profile || !course || !profile.progress || typeof profile.progress !== 'object') return false;
+  const p = profile.progress;
+  const cId = (course.id || '').trim();
+  const cTitle = (course.title || '').trim();
+
+  if (cId && p[cId]?.accessStatus === 'revoked') return true;
+  if (cTitle && p[cTitle]?.accessStatus === 'revoked') return true;
+
+  const targetIdLower = cId.toLowerCase();
+  const targetTitleLower = cTitle.toLowerCase();
+
+  for (const key of Object.keys(p)) {
+    const keyLower = key.toLowerCase().trim();
+    if (
+      (targetIdLower && keyLower === targetIdLower) ||
+      (targetTitleLower && (keyLower === targetTitleLower || keyLower.includes(targetTitleLower)))
+    ) {
+      if (p[key]?.accessStatus === 'revoked') {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 interface CourseViewerProps {
   course: Course;
   userProfile: any;
@@ -1812,6 +1846,10 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   const [showTrackSelectionModal, setShowTrackSelectionModal] = useState(false);
   const [expandedAssignments, setExpandedAssignments] = useState<Record<number, boolean>>({});
 
+  const isCourseAdvanced = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass';
+  const isRevoked = !isAdmin && isCourseAccessRevoked(userProfile, course);
+  const effectiveIsEnrolled = isEnrolled && !isRevoked;
+
   // Auto scroll window to top when day or course changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1851,7 +1889,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       setActiveVideoIdx(0);
     }
 
-    if (syllabusParam === 'false') {
+    if (syllabusParam === 'false' && effectiveIsEnrolled) {
       setViewingSyllabus(false);
     } else {
       setViewingSyllabus(true);
@@ -1862,7 +1900,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     } else {
       setShowAssignment(false);
     }
-  }, [location.search]);
+  }, [location.search, effectiveIsEnrolled]);
 
   const updateParams = (updates: Record<string, string | null>) => {
     const params = new URLSearchParams(window.location.search);
@@ -2081,7 +2119,6 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   const days: CourseDay[] = selectedDurationMode === 'express' 
     ? (course.days || []).slice(0, 3) 
     : (course.days || []);
-  const isCourseAdvanced = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass';
   const unitLabel = isCourseAdvanced ? 'Module' : 'Day';
   const activeDay: any = days[activeDayIdx] || { dayNumber: activeDayIdx + 1, title: `Study ${unitLabel}`, videos: [], assignment: { prompt: '', dueNote: '' } };
   const videos: CourseVideo[] = activeDay.videos || [];
@@ -2696,6 +2733,17 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                 </div>
               </div>
             )}
+
+            {isRevoked && (
+              <div className="md:col-span-2 space-y-2.5 bg-rose-50 p-4 md:p-5 rounded-2xl border-2 border-rose-300">
+                <span className="text-xs md:text-sm font-black uppercase text-rose-850 tracking-wider block">
+                  ⚠️ Access Revoked by Administration
+                </span>
+                <p className="text-xs md:text-sm text-rose-950 leading-relaxed font-bold">
+                  Your access to this advanced training course has been revoked. To unlock this course again, please enter the valid rotating access passcode or complete authorization.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="pt-4">
@@ -2708,7 +2756,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                   }
                   return;
                 }
-                if (!isEnrolled) {
+                if (!effectiveIsEnrolled) {
                   const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass';
                   const isMonetized = appSettings?.advancedCourseSettings?.enabled ?? true;
                   if (isAdv && isMonetized) {
@@ -2753,13 +2801,17 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                 updateParams({ syllabus: 'false', assignment: 'false' });
               }}
               className={`w-full py-4 text-white font-extrabold text-sm uppercase rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer transform active:scale-[0.98] border-0 ${
-                isEnrolled 
+                effectiveIsEnrolled 
                   ? "bg-teal-600 hover:bg-teal-700 shadow-teal-600/10 hover:shadow-teal-600/20" 
-                  : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/10 hover:shadow-indigo-600/20"
+                  : isRevoked
+                    ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/10 hover:shadow-rose-600/20"
+                    : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/10 hover:shadow-indigo-600/20"
               }`}
             >
-              {isEnrolled ? (
+              {effectiveIsEnrolled ? (
                 <>📊 Enter Classroom & Begin Lessons →</>
+              ) : isRevoked ? (
+                <>🔒 Unlock Access (Passcode Required) →</>
               ) : (
                 <>🔒 Enroll & Unlock Classroom →</>
               )}
@@ -2796,7 +2848,35 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       )}
 
       {/* 2. DAILY LESSONS TIMELINE Navigation (Moved to the bottom sequentially, only covered days showing) */}
-      {!viewingSyllabus && (
+      {!viewingSyllabus && !effectiveIsEnrolled && (
+        <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-8 shadow-sm space-y-4 text-center">
+          <div className="mx-auto w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center text-rose-600 text-2xl font-black">
+            🔒
+          </div>
+          <div className="space-y-1 max-w-md mx-auto">
+            <h4 className="font-extrabold text-lg text-rose-950">Course Classroom Locked</h4>
+            <p className="text-xs text-rose-800 font-semibold leading-relaxed">
+              {isRevoked 
+                ? "Your access to this course has been revoked. Please enter the valid unlock passcode or contact administration to regain access." 
+                : "You must enroll or unlock this course to access the interactive lessons and video materials."}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              if (onRequestUnlockAdvanced) {
+                onRequestUnlockAdvanced(course);
+              } else {
+                updateParams({ syllabus: 'true' });
+              }
+            }}
+            className="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer border-0"
+          >
+            Unlock Course Access →
+          </button>
+        </div>
+      )}
+
+      {!viewingSyllabus && effectiveIsEnrolled && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm space-y-6 text-left animate-fade-in -mx-6 md:mx-0 rounded-none md:rounded-3xl border-x-0 md:border-x">
           <div className="border-b pb-3 flex items-center justify-between">
             <div className="space-y-0.5">
@@ -5525,7 +5605,14 @@ export default function StudentDashboard() {
 
   const isProfileRegisteredForCourse = (profile: any, course: any): boolean => {
     if (!profile || !course) return false;
-    
+
+    // If access has been revoked by admin, strictly deny enrollment & access
+    if (isCourseAccessRevoked(profile, course)) {
+      return false;
+    }
+
+    const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || (course.level && ['advanced', 'masterclass'].includes(course.level.toLowerCase()));
+
     // Check if the student has explicit progress entry for this course
     if (profile.progress && profile.progress[course.id] && profile.progress[course.id].accessStatus !== 'revoked') {
       return true;
@@ -5533,13 +5620,20 @@ export default function StudentDashboard() {
 
     // Check if course ID or title is in registeredCourses array
     if (Array.isArray(profile.registeredCourses)) {
-      if (profile.registeredCourses.includes(course.id) || profile.registeredCourses.includes(course.title)) {
+      const hasReg = profile.registeredCourses.some((rc: string) => 
+        typeof rc === 'string' && (
+          rc === course.id || 
+          rc === course.title ||
+          rc.toLowerCase().trim() === (course.id || '').toLowerCase().trim() ||
+          rc.toLowerCase().trim() === (course.title || '').toLowerCase().trim()
+        )
+      );
+      if (hasReg) {
         return true;
       }
     }
 
-    // Advanced / Masterclass courses require progress or explicit registeredCourses entry
-    const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || (course.level && ['advanced', 'masterclass'].includes(course.level.toLowerCase()));
+    // Advanced / Masterclass courses require unlocked progress or explicit registeredCourses entry
     if (isAdv) {
       return false;
     }
@@ -5633,6 +5727,7 @@ export default function StudentDashboard() {
 
     return courses.filter((c, idx) => {
       if (c.isCloned || c.durationMode === 'express') return false;
+      if (!isAdmin && isCourseAccessRevoked(userProfile, c)) return false;
 
       let isEnrolled = progressSet.has(c.id);
 
@@ -7439,7 +7534,7 @@ export default function StudentDashboard() {
                   showToast={showToast}
                   handleResetProgress={handleResetProgress}
                   isAdmin={isAdmin}
-                  isEnrolled={isAdmin || !!(userProfile?.progress && userProfile.progress[selectedCourse.id] && userProfile.progress[selectedCourse.id].accessStatus !== 'revoked') || isProfileRegisteredForCourse(userProfile, selectedCourse)}
+                  isEnrolled={isAdmin || (!isCourseAccessRevoked(userProfile, selectedCourse) && (!!(userProfile?.progress && userProfile.progress[selectedCourse.id] && userProfile.progress[selectedCourse.id].accessStatus !== 'revoked') || isProfileRegisteredForCourse(userProfile, selectedCourse)))}
                   onLogin={handleLogin}
                   courses={courses}
                   hasCompletedFirstCourse={hasCompletedFirstCourse}
@@ -8155,9 +8250,20 @@ export default function StudentDashboard() {
                   const nextProgress: Record<string, any> = { ...(userProfile?.progress || {}) };
                   nextProgress[courseId] = {
                     ...(nextProgress[courseId] || {}),
+                    accessStatus: 'active',
                     durationMode: 'standard',
+                    unlockedAt: new Date().toISOString(),
                     createdAt: nextProgress[courseId]?.createdAt || new Date().toISOString()
                   };
+
+                  if (nextProgress[advancedPaymentCourse.title]) {
+                    nextProgress[advancedPaymentCourse.title] = {
+                      ...(nextProgress[advancedPaymentCourse.title] || {}),
+                      accessStatus: 'active',
+                      durationMode: 'standard',
+                      unlockedAt: new Date().toISOString()
+                    };
+                  }
 
                   const existingRegistered = Array.isArray(userProfile?.registeredCourses) ? userProfile.registeredCourses : [];
                   const updatedRegisteredCourses = Array.from(new Set([...existingRegistered, courseId, advancedPaymentCourse.title]));
@@ -8180,28 +8286,32 @@ export default function StudentDashboard() {
                   try {
                     await updateDoc(userRef, dbUpdates);
                   } catch (updateErr: any) {
-                    console.warn("Advanced enrollment updateDoc failed, checking if document exists:", updateErr);
-                    const snap = await getDoc(userRef);
-                    if (!snap.exists()) {
-                      console.log("Document does not exist in Firestore. Creating it resiliently...");
-                      const newProfileData = {
-                        fullName: currentUser.displayName || currentUser.email?.split('@')[0] || 'CIYA Scholar',
-                        email: currentUser.email,
-                        approvalStatus: 'Approved',
-                        isActivated: true,
-                        isDashboardUnlocked: true,
-                        cohort: 'Cohort 1',
-                        recommendedPath: userProfile?.recommendedPath || advancedPaymentCourse.title,
-                        courseType: userProfile?.courseType || advancedPaymentCourse.title,
-                        pathwaySelection: userProfile?.pathwaySelection || advancedPaymentCourse.title,
-                        progress: nextProgress,
-                        registeredCourses: updatedRegisteredCourses,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                      };
-                      await setDoc(userRef, newProfileData);
-                    } else {
-                      throw updateErr;
+                    console.warn("Advanced enrollment updateDoc failed, attempting merge setDoc:", updateErr);
+                    try {
+                      const snap = await getDoc(userRef);
+                      if (!snap.exists()) {
+                        const newProfileData = {
+                          fullName: currentUser.displayName || currentUser.email?.split('@')[0] || 'CIYA Scholar',
+                          email: currentUser.email || '',
+                          approvalStatus: 'Approved',
+                          isActivated: true,
+                          isDashboardUnlocked: true,
+                          cohort: userProfile?.cohort || 'Cohort 1',
+                          recommendedPath: userProfile?.recommendedPath || advancedPaymentCourse.title,
+                          courseType: userProfile?.courseType || advancedPaymentCourse.title,
+                          pathwaySelection: userProfile?.pathwaySelection || advancedPaymentCourse.title,
+                          progress: nextProgress,
+                          registeredCourses: updatedRegisteredCourses,
+                          createdAt: serverTimestamp(),
+                          updatedAt: serverTimestamp()
+                        };
+                        await setDoc(userRef, newProfileData);
+                      } else {
+                        await setDoc(userRef, dbUpdates, { merge: true });
+                      }
+                    } catch (fallbackErr: any) {
+                      console.error("Fallback setDoc also encountered an issue:", fallbackErr);
+                      throw fallbackErr;
                     }
                   }
 
@@ -8211,7 +8321,7 @@ export default function StudentDashboard() {
                   setShowCongratsPopup(true);
                   showToast(`🎉 Success! Advanced track unlocked!`);
                 } catch (err: any) {
-                  console.error(err);
+                  console.error("Advanced enrollment error:", err);
                   alert(`Passcode correct, but failed to save enrollment in database: ${err?.message || err || 'Unknown Error'}. Please check connection and try again.`);
                 }
               }}
