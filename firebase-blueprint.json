@@ -205,12 +205,58 @@
         "updatedAt": { "type": "string", "format": "timestamp" }
       },
       "required": ["title", "content", "createdAt", "updatedAt"]
+    },
+    "BuzzGroup": {
+      "title": "Buzz Group",
+      "description": "Student study groups and announcement cohorts",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the group" },
+        "description": { "type": "string", "description": "Short description of the cohort" },
+        "category": { "type": "string", "enum": ["general", "web", "film", "image", "projects"] },
+        "imageUrl": { "type": "string", "description": "Cloudinary avatar URL" },
+        "allowStudentsChat": { "type": "boolean", "description": "Whether students are allowed to chat" },
+        "createdAt": { "type": "number" },
+        "createdBy": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "lastMessageTime": { "type": "number" },
+        "lastMessageSender": { "type": "string" },
+        "membersCount": { "type": "number" }
+      },
+      "required": ["name", "allowStudentsChat"]
+    },
+    "BuzzMessage": {
+      "title": "Buzz Message",
+      "description": "Live chat message within a buzz study group",
+      "type": "object",
+      "properties": {
+        "groupId": { "type": "string" },
+        "senderUid": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderEmail": { "type": "string" },
+        "senderPhoto": { "type": "string" },
+        "isAdmin": { "type": "boolean" },
+        "text": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "mediaType": { "type": "string", "enum": ["image", "file", "audio"] },
+        "timestamp": { "type": "number" },
+        "reactions": { "type": "object" }
+      },
+      "required": ["groupId", "senderUid", "senderName", "timestamp"]
     }
   },
   "firestore": {
     "/settings/{settingsDoc}": {
       "schema": { "$ref": "#/entities/AppSettings" },
       "description": "Global config documents for general templates, locks and prompt shuffling definitions."
+    },
+    "/buzz_groups/{groupId}": {
+      "schema": { "$ref": "#/entities/BuzzGroup" },
+      "description": "Student study groups, cohorts, and chat channels."
+    },
+    "/buzz_groups/{groupId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/BuzzMessage" },
+      "description": "Real-time messages sent inside a buzz group."
     },
     "/courses/{courseId}": {
       "schema": { "$ref": "#/entities/Course" },

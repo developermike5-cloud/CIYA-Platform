@@ -2205,7 +2205,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
               </div>
 
               {/* Modal Body */}
-              <div className="p-5 md:p-6 overflow-y-auto space-y-5 flex-1 text-slate-700">
+              <div className="p-5 md:p-6 overflow-y-auto space-y-5 flex-1 text-slate-700 min-h-0">
                 {/* How To Steps */}
                 <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-2xl p-4 space-y-2.5">
                   <h4 className="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">

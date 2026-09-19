@@ -7,13 +7,7 @@ import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 
 // Safe directory name resolution for ESM / CommonJS hybrid environment
-const currentDir = (() => {
-  try {
-    return __dirname;
-  } catch {
-    return path.dirname(fileURLToPath(import.meta.url));
-  }
-})();
+const currentDir = process.cwd();
 import { GoogleGenAI, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({

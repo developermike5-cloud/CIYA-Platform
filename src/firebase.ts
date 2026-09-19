@@ -257,14 +257,19 @@ try {
 
 export const rtdb = rtdbInstance;
 
-// Set up global synchronization hook via Realtime Database
+// Set up global synchronization hook via Firestore
+import { onSnapshot } from 'firebase/firestore';
+
 let isLocalToggleInitiated = false;
 
-if (typeof window !== 'undefined' && rtdbInstance) {
+if (typeof window !== 'undefined' && firestoreDb) {
   try {
-    const dbToggleRef = ref(rtdbInstance, 'settings/db_connection_disabled');
-    onValue(dbToggleRef, (snapshot) => {
-      const isDisabled = !!snapshot.val();
+    const signalDocRef = doc(firestoreDb, 'settings', 'system_signals');
+    onSnapshot(signalDocRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+      
+      const data = snapshot.data();
+      const isDisabled = !!data.db_connection_disabled;
       const shouldBeEnabled = !isDisabled;
       const isChange = shouldBeEnabled !== dbNetworkEnabled;
       
@@ -282,10 +287,14 @@ if (typeof window !== 'undefined' && rtdbInstance) {
         }
       }
     }, (error) => {
-      console.warn("Failed to retrieve db_connection_disabled toggle value from RTDB:", error);
+      // If settings/system_signals doesn't exist yet or is restricted, we just ignore it silently
+      // as it's an optional global sync feature.
+      if (error.code !== 'permission-denied') {
+        console.warn("Firestore: System signals sync notice:", error.message);
+      }
     });
   } catch (err) {
-    console.warn("Failed to set up RTDB database sync trigger:", err);
+    console.warn("Failed to set up Firestore database sync trigger:", err);
   }
 }
 
@@ -295,12 +304,13 @@ export async function setGlobalDbConnectionDisabled(disabled: boolean) {
   // Always update local storage first to guarantee local offline simulation works
   safeSetItem('ciya_db_connection_disabled', disabled ? 'true' : 'false');
 
-  // Attempt to synchronize globally via RTDB if available
-  if (rtdbInstance) {
+  // Attempt to synchronize globally via Firestore
+  if (firestoreDb) {
     try {
-      await set(ref(rtdbInstance, 'settings/db_connection_disabled'), disabled);
+      const signalDocRef = doc(firestoreDb, 'settings', 'system_signals');
+      await setDoc(signalDocRef, { db_connection_disabled: disabled }, { merge: true });
     } catch (err) {
-      console.warn("Failed to push global db_connection_disabled state to RTDB (falling back to local-only toggle):", err);
+      console.warn("Failed to push global db_connection_disabled state to Firestore (falling back to local-only toggle):", err);
     }
   }
 

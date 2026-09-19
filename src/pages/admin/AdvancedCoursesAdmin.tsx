@@ -296,10 +296,6 @@ export default function AdvancedCoursesAdmin() {
           <ShieldCheck className="w-64 h-64 text-indigo-400" />
         </div>
         <div className="relative z-10 space-y-3 max-w-3xl">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-xs font-bold text-indigo-300">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            100% Frontend Hardcoded Track
-          </div>
           <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">Advanced Course Control Hub</h1>
           <p className="text-xs md:text-sm text-slate-300 font-medium leading-relaxed">
             Manage your high-tier advanced curriculum in complete isolation from the backend. Since everything here is loaded statically from the frontend file <code className="text-indigo-200 bg-indigo-950/60 px-1.5 py-0.5 rounded font-mono">advanced_courses.json</code>, students will download it directly as static code—resulting in <strong>zero database queries</strong> and <strong>zero Firestore limit warnings</strong>.

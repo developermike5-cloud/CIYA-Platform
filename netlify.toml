@@ -23,3 +23,11 @@
     X-Frame-Options = ""
     # Allow framing from Netlify, local hosts, and your specific AI Studio preview domains
     Content-Security-Policy = "frame-ancestors 'self' https://ais-pre-skdnreasgm2xhvmncrdpgs-526599491602.europe-west2.run.app https://ais-dev-skdnreasgm2xhvmncrdpgs-526599491602.europe-west2.run.app https://ai.studio https://*.google.com;"
+    # Ensure index.html and other non-hashed assets are not cached
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    # Allow long-term caching for immutable hashed assets
+    Cache-Control = "public, max-age=31536000, immutable"

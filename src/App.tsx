@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from './firebase';
 import Home from './pages/Home';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminLayout from './pages/admin/AdminLayout';
@@ -15,6 +18,7 @@ import NotificationsAdmin from './pages/admin/NotificationsAdmin';
 import PortalLocksAdmin from './pages/admin/PortalLocksAdmin';
 import BlogAdmin from './pages/admin/BlogAdmin';
 import LeaderboardAdmin from './pages/admin/LeaderboardAdmin';
+import BuzzGroupsAdmin from './pages/admin/BuzzGroupsAdmin';
 import Onboarding from './pages/Onboarding';
 import WaitingOnboarding from './pages/WaitingOnboarding';
 import GetStarted from './pages/GetStarted';
@@ -22,10 +26,12 @@ import PastCohortProjects from './pages/PastCohortProjects';
 import { BrandedAlertContainer } from './components/BrandedAlert';
 import { safeStorage } from './utils/safeStorage';
 
-function NavigationTracker() {
+function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const locationRef = useRef(location.pathname);
 
+  // Restore last visited path and handle deep links
   useEffect(() => {
     // Only attempt to restore the last visited path ONCE per browser session (tab)
     let hasRestored = 'false';
@@ -33,48 +39,25 @@ function NavigationTracker() {
       hasRestored = sessionStorage.getItem('ciya_initial_path_restored') || 'false';
     } catch (e) {}
 
-    if (hasRestored === 'true') {
-      return;
-    }
+    if (hasRestored === 'true') return;
     
-    // Mark as restored immediately so it never runs again during this session
+    // Mark as restored immediately
     try {
       sessionStorage.setItem('ciya_initial_path_restored', 'true');
     } catch (e) {}
 
     // ONLY restore if the user initially landed on the root page '/'
     const isRootPath = window.location.pathname === '/' || window.location.pathname === '';
-    if (!isRootPath) {
-      return;
-    }
+    if (!isRootPath) return;
 
     const savedPath = safeStorage.getItem('ciya_last_visited_path');
     const currentPath = window.location.pathname + window.location.search;
     
     if (savedPath && savedPath !== currentPath) {
-      // Loop protection: check if we've recently redirected to this path and got bounced back
-      const lastRedirectTime = safeStorage.getItem('ciya_last_redirect_time');
-      const lastRedirectPath = safeStorage.getItem('ciya_last_redirect_path');
-      const now = Date.now();
-      
-      if (lastRedirectPath === savedPath && lastRedirectTime && (now - parseInt(lastRedirectTime, 10) < 3000)) {
-        console.warn("Redirect loop detected for path:", savedPath, ". Clearing saved path to prevent freezing.");
-        safeStorage.removeItem('ciya_last_visited_path');
-        safeStorage.removeItem('ciya_last_redirect_path');
-        safeStorage.removeItem('ciya_last_redirect_time');
-        return;
-      }
-      
-      // Save redirect attempt details for loop detection
-      safeStorage.setItem('ciya_last_redirect_path', savedPath);
-      safeStorage.setItem('ciya_last_redirect_time', now.toString());
-      
-      // Only restore protected routes if we actually have a cached user session
       const isProtected = savedPath.startsWith('/admin') || savedPath.startsWith('/dashboard');
       const hasCachedUser = safeStorage.getItem('ciya_cached_user');
       
       if (isProtected && !hasCachedUser) {
-        // Do not auto-redirect guest users to protected pages
         safeStorage.removeItem('ciya_last_visited_path');
         return;
       }
@@ -83,32 +66,63 @@ function NavigationTracker() {
     }
   }, [navigate]);
 
+  // Force login for PWA users
+  useEffect(() => {
+    const isRoot = location.pathname === '/';
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    
+    if (isRoot && isPWA) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
+  // Sync last visited path for deep-linking support
   useEffect(() => {
     if (location.pathname) {
       const fullPath = location.pathname + location.search;
       safeStorage.setItem('ciya_last_visited_path', fullPath);
+      locationRef.current = location.pathname;
     }
   }, [location]);
 
-  return null;
-}
+  // Handle system signal for settings sync
+  useEffect(() => {
+    let unsubSignal: (() => void) | null = null;
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (unsubSignal) unsubSignal();
+      if (user) {
+        // Correct path is settings/system_signals to match the rest of the app logic
+        const signalRef = doc(db, 'settings', 'system_signals');
+        unsubSignal = onSnapshot(signalRef, () => {
+          // System signal received - this triggers reactivity in listeners that depend on these timestamps
+        }, (err) => {
+          console.warn("Soft handling system signals listener error in App.tsx:", err);
+        });
+      }
+    });
+    return () => {
+      unsubAuth();
+      if (unsubSignal) unsubSignal();
+    };
+  }, []);
 
-export default function App() {
   return (
-    <BrowserRouter>
-      <NavigationTracker />
+    <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-emerald-500/30">
       <BrandedAlertContainer />
+      
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<StudentDashboard />} />
+        <Route path="/get-started" element={<GetStarted />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/waitingonboarding" element={<WaitingOnboarding />} />
-        <Route path="/get-started" element={<GetStarted />} />
-        <Route path="/dashboard" element={<StudentDashboard />} />
-        <Route path="/past-cohort-projects" element={<PastCohortProjects />} />
-        <Route path="/client-form" element={<ClientKycbForm />} />
+        <Route path="/projects" element={<PastCohortProjects />} />
+        <Route path="/kycb" element={<ClientKycbForm />} />
+
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<CoursesAdmin />} />
           <Route path="advanced-courses" element={<AdvancedCoursesAdmin />} />
+          <Route path="course/:id" element={<CourseEdit />} />
           <Route path="users" element={<UsersAdmin />} />
           <Route path="kycb" element={<AdminKycbQuestionnaire />} />
           <Route path="prompts" element={<PromptsAdmin />} />
@@ -117,10 +131,19 @@ export default function App() {
           <Route path="locks" element={<PortalLocksAdmin />} />
           <Route path="blog" element={<BlogAdmin />} />
           <Route path="leaderboard" element={<LeaderboardAdmin />} />
+          <Route path="groups" element={<BuzzGroupsAdmin />} />
           <Route path="courses/new" element={<CourseEdit />} />
           <Route path="courses/:courseId" element={<CourseEdit />} />
         </Route>
       </Routes>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }

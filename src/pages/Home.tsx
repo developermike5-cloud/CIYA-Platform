@@ -920,7 +920,7 @@ function Footer() {
   );
 }
 
-export default function App() {
+export default function Home() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
   const navigate = useNavigate();

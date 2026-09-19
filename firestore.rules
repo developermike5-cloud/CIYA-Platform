@@ -172,6 +172,38 @@ service cloud.firestore {
         && (data.get('publishedDate', '') is string && data.get('publishedDate', '').size() <= 100);
     }
 
+    // Entity Validation: BuzzGroup
+    function isValidBuzzGroup(data) {
+      return data.keys().hasAll(['name'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && (data.get('description', '') is string && data.get('description', '').size() <= 2000)
+        && (data.get('category', 'general') is string && data.get('category', 'general').size() <= 100)
+        && (data.get('imageUrl', '') is string && data.get('imageUrl', '').size() <= 2000)
+        && (data.get('allowStudentsChat', true) is bool)
+        && (data.get('createdBy', '') is string && data.get('createdBy', '').size() <= 200)
+        && (data.get('lastMessage', '') is string && data.get('lastMessage', '').size() <= 500)
+        && (data.get('lastMessageSender', '') is string && data.get('lastMessageSender', '').size() <= 200)
+        && (data.get('lastMessageTime', 0) is int || data.get('lastMessageTime', 0) is float)
+        && (data.get('createdAt', 0) is int || data.get('createdAt', 0) is float)
+        && (data.get('membersCount', 1) is int || data.get('membersCount', 1) is float);
+    }
+
+    // Entity Validation: BuzzMessage
+    function isValidBuzzMessage(data) {
+      return data.keys().hasAll(['groupId', 'senderUid', 'senderName'])
+        && data.groupId is string && data.groupId.size() > 0 && data.groupId.size() <= 128
+        && data.senderUid is string && data.senderUid.size() > 0 && data.senderUid.size() <= 128
+        && data.senderName is string && data.senderName.size() > 0 && data.senderName.size() <= 200
+        && (data.get('senderEmail', '') is string && data.get('senderEmail', '').size() <= 200)
+        && (data.get('senderPhoto', '') is string && data.get('senderPhoto', '').size() <= 2000)
+        && (data.get('text', '') is string && data.get('text', '').size() <= 10000)
+        && (data.get('mediaUrl', '') is string && data.get('mediaUrl', '').size() <= 2000)
+        && (data.get('mediaType', '') is string && data.get('mediaType', '').size() <= 50)
+        && (data.get('isAdmin', false) is bool)
+        && (data.get('timestamp', 0) is int || data.get('timestamp', 0) is float)
+        && (data.get('reactions', {}) is map);
+    }
+
     // Collections Routes
     match /admins/{adminId} {
       // Only root admin or the user themselves can read their admin record
@@ -306,6 +338,34 @@ service cloud.firestore {
     match /settings/{settingsDoc} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /system_signals/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /buzz_groups/{groupId} {
+      allow read, list: if true;
+      allow create: if (isAdmin() || isBaseAdmin()) && isValidBuzzGroup(incoming());
+      allow update: if (isAdmin() || isBaseAdmin())
+                    || (isSignedIn() && isValidBuzzGroup(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageTime', 'lastMessageSender']));
+      allow delete: if isAdmin() || isBaseAdmin();
+
+      match /messages/{messageId} {
+        allow read, list: if true;
+        allow create: if isSignedIn()
+          && isValidBuzzMessage(incoming())
+          && incoming().senderUid == request.auth.uid
+          && (
+            isAdmin() || isBaseAdmin() ||
+            get(/databases/$(database)/documents/buzz_groups/$(groupId)).data.get('allowStudentsChat', true) == true
+          );
+        allow update: if isSignedIn()
+          && isValidBuzzMessage(incoming())
+          && incoming().diff(existing()).affectedKeys().hasOnly(['reactions']);
+        allow delete: if isAdmin() || isBaseAdmin() || (isSignedIn() && existing().senderUid == request.auth.uid);
+      }
     }
   }
 }

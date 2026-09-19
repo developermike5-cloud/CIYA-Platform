@@ -1706,7 +1706,7 @@ export default function PortalLocksAdmin() {
                   Beginners Course Assignment & Locks Console
                 </h1>
                 <p className="text-xs text-blue-100 opacity-90 leading-relaxed font-semibold max-w-2xl">
-                  Manage lock states, customized automatic assignment grading conditions, year badge acquisitions, and automated scanning trigger timings across all hardcoded beginners courses.
+                  Manage lock states, customized automatic assignment grading conditions, year badge acquisitions, and automated scanning trigger timings across all beginners courses.
                 </p>
               </div>
               <div className="md:text-right shrink-0">

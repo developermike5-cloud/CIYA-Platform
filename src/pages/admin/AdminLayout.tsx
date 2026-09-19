@@ -3,7 +3,6 @@ import { Outlet, Navigate, Link, useLocation, useNavigate } from 'react-router';
 import { auth, db, getActiveDatabaseId, setActiveDatabaseId, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, setGlobalDbConnectionDisabled, safeGetItem, safeSetItem, safeRemoveItem } from '../../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
-import { invalidateCache } from '../../lib/supabase-shim/firestore';
 import { Menu, X, Database, Wifi, WifiOff } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 
@@ -148,7 +147,6 @@ export default function AdminLayout() {
       const cachedCoursesTime = safeGetItem('ciya_cached_courses_time_admin') || '0';
       const serverCoursesTime = String(signalData.courses || '0');
       if (serverCoursesTime !== cachedCoursesTime) {
-        invalidateCache('courses');
         safeSetItem('ciya_cached_courses_time_admin', serverCoursesTime);
       }
 
@@ -156,7 +154,6 @@ export default function AdminLayout() {
       const cachedSettingsTime = safeGetItem('ciya_cached_settings_time_admin') || '0';
       const serverSettingsTime = String(signalData.settings || '0');
       if (serverSettingsTime !== cachedSettingsTime) {
-        invalidateCache('settings');
         safeSetItem('ciya_cached_settings_time_admin', serverSettingsTime);
       }
 
@@ -164,7 +161,6 @@ export default function AdminLayout() {
       const cachedBlogTime = safeGetItem('ciya_cached_blog_time_admin') || '0';
       const serverBlogTime = String(signalData.blog || '0');
       if (serverBlogTime !== cachedBlogTime) {
-        invalidateCache('blog');
         safeSetItem('ciya_cached_blog_time_admin', serverBlogTime);
       }
 
@@ -172,7 +168,6 @@ export default function AdminLayout() {
       const cachedKycbTime = safeGetItem('ciya_cached_kycb_time_admin') || '0';
       const serverKycbTime = String(signalData.kycb_signals || '0');
       if (serverKycbTime !== cachedKycbTime) {
-        invalidateCache('kycb_questionnaires');
         safeSetItem('ciya_cached_kycb_time_admin', serverKycbTime);
       }
 
@@ -187,10 +182,10 @@ export default function AdminLayout() {
         });
       }
       if (maxUserSignalTime !== cachedUserSignalsTime) {
-        invalidateCache('users');
-        invalidateCache('assignments');
         safeSetItem('ciya_cached_user_signals_time_admin', maxUserSignalTime);
       }
+    }, (err) => {
+      console.warn("Soft handling system signals listener error in AdminLayout.tsx:", err);
     });
 
     return () => unsubSignals();
@@ -388,6 +383,14 @@ export default function AdminLayout() {
             className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/blog') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
           >
             📰 CIYA Blog Desk
+          </Link>
+
+          <Link 
+            to="/admin/groups" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/groups') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+          >
+            💬 Student Buzz & Groups
           </Link>
 
           <Link 

@@ -84,3 +84,22 @@ export interface Resource {
   title: string;
   url: string;
 }
+
+export interface UserProfile {
+  id?: string;
+  email?: string;
+  fullName?: string;
+  displayName?: string;
+  cohort?: string;
+  photoURL?: string;
+  avatar?: string;
+  phone?: string;
+  role?: string;
+  progress?: Record<string, any>;
+  registeredCourses?: string[];
+  enrolledCourses?: string[];
+  badgePurchased?: boolean;
+  badgeStatus?: string;
+  kycbCompleted?: boolean;
+  [key: string]: any;
+}

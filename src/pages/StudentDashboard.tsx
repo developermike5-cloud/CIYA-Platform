@@ -1,18 +1,23 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
-import { invalidateCache } from '../lib/supabase-shim/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, safeGetItem } from '../firebase';
 import { ref as dbRef, onValue } from 'firebase/database';
 import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link, useLocation } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../types';
-import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText, Wifi, WifiOff, Award } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText, Wifi, WifiOff, Award, ChevronRight, MoreHorizontal, Smartphone, Download, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 import LoginModal from '../components/LoginModal';
 import SecureYoutubePlayer from '../components/SecureYoutubePlayer';
 import PromptGenerator from '../components/PromptGenerator';
 import { StudentBlog } from '../components/StudentBlog';
+import StudentBuzz from '../components/StudentBuzz';
+import CourseCardSplashModal from '../components/CourseCardSplashModal';
+import BuzzSplashModal from '../components/BuzzSplashModal';
+import TemplateSplashModal from '../components/TemplateSplashModal';
+import RegisteredCoursesSplashModal from '../components/RegisteredCoursesSplashModal';
+import TwoColumnCourseCard from '../components/TwoColumnCourseCard';
 import AdminKycbQuestionnaire from './admin/AdminKycbQuestionnaire';
 import { safeStorage } from '../utils/safeStorage';
 import { supabase, getStoragePublicUrl } from '../lib/supabase';
@@ -24,6 +29,10 @@ import { verifyTimeBasedCode, getPasscodeSecondsLeft } from '../utils/passcode';
 import { FRONTEND_YEAR_BADGE_SETTINGS } from '../constants/badgeSettings';
 import { staticLeaderboardData } from '../utils/leaderboardData';
 import staticAnnouncements from '../data/announcements.json';
+import PWAInstallModal from '../components/PWAInstallModal';
+import { usePWAInstall } from '../hooks/usePWAInstall';
+import { PullToRefresh } from '../components/PullToRefresh';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -649,56 +658,185 @@ function renderClickableLinks(text: string) {
 interface AssignmentProps {
   assignment?: { prompt: string; dueNote: string };
   dayIndex: number;
-  submissions: Record<string, { text: string; link: string; submittedAt: string }>;
-  onSubmit: (key: string, data: { text: string; link: string; submittedAt: string }) => void;
+  submissions: Record<string, any>;
+  onSubmit: (key: string, data: any) => void;
   courseId?: string;
 }
 
-function AssignmentPanel({ assignment, dayIndex, courseId }: AssignmentProps) {
-  const navigate = useNavigate();
+function AssignmentPanel({ assignment, dayIndex, courseId, submissions = {}, onSubmit }: AssignmentProps) {
+  const [submitLink, setSubmitLink] = useState('');
+  const [submitText, setSubmitText] = useState('');
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const existingSub = submissions[`day-${dayIndex}`];
+  const isApproved = existingSub?.status === 'Approved';
+  const isPending = existingSub?.status === 'Pending';
+  const isDisapproved = existingSub?.status === 'Disapproved';
+
+  const handleSubmit = async () => {
+    if (isApproved || isPending) return;
+    if (!submitLink.trim() && !submitText.trim() && uploadedImages.length === 0) {
+      alert("Please provide at least one submission option: link, text, or screenshot.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      if (onSubmit) {
+        await onSubmit(`day-${dayIndex}`, {
+          text: submitText,
+          link: submitLink,
+          images: uploadedImages,
+          submittedAt: new Date().toISOString()
+        });
+        setSubmitLink('');
+        setSubmitText('');
+        setUploadedImages([]);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="bg-white border-2 border-dashed border-teal-600 rounded-3xl p-6 space-y-4 shadow-sm text-left">
-      <div className="flex items-center gap-2.5">
-        <span className="text-2xl">📋</span>
+    <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm text-left animate-fade-in">
+      <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+        <div className="w-10 h-10 bg-teal-50 rounded-full flex items-center justify-center text-teal-600 shrink-0">
+          <FileText className="w-5 h-5" />
+        </div>
         <div>
-          <h4 className="font-black text-slate-800 text-sm">Day {dayIndex + 1} End-of-Day Assignment Question</h4>
+          <h4 className="font-black text-slate-900 text-sm md:text-base">Day {dayIndex + 1} Assignment Portal</h4>
           {assignment?.dueNote && <p className="text-[10px] uppercase font-bold text-amber-600 mt-0.5">{assignment.dueNote}</p>}
         </div>
       </div>
 
-      <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 p-4 rounded-xl leading-relaxed font-semibold whitespace-pre-wrap">
-        {renderClickableLinks(assignment?.prompt || "Execute today's syllabus lessons on your system and log your drafted link below.")}
-      </div>
-
-      {/* Direct Link to Submit */}
-      <div className="pt-2">
-        <button
-          type="button"
-          onClick={() => {
-            const path = `/dashboard?view=assignments${courseId ? `&courseId=${courseId}` : ''}&dayIndex=${dayIndex}`;
-            navigate(path);
-          }}
-          className="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-md transition-all border-0 cursor-pointer text-center"
-        >
-          Submit this Assignment on Submission Desk 📤
-        </button>
-      </div>
-
-      {/* Guidance box on how to submit assignment */}
-      <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 space-y-2.5 text-xs text-indigo-950">
-        <div className="flex items-center gap-2">
-          <span className="text-base">🚀</span>
-          <span className="font-extrabold text-indigo-900 uppercase tracking-wider">How to submit your response:</span>
+      <div className="space-y-4">
+        <div className="bg-slate-50 border border-slate-200 p-5 rounded-2xl space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black uppercase text-slate-500 tracking-wider">Assignment Question</span>
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+          <div className="text-sm text-slate-800 leading-relaxed font-semibold whitespace-pre-wrap">
+            {renderClickableLinks(assignment?.prompt || "Execute today's syllabus lessons on your system and log your drafted link below.")}
+          </div>
         </div>
-        <p className="font-semibold leading-relaxed">
-          Please note that assignment submission is no longer done here. To submit your answer, follow these simple steps:
-        </p>
-        <ol className="list-decimal list-inside space-y-1 font-semibold pl-1">
-          <li>Look at the sidebar navigation on the left (on desktop) or the menu navigation (on mobile).</li>
-          <li>Click on the <strong className="text-teal-800 underline">"My Assignments"</strong> menu option.</li>
-          <li>Select <strong className="text-indigo-900">Day {dayIndex + 1} Assignment</strong> from the dropdown in the Assignment Workspace.</li>
-          <li>Paste your live site link/answers and click <strong className="text-indigo-900">"Submit Assignment Proof"</strong>!</li>
-        </ol>
+
+        {isApproved ? (
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 text-center space-y-3">
+            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+              <CheckCircle className="w-6 h-6" />
+            </div>
+            <h5 className="font-black text-emerald-900">Assignment Approved!</h5>
+            <p className="text-xs text-emerald-700 font-semibold">Your submission for Day {dayIndex + 1} has been reviewed and approved. Clean slate accomplished.</p>
+          </div>
+        ) : isPending ? (
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-6 text-center space-y-3">
+            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto text-amber-600">
+              <Clock className="w-6 h-6 animate-pulse" />
+            </div>
+            <h5 className="font-black text-amber-900">Submission Under Review</h5>
+            <p className="text-xs text-amber-700 font-semibold">Your Day {dayIndex + 1} assignment is currently being reviewed by our technical team. You'll be notified once approved.</p>
+          </div>
+        ) : (
+          <div className="space-y-5 pt-2">
+            {isDisapproved && (
+              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 space-y-1.5">
+                <div className="flex items-center gap-2 text-rose-800 font-black text-[11px] uppercase">
+                  <X className="w-4 h-4" />
+                  <span>Previous Submission Disapproved</span>
+                </div>
+                <p className="text-xs text-rose-700 font-semibold">{existingSub.adminReason || "Your previous submission didn't meet the requirements. Please review and resubmit."}</p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Live URL / Proof Link</label>
+              <input
+                type="url"
+                value={submitLink}
+                onChange={(e) => setSubmitLink(e.target.value)}
+                placeholder="https://your-workspace-link.com"
+                className="w-full bg-slate-50 border border-slate-200 text-slate-950 font-bold rounded-2xl py-3 px-4 text-xs focus:border-teal-500 outline-none transition-all shadow-inner"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Workspace Summary / Notes</label>
+              <textarea
+                value={submitText}
+                onChange={(e) => setSubmitText(e.target.value)}
+                rows={4}
+                placeholder="Describe your progress, findings, or paste your script answers here..."
+                className="w-full bg-slate-50 border border-slate-200 text-slate-950 font-bold rounded-2xl py-3 px-4 text-xs focus:border-teal-500 outline-none transition-all shadow-inner resize-none"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Screenshot Uploads (Optional)</label>
+              <div 
+                onClick={() => !uploadingImage && document.getElementById(`assign-upload-${dayIndex}`)?.click()}
+                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
+                  uploadingImage ? 'bg-slate-100 border-slate-300 animate-pulse' : 'bg-slate-50 border-slate-200 hover:bg-white hover:border-teal-400'
+                }`}
+              >
+                <input
+                  id={`assign-upload-${dayIndex}`}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length === 0) return;
+                    setUploadingImage(true);
+                    try {
+                      for (const file of files) {
+                        const res = await uploadToCloudinary(file, 'assignments', courseId);
+                        if (res?.url) {
+                          setUploadedImages(prev => [...prev, res.url]);
+                        }
+                      }
+                    } catch (err) {
+                      console.error("Upload error:", err);
+                    } finally {
+                      setUploadingImage(false);
+                    }
+                  }}
+                />
+                <Smartphone className={`w-6 h-6 mx-auto mb-2 ${uploadingImage ? 'text-slate-400' : 'text-slate-400'}`} />
+                <p className="text-[11px] font-black text-slate-800">{uploadingImage ? 'Uploading Screenshots...' : 'Tap to Upload Proof Screenshots'}</p>
+                <p className="text-[9px] text-slate-500 font-bold mt-1 uppercase tracking-tight">Support JPEG, PNG up to 3 images</p>
+              </div>
+
+              {uploadedImages.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {uploadedImages.map((url, idx) => (
+                    <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-slate-200">
+                      <img src={url} alt="Proof" className="w-full h-full object-cover" />
+                      <button 
+                        onClick={() => setUploadedImages(prev => prev.filter((_, i) => i !== idx))}
+                        className="absolute top-1 right-1 bg-rose-600 text-white p-1 rounded-full shadow-md border-0 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting || uploadingImage}
+              className={`w-full py-4 rounded-2xl text-white font-black text-xs uppercase tracking-widest transition-all shadow-lg transform active:scale-[0.98] border-0 cursor-pointer ${
+                isSubmitting ? 'bg-slate-400' : 'bg-teal-600 hover:bg-teal-700 shadow-teal-600/20'
+              }`}
+            >
+              {isSubmitting ? 'Disbursing to Academy...' : 'Submit Assignment Proof 🚀'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2608,7 +2746,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 font-sans pb-16">
+    <div className="max-w-4xl mx-auto space-y-6 font-sans pb-16">
       {/* 1. CLASSROOM TOP PORTAL SPECS CARD */}
       <div className="bg-gradient-to-b from-white to-slate-50 border border-slate-200 rounded-3xl p-6 md:p-8 shadow-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6 w-full">
         <div className="flex gap-4 items-center text-left min-w-0 flex-1">
@@ -2671,6 +2809,28 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
           </div>
         </div>
       </div>
+
+      {/* 2. TAB NAVIGATION (Lessons vs Assignments) - Only shown when enrolled and not viewing syllabus */}
+      {effectiveIsEnrolled && !viewingSyllabus && (
+        <div className="flex items-center gap-1 p-1 bg-slate-200/50 rounded-2xl w-full max-w-sm mx-auto shadow-inner">
+          <button
+            onClick={() => updateParams({ assignment: 'false' })}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border-0 cursor-pointer ${
+              !showAssignment ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-300/30'
+            }`}
+          >
+            Classroom Lessons
+          </button>
+          <button
+            onClick={() => updateParams({ assignment: 'true' })}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border-0 cursor-pointer ${
+              showAssignment ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-300/30'
+            }`}
+          >
+            Assignment Portal
+          </button>
+        </div>
+      )}
 
       {viewingSyllabus ? (
         <div className="bg-gradient-to-br from-indigo-50/40 via-purple-50/20 to-slate-100/35 border-2 border-indigo-100/65 rounded-3xl p-6 md:p-8 shadow-md space-y-6 text-left">
@@ -4275,7 +4435,7 @@ export default function StudentDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog'>(() => {
+  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz'>(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
     if (view === 'prompts') return 'prompts';
@@ -4284,8 +4444,15 @@ export default function StudentDashboard() {
     if (view === 'assignments') return 'assignments';
     if (view === 'kycb') return 'kycb';
     if (view === 'blog') return 'blog';
+    if (view === 'buzz') return 'buzz';
     return 'courses';
   });
+
+  const [splashPreviewCourse, setSplashPreviewCourse] = useState<Course | null>(null);
+  const [isCourseCardSplashOpen, setIsCourseCardSplashOpen] = useState(false);
+  const [isRegisteredCoursesSplashOpen, setIsRegisteredCoursesSplashOpen] = useState(false);
+  const [isBuzzSplashOpen, setIsBuzzSplashOpen] = useState(false);
+  const [isTemplateSplashOpen, setIsTemplateSplashOpen] = useState(false);
 
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -4360,6 +4527,8 @@ export default function StudentDashboard() {
       setCurrentView('blog');
     } else if (view === 'notifications') {
       setCurrentView('notifications');
+    } else if (view === 'buzz') {
+      setCurrentView('buzz');
     } else {
       setCurrentView('courses');
     }
@@ -5026,6 +5195,8 @@ export default function StudentDashboard() {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsPopupOpen, setIsNotificationsPopupOpen] = useState(false);
+  const [isPWAInstallModalOpen, setIsPWAInstallModalOpen] = useState(false);
+  const { isInstallable, isInstalled, isIOS, installApp, needRefresh, updateServiceWorker } = usePWAInstall();
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
@@ -5047,7 +5218,7 @@ export default function StudentDashboard() {
   const [activeDurationFilter, setActiveDurationFilter] = useState<'standard' | 'express'>('standard');
   const navigate = useNavigate();
 
-  const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog', cId: string | null = null) => {
+  const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz', cId: string | null = null) => {
     setCurrentView(view);
     setSelectedCourseId(cId);
     setIsMobileMenuOpen(false);
@@ -5800,6 +5971,34 @@ export default function StudentDashboard() {
     });
   }, [courses, registeredCoursesList, isAdmin]);
 
+  // All existing courses on the platform for Explore (registered and unregistered combined, no segregation)
+  const allPlatformCourses = useMemo(() => {
+    if (!courses || courses.length === 0) return [];
+    const firstTitleIndexMap = new Map<string, number>();
+    courses.forEach((c, idx) => {
+      const cTitle = (c.title || '').trim().toLowerCase();
+      if (!firstTitleIndexMap.has(cTitle)) {
+        firstTitleIndexMap.set(cTitle, idx);
+      }
+    });
+
+    return courses.filter((c, idx) => {
+      if (c.isCloned || c.durationMode === 'express') return false;
+      const cTitle = (c.title || '').trim().toLowerCase();
+      return firstTitleIndexMap.get(cTitle) === idx;
+    });
+  }, [courses]);
+
+  const filteredExploreCourses = useMemo(() => {
+    return allPlatformCourses.filter(c => {
+      if (activeSkillFilter !== 'all' && c.skill !== activeSkillFilter) return false;
+      const isAdv = c.tier === 'advanced' || c.tier === 'masterclass' || c.level === 'Advanced' || c.level === 'Masterclass';
+      if (courseLevelFilter === 'beginner' && isAdv) return false;
+      if (courseLevelFilter === 'advanced' && !isAdv) return false;
+      return true;
+    });
+  }, [allPlatformCourses, activeSkillFilter, courseLevelFilter]);
+
   // Apply Skill tags sorting filters (locked courses are visible and carry padlocks)
   const filteredCourses = coursesToSee.filter(c => {
     if (activeSkillFilter !== 'all' && c.skill !== activeSkillFilter) return false;
@@ -6180,29 +6379,15 @@ export default function StudentDashboard() {
     <div className="min-h-screen bg-slate-50 flex font-sans overflow-x-hidden">
       {showCongratsPopup && <FallingFlowers />}
       
-      {/* Mobile Sidebar overlay toggle */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/40 z-45 md:hidden backdrop-blur-sm"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-      
-      {/* Sidebar navigation */}
-      <aside className={`w-64 bg-slate-900 border-r border-slate-800 flex flex-col fixed md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      {/* Desktop Sidebar navigation (hidden on mobile, native bottom nav is used instead) */}
+      <aside className="hidden md:flex md:w-64 bg-slate-900 border-r border-slate-800 flex-col md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-30 shrink-0 overflow-y-auto">
         <div className="p-6 flex flex-col gap-1 relative">
           <Link to="/" className="hover:opacity-85 transition-opacity">
             <BrandingLogo size="sm" />
           </Link>
           <span className="text-[9px] font-black tracking-[0.25em] text-teal-400 uppercase leading-none mt-1 pl-3">
-            Academy Portal
+            CIYA
           </span>
-          <button 
-            className="absolute top-6 right-6 md:hidden text-slate-400 hover:text-white border-0 bg-transparent cursor-pointer"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
         
         <nav className="flex-1 px-4 space-y-1.5 mt-5 text-xs font-bold">
@@ -6329,6 +6514,34 @@ export default function StudentDashboard() {
           )}
         </nav>
 
+        {/* PWA App Install CTA in Desktop Sidebar */}
+        <div className="px-4 pb-2">
+          <button
+            type="button"
+            onClick={needRefresh ? updateServiceWorker : () => setIsPWAInstallModalOpen(true)}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+              needRefresh
+                ? 'bg-amber-600 text-white border-amber-500/30 shadow-lg shadow-amber-900/20'
+                : isInstalled
+                  ? 'bg-slate-800/60 text-emerald-400 border-emerald-500/20 hover:bg-slate-800'
+                  : 'bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-200 border-indigo-500/30 hover:border-indigo-400/50 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Smartphone className={`w-4 h-4 shrink-0 ${needRefresh ? 'text-white' : isInstalled ? 'text-emerald-400' : 'text-indigo-400'}`} />
+              <span className="text-[11px] font-black">
+                {needRefresh ? 'Update Available' : isInstalled ? 'App Installed' : 'Install Desktop App'}
+              </span>
+            </div>
+            {!isInstalled && !needRefresh && (
+              <Download className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            )}
+            {needRefresh && (
+              <RefreshCw className="w-3.5 h-3.5 text-white shrink-0 animate-spin-slow" />
+            )}
+          </button>
+        </div>
+
         <div className="p-4 border-t border-slate-800 mb-2 font-bold text-xs">
           {isGuest ? (
             <button 
@@ -6356,52 +6569,108 @@ export default function StudentDashboard() {
       </aside>
 
       {/* Main Container */}
-      <main className={`flex-1 flex flex-col items-stretch h-screen overflow-hidden transition-all duration-500 ${courseLevelFilter === 'advanced' ? 'bg-gradient-to-br from-purple-100/30 via-indigo-50/40 to-fuchsia-100/20' : 'bg-slate-50/50'}`}>
-        <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 sticky top-0 z-40 shadow-sm">
-          <div className="flex items-center gap-3">
-            <button 
-              className="md:hidden text-slate-500 hover:text-slate-700 cursor-pointer bg-transparent border-0" 
-              onClick={() => setIsMobileMenuOpen(true)}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <h2 className="text-base md:text-lg font-black text-slate-800 tracking-tight">
-              {currentView === 'courses' 
-                ? 'CIYA Learning Arena' 
-                : currentView === 'profile' 
-                  ? 'My Student Profile' 
-                  : currentView === 'notifications'
-                    ? 'Notification Desk'
-                    : currentView === 'assignments'
-                      ? 'My Assignments Workspace'
-                      : currentView === 'kycb'
-                        ? 'KYCB Workspace (Know Your Client & Business)'
-                        : currentView === 'blog'
-                          ? 'CIYA News & Resource Desk'
-                          : 'Prompt Template Lab'}
-            </h2>
+      <main className={`flex-1 flex flex-col items-stretch overflow-hidden transition-all duration-500 relative ${courseLevelFilter === 'advanced' ? 'bg-gradient-to-br from-purple-100/30 via-indigo-50/40 to-fuchsia-100/20' : 'bg-slate-50/50'}`}>
+        <PullToRefresh onRefresh={async () => window.location.reload()}>
+        {/* Responsive Header: Traditional Blue Native Bar matching sidebar branding */}
+        <header className="h-14 md:h-20 bg-slate-900 border-b border-slate-800 text-white flex items-center justify-between px-3.5 sm:px-6 shrink-0 sticky top-0 z-40 shadow-md">
+          {/* Mobile view branding (Left) */}
+          <div className="flex md:hidden items-center min-w-0 z-10">
+            <Link to="/" className="hover:opacity-85 transition-opacity shrink-0 flex items-center">
+              <BrandingLogo size="xs" />
+            </Link>
           </div>
-          <div className="flex items-center gap-4">
+
+          {/* Centered Title (Mobile & Desktop) */}
+          <div className="absolute inset-x-0 flex flex-col items-center justify-center pointer-events-none md:pointer-events-auto">
+            {/* Mobile View Title */}
+            <div className="flex md:hidden flex-col items-center">
+              <span className="text-[12px] font-black uppercase text-emerald-400 tracking-[0.15em] block leading-none mb-0.5 drop-shadow-sm">
+                {courseLevelFilter === 'advanced' ? 'Advanced' : 'CIYA'}
+              </span>
+              <h2 className="text-[8px] font-bold text-white/50 tracking-wider truncate leading-tight uppercase">
+                {currentView === 'courses' 
+                  ? 'Learning' 
+                  : currentView === 'buzz'
+                    ? 'Buzz'
+                    : currentView === 'profile' 
+                      ? 'Profile' 
+                      : currentView === 'notifications'
+                        ? 'Alerts'
+                        : currentView === 'assignments'
+                          ? 'Tasks'
+                          : currentView === 'kycb'
+                            ? 'KYCB'
+                            : currentView === 'blog'
+                              ? 'News'
+                              : 'Lab'}
+              </h2>
+            </div>
+
+            {/* Desktop View Title (Centered) */}
+            <div className="hidden md:flex items-center gap-3">
+              <h2 className="text-base md:text-lg font-black text-white tracking-tight">
+                {currentView === 'courses' 
+                  ? 'CIYA Learning Arena' 
+                  : currentView === 'buzz'
+                    ? 'CIYA Buzz Community & News'
+                    : currentView === 'profile' 
+                      ? 'My Student Profile' 
+                      : currentView === 'notifications'
+                        ? 'Notification Desk'
+                        : currentView === 'assignments'
+                          ? 'My Assignments Workspace'
+                          : currentView === 'kycb'
+                            ? 'KYCB Workspace (Know Your Client & Business)'
+                            : currentView === 'blog'
+                              ? 'CIYA News & Resource Desk'
+                              : 'Prompt Template Lab'}
+              </h2>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 md:gap-3 z-10">
+            {(!isInstalled || needRefresh) && (
+              <button
+                type="button"
+                onClick={needRefresh ? updateServiceWorker : () => setIsPWAInstallModalOpen(true)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-black border cursor-pointer transition-colors shadow-2xs ${
+                  needRefresh 
+                    ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30' 
+                    : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30'
+                }`}
+                title={needRefresh ? "Update Available - Click to Update" : "Install CIYA App on your device"}
+              >
+                {needRefresh ? (
+                  <RefreshCw className="w-3.5 h-3.5 shrink-0 text-amber-400 animate-spin-slow" />
+                ) : (
+                  <Smartphone className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                )}
+                <span className="hidden sm:inline">
+                  {needRefresh ? 'Update Available' : 'Install App'}
+                </span>
+              </button>
+            )}
             {!dbNetworkEnabled && (
-              <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-1 text-amber-700 animate-pulse" title="Database Offline (All changes are kept in local storage)">
-                <WifiOff className="w-3.5 h-3.5 shrink-0" />
-                <span className="text-[9px] font-black tracking-wider uppercase hidden sm:inline">Cache Mode</span>
+              <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/25 rounded-lg px-2 py-0.5 text-amber-300 animate-pulse" title="Database Offline (All changes are kept in local storage)">
+                <WifiOff className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0" />
+                <span className="text-[8px] md:text-[9px] font-black tracking-wider uppercase">Offline</span>
               </div>
             )}
+            
             {!isGuest && (
               <div className="relative z-50">
                 <button 
                   onClick={() => setIsNotificationsPopupOpen(!isNotificationsPopupOpen)}
-                  className={`p-2.5 rounded-full cursor-pointer transition-all relative border-0 flex items-center justify-center outline-none ${
+                  className={`p-2 md:p-2.5 rounded-full cursor-pointer transition-all relative border-0 flex items-center justify-center outline-none ${
                     isNotificationsPopupOpen || currentView === 'notifications' 
-                      ? 'bg-amber-50 text-amber-600 ring-2 ring-amber-500/20' 
-                      : 'text-slate-500 bg-slate-50 hover:bg-slate-100 hover:text-slate-700'
+                      ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400' 
+                      : 'text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white'
                   }`}
                   title="View Alerts & Notifications"
                 >
-                  <Bell className="w-4.5 h-4.5" />
+                  <Bell className="w-4 h-4 md:w-4.5 md:h-4.5" />
                   {unreadNotificationsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[8px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center ring-2 ring-white">
+                    <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-[8px] font-black w-4 h-4 md:w-4.5 md:h-4.5 rounded-full flex items-center justify-center ring-2 ring-slate-900">
                       {unreadNotificationsCount}
                     </span>
                   )}
@@ -6416,7 +6685,7 @@ export default function StudentDashboard() {
                     />
                     
                     {/* Pop-up dropdown */}
-                    <div className="absolute right-[-70px] xs:right-[-64px] sm:right-0 mt-2.5 w-[280px] xs:w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 py-3.5 z-[101] text-left font-sans">
+                    <div className="absolute right-[-40px] xs:right-[-20px] sm:right-0 mt-2.5 w-[280px] xs:w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 py-3.5 z-[101] text-left font-sans">
                       <div className="px-4 pb-2.5 border-b border-slate-100 flex items-center justify-between">
                         <span className="font-extrabold text-slate-800 text-sm">Notifications</span>
                         {unreadNotificationsCount > 0 && (
@@ -6476,28 +6745,46 @@ export default function StudentDashboard() {
                 )}
               </div>
             )}
-             {isGuest ? (
-               <button 
-                 onClick={handleLogin} 
-                 className="text-xs font-black text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 px-5 py-2.5 rounded-full border-none cursor-pointer flex items-center gap-1.5 transition-colors"
-               >
-                 <UserIcon className="w-3.5 h-3.5" />
-                 Sign In
-               </button>
-             ) : (
-               <button 
-                 onClick={handleLogout} 
-                 className="text-xs font-bold text-slate-500 hover:text-slate-800 border-0 bg-transparent cursor-pointer"
-               >
-                 Sign out
-               </button>
-             )}
+
+            {/* Desktop Auth Controls */}
+            <div className="hidden md:block">
+              {isGuest ? (
+                <button 
+                  onClick={handleLogin} 
+                  className="text-xs font-black text-emerald-300 hover:text-white bg-emerald-500/20 hover:bg-emerald-500/30 px-5 py-2.5 rounded-full border border-emerald-500/30 cursor-pointer flex items-center gap-1.5 transition-colors"
+                >
+                  <UserIcon className="w-3.5 h-3.5" />
+                  Sign In
+                </button>
+              ) : (
+                <button 
+                  onClick={handleLogout} 
+                  className="text-xs font-bold text-slate-400 hover:text-white border-0 bg-transparent cursor-pointer"
+                >
+                  Sign out
+                </button>
+              )}
+            </div>
           </div>
         </header>
         
         {/* Core content scroll container */}
-        <div className="flex-1 overflow-auto p-3 sm:p-6 md:p-8">
-          {currentView === 'blog' ? (
+        <div className="flex-1 p-3 sm:p-6 md:p-8 pb-28 md:pb-8 relative">
+          <motion.div
+            key={currentView}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="w-full"
+          >
+          {currentView === 'buzz' ? (
+            <StudentBuzz
+              currentUser={currentUser}
+              userProfile={userProfile}
+              isAdmin={isAdmin}
+              onLoginRequest={handleLogin}
+            />
+          ) : currentView === 'blog' ? (
             <StudentBlog isLocked={!isAdmin && appSettings?.lockedSections?.blog} />
           ) : currentView === 'kycb' ? (
             (!isAdmin && appSettings?.lockedSections?.kycb) ? (
@@ -6681,98 +6968,7 @@ export default function StudentDashboard() {
                   )}
                 </div>
 
-                {/* CARD 2: REGISTERED COURSES & ACTIVE LEARNING */}
-                <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800">
-                  <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
-                    <div className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 shrink-0">
-                      <BookOpen className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Registered Courses & Active Learning</h3>
-                      <p className="text-xs text-slate-500 font-medium">All course pathways you have registered for and are actively pursuing.</p>
-                    </div>
-                  </div>
-
-                  {registeredCoursesList && registeredCoursesList.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {registeredCoursesList.map((course, idx) => {
-                        const courseId = course.id || '';
-                        const isSelected = selectedCourseId === courseId || (!selectedCourseId && idx === 0);
-                        const progressObj = userProfile.progress?.[courseId] || {};
-                        const completedCount = progressObj.completedVideos ? Object.keys(progressObj.completedVideos).length : 0;
-                        const totalLessons = course.days ? course.days.reduce((acc: number, d: any) => acc + (d.videos?.length || 0), 0) : 0;
-                        const pct = totalLessons > 0 ? Math.min(100, Math.round((completedCount / totalLessons) * 100)) : 0;
-                        const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced';
-
-                        return (
-                          <div 
-                            key={courseId}
-                            className={`p-5 rounded-2xl border transition-all text-left flex flex-col justify-between gap-4 ${
-                              isSelected 
-                                ? 'border-teal-500 bg-teal-50/20 shadow-sm ring-1 ring-teal-500/30' 
-                                : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
-                            }`}
-                          >
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${
-                                  isAdv ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-slate-200 text-slate-700'
-                                }`}>
-                                  {isAdv ? 'Advanced Course' : "Beginner's Course"}
-                                </span>
-                                
-                                {isSelected && (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[9px] font-black uppercase tracking-wider animate-pulse">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Actively Studying
-                                  </span>
-                                )}
-                              </div>
-
-                              <h4 className="font-extrabold text-sm text-slate-900 leading-snug">{course.title}</h4>
-                              <p className="text-xs text-slate-500 line-clamp-2">{course.subtitle || course.description}</p>
-                            </div>
-
-                            <div className="space-y-3 pt-2 border-t border-slate-200/60">
-                              <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
-                                <span>Progress ({pct}%)</span>
-                                <span>{completedCount}/{totalLessons} Lessons</span>
-                              </div>
-                              <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-teal-600 rounded-full transition-all duration-500" style={{ width: `${pct}%` }}></div>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedCourseId(courseId);
-                                  setCurrentView('courses');
-                                }}
-                                className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all shadow-sm flex items-center justify-center gap-1.5"
-                              >
-                                Study Course →
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl space-y-3">
-                      <span className="text-3xl block">📚</span>
-                      <h4 className="font-black text-slate-800 text-sm uppercase">No Registered Courses Found</h4>
-                      <p className="text-xs text-slate-500 max-w-sm mx-auto">You haven't registered for any course pathway yet. Explore our curriculum to get started!</p>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView('courses')}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase rounded-xl cursor-pointer transition-all"
-                      >
-                        Browse Available Courses
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* CARD 3: CIYA PRO MEMBERSHIP & OFFICIAL BADGE */}
+                {/* CARD 2: CIYA PRO MEMBERSHIP & OFFICIAL BADGE */}
                 <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800">
                   <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
                     <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
@@ -7496,7 +7692,7 @@ export default function StudentDashboard() {
                           <div className="pt-6 border-t border-slate-100 space-y-3.5 text-left">
                             <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Your Submitted Checkpoints</h4>
                             <div className="space-y-2">
-                              {filteredMySubs.sort((a,b) => b.dayIndex - a.dayIndex).map((sub, sIdx) => (
+                              {filteredMySubs.sort((a,b) => b.dayIndex - a.dayIndex).slice(0, 3).map((sub, sIdx) => (
                                 <div key={sub.id || sIdx} className="bg-slate-50 border p-3.5 rounded-2xl flex justify-between items-center gap-4 text-xs font-bold">
                                   <div className="space-y-0.5 min-w-0">
                                     <span className="bg-slate-205 text-slate-700 font-extrabold px-1.5 py-0.5 rounded text-[8px] uppercase">
@@ -7682,291 +7878,237 @@ export default function StudentDashboard() {
                         <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto font-semibold">Assigned active course tracks to your student profile will reveal here shortly.</p>
                       </div>
                     ) : (
-                      <div className="space-y-12">
-                        {/* SECTION 1: REGISTERED/ENROLLED COURSES OR LEADERBOARD */}
-                        {!isGuest ? (
-                          <div className="space-y-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 gap-3">
-                              <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2">
-                                <span>🎓</span> My Registered Course
-                              </h3>
+                      <div className="space-y-6">
+                        {/* Explore Courses Header & Cohort Leaderboard Switcher */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/80 pb-3 gap-3">
+                          <div className="text-left">
+                            <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2">
+                              <span>🧭</span> Explore Courses Catalog
+                            </h3>
+                            <p className="text-xs text-slate-500 font-semibold">
+                              Browse all CIYA training tracks · Tap any course card to enter classroom
+                            </p>
+                          </div>
 
-                              {/* Toggle Button to Switch View Between Enrolled Courses and Leaderboard */}
-                              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200/80 shrink-0">
+                          {/* Toggle View Between All Courses and Leaderboard */}
+                          {(() => {
+                            const studentCohort = userProfile?.cohort || 'Cohort 3';
+                            const isCohort1Or2 = studentCohort === 'Cohort 1' || studentCohort === 'Cohort 2';
+                            const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 3'];
+                            const isLeaderboardAllowed = !isCohort1Or2 && allowedCohorts.includes(studentCohort) && !isGuest;
+
+                            return (
+                              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200/80 shrink-0 self-start sm:self-auto">
                                 <button
                                   type="button"
                                   onClick={() => setCoursesViewTab('courses')}
-                                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer ${
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer ${
                                     coursesViewTab === 'courses'
                                       ? 'bg-white text-slate-900 shadow-xs border border-slate-200/80'
                                       : 'text-slate-500 hover:text-slate-900'
                                   }`}
                                 >
-                                  📚 Enrolled Courses ({filteredRegisteredCourses.length})
+                                  🧭 All Courses ({filteredCourses.length})
                                 </button>
 
-                              {/* Cohort Leaderboard button: Completely hidden for Cohort 1 & Cohort 2, and disallowed cohorts */}
-                              {(() => {
-                                const studentCohort = userProfile?.cohort || 'Cohort 3';
-                                const isCohort1Or2 = studentCohort === 'Cohort 1' || studentCohort === 'Cohort 2';
-                                const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 3'];
-                                const isLeaderboardAllowed = !isCohort1Or2 && allowedCohorts.includes(studentCohort);
-
-                                if (!isLeaderboardAllowed) return null;
-
-                                return (
+                                {isLeaderboardAllowed && (
                                   <button
                                     type="button"
                                     onClick={() => setCoursesViewTab('leaderboard')}
-                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
                                       coursesViewTab === 'leaderboard'
                                         ? 'bg-amber-500 text-slate-950 shadow-xs border border-amber-400 font-extrabold'
                                         : 'text-slate-600 hover:text-amber-800'
                                     }`}
                                   >
-                                    <span>🏆</span> Cohort Leaderboard
+                                    <span>🏆</span> Leaderboard
                                   </button>
-                                );
-                              })()}
+                                )}
                               </div>
-                            </div>
+                            );
+                          })()}
+                        </div>
 
-                            {/* View 1: Registered Courses */}
-                            {coursesViewTab === 'courses' && (
-                              filteredRegisteredCourses.length === 0 ? (
-                                <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
-                                  No enrolled courses in this track.
-                                </div>
-                              ) : (
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                                  {filteredRegisteredCourses.map(course => (
-                                    <CourseCard 
-                                      key={course.id} 
-                                      course={course} 
-                                      userProfile={userProfile}
-                                      isEnrolled={true}
-                                      isLocked={false} 
-                                      onSelect={() => {
-                                        handleSelectCourseId(course.id || null);
-                                      }} 
-                                      currentUser={currentUser}
-                                      appSettings={appSettings}
-                                      onCourseUnlocked={handleCourseUnlocked}
-                                    />
-                                  ))}
-                                </div>
-                              )
-                            )}
-
-                            {/* View 2: Static Cohort Leaderboard Widget (Cohort 1 & 2 destroyed/hidden, Cohort 3 loads strictly static JSON) */}
-                            {coursesViewTab === 'leaderboard' && (() => {
-                              const studentCohort = userProfile?.cohort || 'Cohort 3';
-                              const isCohort1Or2 = studentCohort === 'Cohort 1' || studentCohort === 'Cohort 2';
-                              const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 3'];
-                              const isLeaderboardAllowed = !isCohort1Or2 && allowedCohorts.includes(studentCohort);
-
-                              if (!isLeaderboardAllowed) {
-                                return (
-                                  <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500 max-w-xl mx-auto">
-                                    The leaderboard feature is not active for your cohort.
-                                  </div>
-                                );
-                              }
-
-                              const activeCohort = selectedLeaderboardCohort || (studentCohort !== 'Cohort 1' && studentCohort !== 'Cohort 2' ? studentCohort : 'Cohort 3');
-                              const staticCohortEntries = staticLeaderboardData[activeCohort] || staticLeaderboardData['Cohort 3'] || [];
-
-                              return (
-                                <div className="mt-2 bg-white border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-sm max-w-5xl mx-auto space-y-6 text-left font-sans">
-                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 border-slate-100">
-                                    <div className="space-y-1">
-                                      <h4 className="text-base font-black uppercase text-slate-900 flex items-center gap-2">
-                                        <Award className="w-5 h-5 text-amber-500" />
-                                        🏆 {activeCohort} Official Leaderboard Standings
-                                      </h4>
-                                      <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-                                        Official student standings updated periodically by CIYA academy admin.
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  {staticCohortEntries.length === 0 ? (
-                                    <div className="text-center py-10 bg-slate-50 border border-slate-200/60 rounded-2xl p-6">
-                                      <span className="text-3xl block mb-2 select-none">📊</span>
-                                      <h5 className="text-xs font-black text-slate-700 uppercase tracking-wide">No Rankings Available for {activeCohort}</h5>
-                                      <p className="text-[11px] text-slate-500 font-semibold mt-1">Official standings will be posted here as training progresses.</p>
-                                    </div>
-                                  ) : (
-                                    <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white">
-                                      <table className="w-full text-left border-collapse">
-                                        <thead>
-                                          <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                                            <th className="py-3 px-3 text-center w-20">Rank</th>
-                                            <th className="py-3 px-4">Student</th>
-                                            <th className="py-3 px-3 text-center">Lessons</th>
-                                            <th className="py-3 px-3 text-center">Quizzes</th>
-                                            <th className="py-3 px-4 text-right">Total Score</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                          {staticCohortEntries.map((entry, idx) => {
-                                            const isMe = entry.email?.toLowerCase() === currentUser?.email?.toLowerCase();
-                                            const rankNum = entry.rank || idx + 1;
-                                            const isTop1 = rankNum === 1;
-                                            const isTop2 = rankNum === 2;
-                                            const isTop3 = rankNum === 3;
-
-                                            return (
-                                              <tr 
-                                                key={entry.email || idx}
-                                                className={`transition-colors ${
-                                                  isMe 
-                                                    ? 'bg-indigo-50/80 font-bold' 
-                                                    : isTop1
-                                                      ? 'bg-amber-50/40 hover:bg-amber-50/60'
-                                                      : isTop2
-                                                        ? 'bg-slate-50/60 hover:bg-slate-100/60'
-                                                        : isTop3
-                                                          ? 'bg-orange-50/40 hover:bg-orange-50/60'
-                                                          : 'hover:bg-slate-50/50'
-                                                }`}
-                                              >
-                                                <td className="py-3.5 px-3 text-center shrink-0">
-                                                  {isTop1 && (
-                                                    <span className="inline-flex items-center gap-1 bg-amber-100 border border-amber-300 text-amber-900 font-black text-[11px] px-2.5 py-1 rounded-full uppercase shadow-xs">
-                                                      🥇 1st
-                                                    </span>
-                                                  )}
-                                                  {isTop2 && (
-                                                    <span className="inline-flex items-center gap-1 bg-slate-200 border border-slate-300 text-slate-900 font-black text-[11px] px-2.5 py-1 rounded-full uppercase shadow-xs">
-                                                      🥈 2nd
-                                                    </span>
-                                                  )}
-                                                  {isTop3 && (
-                                                    <span className="inline-flex items-center gap-1 bg-orange-100 border border-orange-300 text-orange-900 font-black text-[11px] px-2.5 py-1 rounded-full uppercase shadow-xs">
-                                                      🥉 3rd
-                                                    </span>
-                                                  )}
-                                                  {!isTop1 && !isTop2 && !isTop3 && (
-                                                    <span className="font-mono text-xs font-bold text-slate-400">
-                                                      #{rankNum}
-                                                    </span>
-                                                  )}
-                                                </td>
-
-                                                <td className="py-3.5 px-4">
-                                                  <div>
-                                                    <div className="text-xs font-black uppercase text-slate-900 flex items-center gap-1.5">
-                                                      <span>{entry.fullName}</span>
-                                                      {isMe && (
-                                                        <span className="text-[9px] bg-indigo-600 text-white font-black px-1.5 py-0.5 rounded-full uppercase">
-                                                          You
-                                                        </span>
-                                                      )}
-                                                    </div>
-                                                    {entry.email && (
-                                                      <p className="text-[10px] text-slate-400 font-mono leading-none mt-0.5">
-                                                        {entry.email}
-                                                      </p>
-                                                    )}
-                                                  </div>
-                                                </td>
-
-                                                <td className="py-3.5 px-3 text-center">
-                                                  <span className="text-[11px] font-black text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200/60">
-                                                    {entry.lessonsCompleted} Lessons
-                                                  </span>
-                                                </td>
-
-                                                <td className="py-3.5 px-3 text-center">
-                                                  <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-lg">
-                                                    ✓ {entry.quizzesPassed} Quizzes
-                                                  </span>
-                                                </td>
-
-                                                <td className="py-3.5 px-4 text-right font-mono">
-                                                  <span className="text-xs font-black text-indigo-600">
-                                                    {entry.score.toLocaleString()} pts
-                                                  </span>
-                                                </td>
-                                              </tr>
-                                            );
-                                          })}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        ) : (
-                          /* Guest Viewer */
-                          <div className="space-y-4">
-                            <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2 border-b pb-2">
-                              <span>🎓</span> CIYA Premium Academy Courses
-                            </h3>
+                        {/* View 1: 2-Column Responsive Course Cards Grid */}
+                        {coursesViewTab === 'courses' && (
+                          <div className="space-y-6">
                             {filteredCourses.length === 0 ? (
                               <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
                                 No courses available in this track.
                               </div>
                             ) : (
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                                {filteredCourses.map(course => (
-                                  <CourseCard 
-                                    key={course.id} 
-                                    course={course} 
-                                    userProfile={userProfile}
-                                    isEnrolled={false}
-                                    isLocked={true} 
-                                    onSelect={() => {
-                                      alert("Please Sign In with Google to unlock full access to mini-videos, daily study materials, quizzes, live assignments and certificate tracking!");
-                                      handleLogin();
-                                    }} 
-                                    currentUser={currentUser}
-                                    appSettings={appSettings}
-                                    onCourseUnlocked={handleCourseUnlocked}
-                                  />
-                                ))}
+                              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6">
+                                {filteredCourses.map(course => {
+                                  const isEnrolled = isAdmin || (!isCourseAccessRevoked(userProfile, course) && (!!(userProfile?.progress && userProfile.progress[course.id] && userProfile.progress[course.id].accessStatus !== 'revoked') || isProfileRegisteredForCourse(userProfile, course)));
+                                  return (
+                                    <TwoColumnCourseCard
+                                      key={course.id}
+                                      course={course}
+                                      userProfile={userProfile}
+                                      isEnrolled={isEnrolled}
+                                      onSelect={() => {
+                                        if (isGuest) {
+                                          alert("Please Sign In with Google to unlock full access to mini-videos, daily study materials, quizzes, live assignments and certificate tracking!");
+                                          handleLogin();
+                                          return;
+                                        }
+                                        setSplashPreviewCourse(course);
+                                        setIsCourseCardSplashOpen(true);
+                                      }}
+                                    />
+                                  );
+                                })}
                               </div>
                             )}
+
+                            {/* CAROUSEL ANNOUNCEMENTS BANNER CARD */}
+                            <div className="pt-2">
+                              <AnnouncementCarouselCard onNavigateTab={(tab) => { if (tab === 'courses' || tab === 'leaderboard') setCoursesViewTab(tab); }} />
+                            </div>
                           </div>
                         )}
 
-                        {/* CAROUSEL ANNOUNCEMENTS BANNER CARD (Placed under registered courses before un-registered courses) */}
-                        <AnnouncementCarouselCard onNavigateTab={(tab) => { if (tab === 'courses' || tab === 'leaderboard') setCoursesViewTab(tab); }} />
+                        {/* View 2: Static Cohort Leaderboard Widget */}
+                        {coursesViewTab === 'leaderboard' && (() => {
+                          const studentCohort = userProfile?.cohort || 'Cohort 3';
+                          const isCohort1Or2 = studentCohort === 'Cohort 1' || studentCohort === 'Cohort 2';
+                          const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 3'];
+                          const isLeaderboardAllowed = !isCohort1Or2 && allowedCohorts.includes(studentCohort);
 
-                        {/* SECTION 2: OTHER AVAILABLE COURSES (NOT ENROLLED) - Only show when viewing 'courses' tab */}
-                        {!isAdmin && !isGuest && coursesViewTab === 'courses' && (
-                          <div className="space-y-4">
-                            <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2 border-b pb-2">
-                              <span>🌐</span> Other Courses (Not Enrolled)
-                            </h3>
-                            {filteredOtherCourses.length === 0 ? (
-                              <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
-                                No other courses available in this track.
+                          if (!isLeaderboardAllowed) {
+                            return (
+                              <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500 max-w-xl mx-auto">
+                                The leaderboard feature is not active for your cohort.
                               </div>
-                            ) : (
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                                {filteredOtherCourses.map(course => (
-                                  <CourseCard 
-                                    key={course.id} 
-                                    course={course} 
-                                    userProfile={userProfile}
-                                    isEnrolled={false}
-                                    isLocked={false} 
-                                    onSelect={() => {
-                                      handleSelectCourseId(course.id || null);
-                                    }} 
-                                    currentUser={currentUser}
-                                    appSettings={appSettings}
-                                    onCourseUnlocked={handleCourseUnlocked}
-                                  />
-                                ))}
+                            );
+                          }
+
+                          const activeCohort = selectedLeaderboardCohort || (studentCohort !== 'Cohort 1' && studentCohort !== 'Cohort 2' ? studentCohort : 'Cohort 3');
+                          const staticCohortEntries = staticLeaderboardData[activeCohort] || staticLeaderboardData['Cohort 3'] || [];
+
+                          return (
+                            <div className="mt-2 bg-white border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-sm max-w-5xl mx-auto space-y-6 text-left font-sans">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 border-slate-100">
+                                <div className="space-y-1">
+                                  <h4 className="text-base font-black uppercase text-slate-900 flex items-center gap-2">
+                                    <Award className="w-5 h-5 text-amber-500" />
+                                    🏆 {activeCohort} Official Leaderboard Standings
+                                  </h4>
+                                  <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                                    Official student standings updated periodically by CIYA academy admin.
+                                  </p>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        )}
+
+                              {staticCohortEntries.length === 0 ? (
+                                <div className="text-center py-10 bg-slate-50 border border-slate-200/60 rounded-2xl p-6">
+                                  <span className="text-3xl block mb-2 select-none">📊</span>
+                                  <h5 className="text-xs font-black text-slate-700 uppercase tracking-wide">No Rankings Available for {activeCohort}</h5>
+                                  <p className="text-[11px] text-slate-500 font-semibold mt-1">Official standings will be posted here as training progresses.</p>
+                                </div>
+                              ) : (
+                                <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white">
+                                  <table className="w-full text-left border-collapse">
+                                    <thead>
+                                      <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                                        <th className="py-3 px-3 text-center w-20">Rank</th>
+                                        <th className="py-3 px-4">Student</th>
+                                        <th className="py-3 px-3 text-center">Lessons</th>
+                                        <th className="py-3 px-3 text-center">Quizzes</th>
+                                        <th className="py-3 px-4 text-right">Total Score</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      {staticCohortEntries.map((entry, idx) => {
+                                        const isMe = entry.email?.toLowerCase() === currentUser?.email?.toLowerCase();
+                                        const rankNum = entry.rank || idx + 1;
+                                        const isTop1 = rankNum === 1;
+                                        const isTop2 = rankNum === 2;
+                                        const isTop3 = rankNum === 3;
+
+                                        return (
+                                          <tr 
+                                            key={entry.email || idx}
+                                            className={`transition-colors ${
+                                              isMe 
+                                                ? 'bg-indigo-50/80 font-bold' 
+                                                : isTop1
+                                                  ? 'bg-amber-50/40 hover:bg-amber-50/60'
+                                                  : isTop2
+                                                    ? 'bg-slate-50/60 hover:bg-slate-100/60'
+                                                    : isTop3
+                                                      ? 'bg-orange-50/40 hover:bg-orange-50/60'
+                                                      : 'hover:bg-slate-50/50'
+                                            }`}
+                                          >
+                                            <td className="py-3.5 px-3 text-center shrink-0">
+                                              {isTop1 && (
+                                                <span className="inline-flex items-center gap-1 bg-amber-100 border border-amber-300 text-amber-900 font-black text-[11px] px-2.5 py-1 rounded-full uppercase shadow-xs">
+                                                  🥇 1st
+                                                </span>
+                                              )}
+                                              {isTop2 && (
+                                                <span className="inline-flex items-center gap-1 bg-slate-200 border border-slate-300 text-slate-900 font-black text-[11px] px-2.5 py-1 rounded-full uppercase shadow-xs">
+                                                  🥈 2nd
+                                                </span>
+                                              )}
+                                              {isTop3 && (
+                                                <span className="inline-flex items-center gap-1 bg-orange-100 border border-orange-300 text-orange-900 font-black text-[11px] px-2.5 py-1 rounded-full uppercase shadow-xs">
+                                                  🥉 3rd
+                                                </span>
+                                              )}
+                                              {!isTop1 && !isTop2 && !isTop3 && (
+                                                <span className="font-mono text-xs font-bold text-slate-400">
+                                                  #{rankNum}
+                                                </span>
+                                              )}
+                                            </td>
+
+                                            <td className="py-3.5 px-4">
+                                              <div>
+                                                <div className="text-xs font-black uppercase text-slate-900 flex items-center gap-1.5">
+                                                  <span>{entry.fullName}</span>
+                                                  {isMe && (
+                                                    <span className="text-[9px] bg-indigo-600 text-white font-black px-1.5 py-0.5 rounded-full uppercase">
+                                                      You
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                {entry.email && (
+                                                  <p className="text-[10px] text-slate-400 font-mono leading-none mt-0.5">
+                                                    {entry.email}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </td>
+
+                                            <td className="py-3.5 px-3 text-center">
+                                              <span className="text-[11px] font-black text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200/60">
+                                                {entry.lessonsCompleted} Lessons
+                                              </span>
+                                            </td>
+
+                                            <td className="py-3.5 px-3 text-center">
+                                              <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-lg">
+                                                ✓ {entry.quizzesPassed} Quizzes
+                                              </span>
+                                            </td>
+
+                                            <td className="py-3.5 px-4 text-right font-mono">
+                                              <span className="text-xs font-black text-indigo-600">
+                                                {entry.score.toLocaleString()} pts
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -7977,8 +8119,504 @@ export default function StudentDashboard() {
               )}
             </>
           )}
+          </motion.div>
         </div>
+        </PullToRefresh>
       </main>
+
+      {/* Mobile Native App Bottom Navigation Bar */}
+      <nav 
+        className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] px-2 pt-1 pb-[max(env(safe-area-inset-bottom),10px)] select-none transition-all duration-300"
+        aria-label="Mobile Navigation"
+      >
+        <div className="grid grid-cols-5 items-center max-w-lg mx-auto relative">
+          {/* 1. Explore (Directly shows dashboard catalog; clicking course opens splash card) */}
+          {(() => {
+            const isCourseRegistered = Boolean(
+              selectedCourseId &&
+              (isAdmin || registeredCoursesList.some(r => r.id === selectedCourseId) || (userProfile?.progress && userProfile.progress[selectedCourseId] && userProfile.progress[selectedCourseId].accessStatus !== 'revoked'))
+            );
+            const isClassroomActive = Boolean(
+              currentView === 'courses' &&
+              selectedCourseId &&
+              isCourseRegistered &&
+              new URLSearchParams(location.search).get('syllabus') === 'false'
+            );
+            const isActive = currentView === 'courses' && !isClassroomActive && !isRegisteredCoursesSplashOpen && !isBuzzSplashOpen && !isTemplateSplashOpen && !isMobileMenuOpen;
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRegisteredCoursesSplashOpen(false);
+                  setIsBuzzSplashOpen(false);
+                  setIsTemplateSplashOpen(false);
+                  setIsMobileMenuOpen(false);
+                  setIsCourseCardSplashOpen(false);
+                  handleSelectCourseId(null);
+                  setCurrentView('courses');
+                }}
+                className="relative flex flex-col items-center justify-end h-14 pb-1 border-0 bg-transparent cursor-pointer select-none transition-all group"
+              >
+                {isActive ? (
+                  <>
+                    <motion.div
+                      layoutId="mobileNavActiveBubble"
+                      transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
+                    >
+                      <Compass className="w-5 h-5 stroke-[2.5]" />
+                    </motion.div>
+                    <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
+                      Explore
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
+                      <Compass className="w-5 h-5 stroke-2" />
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
+                      Explore
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })()}
+
+          {/* 2. Course (Registered Courses served here; shifts active when classroom of registered course is entered) */}
+          {(() => {
+            const isCourseRegistered = Boolean(
+              selectedCourseId &&
+              (isAdmin || registeredCoursesList.some(r => r.id === selectedCourseId) || (userProfile?.progress && userProfile.progress[selectedCourseId] && userProfile.progress[selectedCourseId].accessStatus !== 'revoked'))
+            );
+            const isClassroomActive = Boolean(
+              currentView === 'courses' &&
+              selectedCourseId &&
+              isCourseRegistered &&
+              new URLSearchParams(location.search).get('syllabus') === 'false'
+            );
+            const isActive = isRegisteredCoursesSplashOpen || isClassroomActive;
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBuzzSplashOpen(false);
+                  setIsTemplateSplashOpen(false);
+                  setIsMobileMenuOpen(false);
+                  setIsCourseCardSplashOpen(false);
+                  setIsRegisteredCoursesSplashOpen(true);
+                }}
+                className="relative flex flex-col items-center justify-end h-14 pb-1 border-0 bg-transparent cursor-pointer select-none transition-all group"
+              >
+                {isActive ? (
+                  <>
+                    <motion.div
+                      layoutId="mobileNavActiveBubble"
+                      transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
+                    >
+                      <BookOpen className="w-5 h-5 stroke-[2.5]" />
+                    </motion.div>
+                    <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
+                      Course
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
+                      <BookOpen className="w-5 h-5 stroke-2" />
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
+                      Course
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })()}
+
+          {/* 3. Buzz (Live Chat & Academy Blog in standalone views) */}
+          {(() => {
+            const isActive = isBuzzSplashOpen || ((currentView === 'buzz' || currentView === 'blog') && !isRegisteredCoursesSplashOpen && !isBuzzSplashOpen && !isTemplateSplashOpen && !isMobileMenuOpen);
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRegisteredCoursesSplashOpen(false);
+                  setIsTemplateSplashOpen(false);
+                  setIsMobileMenuOpen(false);
+                  setIsCourseCardSplashOpen(false);
+                  setIsBuzzSplashOpen(true);
+                }}
+                className="relative flex flex-col items-center justify-end h-14 pb-1 border-0 bg-transparent cursor-pointer select-none transition-all group"
+              >
+                {isActive ? (
+                  <>
+                    <motion.div
+                      layoutId="mobileNavActiveBubble"
+                      transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
+                    >
+                      <MessageCircle className="w-5 h-5 stroke-[2.5]" />
+                    </motion.div>
+                    <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
+                      Buzz
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
+                      <MessageCircle className="w-5 h-5 stroke-2" />
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
+                      Buzz
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })()}
+
+          {/* 5. Template (Prompt Lab & KYCB in standalone views) */}
+          {(() => {
+            const isActive = isTemplateSplashOpen || ((currentView === 'prompts' || currentView === 'kycb') && !isRegisteredCoursesSplashOpen && !isBuzzSplashOpen && !isMobileMenuOpen);
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRegisteredCoursesSplashOpen(false);
+                  setIsBuzzSplashOpen(false);
+                  setIsMobileMenuOpen(false);
+                  setIsCourseCardSplashOpen(false);
+                  setIsTemplateSplashOpen(true);
+                }}
+                className="relative flex flex-col items-center justify-end h-14 pb-1 border-0 bg-transparent cursor-pointer select-none transition-all group"
+              >
+                {isActive ? (
+                  <>
+                    <motion.div
+                      layoutId="mobileNavActiveBubble"
+                      transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
+                    >
+                      <Sparkles className="w-5 h-5 stroke-[2.5]" />
+                    </motion.div>
+                    <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
+                      Template
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
+                      <Sparkles className="w-5 h-5 stroke-2" />
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
+                      Template
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })()}
+
+          {/* 5. Menu / Action Sheet */}
+          {(() => {
+            const isActive = isMobileMenuOpen || ((currentView === 'profile' || currentView === 'notifications') && !isRegisteredCoursesSplashOpen && !isBuzzSplashOpen && !isTemplateSplashOpen);
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRegisteredCoursesSplashOpen(false);
+                  setIsBuzzSplashOpen(false);
+                  setIsTemplateSplashOpen(false);
+                  setIsCourseCardSplashOpen(false);
+                  setIsMobileMenuOpen(true);
+                }}
+                className="relative flex flex-col items-center justify-end h-14 pb-1 border-0 bg-transparent cursor-pointer select-none transition-all group"
+              >
+                {isActive ? (
+                  <>
+                    <motion.div
+                      layoutId="mobileNavActiveBubble"
+                      transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
+                    >
+                      <UserIcon className="w-5 h-5 stroke-[2.5]" />
+                    </motion.div>
+                    <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
+                      Menu
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
+                      <UserIcon className="w-5 h-5 stroke-2" />
+                      {unreadNotificationsCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-slate-900 animate-pulse" />
+                      )}
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
+                      Menu
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })()}
+        </div>
+      </nav>
+
+      {/* Mobile Native App Action Bottom Sheet (More Hub) */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-40 md:hidden flex flex-col justify-end pointer-events-none">
+          {/* Frosted dark backdrop */}
+          <div 
+            className="fixed inset-0 bg-slate-950/65 backdrop-blur-xs transition-opacity pointer-events-auto"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+
+          {/* Slide-Up Sheet Container (Positioned strictly above bottom navigation bar) */}
+          <motion.div 
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            transition={{ type: "spring", damping: 28, stiffness: 280 }}
+            className="fixed inset-x-0 bottom-[62px] sm:bottom-[68px] z-40 max-w-xl mx-auto bg-white rounded-t-[32px] p-5 pb-6 shadow-[0_-12px_40px_rgba(0,0,0,0.25)] border-t border-slate-200/90 max-h-[calc(85dvh-64px)] overflow-y-auto font-sans text-left pointer-events-auto"
+          >
+            {/* Grab Handle */}
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-4" />
+
+            {/* Profile Overview Card */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
+                  {currentUser?.photoURL ? (
+                    <img src={currentUser.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    (userProfile?.fullName || currentUser?.displayName || 'S').slice(0, 1).toUpperCase()
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-sm font-black text-slate-900 truncate">
+                    {userProfile?.fullName || currentUser?.displayName || (isGuest ? 'Guest Student' : 'Student')}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-semibold truncate font-mono">
+                    {currentUser?.email || 'Browse & preview courses'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Sheet Menu Options */}
+            <div className="space-y-1.5 text-xs font-bold">
+              {/* Profile Settings */}
+              {!isGuest && (
+                <button
+                  type="button"
+                  onClick={() => handleViewChange('profile')}
+                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl transition-all border cursor-pointer ${
+                    currentView === 'profile'
+                      ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-black'
+                      : 'bg-white hover:bg-slate-50 border-slate-200/60 text-slate-800 font-extrabold'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                      <UserIcon className="w-4 h-4" />
+                    </div>
+                    <span>My Profile & Settings</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
+              )}
+
+              {/* Notification Desk */}
+              {!isGuest && (
+                <button
+                  type="button"
+                  onClick={() => handleViewChange('notifications')}
+                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl transition-all border cursor-pointer ${
+                    currentView === 'notifications'
+                      ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-black'
+                      : 'bg-white hover:bg-slate-50 border-slate-200/60 text-slate-800 font-extrabold'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                      <Bell className="w-4 h-4" />
+                    </div>
+                    <span>Notification Desk</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {unreadNotificationsCount > 0 && (
+                      <span className="bg-rose-550 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                        {unreadNotificationsCount} new
+                      </span>
+                    )}
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </div>
+                </button>
+              )}
+
+              {/* Admin Panel Link */}
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl transition-all border border-amber-200 bg-amber-50 text-amber-900 font-black no-underline"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0">
+                      💻
+                    </div>
+                    <span>Admin Control Panel</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-amber-600" />
+                </Link>
+              )}
+
+              {/* PWA App Install option */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (needRefresh) {
+                    updateServiceWorker();
+                  } else {
+                    setIsMobileMenuOpen(false);
+                    setIsPWAInstallModalOpen(true);
+                  }
+                }}
+                className={`w-full flex items-center justify-between p-3.5 rounded-2xl transition-all border cursor-pointer ${
+                  needRefresh
+                    ? 'bg-amber-600 border-amber-500 text-white font-black shadow-lg shadow-amber-900/30'
+                    : isInstalled
+                      ? 'bg-slate-50 border-slate-200 text-slate-700 font-extrabold'
+                      : 'bg-gradient-to-r from-indigo-50 to-sky-50 border-indigo-200/80 text-indigo-950 font-black shadow-xs'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                    needRefresh
+                      ? 'bg-white/20 text-white'
+                      : isInstalled ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-600 text-white shadow-xs'
+                  }`}>
+                    {needRefresh ? <RefreshCw className="w-4 h-4 animate-spin-slow" /> : <Smartphone className="w-4 h-4" />}
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xs font-black">
+                      {needRefresh ? 'Update Available' : isInstalled ? 'Update Available' : 'Install CIYA Mobile App'}
+                    </div>
+                    <div className={`text-[10px] font-semibold ${needRefresh ? 'text-white/80' : 'text-slate-500'}`}>
+                      {needRefresh ? 'Tap to apply new version' : isInstalled ? 'App is ready for updates' : 'One-tap launch & offline support'}
+                    </div>
+                  </div>
+                </div>
+                {needRefresh ? (
+                  <ChevronRight className="w-4 h-4 text-white" />
+                ) : !isInstalled ? (
+                  <Download className="w-4 h-4 text-indigo-600" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                )}
+              </button>
+
+              {/* Auth Button */}
+              <div className="pt-2">
+                {isGuest ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleLogin();
+                    }}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md border-0 cursor-pointer"
+                  >
+                    <UserIcon className="w-4 h-4" />
+                    Sign In with Google
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full py-3 px-4 rounded-2xl bg-red-50 text-red-600 font-black text-xs flex items-center justify-center gap-2 border border-red-100 hover:bg-red-100 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* 1. Course Card Bottom Splash Modal (Shows full card first before proceeding to description page) */}
+      <CourseCardSplashModal
+        isOpen={isCourseCardSplashOpen}
+        course={splashPreviewCourse}
+        userProfile={userProfile}
+        isAdmin={isAdmin}
+        onClose={() => setIsCourseCardSplashOpen(false)}
+        onViewDescription={(courseId) => {
+          setIsCourseCardSplashOpen(false);
+          handleSelectCourseId(courseId);
+        }}
+      />
+
+      {/* 2. Registered Courses Bottom Splash Modal */}
+      <RegisteredCoursesSplashModal
+        isOpen={isRegisteredCoursesSplashOpen}
+        onClose={() => setIsRegisteredCoursesSplashOpen(false)}
+        registeredCourses={registeredCoursesList}
+        userProfile={userProfile}
+        assignments={allMySubmissions}
+        onViewAssignments={() => handleViewChange('assignments')}
+        onSelectCourse={(courseId) => {
+          setIsRegisteredCoursesSplashOpen(false);
+          handleSelectCourseId(courseId);
+          navigate(`/dashboard?view=courses&courseId=${courseId}&syllabus=false`);
+        }}
+        onBrowseCatalog={() => {
+          setIsRegisteredCoursesSplashOpen(false);
+          handleSelectCourseId(null);
+          setCurrentView('courses');
+        }}
+      />
+
+      {/* 3. Buzz Bottom Splash Modal (Live Chat & Academy Blog in standalone views) */}
+      <BuzzSplashModal
+        isOpen={isBuzzSplashOpen}
+        onClose={() => setIsBuzzSplashOpen(false)}
+        onSelectSection={(section) => {
+          setIsBuzzSplashOpen(false);
+          if (section === 'groups') {
+            handleViewChange('buzz');
+          } else {
+            handleViewChange('blog');
+          }
+        }}
+      />
+
+      {/* 4. Template Bottom Splash Modal (Prompt Templates Lab + KYCB Business Sheets) */}
+      <TemplateSplashModal
+        isOpen={isTemplateSplashOpen}
+        onClose={() => setIsTemplateSplashOpen(false)}
+        onSelectSection={(section) => {
+          setIsTemplateSplashOpen(false);
+          handleViewChange(section);
+        }}
+      />
 
       {/* SUCCESSFUL ASSIGNMENT SUBMISSION POPUP */}
       {showSuccessPopup && (
@@ -8370,6 +9008,7 @@ export default function StudentDashboard() {
       )}
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+      <PWAInstallModal isOpen={isPWAInstallModalOpen} onClose={() => setIsPWAInstallModalOpen(false)} />
     </div>
   );
 }

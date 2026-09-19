@@ -17,8 +17,8 @@
     "instructor": "CIYA Team",
     "outcomes": "By the end of this course, you will be able to:\n\nBuild secure websites with user authentication and authorization.\nConnect websites to modern cloud databases and storage systems.\nCreate professional admin dashboards to manage website content.\nDeploy websites to multiple hosting platforms and connect custom domains.\nUpdate website content, images, and videos without rebuilding the entire project.\nOptimize, refine, and prepare websites for real clients.\nPackage, price, and confidently sell your website development services.\nGet CIYA certificate of completion",
     "requirements": "Successful completion of the CIYA Beginner Website Development Class (recommended).\nA smartphone, tablet, or laptop with internet access.\nA Google account and willingness to create free developer accounts during the training.\nBasic understanding of website creation and AI-assisted development.\nCommitment to complete practical exercises and build the class project.",
-    "publish_status": "Draft",
-    "status": "draft",
+    "publish_status": "Published",
+    "status": "published",
     "isLocked": true,
     "days": [
       {
@@ -36,7 +36,7 @@
             "video_url": "https://youtu.be/ybXSN6dB1sk",
             "url": "https://youtu.be/ybXSN6dB1sk",
             "duration": "06:31 min",
-            "description": "A deep dive into server-client architect5 Points of Prior Foundational Required Knowledge\nBasic Web Appearance Skills: You should already know how to use AI tools or standard tools to spin up a professional-looking, static web page focusing on aesthetics like layout, typography, and colors [00:26].\n\nUnderstanding Front-End Basics: A basic grasp of what a \"front end\" is—the visible part of an app containing the buttons, forms, and visual interface that users interact with [02:21].\n\nFamiliarity with the Idea of Cloud/Hosting Tools: An awareness that modern tools exist to host code and handle files (like GitHub, Netlify, or Firebase) without needing to manage physical computer servers yourself [03:23].\n\nAwareness of Core Business Needs: Understanding the basic functional requirements a real-world business has, such as needing user accounts, secure login systems, and a way to take payments or book appointments [01:32].\n\nA Growth Mindset Towards Errors: A willingness to accept that making mistakes, breaking things, and fixing bugs is the core process of learning to build functional software [04:31].ures, secure environment variables, and scalable state machines.",
+            "description": "A deep dive into server-client architect5 Points of Prior Foundational Required Knowledge\nBasic Web Appearance Skills: You should already know how to use AI tools or standard tools to spin up a professional-looking, static web page focusing on aesthetics like layout, typography, and colors [00:26].\n\nUnderstanding Front-End Basics: A basic grasp of what a \"front end\" is—the visible part of an app containing the buttons, forms, and visual interface that users interact with [02:21].\n\nFamiliarity with the Idea of Cloud/Hosting Tools: An awareness that modern tools exist to host code and handle files (like GitHub, Netlify, or Firebase) without needing to manage physical computer servers yourself [03:23].\n\nAwareness of Core Business Needs: Understanding the basic functional requirements a real-world business has, such as needing user accounts, secure login systems, and a way to take payments or book appointments [01:32].\n\nA Growth Mindset Towards Errors: A willingness to accept that making mistakes, breaking things, and fixing bugs is the core process of learning to build functional software [04:31].\n\nAwareness of the CIYA Training Ecosystem: Knowing that the Advanced course builds on the foundation established in the Beginner training, applying those visual and logical concepts to high-fidelity, data-driven applications [05:45].",
             "resources": "",
             "checkType": "tf",
             "check": [
@@ -647,8 +647,8 @@
         "title": "DAY 2: FIREBASE SETUP",
         "description": "",
         "assignment": {
-          "prompt": "The assignment is coming once all of this module's lessons are completed.",
-          "dueNote": "Submit before midnight to stay eligible for direct coaching verification."
+          "prompt": "The Module 2 assignment is very straightforward.\n\nSelect one of your existing website projects that is entirely frontend and do the following:\n\n1. Set up a Firebase backend account manually for it\n2. Connect the backend account to the frontend \n3. Initiate the email & password authentication flow\n4. Set up Google auth authentication flow\n5. Ensure both Auths are working because they will be tested\n6. Begin the Firestore Database Integration after auth setup\n7. Ensure all users' database info is synced to Firestore\n8. Set up an admin dashboard with different admin power and permission\n9. Execute Firestore resource management using pagination, sorting, filtering, and searching for a collection\n10. Create an email and password for a super admin account, which the coach will use to test everything you did and certify you before going on to Module 3",
+          "dueNote": "Incomplete assignment won't be approved!"
         },
         "videos": [
           {
@@ -961,18 +961,6 @@
               },
               {
                 "type": "mcq",
-                "question": "Question 3: How are the Firebase SDK credentials properly transferred into the front-end project layout?",
-                "options": [
-                  "By pasting a public TikTok sharing URL link directly into the main chat window",
-                  "By restarting the local internet router network",
-                  "By manually typing out thousands of lines of JavaScript binary codes without using tools",
-                  "By copying the configuration block from Firebase and supplying it to Google AI Studio to create a dedicated Firebase app configuration file"
-                ],
-                "correct": 3,
-                "explanation": "The presentation demonstrates copying the generated SDK setup snippet from Firebase and pasting it into the AI prompt window so Google AI Studio automatically wires up the configuration file."
-              },
-              {
-                "type": "mcq",
                 "question": "Question 4: Where can you retrieve your SDK configuration snippet in Firebase if you forget to copy it during initial registration?",
                 "options": [
                   "Inside your computer's hidden system download folder",
@@ -1277,7 +1265,7 @@
               },
               {
                 "type": "mcq",
-                "question": "Question 4: How does Firebase communicate with the front end during a Google authentication attempt?",
+                "question": "Question 4: How can a Firebase communicate with the front end during a Google authentication attempt?",
                 "options": [
                   "By opening a secure Google popup or redirect window that returns an authentication token and user profile object.",
                   "By sending a physical SMS text message to the developer's personal mobile phone.",
@@ -1317,7 +1305,7 @@
             "check": [
               {
                 "type": "mcq",
-                "question": "Question 1: What major distinction does the presenter highlight between auto-generated AI backends and manually created Firebase backends?",
+                "question": "Question 1: What major distinction is given between auto-generated AI backends and manually created Firebase backends?",
                 "options": [
                   "Auto-generated backends cost extra money per login attempt, whereas manual backends are free.",
                   "Auto-generated backends display messy, default project names in the Google OAuth popup, whereas manual setup lets you customize your brand name.",
@@ -1379,6 +1367,462 @@
             "funFact": {
               "headline": "Did you know?",
               "body": "Allowing an AI to auto-generate your Firebase backend exposes ugly, auto-generated backend IDs directly to your users inside the Google Sign-In popup—proving that real branding still demands manual human developer setup in the console."
+            }
+          },
+          {
+            "id": "av3hi6t",
+            "title": "INTRO TO SQL AND NOSQL DATABASE",
+            "video_url": "https://youtu.be/f3gdBeT1bWA",
+            "url": "https://youtu.be/f3gdBeT1bWA",
+            "duration": "24:02min",
+            "description": "Basic Data Storage Concepts: Understanding how web applications save user information permanently beyond immediate web browser sessions using backend databases.\n\nTable vs. Document Structures: Familiarity with the fundamental structural differences between relational databases organized in rigid rows and columns versus non-relational document databases organized in flexible JSON-like objects.\n\nPrimary Keys & Document Identifiers: Knowledge of how database records use unique identifiers (such as auto-generated IDs or primary keys) to locate, reference, and update individual data items.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What major structural distinction is given between SQL (Relational) and NoSQL (Non-Relational) databases?",
+                "options": [
+                  "SQL databases can only store numerical values, while NoSQL databases can only store text strings.",
+                  "SQL databases store data in strict, pre-defined tables with fixed columns and rows, whereas NoSQL databases store data in flexible document trees or key-value structures.",
+                  "SQL databases require a high-speed satellite internet connection, while NoSQL databases work completely offline without internet.",
+                  "NoSQL databases charge users a monthly subscription per record, whereas SQL databases are always free."
+                ],
+                "correct": 1,
+                "explanation": "Relational SQL databases rely on strict schemas organized into tables with rows and columns, whereas NoSQL databases (like Firebase Firestore) use flexible, document-based models to hold dynamic data."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: Why do modern web applications and AI tools frequently favor NoSQL document databases like Firebase Firestore during rapid development?",
+                "options": [
+                  "Because NoSQL allows developers to add dynamic fields to records on the fly without having to redefine rigid database schemas beforehand.",
+                  "Because NoSQL databases automatically generate physical printouts of database records every hour.",
+                  "Because SQL databases cannot be connected to web applications hosted on custom domain names.",
+                  "Because NoSQL completely replaces the need for user authentication security rules."
+                ],
+                "correct": 0,
+                "explanation": "NoSQL document structures provide high schema flexibility, enabling developers to expand or alter data attributes dynamically as app requirements evolve without altering fixed table schemas."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How are data records uniquely located and organized inside a NoSQL document database system?",
+                "options": [
+                  "By searching through random text strings pasted inside standard user chat bubbles.",
+                  "By running automated antivirus scans across the browser's local cache storage.",
+                  "By typing out manually formatted paper spreadsheets into the server hardware console.",
+                  "By using unique document IDs organized under designated paths called Collections."
+                ],
+                "correct": 3,
+                "explanation": "In NoSQL systems like Firestore, data items exist as individual \"Documents\" grouped inside top-level containers called \"Collections,\" each identified by a unique Document ID string."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What database warning does the presenter highlight when choosing between relational tables and non-relational document structures for scalable apps?",
+                "options": [
+                  "Relational SQL databases will automatically crash if more than ten users register on the website at once.",
+                  "NoSQL databases erase all stored application records every time the server restarts.",
+                  "Relational tables require complex JOIN operations across multiple tables for complex queries, whereas NoSQL optimizes for horizontal scaling and rapid document fetching.",
+                  "SQL databases can only be read on desktop computers and cannot send data to mobile apps."
+                ],
+                "correct": 2,
+                "explanation": "The presenter clarifies that SQL databases rely heavily on relational links and complex joins, whereas NoSQL document databases scale horizontally with ease for high-read applications."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: How does a developer update or attach additional attributes to an existing NoSQL database document?",
+                "options": [
+                  "By deleting the entire database project and building a new backend console from scratch.",
+                  "By writing or updating specific field key-value pairs directly on the document without disrupting unaffected fields.",
+                  "By submitting a manual request ticket through the web host's domain registrar service.",
+                  "By clearing the user's local web browser app history cache."
+                ],
+                "correct": 1,
+                "explanation": "In NoSQL document databases, fields can be dynamically injected, updated, or merged into existing documents using simple key-value pairings without breaking existing data structures."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Unlike traditional SQL databases that force every single user record to follow the exact same rigid column layout, NoSQL document databases allow two records in the same collection to have completely different fields without breaking the application."
+            }
+          },
+          {
+            "id": "yx1abz6",
+            "title": "SETTING UP CLOUD FIRESTORE DATABASE MANUALLY AND AUTOMATEDLY",
+            "video_url": "https://youtu.be/pO3sYpkTeyQ",
+            "url": "https://youtu.be/pO3sYpkTeyQ",
+            "duration": "17:44 min",
+            "description": "Authentication vs. Database Roles: Understanding that user authentication (like Google Sign-In or Email/Password) only manages access credentials and user IDs, whereas Cloud Firestore (a NoSQL database) is required to permanently store user profile details like full names, gender, and custom settings.\n\nServer Location & Latency: Basic awareness that choosing a cloud database server center closer to your target audience (e.g., selecting London over distant locations when targeting West African users) reduces latency and speeds up data fetching.\n\nDatabase Rules & Account Restrictions: Familiarity with how security and policy configurations—such as password length limits or security rules—enforce validation constraints during account sign-up and backend data submission.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What major distinction is given between Firebase Authentication and Cloud Firestore database storage?",
+                "options": [
+                  "Firebase Authentication changes the primary language structure of the website text.",
+                  "Cloud Firestore links cost money to configure, while Firebase Authentication is always completely free.",
+                  "Firebase Authentication only acts as a security gate to open/close user sessions, whereas Cloud Firestore permanently stores full profile details like names and custom user data.",
+                  "Firebase Authentication only works on desktop screens, while Cloud Firestore only works on mobile devices."
+                ],
+                "correct": 2,
+                "explanation": "The presenter clarifies that authentication merely manages the login access \"lock and key\" (user ID and email), while Cloud Firestore is the NoSQL database needed to store rich profile information."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What database selection recommendation does the presenter give when creating a Firestore database manually versus letting the AI agent automate it?",
+                "options": [
+                  "Manual setups cause the whole application server to crash immediately.",
+                  "Manual configurations wipe out all website WhatsApp booking forms automatically.",
+                  "Most online videos incorrectly select the Standard Edition, whereas letting the AI agent automate the setup defaults to the superior Enterprise Edition.",
+                  "AI agents cannot read voice-based prompts when creating databases."
+                ],
+                "correct": 2,
+                "explanation": "The presenter notes that human developers often mistakenly select the restricted Standard Edition, whereas Google AI Studio automatically configures the broader, more robust Enterprise Edition."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How should a developer select the geographic server location when setting up Cloud Firestore?",
+                "options": [
+                  "By choosing a data center location as geographically close to the target end-users as possible, which cannot be changed after creation.",
+                  "By typing out thousands of lines of JavaScript file strings into the chat bubble.",
+                  "By restarting the local internet router network twice before clicking save.",
+                  "By pasting a public TikTok video sharing URL directly into the editor."
+                ],
+                "correct": 0,
+                "explanation": "Selecting a server region close to your user base optimizes response speed and latency; importantly, once a Firestore location is set, it cannot be altered."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: How can a non-coder trigger automated Firestore setup without knowing exact technical terminology?",
+                "options": [
+                  "By clicking the share button, opening the browser history list, and clearing all app cache records.",
+                  "By leaving a feedback complaint ticket inside the WhatsApp chat panel.",
+                  "By deleting the device's internet browser history records completely.",
+                  "By describing the desired outcome in natural plain language (e.g., asking the AI agent to save user profile details to the backend)."
+                ],
+                "correct": 3,
+                "explanation": "AI agents are intelligent enough to infer database configuration steps (initiating Firestore) directly from plain human descriptions without needing exact technical database buzzwords."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What caused the sign-up failure during the live temporary email testing demonstration in the video?",
+                "options": [
+                  "The internet router network was completely disconnected.",
+                  "The tested password hit the maximum 12-character constraint defined in the Firebase authentication settings policy.",
+                  "The user character was imaginary and downloaded for training demonstration purposes.",
+                  "The database server in London ran out of storage space."
+                ],
+                "correct": 1,
+                "explanation": "During the test run, entering a 12-character password triggered a policy validation edge-case based on the strict password policy set in Firebase Authentication."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Once you select and lock in a geographic data center location for your Cloud Firestore database, Google Firebase makes it impossible to change that server region ever again for that project."
+            }
+          },
+          {
+            "id": "rl0ed8u",
+            "title": "HOW TO SYNC FIRESTORE DATABASE WITH THE FRONTEND",
+            "video_url": "https://youtu.be/PKzP44E34mM",
+            "url": "https://youtu.be/PKzP44E34mM",
+            "duration": "26:54 min",
+            "description": "UID (Unique Identifier) Matching: Understanding that Firebase Authentication assigns every signed-up user a unique string of characters (a UID) that acts like a digital fingerprint, linking their authentication session directly to their personal document in Cloud Firestore.\n\nAuthentication vs. Authorization: Recognizing that authentication verifies who a user is (logging in with email/password), whereas authorization uses database security rules to define what data that authenticated user is permitted to read or edit.\n\nFrontend-to-Backend Syncing: Basic familiarity with how user input on a web form (such as delivery addresses, phone numbers, and profile details) gets sent from the user interface and written into specific document fields within backend NoSQL collections.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: How does Cloud Firestore uniquely connect a signed-in user to their personal database profile document?",
+                "options": [
+                  "By matching the user's IP address with their device MAC address.",
+                  "By assigning a unique, non-duplicable User ID (UID) generated during authentication as the Firestore document key.",
+                  "By charging users a monthly fee for every database search query they make.",
+                  "By requiring users to re-enter their phone number every time they view a product."
+                ],
+                "correct": 1,
+                "explanation": "The video demonstrates that Firebase generates a unique UID for each user (acting like a digital fingerprint), which serves as the document key inside the \"users\" Firestore collection."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What primary distinction is drawn between Authentication and Authorization within Firebase?",
+                "options": [
+                  "Authentication verifies who the user is at the login door, while Authorization defines what data that user has permission to read or modify inside the database.",
+                  "Authentication requires paid subscriptions, whereas Authorization is always free.",
+                  "Authentication only functions on desktop computers, while Authorization only runs on mobile apps.",
+                  "Authentication deletes all user records every 24 hours automatically."
+                ],
+                "correct": 0,
+                "explanation": "The presenter explains using a security guard analogy: Authentication verifies your identity (ID badge at the entrance), while Authorization (security rules) determines which room/data you are permitted to access inside the building."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: Why are backend database document keys often stored as auto-generated UID strings rather than full human names like \"Goodness Paul\"?",
+                "options": [
+                  "Because human names can be duplicated across different accounts, whereas UIDs guarantee absolute uniqueness across the system.",
+                  "Because typing names causes the entire application server to crash.",
+                  "Because Google AI Studio cannot process spaces between names.",
+                  "Because NoSQL databases automatically erase text field names after saving."
+                ],
+                "correct": 0,
+                "explanation": "Multiple users can share the same human name, but UIDs are strictly unique per account, preventing database collisions and account data mixing."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: How can a developer enforce strict user input rules (such as restricting Nigerian phone numbers strictly to 11 digits) without writing complex manual code?",
+                "options": [
+                  "By restarting the local internet router before filling out web forms.",
+                  "By deleting the browser history cache after every profile submission.",
+                  "By leaving a feedback complaint ticket inside the WhatsApp chat panel.",
+                  "By prompting the AI agent in natural language to set exact validation constraints on the input form."
+                ],
+                "correct": 3,
+                "explanation": "The presenter highlights that developers can simply prompt the AI agent with specific validation rules (e.g., minimum and maximum 11 digits for Nigerian phone numbers) to handle form constraints cleanly."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What built-in feature on the e-commerce user profile was converted from a static hardcoded number into a dynamic Firestore-driven value?",
+                "options": [
+                  "The total number of website visitors on the homepage.",
+                  "The user's accumulated reward points balance (e.g., granting 150 points upon new sign-up).",
+                  "The total number of items stored in the public shopping cart.",
+                  "The global price of all listed grocery items."
+                ],
+                "correct": 1,
+                "explanation": "The static 1,650 points shown on the old interface was converted into a dynamic database field that updates per user, automatically awarding new users 150 reward points upon registration."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "In a Firebase backend, two users can share the exact same full name and profile details, but their system-generated UID acts like a digital fingerprint that makes it impossible for their database records to ever collide or mix up."
+            }
+          },
+          {
+            "id": "uiikceq",
+            "title": "FIRESTORE CRUD OPERATIONS",
+            "video_url": "https://youtu.be/U01XG4qyvRY",
+            "url": "https://youtu.be/U01XG4qyvRY",
+            "duration": "20:41 min",
+            "description": "Authentication vs. Authorization:  You must understand that authentication verifies who a user is (e.g., signing in), whereas authorization defines what permissions and actions that authenticated user is allowed to perform on the application.\n\nThe Principles of CRUD Operations & Database Rules:  You need foundational clarity on CRUD (Create, Read, Update, Delete) actions , as well as how backend security rules restrict these operations (such as grouping Create, Update, and Delete into write permissions) \n\nStatic (Frontend) vs. Dynamic (Backend) Data Management: You should know the difference between hardcoded frontend assets—which require code updates and re-deployments to change—and database-driven backends, which reflect changes live immediately across user interfaces",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What primary distinction is drawn between authentication and authorization when managing user access?",
+                "options": [
+                  "Authentication verifies user identity, while authorization specifies the permissions and actions a user can perform",
+                  "Authentication controls database billing, while authorization updates CSS layout grids.",
+                  "Authorization applies only to non-registered users, whereas authentication is reserved for super admins.",
+                  "Authentication stores local browser history cache, while authorization sends real-time email notifications."
+                ],
+                "correct": 0,
+                "explanation": "Authentication establishes that a user has logged in, whereas authorization determines their exact permissions and boundaries within the application system [02:59]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What operational limitation is placed on the Manager role compared to the Super Admin regarding product management?",
+                "options": [
+                  "The Manager can only view user profiles but cannot access any store products.",
+                  "The Manager can update, delete, and read products, but lacks permission to create new products .",
+                  "The Manager can create unlimited products but cannot modify existing prices.",
+                  "The Manager has permanent rights to delete the Super Admin’s primary account."
+                ],
+                "correct": 1,
+                "explanation": "The presenter specifies that while the Super Admin holds complete creation rights, the Manager is strictly restricted to updating, deleting, and reading existing database items"
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: Why does the presenter advocate moving hardcoded product sections from the frontend to the Firestore backend?",
+                "options": [
+                  "Hardcoded frontend changes require manual code edits and hosting re-deployments, whereas backend updates reflect live instantly",
+                  "Frontend assets consume paid server bandwidth on every single button click.",
+                  "Firestore automatically converts all backend product entries into high-resolution promo videos.",
+                  "Storing data on the frontend causes local Wi-Fi routers to automatically disconnect."
+                ],
+                "correct": 0,
+                "explanation": "Frontend changes force developers to rewrite code and push updates through hosting platforms, while database-driven backend updates take effect immediately on live sites"
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: In the database security rules demonstration, which role possesses immutable rights and complete CRUD access across the entire application?",
+                "options": [
+                  "The Sales Representative",
+                  "The Principal Supervisor",
+                  "The Super Admin",
+                  "The Guest Visitor"
+                ],
+                "correct": 2,
+                "explanation": "The Super Admin account is permanently defined as immutable (cannot be deleted or overwritten by lower roles) and retains unrestricted CRUD permissions"
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What happens when a database user attempts an action that violates the configured Firestore security rules?",
+                "options": [
+                  "The application automatically resets all user accounts to default factory settings.",
+                  "The browser generates an \"insufficient permission\" error and blocks the unauthorized operation",
+                  "The database automatically emails the user a temporary override password.",
+                  "The frontend styling converts all application text into raw JavaScript strings."
+                ],
+                "correct": 1,
+                "explanation": "When database security rules prohibit an requested operation, Firebase triggers an \"insufficient permission\" error to protect the system [09:43]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "\"Database security rules act like an unyielding soldier who strictly obeys the last order given—meaning if you accidentally write a rule blocking yourself as the owner from updating your website, the database will strictly enforce it and lock you out"
+            }
+          },
+          {
+            "id": "f1adglk",
+            "title": "HOW TO SETUP AN ADMIN DASHBOARD USING CRUD",
+            "video_url": "https://youtu.be/HFYm-T-mAA8",
+            "url": "https://youtu.be/HFYm-T-mAA8",
+            "duration": "19:29 min",
+            "description": "Static vs. Dynamic Data Architecture: You need to understand the difference between hardcoded frontend elements (which require developer code edits to change) and dynamic backend-served collections (which update real-time across user devices without needing page reloads).\n\nCRUD Operation Hierarchy: You should have foundational knowledge of CRUD (Create, Read, Update, Delete) permissions and how restricting specific CRUD actions forms role-based access levels for different users.\n\nRole-Based Authorization & Role Enforcement: You must understand how backend authorization rules map user emails or IDs to administrative tiers (such as Super Admin, Manager, Supervisor, and Sales Rep) to control dashboard feature visibility and action rights.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What happens on the live website when the Super Admin updates the price of an item in the backend product catalog?",
+                "options": [
+                  "The developer must push the updated codebase to GitHub before changes take effect.",
+                  "The new price updates immediately across all active user screens live without requiring a page refresh.",
+                  "The whole application server shuts down for ten minutes to re-index product prices.",
+                  "The price updates only for desktop users while remaining unchanged on mobile devices."
+                ],
+                "correct": 1,
+                "explanation": "The presenter demonstrates changing a product price to 15,000 in the dashboard, showing that backend-driven updates reflect instantly on all live active client screens without manual code deployment or page refreshing."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: How does the system visually adapt the Admin Dashboard interface when a Manager logs in compared to a Super Admin?",
+                "options": [
+                  "The Manager sees the entire dashboard styled in black and white mode.",
+                  "The \"Create New Product\" button is disabled and hidden because the Manager is restricted from creating items.",
+                  "The Manager's interface disables all product search bars and delete options.",
+                  "The Manager receives a continuous popup asking for secondary email verification."
+                ],
+                "correct": 1,
+                "explanation": "Because the Manager role is granted only Read, Update, and Delete rights, the system removes the ability/button to create new products from their admin view."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: What administrative restrictions apply to the Supervisor role within the demonstration system?",
+                "options": [
+                  "The Supervisor can only perform Read and Delete actions, meaning the Edit/Update button is completely removed from their view.",
+                  "The Supervisor can create new items and update prices but cannot read customer profiles.",
+                  "The Supervisor holds full immutable control over the Super Admin's email account.",
+                  "The Supervisor is restricted from seeing any product images in the store catalog."
+                ],
+                "correct": 0,
+                "explanation": "The Supervisor is given only Read and Delete rights, causing the system to automatically strip away the Edit button from their product management list."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What is the functional limitation of the Sales Representative role when accessing the Admin Dashboard?",
+                "options": [
+                  "The Sales Rep can edit product prices but cannot delete catalog items.",
+                  "The Sales Rep can create products but cannot read customer accounts.",
+                  "The Sales Rep possesses Read-Only rights, meaning they cannot Add, Edit, or Delete any catalog entries.",
+                  "The Sales Rep is logged out automatically every sixty seconds."
+                ],
+                "correct": 2,
+                "explanation": "The Sales Rep sits at the lowest authorization tier with Read-Only permissions, meaning all operational buttons (Add, Edit, Delete) are disabled/hidden for them."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What immediate effect occurs when the Super Admin revokes administrative authorization from an existing staff member's email?",
+                "options": [
+                  "The user's device screen locks until they contact customer support.",
+                  "The user's access to the Admin Dashboard and its navigation buttons is instantly stripped away in real time.",
+                  "The backend automatically deletes all past transactions made by that staff member.",
+                  "The user's web browser history cache is cleared completely."
+                ],
+                "correct": 1,
+                "explanation": "When the presenter clicks to revoke authorization for Manager Goodness Paul, the Admin Center navigation button disappears instantly from his interface without requiring a manually triggered refresh."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "\"Because dynamic database systems communicate with the frontend in real time, granting or revoking user admin privileges updates their visible interface and capabilities instantly across active screens without needing a page refresh or code re-deployment.\""
+            }
+          },
+          {
+            "id": "g61p1xq",
+            "title": "HOW TO MANAGE FIRESTORE DAILY SPARK LIMIT",
+            "video_url": "https://youtu.be/FKApfLuLMkI",
+            "url": "https://youtu.be/FKApfLuLMkI",
+            "duration": "29:46 min",
+            "description": "Firebase Pricing Tiers & Billing Structure: You need a foundational understanding of Firebase's free Spark Plan versus its pay-as-you-go Blaze Plan, specifically knowing how resource quotas and billing thresholds are enforced on cloud databases.\n\nFirestore Read, Write, and Delete Operations: You should understand how database queries trigger read and write operations, as every document fetch or update counts directly toward daily usage limits.\n\nDatabase Querying & State Optimization: You need knowledge of efficient querying techniques—such as batch fetching, caching, and limiting real-time listeners—to avoid triggering unnecessary infinite loops or excessive database calls that exhaust quotas rapidly.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What primary constraint distinguishes Firebase's free Spark Plan from the paid Blaze Plan when using Firestore?",
+                "options": [
+                  "The Spark Plan limits daily read, write, and delete operations to fixed quotas, whereas the Blaze Plan charges dynamically for usage beyond those thresholds.",
+                  "The Spark Plan only supports desktop web browsers, while the Blaze Plan works exclusively on mobile apps.",
+                  "The Spark Plan automatically deletes all stored user data every 24 hours.",
+                  "The Spark Plan disables database security rules, requiring manual encryption scripts."
+                ],
+                "correct": 0,
+                "explanation": "Firebase's Spark Plan provides a generous free daily quota of reads, writes, and deletes; exceeding these limits pauses database operations until the daily quota resets or the project upgrades to the Blaze Plan."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What common frontend coding mistake causes a developer to rapidly exhaust their Firestore daily Spark quota within minutes?",
+                "options": [
+                  "Uploading high-resolution PNG images to standard UI layout grids.",
+                  "Placing real-time database listeners inside unoptimized component render loops, causing thousands of continuous re-fetches.",
+                  "Enabling dark mode themes on user account dashboards.",
+                  "Adding multiple administrative roles inside the security rules panel."
+                ],
+                "correct": 1,
+                "explanation": "Unbound real-time listeners or fetching data inside infinite UI render loops trigger endless continuous database reads, consuming thousands of free daily quota units in a very short time."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How can a developer monitor their project's daily quota consumption before hitting the hard usage ceiling?",
+                "options": [
+                  "By clearing local web browser cache and restarting the device.",
+                  "By checking the Usage & Billing tab inside the Firebase Console to track daily reads, writes, and bandwidth metrics in real time.",
+                  "By emailing Google Cloud support every time a new feature is deployed.",
+                  "By converting all database collections into static JSON files on the frontend."
+                ],
+                "correct": 1,
+                "explanation": "The Firebase Console provides a dedicated Usage tab that visually tracks daily quota metrics, enabling developers to monitor resource utilization and detect abnormal spikes before reaching limits."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What best practice should be implemented on the frontend to minimize unnecessary Firestore database reads?",
+                "options": [
+                  "Hardcoding user credentials inside HTML form fields.",
+                  "Implementing client-side caching or state management to reuse fetched data rather than re-querying the database on every page navigation.",
+                  "Deleting backend indexes to prevent automatic collection sorting.",
+                  "Switching database communication protocols from HTTPS to standard HTTP."
+                ],
+                "correct": 1,
+                "explanation": "Caching query results locally in memory or browser storage prevents duplicate database read requests whenever a user navigates between pages or components."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What happens to a live web application when its Firestore database exceeds the daily Spark free quota and has no billing plan attached?",
+                "options": [
+                  "Firebase permanently deletes the entire project and all associated user accounts.",
+                  "The application automatically upgrades to a paid plan and charges the owner's bank account.",
+                  "Database operations are temporarily suspended, causing read/write calls to fail until the daily quota resets at midnight UTC.",
+                  "The application redirects all visitors to the official Firebase documentation homepage."
+                ],
+                "correct": 2,
+                "explanation": "Reaching the free daily quota threshold on the Spark Plan temporarily blocks incoming database reads and writes, throwing quota error codes until the daily counter resets."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "\"A single unhandled infinite loop in a frontend component listener can trigger tens of thousands of Firestore reads in just a few seconds, completely burning through an entire day's free Spark allowance before you even notice.\""
             }
           }
         ]
@@ -1528,7 +1972,7 @@
         ]
       }
     ],
-    "updatedAt": "2026-08-24T14:19:30.428Z",
+    "updatedAt": "2026-09-19T10:00:22.356Z",
     "id": "advanced-ai-mastery",
     "createdAt": "2026-07-16T03:00:00.000Z"
   }
