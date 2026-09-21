@@ -95,7 +95,12 @@ export default function BrandingLogo({ className = '', size = 'md', theme = 'dar
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-tr from-amber-400 to-orange-500 rounded-full" />
+            <img 
+              src="https://res.cloudinary.com/a7nwgaul/image/upload/v1789814153/Gemini_Generated_Image_bjv5pubjv5pubjv5.png" 
+              alt="CIYA Brand Logo" 
+              className="w-full h-full object-cover rounded-full"
+              referrerPolicy="no-referrer"
+            />
           )}
         </div>
       </div>

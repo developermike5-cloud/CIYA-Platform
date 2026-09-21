@@ -242,6 +242,7 @@ function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
       <div className="hidden md:flex items-center gap-10 text-sm font-medium text-teal-200">
         <a href="#mission" className="hover:text-amber-400 transition-colors">Mission</a>
         <a href="#courses" className="hover:text-amber-400 transition-colors">Courses</a>
+        <Link to="/past-cohort-projects" className="hover:text-amber-400 transition-colors">Projects</Link>
         <Link to="/dashboard?view=prompts" className="hover:text-amber-400 transition-colors flex items-center gap-1">
           <Star className="w-3.5 h-3.5 text-amber-450 fill-amber-450" />
           <span>Prompt Generator</span>
@@ -882,6 +883,7 @@ function Footer() {
             <li><a href="#ecommerce-section" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">AI E-commerce Creator</a></li>
             <li><a href="#portfolio-section" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">AI Portfolio Creator</a></li>
             <li><a href="#courses" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">All Tracks</a></li>
+            <li><Link to="/past-cohort-projects" className="text-sm text-teal-400 hover:text-teal-200 transition-colors">Past Cohort Projects</Link></li>
           </ul>
         </div>
         

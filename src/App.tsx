@@ -117,6 +117,7 @@ function AppContent() {
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/waitingonboarding" element={<WaitingOnboarding />} />
         <Route path="/projects" element={<PastCohortProjects />} />
+        <Route path="/past-cohort-projects" element={<PastCohortProjects />} />
         <Route path="/kycb" element={<ClientKycbForm />} />
 
         <Route path="/admin" element={<AdminLayout />}>

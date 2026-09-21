@@ -16,30 +16,24 @@ export default defineConfig(({mode}) => {
         includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
           id: '/',
-          name: 'CIYA - AI Academy',
+          name: 'Create It Yourself Academy (CIYA)',
           short_name: 'CIYA',
           description: 'An academy learning platform designed to help people learn modern AI tools.',
           theme_color: '#0f172a',
           background_color: '#0f172a',
           display: 'standalone',
           orientation: 'portrait',
-          start_url: '/',
+          start_url: '/dashboard',
           scope: '/',
           icons: [
             {
-              src: '/pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any'
-            },
-            {
-              src: '/pwa-512x512.png',
+              src: 'https://res.cloudinary.com/a7nwgaul/image/upload/v1789814153/Gemini_Generated_Image_bjv5pubjv5pubjv5.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: '/pwa-maskable-512x512.png',
+              src: 'https://res.cloudinary.com/a7nwgaul/image/upload/v1789814153/Gemini_Generated_Image_bjv5pubjv5pubjv5.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'

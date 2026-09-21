@@ -5606,6 +5606,17 @@ export default function StudentDashboard() {
     setIsLoginOpen(true);
   };
 
+  // Auto-open login for PWA users or via query param
+  useEffect(() => {
+    if (authChecking) return;
+    const params = new URLSearchParams(window.location.search);
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    
+    if ((params.get('login') === 'true' || isPWA) && !currentUser) {
+      setIsLoginOpen(true);
+    }
+  }, [currentUser, authChecking]);
+
   useEffect(() => {
     let unsubSnapshot: (() => void) | null = null;
 
@@ -5760,7 +5771,10 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (!authChecking && !currentUser) {
-      navigate('/?login=true', { replace: true });
+      const isPWA = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+      if (!isPWA) {
+        navigate('/?login=true', { replace: true });
+      }
     }
   }, [authChecking, currentUser, navigate]);
 
@@ -6070,7 +6084,13 @@ export default function StudentDashboard() {
     await signOut(auth);
     setCurrentUser(null);
     setUserProfile(null);
-    navigate('/?login=true');
+    
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    if (isPWA) {
+      setIsLoginOpen(true);
+    } else {
+      navigate('/?login=true');
+    }
   };
 
   const isGuest = !currentUser || !userProfile;
