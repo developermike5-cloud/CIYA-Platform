@@ -276,7 +276,7 @@ export default function PastCohortProjects() {
           {/* Sparkly Badge */}
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-black uppercase text-amber-400 tracking-wider">
             <Sparkles className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-            Join Cohort 3 Today
+            Countdown to Cohort 4
           </div>
 
           {/* Heading */}
@@ -338,8 +338,8 @@ export default function PastCohortProjects() {
 
         {/* Footer info */}
         <div className="pt-6 border-t border-teal-900/40 mt-6 text-center lg:text-left">
-          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-            Cohort 3 Admissions Closing Soon • Mobile Ready
+          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-relaxed">
+            Cohort 4 Launching Soon • Check the WhatsApp community for updates
           </div>
         </div>
 

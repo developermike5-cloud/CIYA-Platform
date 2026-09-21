@@ -46,6 +46,12 @@ export function usePWAInstall() {
   } = useRegisterSW({
     onRegistered(r) {
       console.log('SW Registered:', r);
+      // Check for updates every 10 minutes
+      if (r) {
+        setInterval(() => {
+          r.update();
+        }, 10 * 60 * 1000);
+      }
     },
     onRegisterError(error) {
       console.error('SW Registration error:', error);

@@ -938,6 +938,10 @@ export default function Home() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        // Prevent redirecting if we just logged out (safety check)
+        const isLoggingOut = sessionStorage.getItem('ciya_logout_in_progress') === 'true';
+        if (isLoggingOut) return;
+
         if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
           navigate('/admin');
         } else {

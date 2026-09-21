@@ -25,11 +25,41 @@ import GetStarted from './pages/GetStarted';
 import PastCohortProjects from './pages/PastCohortProjects';
 import { BrandedAlertContainer } from './components/BrandedAlert';
 import { safeStorage } from './utils/safeStorage';
+import { usePWAInstall } from './hooks/usePWAInstall';
 
 function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const locationRef = useRef(location.pathname);
+  const { needRefresh, updateServiceWorker } = usePWAInstall();
+
+  // Handle Updates: Auto-refresh when a new version is detected
+  useEffect(() => {
+    if (needRefresh) {
+      console.log('[PWA] Update detected. Refreshing for latest version...');
+      updateServiceWorker();
+    }
+  }, [needRefresh, updateServiceWorker]);
+
+  // Secondary Update Heartbeat (Fallback for mobile background tabs)
+  useEffect(() => {
+    const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
+    if (!isMobile) return;
+
+    // Check every 20 minutes for updates while the app is active
+    const updateInterval = setInterval(() => {
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(reg => {
+          if (reg) {
+            reg.update();
+            console.log('[PWA] Mobile background update heartbeat triggered.');
+          }
+        });
+      }
+    }, 20 * 60 * 1000);
+
+    return () => clearInterval(updateInterval);
+  }, []);
 
   // Restore last visited path and handle deep links
   useEffect(() => {

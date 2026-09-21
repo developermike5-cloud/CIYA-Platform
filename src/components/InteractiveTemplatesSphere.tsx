@@ -260,7 +260,7 @@ export default function InteractiveTemplatesSphere() {
           Explore Our <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-amber-400 to-orange-400">Past Cohort Web Design Blueprints</span>
         </h2>
         <p className="text-teal-200/80 text-sm md:text-base max-w-2xl mx-auto leading-relaxed font-semibold">
-          Join the next cohort to begin building tools that will make you cool money
+          Countdown to Cohort 4! Check the WhatsApp community for launch updates.
         </p>
       </div>
 

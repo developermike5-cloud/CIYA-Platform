@@ -4570,9 +4570,9 @@ export default function StudentDashboard() {
   const [leaderboardConfig, setLeaderboardConfig] = useState<any>(() => {
     try {
       const cached = safeStorage.getItem('ciya_cached_leaderboard_config');
-      return cached ? JSON.parse(cached) : { allowedCohorts: ['Cohort 3'] };
+      return cached ? JSON.parse(cached) : { allowedCohorts: ['Cohort 4'] };
     } catch (e) {
-      return { allowedCohorts: ['Cohort 3'] };
+      return { allowedCohorts: ['Cohort 4'] };
     }
   });
   const [selectedLeaderboardCohort, setSelectedLeaderboardCohort] = useState<string>('');
@@ -5200,6 +5200,14 @@ export default function StudentDashboard() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
+
+  // Auto-open login if guest in PWA mode
+  useEffect(() => {
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    if (!authChecking && !currentUser && isPWA) {
+      setIsLoginOpen(true);
+    }
+  }, [authChecking, currentUser]);
   const [liveCheckComplete, setLiveCheckComplete] = useState(() => {
     const cachedProfile = safeStorage.getItem('ciya_cached_profile');
     if (cachedProfile) {
@@ -6081,15 +6089,25 @@ export default function StudentDashboard() {
   const handleLogout = async () => {
     safeStorage.removeItem('ciya_cached_user');
     safeStorage.removeItem('ciya_cached_profile');
-    await signOut(auth);
+    
+    // Set local state immediately to avoid flickers
     setCurrentUser(null);
     setUserProfile(null);
+    
+    // Set a temporary flag to prevent Home.tsx from redirecting us back
+    sessionStorage.setItem('ciya_logout_in_progress', 'true');
+    setTimeout(() => {
+      sessionStorage.removeItem('ciya_logout_in_progress');
+    }, 2000); // 2 second window is plenty
+    
+    await signOut(auth);
     
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
     if (isPWA) {
       setIsLoginOpen(true);
     } else {
-      navigate('/?login=true');
+      // Use replace:true to prevent back-button loops
+      navigate('/?login=true', { replace: true });
     }
   };
 
@@ -6185,9 +6203,18 @@ export default function StudentDashboard() {
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans p-6">
-        <div className="flex flex-col items-center justify-center max-w-sm w-full text-center animate-pulse">
-          <BrandingLogo size="lg" theme="light" />
+        <div className="flex flex-col items-center justify-center max-w-sm w-full text-center">
+          <BrandingLogo size="lg" theme="light" className="mb-8 animate-pulse" />
+          <h2 className="text-xl font-black text-slate-800 mb-2">Student Portal</h2>
+          <p className="text-sm text-slate-500 font-medium mb-8">Please sign in to access your courses and dashboard.</p>
+          <button 
+            onClick={() => setIsLoginOpen(true)}
+            className="px-8 py-3 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-2xl shadow-lg transition-all cursor-pointer border-0"
+          >
+            Sign In Now
+          </button>
         </div>
+        <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
       </div>
     );
   }
@@ -7912,9 +7939,9 @@ export default function StudentDashboard() {
 
                           {/* Toggle View Between All Courses and Leaderboard */}
                           {(() => {
-                            const studentCohort = userProfile?.cohort || 'Cohort 3';
+                            const studentCohort = userProfile?.cohort || 'Cohort 4';
                             const isCohort1Or2 = studentCohort === 'Cohort 1' || studentCohort === 'Cohort 2';
-                            const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 3'];
+                            const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 4'];
                             const isLeaderboardAllowed = !isCohort1Or2 && allowedCohorts.includes(studentCohort) && !isGuest;
 
                             return (
@@ -7990,9 +8017,9 @@ export default function StudentDashboard() {
 
                         {/* View 2: Static Cohort Leaderboard Widget */}
                         {coursesViewTab === 'leaderboard' && (() => {
-                          const studentCohort = userProfile?.cohort || 'Cohort 3';
+                          const studentCohort = userProfile?.cohort || 'Cohort 4';
                           const isCohort1Or2 = studentCohort === 'Cohort 1' || studentCohort === 'Cohort 2';
-                          const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 3'];
+                          const allowedCohorts: string[] = Array.isArray(leaderboardConfig?.allowedCohorts) ? leaderboardConfig.allowedCohorts : ['Cohort 4'];
                           const isLeaderboardAllowed = !isCohort1Or2 && allowedCohorts.includes(studentCohort);
 
                           if (!isLeaderboardAllowed) {
@@ -8003,8 +8030,8 @@ export default function StudentDashboard() {
                             );
                           }
 
-                          const activeCohort = selectedLeaderboardCohort || (studentCohort !== 'Cohort 1' && studentCohort !== 'Cohort 2' ? studentCohort : 'Cohort 3');
-                          const staticCohortEntries = staticLeaderboardData[activeCohort] || staticLeaderboardData['Cohort 3'] || [];
+                          const activeCohort = selectedLeaderboardCohort || (studentCohort !== 'Cohort 1' && studentCohort !== 'Cohort 2' ? studentCohort : 'Cohort 4');
+                          const staticCohortEntries = staticLeaderboardData[activeCohort] || staticLeaderboardData['Cohort 4'] || [];
 
                           return (
                             <div className="mt-2 bg-white border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-sm max-w-5xl mx-auto space-y-6 text-left font-sans">

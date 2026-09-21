@@ -128,7 +128,7 @@ const DEFAULT_SEED_GROUPS: BuzzGroup[] = [
     allowStudentsChat: false, // Announcements only
     membersCount: 520,
     createdAt: Date.now() - 86400000 * 40,
-    lastMessage: 'Cohort 3 graduation assignment submission portal is now live.',
+    lastMessage: 'Congratulations to Cohort 3 on their graduation! Welcome Cohort 4.',
     lastMessageTime: Date.now() - 3600000 * 1,
     lastMessageSender: 'Super Admin'
   }

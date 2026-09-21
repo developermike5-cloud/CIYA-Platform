@@ -11,7 +11,7 @@ export default defineConfig(({mode}) => {
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'prompt',
+        registerType: 'autoUpdate',
         injectRegister: 'auto',
         includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
@@ -44,7 +44,7 @@ export default defineConfig(({mode}) => {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           cleanupOutdatedCaches: true,
           clientsClaim: true,
-          skipWaiting: false,
+          skipWaiting: true,
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // Increase limit to 5MB
           runtimeCaching: [
             {
@@ -64,7 +64,7 @@ export default defineConfig(({mode}) => {
           ]
         },
         devOptions: {
-          enabled: true,
+          enabled: false,
           type: 'module'
         }
       })
