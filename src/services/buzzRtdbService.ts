@@ -8,7 +8,11 @@ import {
   query, 
   orderBy, 
   limit, 
-  onSnapshot 
+  onSnapshot,
+  increment,
+  collectionGroup,
+  where,
+  serverTimestamp as firestoreTimestamp
 } from 'firebase/firestore';
 import { 
   ref, 
@@ -21,7 +25,8 @@ import {
   limitToLast, 
   onValue, 
   onDisconnect, 
-  serverTimestamp 
+  runTransaction,
+  serverTimestamp as rtdbTimestamp 
 } from 'firebase/database';
 import { db, rtdb, auth } from '../firebase';
 import { safeStorage } from '../utils/safeStorage';
@@ -39,6 +44,10 @@ export interface BuzzGroup {
   lastMessageTime?: number;
   lastMessageSender?: string;
   membersCount?: number;
+  isPersonal?: boolean;
+  ownerUid?: string;
+  isProOnly?: boolean;
+  isAdminOnly?: boolean;
 }
 
 export interface BuzzMessage {
@@ -51,9 +60,17 @@ export interface BuzzMessage {
   isAdmin?: boolean;
   text: string;
   mediaUrl?: string;
-  mediaType?: 'image' | 'file' | 'audio';
+  mediaType?: 'image' | 'file' | 'audio' | 'video';
   timestamp: number;
   reactions?: Record<string, number>;
+  user_reactions?: Record<string, string>; // userId -> emoji
+  replyTo?: {
+    id: string;
+    senderName: string;
+    text: string;
+  };
+  starredBy?: Record<string, boolean>;
+  starredAt?: number;
 }
 
 export interface OnlineUser {
@@ -145,77 +162,87 @@ if (localGroupsCache.length === 0) {
 }
 
 /**
- * Subscribes to the list of student study groups from Cloud Firestore in real-time.
- * Automatically seeds default groups if collection is newly initialized.
+ * Realtime Database Only Service for Buzz Chat.
+ * Replaces Firestore implementation to minimize costs and improve latency.
  */
-export function subscribeToGroups(callback: (groups: BuzzGroup[]) => void): () => void {
-  if (!db) {
+export function subscribeToGroups(
+  currentUid: string | null,
+  callback: (groups: BuzzGroup[]) => void
+): () => void {
+  if (!rtdb) {
     callback(localGroupsCache);
     return () => {};
   }
 
-  let hasSeeded = false;
-
-  const groupsColRef = collection(db, 'buzz_groups');
-  const unsubscribe = onSnapshot(
-    groupsColRef,
-    (snapshot) => {
-      if (snapshot.empty) {
-        // Seed default groups into Firestore if completely empty
-        if (!hasSeeded) {
-          hasSeeded = true;
-          DEFAULT_SEED_GROUPS.forEach(async (g) => {
-            try {
-              await setDoc(doc(db, 'buzz_groups', g.id), g);
-            } catch (e) {
-              // Ignore seeding failure if non-admin
-            }
-          });
-        }
-        callback(DEFAULT_SEED_GROUPS);
-        return;
-      }
-
-      const list: BuzzGroup[] = snapshot.docs.map((docSnap) => {
-        const item = docSnap.data();
-        return {
-          id: docSnap.id,
-          name: item.name || 'Unnamed Group',
-          description: item.description || '',
-          imageUrl: item.imageUrl || '',
-          category: item.category || 'general',
-          allowStudentsChat: item.allowStudentsChat !== false, // default true
-          createdAt: item.createdAt || Date.now(),
-          createdBy: item.createdBy || '',
-          lastMessage: item.lastMessage || '',
-          lastMessageTime: item.lastMessageTime || 0,
-          lastMessageSender: item.lastMessageSender || '',
-          membersCount: item.membersCount || 1
-        };
+  const groupsRef = ref(rtdb, 'buzz_groups');
+  
+  const unsubscribe = onValue(groupsRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data) {
+      // Seed default groups into RTDB if completely empty
+      DEFAULT_SEED_GROUPS.forEach(async (g) => {
+        try {
+          await set(ref(rtdb, `buzz_groups/${g.id}`), g);
+        } catch (e) {}
       });
-
-      // Sort by lastMessageTime or createdAt descending
-      list.sort((a, b) => (b.lastMessageTime || b.createdAt) - (a.lastMessageTime || a.createdAt));
-
-      localGroupsCache = list;
-      safeStorage.setItem('ciya_buzz_rtdb_groups_cache', JSON.stringify(list));
-      callback(list);
-    },
-    (err) => {
-      console.warn('Firestore subscribeToGroups error, using local fallback:', err);
-      callback(localGroupsCache);
+      callback(DEFAULT_SEED_GROUPS);
+      return;
     }
-  );
+
+    const list: BuzzGroup[] = Object.keys(data).map(id => ({
+      ...data[id],
+      id
+    })).filter((g) => {
+      if (g.isPersonal) return g.ownerUid === currentUid;
+      return true; 
+    });
+
+    list.sort((a, b) => {
+      if (a.isPersonal && !b.isPersonal) return -1;
+      if (!a.isPersonal && b.isPersonal) return 1;
+      return (b.lastMessageTime || b.createdAt) - (a.lastMessageTime || a.createdAt);
+    });
+
+    localGroupsCache = list;
+    safeStorage.setItem('ciya_buzz_rtdb_groups_cache', JSON.stringify(list));
+    callback(list);
+  }, (err) => {
+    console.warn('RTDB subscribeToGroups error:', err);
+    callback(localGroupsCache);
+  });
 
   return () => {
-    try {
-      unsubscribe();
-    } catch (e) {}
+    try { unsubscribe(); } catch (e) {}
   };
 }
 
 /**
- * Creates a new student study group in Firestore and RTDB.
+ * Ensures a personal "You" chat room exists for a user in RTDB.
+ */
+export async function ensurePersonalGroup(uid: string, name: string): Promise<void> {
+  if (!rtdb || !uid) return;
+  const personalGroupId = `personal_${uid}`;
+  const groupRef = ref(rtdb, `buzz_groups/${personalGroupId}`);
+  
+  const snapshot = await get(groupRef);
+  if (!snapshot.exists()) {
+    await set(groupRef, {
+      id: personalGroupId,
+      name: 'You',
+      description: 'Store and save important info relating to your studies.',
+      category: 'Personal',
+      imageUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&q=80',
+      allowStudentsChat: true,
+      createdAt: Date.now(),
+      membersCount: 1,
+      isPersonal: true,
+      ownerUid: uid
+    });
+  }
+}
+
+/**
+ * Creates a new student study group in RTDB.
  */
 export async function createBuzzGroup(group: Omit<BuzzGroup, 'id' | 'createdAt'>): Promise<string> {
   const newGroupId = `group_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -223,6 +250,8 @@ export async function createBuzzGroup(group: Omit<BuzzGroup, 'id' | 'createdAt'>
     ...group,
     id: newGroupId,
     allowStudentsChat: group.allowStudentsChat !== false,
+    isProOnly: !!group.isProOnly,
+    isAdminOnly: !!group.isAdminOnly,
     createdAt: Date.now(),
     membersCount: 1,
     lastMessage: 'Group created by admin.',
@@ -230,18 +259,8 @@ export async function createBuzzGroup(group: Omit<BuzzGroup, 'id' | 'createdAt'>
     lastMessageSender: group.createdBy || 'Admin'
   };
 
-  // 1. Primary write to Firestore
-  if (db) {
-    await setDoc(doc(db, 'buzz_groups', newGroupId), groupData);
-  }
-
-  // 2. Mirror write to RTDB (safe try/catch so it never throws PERMISSION_DENIED)
   if (rtdb) {
-    try {
-      await set(ref(rtdb, `buzz_groups/${newGroupId}`), groupData);
-    } catch (rtdbErr) {
-      console.warn('RTDB group mirror skipped (using Firestore):', rtdbErr);
-    }
+    await set(ref(rtdb, `buzz_groups/${newGroupId}`), groupData);
   }
 
   localGroupsCache = [groupData, ...localGroupsCache];
@@ -250,21 +269,11 @@ export async function createBuzzGroup(group: Omit<BuzzGroup, 'id' | 'createdAt'>
 }
 
 /**
- * Updates an existing group (name, description, imageUrl, allowStudentsChat).
+ * Updates an existing group in RTDB.
  */
 export async function updateBuzzGroup(groupId: string, data: Partial<BuzzGroup>): Promise<void> {
-  // 1. Update Firestore
-  if (db) {
-    await updateDoc(doc(db, 'buzz_groups', groupId), data);
-  }
-
-  // 2. Safe mirror to RTDB
   if (rtdb) {
-    try {
-      await update(ref(rtdb, `buzz_groups/${groupId}`), data);
-    } catch (rtdbErr) {
-      console.warn('RTDB group update mirror skipped (using Firestore):', rtdbErr);
-    }
+    await update(ref(rtdb, `buzz_groups/${groupId}`), cleanObject(data));
   }
 
   localGroupsCache = localGroupsCache.map((g) => (g.id === groupId ? { ...g, ...data } : g));
@@ -273,27 +282,18 @@ export async function updateBuzzGroup(groupId: string, data: Partial<BuzzGroup>)
 
 /**
  * Toggles whether students are allowed to send messages in the group.
- * If false, group is in Announcement mode (only admins can post).
  */
 export async function toggleGroupStudentChat(groupId: string, allowStudentsChat: boolean): Promise<void> {
   return updateBuzzGroup(groupId, { allowStudentsChat });
 }
 
 /**
- * Deletes a group from Firestore and RTDB.
+ * Deletes a group from RTDB.
  */
 export async function deleteBuzzGroup(groupId: string): Promise<void> {
-  if (db) {
-    await deleteDoc(doc(db, 'buzz_groups', groupId));
-  }
-
   if (rtdb) {
-    try {
-      await remove(ref(rtdb, `buzz_groups/${groupId}`));
-      await remove(ref(rtdb, `buzz_messages/${groupId}`));
-    } catch (rtdbErr) {
-      console.warn('RTDB delete mirror skipped (using Firestore):', rtdbErr);
-    }
+    await remove(ref(rtdb, `buzz_groups/${groupId}`));
+    await remove(ref(rtdb, `buzz_messages/${groupId}`));
   }
 
   localGroupsCache = localGroupsCache.filter((g) => g.id !== groupId);
@@ -301,83 +301,75 @@ export async function deleteBuzzGroup(groupId: string): Promise<void> {
 }
 
 /**
- * Subscribes to messages for a specific group with a strict pagination limit
- * of 50 messages to preserve bandwidth and quota.
+ * Full RTDB Message Subscription.
  */
-export function subscribeToGroupMessages(
+export function subscribeToGroupMessagesRTDB(
   groupId: string,
   callback: (messages: BuzzMessage[]) => void,
   limitCount = 50
 ): () => void {
-  // If Firestore is available, use real-time Firestore listener with limit(50)
-  if (db) {
-    const messagesQuery = query(
-      collection(db, 'buzz_groups', groupId, 'messages'),
-      orderBy('timestamp', 'desc'),
-      limit(limitCount)
-    );
-
-    const unsubscribe = onSnapshot(
-      messagesQuery,
-      (snapshot) => {
-        const list: BuzzMessage[] = snapshot.docs.map((d) => {
-          const item = d.data();
-          return {
-            id: d.id,
-            groupId: item.groupId || groupId,
-            senderUid: item.senderUid || '',
-            senderName: item.senderName || 'Student',
-            senderEmail: item.senderEmail || '',
-            senderPhoto: item.senderPhoto || '',
-            isAdmin: !!item.isAdmin,
-            text: item.text || '',
-            mediaUrl: item.mediaUrl || '',
-            mediaType: item.mediaType,
-            timestamp: item.timestamp || Date.now(),
-            reactions: item.reactions || {}
-          };
-        });
-
-        // Reverse to chronological order (oldest to newest)
-        list.reverse();
-
-        try {
-          safeStorage.setItem(`ciya_buzz_messages_${groupId}`, JSON.stringify(list));
-        } catch (e) {}
-
-        callback(list);
-      },
-      (err) => {
-        console.warn('Firestore subscribeToGroupMessages error, trying local cache:', err);
-        try {
-          const saved = safeStorage.getItem(`ciya_buzz_messages_${groupId}`);
-          if (saved) callback(JSON.parse(saved));
-        } catch (e) {}
-      }
-    );
-
-    return () => {
-      try {
-        unsubscribe();
-      } catch (e) {}
-    };
-  }
-
-  // Fallback if db is somehow unavailable
-  try {
-    const saved = safeStorage.getItem(`ciya_buzz_messages_${groupId}`);
-    if (saved) callback(JSON.parse(saved));
-    else callback([]);
-  } catch (e) {
+  if (!rtdb) {
     callback([]);
+    return () => {};
   }
-  return () => {};
+
+  const messagesRef = rtdbQuery(
+    ref(rtdb, `buzz_messages/${groupId}`),
+    limitToLast(limitCount)
+  );
+
+  const unsubscribe = onValue(messagesRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data) {
+      callback([]);
+      return;
+    }
+
+    const list: BuzzMessage[] = Object.keys(data).map(id => {
+      const item = data[id];
+      return {
+        ...item,
+        id,
+        user_reactions: item.user_reactions || {},
+        starredBy: item.starredBy || {}
+      } as BuzzMessage;
+    });
+
+    list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    callback(list);
+  }, (err) => {
+    console.warn('RTDB subscribeToGroupMessages error:', err);
+    callback([]);
+  });
+
+  return () => {
+    try { unsubscribe(); } catch (e) {}
+  };
+}
+
+// Keep old name for backward compatibility in components
+export const subscribeToGroupMessages = subscribeToGroupMessagesRTDB;
+
+/**
+ * Removes undefined properties from an object to prevent RTDB errors.
+ */
+function cleanObject(obj: any): any {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(item => cleanObject(item));
+
+  const result = { ...obj };
+  Object.keys(result).forEach(key => {
+    if (result[key] === undefined) {
+      delete result[key];
+    } else if (result[key] !== null && typeof result[key] === 'object') {
+      result[key] = cleanObject(result[key]);
+    }
+  });
+  return result;
 }
 
 /**
- * Sends a message into Firestore and RTDB.
- * Media (if any) has already been uploaded to Cloudinary,
- * so only the text and Cloudinary mediaUrl string are stored in the database.
+ * Sends a message into RTDB ONLY.
  */
 export async function sendBuzzMessage(
   groupId: string,
@@ -389,9 +381,16 @@ export async function sendBuzzMessage(
     isAdmin: boolean;
     text: string;
     mediaUrl?: string;
-    mediaType?: 'image' | 'file' | 'audio';
+    mediaType?: 'image' | 'file' | 'audio' | 'video';
+    replyTo?: {
+      id: string;
+      senderName: string;
+      text: string;
+    };
   }
 ): Promise<void> {
+  if (!rtdb) return;
+
   const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const now = Date.now();
 
@@ -402,85 +401,146 @@ export async function sendBuzzMessage(
     senderName: message.senderName,
     senderEmail: message.senderEmail,
     senderPhoto: message.senderPhoto || '',
-    isAdmin: message.isAdmin,
+    isAdmin: !!message.isAdmin,
     text: message.text || '',
     mediaUrl: message.mediaUrl || '',
-    mediaType: message.mediaType,
+    mediaType: message.mediaType || 'file',
     timestamp: now,
-    reactions: {}
+    replyTo: message.replyTo,
+    starredBy: {}
   };
 
   const summary = message.mediaUrl 
     ? (message.text ? `[Media] ${message.text}` : '[Shared Media Attachment]')
     : message.text;
 
-  // 1. Write to Firestore
-  if (db) {
-    await setDoc(doc(db, 'buzz_groups', groupId, 'messages', messageId), fullMessage);
-    try {
-      await updateDoc(doc(db, 'buzz_groups', groupId), {
-        lastMessage: summary.slice(0, 100),
-        lastMessageTime: now,
-        lastMessageSender: message.senderName
-      });
-    } catch (e) {}
-  }
+  const rtdbMessage = cleanObject(fullMessage);
 
-  // 2. Safe mirror to RTDB
-  if (rtdb) {
-    try {
-      await set(ref(rtdb, `buzz_messages/${groupId}/${messageId}`), fullMessage);
-      await update(ref(rtdb, `buzz_groups/${groupId}`), {
-        lastMessage: summary.slice(0, 100),
-        lastMessageTime: now,
-        lastMessageSender: message.senderName
-      });
-    } catch (e) {
-      console.warn('RTDB message mirror skipped:', e);
-    }
-  }
-
-  // Local storage backup
   try {
-    const saved = safeStorage.getItem(`ciya_buzz_messages_${groupId}`);
-    const list = saved ? JSON.parse(saved) : [];
-    list.push(fullMessage);
-    safeStorage.setItem(`ciya_buzz_messages_${groupId}`, JSON.stringify(list.slice(-50)));
-  } catch (e) {}
+    const updates: Record<string, any> = {};
+    updates[`buzz_messages/${groupId}/${messageId}`] = rtdbMessage;
+    updates[`buzz_groups/${groupId}/lastMessage`] = summary.slice(0, 100);
+    updates[`buzz_groups/${groupId}/lastMessageTime`] = now;
+    updates[`buzz_groups/${groupId}/lastMessageSender`] = message.senderName;
+    
+    await update(ref(rtdb), updates);
+  } catch (e: any) {
+    console.error('RTDB sendBuzzMessage failed:', e.code, e.message);
+    throw e;
+  }
 }
 
 /**
- * Adds an emoji reaction to a message.
+ * Toggles an emoji reaction in RTDB.
  */
 export async function toggleMessageReaction(
   groupId: string,
   messageId: string,
-  emoji: string
+  emoji: string,
+  userId: string,
+  currentEmoji?: string | null
 ): Promise<void> {
-  if (db) {
-    try {
-      const msgDocRef = doc(db, 'buzz_groups', groupId, 'messages', messageId);
-      const snap = await getDocs(query(collection(db, 'buzz_groups', groupId, 'messages'), limit(1)));
-      // Increment reaction in doc
-      const updateObj: Record<string, any> = {};
-      updateObj[`reactions.${emoji}`] = Date.now(); // Record reaction
-      await updateDoc(msgDocRef, updateObj).catch(() => {});
-    } catch (e) {}
-  }
+  if (!userId || !rtdb || !groupId || !messageId) return;
 
-  if (rtdb) {
-    try {
-      const reactionRef = ref(rtdb, `buzz_messages/${groupId}/${messageId}/reactions/${emoji}`);
-      const snap = await get(reactionRef);
-      const currentCount = snap.exists() ? (snap.val() || 0) : 0;
-      await set(reactionRef, currentCount + 1);
-    } catch (e) {}
+  const userReactionRef = ref(rtdb, `buzz_messages/${groupId}/${messageId}/user_reactions/${userId}`);
+
+  try {
+    const action = currentEmoji === emoji ? remove(userReactionRef) : set(userReactionRef, emoji);
+    
+    await Promise.race([
+      action,
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Realtime Database not reachable')), 8000)
+      )
+    ]);
+  } catch (e: any) {
+    console.error('Reaction toggle failed:', e.code, e.message);
+    throw e;
   }
 }
 
 /**
- * Initializes real-time online presence for a user with safe fallbacks.
+ * Deletes a message from RTDB.
  */
+export async function deleteBuzzMessage(groupId: string, messageId: string): Promise<void> {
+  if (rtdb) {
+    await remove(ref(rtdb, `buzz_messages/${groupId}/${messageId}`));
+  }
+}
+
+/**
+ * Toggles a star (favorite) on a message in RTDB.
+ */
+export async function toggleStarMessage(
+  groupId: string, 
+  messageId: string, 
+  userId: string, 
+  isStarred: boolean,
+  messageData?: BuzzMessage
+): Promise<void> {
+  if (!rtdb || !userId) return;
+
+  try {
+    const updates: Record<string, any> = {};
+    
+    // 1. Update the message itself
+    updates[`buzz_messages/${groupId}/${messageId}/starredBy/${userId}`] = isStarred ? true : null;
+    
+    // 2. Update user's personal stars collection for efficient lookup
+    if (isStarred && messageData) {
+      updates[`user_stars/${userId}/${messageId}`] = cleanObject({
+        ...messageData,
+        groupId,
+        id: messageId,
+        starredAt: Date.now()
+      });
+    } else {
+      updates[`user_stars/${userId}/${messageId}`] = null;
+    }
+
+    await update(ref(rtdb), updates);
+  } catch (e) {
+    console.error('RTDB star update failed:', e);
+  }
+}
+
+/**
+ * Subscribes to starred messages in RTDB.
+ */
+export function subscribeToStarredMessages(
+  userId: string,
+  callback: (messages: BuzzMessage[]) => void
+): () => void {
+  if (!rtdb || !userId) {
+    callback([]);
+    return () => {};
+  }
+
+  const starsRef = ref(rtdb, `user_stars/${userId}`);
+  
+  const unsubscribe = onValue(starsRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data) {
+      callback([]);
+      return;
+    }
+
+    const list: BuzzMessage[] = Object.keys(data).map(id => ({
+      ...data[id],
+      id
+    }));
+
+    list.sort((a, b) => (b.starredAt || b.timestamp || 0) - (a.starredAt || a.timestamp || 0));
+    callback(list);
+  }, (err) => {
+    console.warn('RTDB subscribeToStarredMessages error:', err);
+    callback([]);
+  });
+
+  return () => {
+    try { unsubscribe(); } catch (e) {}
+  };
+}
 export function initUserPresence(
   user: { uid: string; name: string; email: string; photoUrl?: string },
   activeGroupId?: string
@@ -512,7 +572,7 @@ export function initUserPresence(
         try {
           onDisconnect(userPresenceRef).set({
             status: 'offline',
-            lastSeen: serverTimestamp()
+            lastSeen: rtdbTimestamp()
           }).catch(() => {});
 
           set(userPresenceRef, {
@@ -681,11 +741,8 @@ export function subscribeToGroupTyping(
 // Category Management Helpers
 // -------------------------------------------------------------
 export const DEFAULT_BUZZ_CATEGORIES = [
-  'General Lounge',
-  'AI Website & Dev',
-  'AI Film & Video',
-  'AI Graphics & Branding',
-  'Capstone Projects'
+  'Website Development',
+  'Mobile App Development'
 ];
 
 export function subscribeToBuzzCategories(

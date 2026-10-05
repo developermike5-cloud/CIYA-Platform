@@ -96,40 +96,19 @@ if (typeof window !== 'undefined') {
 }
 
 // 2. Resilient firestore initialization
-if (useMemoryCache) {
-  try {
-    firestoreDb = initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-      localCache: memoryLocalCache()
-    }, chosenDatabaseId || undefined);
-  } catch (err) {
-    firestoreDb = getFirestore(app, chosenDatabaseId || undefined);
-  }
-} else {
-  try {
-    // Try to initialize with persistent local cache first for high performance and disk-based offline support
-    firestoreDb = initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-      })
-    }, chosenDatabaseId || undefined);
-  } catch (initError) {
-    try {
-      // If it's already initialized or fails, fall back to getFirestore
-      firestoreDb = getFirestore(app, chosenDatabaseId || undefined);
-    } catch (getDbError) {
-      try {
-        // Fall back to memory cache with forced long polling if IndexedDB is blocked
-        firestoreDb = initializeFirestore(app, {
-          experimentalForceLongPolling: true,
-          localCache: memoryLocalCache()
-        }, chosenDatabaseId || undefined);
-      } catch (secondError: any) {
-        firestoreDb = getFirestore(app, chosenDatabaseId || undefined);
-      }
-    }
-  }
+try {
+  // Use persistent local cache if not in a restricted iframe environment
+  firestoreDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    localCache: useMemoryCache 
+      ? memoryLocalCache() 
+      : persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        })
+  }, chosenDatabaseId || undefined);
+} catch (initError) {
+  // If already initialized or fails, fall back to basic getFirestore
+  firestoreDb = getFirestore(app, chosenDatabaseId || undefined);
 }
 export const db = firestoreDb;
 
@@ -157,18 +136,16 @@ export async function setFirestoreNetworkState(enabled: boolean) {
         await enableNetwork(firestoreDb);
       }
       dbNetworkEnabled = true;
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('firestore-network-status', { detail: { enabled: true } }));
-      }
     } else {
       console.log("Firestore: Freezing network. Operating purely on browser cache...");
       if (firestoreDb) {
         await disableNetwork(firestoreDb);
       }
       dbNetworkEnabled = false;
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('firestore-network-status', { detail: { enabled: false } }));
-      }
+    }
+    
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('firestore-network-status', { detail: { enabled } }));
     }
   } catch (err) {
     console.warn("Failed to switch Firestore network state:", err);
@@ -195,108 +172,39 @@ export function setActiveDatabaseId(dbId: string) {
   }
 }
 
-// 3. Resilient Auth initialization (avoid already-initialized errors and gracefully fall back under sandboxed limitations)
+// 3. Resilient Auth initialization
 let authInstance;
 try {
-  // Try to retrieve existing auth instance first to prevent "already-initialized" errors on reload
   authInstance = getAuth(app);
-} catch (getAuthErr) {
-  try {
-    // Try to initialize with custom multi-persistence config
-    authInstance = initializeAuth(app, {
-      persistence: [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence]
-    });
-  } catch (e: any) {
-    if (e && e.code === 'auth/already-initialized') {
-      authInstance = getAuth(app);
-    } else {
-      console.warn("initializeAuth standard persistence failed (usually iframe constraints), falling back to inMemoryPersistence:", e);
-      try {
-        authInstance = initializeAuth(app, {
-          persistence: inMemoryPersistence
-        });
-      } catch (err2: any) {
-        if (err2 && err2.code === 'auth/already-initialized') {
-          authInstance = getAuth(app);
-        } else {
-          console.error("Auth inMemoryPersistence fallback failed, using getAuth(app):", err2);
-          authInstance = getAuth(app);
-        }
-      }
-    }
-  }
+} catch (e: any) {
+  authInstance = initializeAuth(app, {
+    persistence: [browserLocalPersistence, browserSessionPersistence, inMemoryPersistence]
+  });
 }
 
 export const auth = authInstance;
 
-// Initialize Realtime Database for zero-cost high-frequency real-time events,
-// such as live settings locks, which prevents wasting Firestore daily read/write quota rules!
+// Initialize Realtime Database
 let rtdbInstance;
 try {
-  // Safe regional construction supporting US/EU databases
-  const defaultRtdbUrl = `https://${firebaseConfig.projectId}-default-rtdb.firebaseio.com`;
-  const isEurope = 
-    firebaseConfig.projectId?.includes('europe-west') || 
-    firebaseConfig.firestoreDatabaseId?.includes('europe') ||
-    firebaseConfig.projectId === 'gen-lang-client-0862975917' ||
-    (typeof window !== 'undefined' && (
-      window.location.hostname.includes('europe') || 
-      window.location.hostname.includes('london') || 
-      window.location.hostname.includes('west2')
-    ));
-  const fallbackUrl = isEurope 
-    ? `https://${firebaseConfig.projectId}-default-rtdb.europe-west1.firebasedatabase.app` 
-    : defaultRtdbUrl;
+  const rtdbUrl = (firebaseConfig as any).databaseURL;
+  rtdbInstance = rtdbUrl ? getDatabase(app, rtdbUrl) : getDatabase(app);
   
-  const rtdbUrl = (firebaseConfig as any).databaseURL || fallbackUrl;
-  rtdbInstance = getDatabase(app, rtdbUrl);
+  if (typeof window !== 'undefined') {
+    const connectedRef = ref(rtdbInstance, '.info/connected');
+    onValue(connectedRef, (snap) => {
+      const isConnected = !!snap.val();
+      console.log(`[RTDB] connected: ${isConnected}`);
+    });
+  }
 } catch (e) {
-  console.warn("Could not construct fallbacks for Realtime Database, using standard initialization", e);
+  console.warn("Could not initialize Realtime Database", e);
   rtdbInstance = getDatabase(app);
 }
 
 export const rtdb = rtdbInstance;
 
-// Set up global synchronization hook via Firestore
-import { onSnapshot } from 'firebase/firestore';
-
-let isLocalToggleInitiated = false;
-
-if (typeof window !== 'undefined' && firestoreDb) {
-  try {
-    const signalDocRef = doc(firestoreDb, 'settings', 'system_signals');
-    onSnapshot(signalDocRef, (snapshot) => {
-      if (!snapshot.exists()) return;
-      
-      const data = snapshot.data();
-      const isDisabled = !!data.db_connection_disabled;
-      const shouldBeEnabled = !isDisabled;
-      const isChange = shouldBeEnabled !== dbNetworkEnabled;
-      
-      safeSetItem('ciya_db_connection_disabled', isDisabled ? 'true' : 'false');
-
-      if (isChange) {
-        if (isLocalToggleInitiated) {
-          isLocalToggleInitiated = false;
-          setFirestoreNetworkState(shouldBeEnabled);
-        } else {
-          // background sync - update Firestore connection mode reactively without disruptive page reload
-          setFirestoreNetworkState(shouldBeEnabled).then(() => {
-            console.log("Firestore: DB Connection mode changed in background to", shouldBeEnabled ? "Online" : "Offline");
-          });
-        }
-      }
-    }, (error) => {
-      // If settings/system_signals doesn't exist yet or is restricted, we just ignore it silently
-      // as it's an optional global sync feature.
-      if (error.code !== 'permission-denied') {
-        console.warn("Firestore: System signals sync notice:", error.message);
-      }
-    });
-  } catch (err) {
-    console.warn("Failed to set up Firestore database sync trigger:", err);
-  }
-}
+// Note: Global synchronization hook via Firestore moved to App.tsx to avoid initialization races
 
 export async function setGlobalDbConnectionDisabled(disabled: boolean) {
   isLocalToggleInitiated = true;

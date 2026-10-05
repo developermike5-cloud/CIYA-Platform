@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../../types';
+import CustomDropdown from '../../components/CustomDropdown';
 import { ArrowLeft, Save, Sparkles, AlertCircle, Plus, Trash2, HelpCircle } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
 
@@ -775,6 +776,10 @@ export default function CourseEdit() {
       });
 
       if (!response.ok) {
+        if (response.status === 429) {
+          const data = await response.json();
+          throw new Error(data.message || "AI Rate limit exceeded. Please wait a moment.");
+        }
         throw new Error("Failed to consult Gemini AI. Please check server logs.");
       }
 
@@ -1327,41 +1332,39 @@ export default function CourseEdit() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Skill Category *</label>
-              <select
-                className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold cursor-pointer"
+              <CustomDropdown
                 value={form.skill || "web"}
-                onChange={e => {
-                  const val = e.target.value;
+                options={Object.entries(SKILLS).map(([k, v]) => ({
+                  label: `${v.icon} ${v.label}`,
+                  value: k
+                }))}
+                onChange={val => {
                   setField("skill", val);
                   setField("subskill", SKILLS[val]?.defaultSubskills[0] || "");
                   setField("skillPath", SKILLS[val]?.defaultSkillPaths[0] || "");
                 }}
-              >
-                {Object.entries(SKILLS).map(([k, v]) => (
-                  <option key={k} value={k}>{v.icon} {v.label}</option>
-                ))}
-              </select>
+                className="w-full"
+                theme="indigo"
+              />
             </div>
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Sub-Skill *</label>
               <div className="space-y-2">
-                <select
-                  className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold cursor-pointer"
+                <CustomDropdown
                   value={selectedSkillMeta?.defaultSubskills.includes(form.subskill || "") ? form.subskill : "custom"}
-                  onChange={e => {
-                    const val = e.target.value;
+                  options={[
+                    ...(selectedSkillMeta?.defaultSubskills.map(sub => ({ label: sub, value: sub })) || []),
+                    { label: '➕ Add Custom Subskill...', value: 'custom' }
+                  ]}
+                  onChange={val => {
                     if (val === "custom") {
                       setField("subskill", "");
                     } else {
                       setField("subskill", val);
                     }
                   }}
-                >
-                  {selectedSkillMeta?.defaultSubskills.map(sub => (
-                    <option key={sub} value={sub}>{sub}</option>
-                  ))}
-                  <option value="custom">➕ Add Custom Subskill...</option>
-                </select>
+                  className="w-full"
+                />
 
                 {(!selectedSkillMeta?.defaultSubskills.includes(form.subskill || "") || form.subskill === "") && (
                   <input
@@ -1380,23 +1383,21 @@ export default function CourseEdit() {
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Skill Path *</label>
               <div className="space-y-2">
-                <select
-                  className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold cursor-pointer"
+                <CustomDropdown
                   value={selectedSkillMeta?.defaultSkillPaths.includes(form.skillPath || "") ? form.skillPath : "custom"}
-                  onChange={e => {
-                    const val = e.target.value;
+                  options={[
+                    ...(selectedSkillMeta?.defaultSkillPaths.map(path => ({ label: path, value: path })) || []),
+                    { label: '➕ Add Custom Skill Path...', value: 'custom' }
+                  ]}
+                  onChange={val => {
                     if (val === "custom") {
                       setField("skillPath", "");
                     } else {
                       setField("skillPath", val);
                     }
                   }}
-                >
-                  {selectedSkillMeta?.defaultSkillPaths.map(path => (
-                    <option key={path} value={path}>{path}</option>
-                  ))}
-                  <option value="custom">➕ Add Custom Skill Path...</option>
-                </select>
+                  className="w-full"
+                />
 
                 {(!selectedSkillMeta?.defaultSkillPaths.includes(form.skillPath || "") || form.skillPath === "") && (
                   <input
@@ -1411,33 +1412,34 @@ export default function CourseEdit() {
             </div>
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Course Duration Mode *</label>
-              <select
-                className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold cursor-pointer"
+              <CustomDropdown
                 value={form.durationMode || "standard"}
-                onChange={e => setField("durationMode", e.target.value)}
-              >
-                <option value="standard">Standard (5-Day Structured pacing)</option>
-                <option value="express">Express (Self-paced, immediate access)</option>
-              </select>
+                options={[
+                  { label: 'Standard (5-Day Structured pacing)', value: 'standard' },
+                  { label: 'Express (Self-paced, immediate access)', value: 'express' }
+                ]}
+                onChange={val => setField("durationMode", val)}
+                className="w-full"
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Difficulty/Tier</label>
-              <select
-                className="w-full bg-slate-50 text-slate-950 border border-slate-200 rounded-xl p-3 focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-bold cursor-pointer"
+              <CustomDropdown
                 value={form.tier || "beginner"}
-                onChange={e => {
-                  const val = e.target.value as any;
+                options={[
+                  { label: 'Beginner (Free)', value: 'beginner' },
+                  { label: 'Advanced (₦15,000)', value: 'advanced' },
+                  { label: 'Masterclass (₦30,000)', value: 'masterclass' }
+                ]}
+                onChange={val => {
                   setField("tier", val);
                   setField("price", val === 'beginner' ? 0 : val === 'advanced' ? 15000 : 30000);
                 }}
-              >
-                <option value="beginner">Beginner (Free)</option>
-                <option value="advanced">Advanced (₦15,000)</option>
-                <option value="masterclass">Masterclass (₦30,000)</option>
-              </select>
+                className="w-full"
+              />
             </div>
             <div>
               <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Instructor</label>
@@ -1728,58 +1730,57 @@ export default function CourseEdit() {
                         {/* Course Selector */}
                         <div>
                           <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">Source Track Module</label>
-                          <select
-                            onChange={(e) => {
-                              const val = e.target.value;
+                          <CustomDropdown
+                            value={importSelectedCourseId[vIdx] || ""}
+                            options={[
+                              { label: '-- Choose Course --', value: '' },
+                              ...coursesList
+                                .filter(c => !courseId || c.id !== courseId)
+                                .map((c) => ({
+                                  label: c.title,
+                                  value: c.id
+                                }))
+                            ]}
+                            onChange={(val) => {
                               setImportSelectedCourseId(prev => ({ ...prev, [vIdx]: val }));
                               setImportSelectedLessonIdx(prev => ({ ...prev, [vIdx]: "" }));
                             }}
-                            value={importSelectedCourseId[vIdx] || ""}
-                            className="w-full text-xs font-semibold p-2 rounded-lg border border-slate-200 bg-white focus:ring-1 focus:ring-teal-500 text-slate-800"
-                          >
-                            <option value="">-- Choose Course --</option>
-                            {coursesList
-                              .filter(c => !courseId || c.id !== courseId)
-                              .map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.title}
-                                </option>
-                              ))
-                            }
-                          </select>
+                            className="w-full"
+                            theme="indigo"
+                          />
                         </div>
 
                         {/* Lesson Selector */}
                         <div>
                           <label className="block text-[9px] uppercase font-bold text-slate-500 mb-1">Source Lesson</label>
-                          <select
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setImportSelectedLessonIdx(prev => ({ ...prev, [vIdx]: val }));
-                            }}
+                          <CustomDropdown
                             value={importSelectedLessonIdx[vIdx] || ""}
                             disabled={!importSelectedCourseId[vIdx]}
-                            className="w-full text-xs font-semibold p-2 rounded-lg border border-slate-200 bg-white focus:ring-1 focus:ring-teal-500 text-slate-800 disabled:opacity-40"
-                          >
-                            <option value="">-- Select Lesson --</option>
-                            {(() => {
-                              const srcCourse = coursesList.find(c => c.id === importSelectedCourseId[vIdx]);
-                              if (!srcCourse) return null;
-                              
-                              const optionsList: { dayIdx: number, videoIdx: number, video: CourseVideo }[] = [];
-                              (srcCourse.days || []).forEach((day, dI) => {
-                                (day.videos || []).forEach((vid, vI) => {
-                                  optionsList.push({ dayIdx: dI, videoIdx: vI, video: vid });
+                            options={[
+                              { label: '-- Select Lesson --', value: '' },
+                              ...(() => {
+                                const srcCourse = coursesList.find(c => c.id === importSelectedCourseId[vIdx]);
+                                if (!srcCourse) return [];
+                                
+                                const optionsList: { dayIdx: number, videoIdx: number, video: CourseVideo }[] = [];
+                                (srcCourse.days || []).forEach((day, dI) => {
+                                  (day.videos || []).forEach((vid, vI) => {
+                                    optionsList.push({ dayIdx: dI, videoIdx: vI, video: vid });
+                                  });
                                 });
-                              });
-                              
-                              return optionsList.map((item, optI) => (
-                                <option key={optI} value={`${item.dayIdx}-${item.videoIdx}`}>
-                                  Day {item.dayIdx + 1}: {item.video.title || `Lesson ${item.videoIdx + 1}`}
-                                </option>
-                              ));
-                            })()}
-                          </select>
+                                
+                                return optionsList.map((item) => ({
+                                  label: `Day ${item.dayIdx + 1}: ${item.video.title || `Lesson ${item.videoIdx + 1}`}`,
+                                  value: `${item.dayIdx}-${item.videoIdx}`
+                                }));
+                              })()
+                            ]}
+                            onChange={(val) => {
+                              setImportSelectedLessonIdx(prev => ({ ...prev, [vIdx]: val }));
+                            }}
+                            className="w-full"
+                            theme="indigo"
+                          />
                         </div>
 
                         {/* Trigger button */}
@@ -2042,16 +2043,18 @@ export default function CourseEdit() {
 
                       <div>
                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Min Screenshot Uploads</label>
-                        <select
-                          className="w-full bg-white text-slate-950 border border-slate-200 rounded-xl p-2.5 focus:ring-1 focus:ring-indigo-500 outline-none text-xs font-bold"
-                          value={(form.days || [])[activeDayIdx]?.assignment?.minScreenshots || 0}
-                          onChange={e => handleAssignmentChange(activeDayIdx, 'minScreenshots', parseInt(e.target.value) || 0)}
-                        >
-                          <option value="0">No screenshots required (0)</option>
-                          <option value="1">At least 1 screenshot</option>
-                          <option value="2">At least 2 screenshots</option>
-                          <option value="3">At least 3 screenshots (Recommended)</option>
-                        </select>
+                        <CustomDropdown
+                          value={((form.days || [])[activeDayIdx]?.assignment?.minScreenshots || 0).toString()}
+                          options={[
+                            { label: 'No screenshots required (0)', value: '0' },
+                            { label: 'At least 1 screenshot', value: '1' },
+                            { label: 'At least 2 screenshots', value: '2' },
+                            { label: 'At least 3 screenshots (Recommended)', value: '3' }
+                          ]}
+                          onChange={val => handleAssignmentChange(activeDayIdx, 'minScreenshots', parseInt(val) || 0)}
+                          className="w-full"
+                          theme="indigo"
+                        />
                       </div>
 
                       <div className="sm:col-span-2">

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, limit, where, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db, auth, triggerSystemSignal } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { CheckCircle2, XCircle, Clock, Search, FileText, Download, Check, RefreshCw, Trash2, Trash } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Search, FileText, ExternalLink, Check, RefreshCw, Trash2, Trash, ChevronDown, Copy } from 'lucide-react';
+import CustomDropdown from '../../components/CustomDropdown';
 import { safeStorage } from '../../utils/safeStorage';
 import { rejectSubmissionMedia } from '../../lib/cloudinaryService';
 
@@ -57,6 +58,7 @@ export default function AssignmentsAdmin() {
   const [reason, setReason] = useState('');
   const [submittingGrade, setSubmittingGrade] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'refused', msg: string } | null>(null);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
 
@@ -383,29 +385,28 @@ export default function AssignmentsAdmin() {
               />
             </div>
             {/* Course Type Filter Dropdown */}
-            <select
+            <CustomDropdown
               value={courseTypeFilter}
-              onChange={(e) => setCourseTypeFilter(e.target.value as any)}
-              className="bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm shrink-0"
-            >
-              <option value="All">All Curriculum Levels</option>
-              <option value="Beginner">Beginner's Courses Only</option>
-              <option value="Advanced">Advanced Courses Only</option>
-            </select>
+              options={[
+                { label: 'All Curriculum Levels', value: 'All' },
+                { label: "Beginner's Courses Only", value: 'Beginner' },
+                { label: 'Advanced Courses Only', value: 'Advanced' }
+              ]}
+              onChange={(val) => setCourseTypeFilter(val as any)}
+              className="w-48"
+            />
             {/* Cohort Filter Dropdown */}
-            <select
+            <CustomDropdown
               value={cohortFilter}
-              onChange={(e) => setCohortFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm shrink-0"
-            >
-              <option value="All">All Cohorts</option>
-              {uniqueCohorts.map(cohort => (
-                <option key={cohort} value={cohort}>{cohort}</option>
-              ))}
-              {/* Ensure default cohorts exist as options */}
-              {!uniqueCohorts.includes('Cohort 1') && <option value="Cohort 1">Cohort 1</option>}
-              {!uniqueCohorts.includes('Cohort 2') && <option value="Cohort 2">Cohort 2</option>}
-            </select>
+              options={[
+                { label: 'All Cohorts', value: 'All' },
+                ...uniqueCohorts.map(cohort => ({ label: cohort, value: cohort })),
+                ...(!uniqueCohorts.includes('Cohort 1') ? [{ label: 'Cohort 1', value: 'Cohort 1' }] : []),
+                ...(!uniqueCohorts.includes('Cohort 2') ? [{ label: 'Cohort 2', value: 'Cohort 2' }] : [])
+              ]}
+              onChange={(val) => setCohortFilter(val)}
+              className="w-40"
+            />
           </div>
 
           {/* Bulk deletion action banner */}
@@ -511,10 +512,10 @@ export default function AssignmentsAdmin() {
                         </span>
                       </td>
                       <td className="p-3">
-                        {sub.fileName ? (
-                          <div className="flex items-center gap-1.5 text-teal-700 font-semibold max-w-[150px] truncate">
-                            <FileText className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">{sub.fileName}</span>
+                        {sub.fileUrl ? (
+                          <div className="flex items-center gap-1.5 text-slate-500 font-semibold max-w-[150px] truncate">
+                            <FileText className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                            <span className="truncate">{sub.fileName || "Attachment"}</span>
                           </div>
                         ) : (
                           <span className="text-slate-400 text-[10px] font-bold">Text-only Response</span>
@@ -608,15 +609,38 @@ export default function AssignmentsAdmin() {
                       </div>
                     </div>
                     
-                    <a 
-                      href={selectedSub.fileUrl} 
-                      download={selectedSub.fileName || "submission"}
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10px] uppercase tracking-wide px-3 py-2 rounded-xl shrink-0 cursor-pointer border-0"
-                    >
-                      <Download className="w-3 h-3" /> View Link / File
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center bg-slate-100 rounded-xl px-3 py-2 border border-slate-200/50 max-w-[160px] group transition-all hover:bg-slate-200/50">
+                        <input 
+                          readOnly 
+                          value={selectedSub.fileUrl} 
+                          className="bg-transparent text-[10px] text-slate-500 outline-none w-full cursor-default font-mono truncate"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedSub.fileUrl) {
+                              navigator.clipboard.writeText(selectedSub.fileUrl);
+                              setCopiedUrl(true);
+                              setTimeout(() => setCopiedUrl(false), 2000);
+                            }
+                          }}
+                          className="text-slate-400 hover:text-indigo-600 transition-colors ml-1 p-0.5"
+                          title="Copy URL"
+                        >
+                          {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+
+                      <a 
+                        href={selectedSub.fileUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10px] uppercase tracking-wide px-3 py-2 rounded-xl shrink-0 cursor-pointer border-0 transition-all active:scale-95 shadow-sm"
+                      >
+                        <ExternalLink className="w-3 h-3" /> Open
+                      </a>
+                    </div>
                   </div>
 
                   {/* Image render sandbox if it is an image */}

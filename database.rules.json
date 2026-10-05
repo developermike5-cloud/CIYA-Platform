@@ -1,0 +1,74 @@
+{
+  "rules": {
+    // Root level: Default deny for absolute safety
+    ".read": false,
+    ".write": false,
+
+    "buzz_messages": {
+      "$groupId": {
+        // Only authenticated users can read messages in a group
+        ".read": "auth != null",
+        "$messageId": {
+          // Users can write if they are authenticated and it's a new message OR they are the sender
+          ".write": "auth != null && (!data.exists() || data.child('senderUid').val() === auth.uid)",
+          "user_reactions": {
+            "$uid": {
+              // Users can only write their own reactions
+              ".write": "auth != null && $uid === auth.uid",
+              ".validate": "newData.isString() && newData.val().length <= 8"
+            }
+          },
+          "starredBy": {
+            "$uid": {
+              // Users can only star/unstar for themselves
+              ".write": "auth != null && $uid === auth.uid"
+            }
+          }
+        }
+      }
+    },
+    "buzz_groups": {
+      // Authenticated users can see the list of groups
+      ".read": "auth != null",
+      "$groupId": {
+        // Group metadata updates (last message info) allowed for authenticated users
+        ".write": "auth != null",
+        "lastMessage": { ".write": "auth != null" },
+        "lastMessageTime": { ".write": "auth != null" },
+        "lastMessageSender": { ".write": "auth != null" }
+      }
+    },
+    "user_stars": {
+      "$uid": {
+        // Strictly private - only the owner can see or manage their starred messages
+        ".read": "auth != null && $uid === auth.uid",
+        ".write": "auth != null && $uid === auth.uid"
+      }
+    },
+    "presence": {
+      // Users can see who is online
+      ".read": "auth != null",
+      "$uid": {
+        // Users can only update their own presence status
+        ".write": "auth != null && $uid === auth.uid"
+      }
+    },
+    "typing": {
+      "$groupId": {
+        // Users can see who is typing in their group
+        ".read": "auth != null",
+        "$uid": {
+          // Users can only set their own typing status
+          ".write": "auth != null && $uid === auth.uid"
+        }
+      }
+    },
+    "settings": {
+      "buzz_categories": {
+        // Global settings for categories
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag } from 'lucide-react';
 import { ALL_COUNTRIES } from '../utils/countries';
+import CustomDropdown from '../components/CustomDropdown';
 
 type Pathway = 'A' | 'B' | 'C' | null;
 
@@ -444,27 +445,31 @@ _Action: Please review my CIY Academy application. Thank you!_`;
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Gender *</label>
-                  <div className="relative">
-                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                    <select value={data.gender} onChange={e => selectData('gender', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-800">
-                      <option value="" disabled>Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    value={data.gender}
+                    onChange={val => selectData('gender', val)}
+                    options={[
+                      { label: 'Select Gender', value: '' },
+                      { label: 'Male', value: 'Male' },
+                      { label: 'Female', value: 'Female' }
+                    ]}
+                    className="w-full"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Age Range *</label>
-                  <div className="relative">
-                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                    <select value={data.ageRange} onChange={e => selectData('ageRange', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-800">
-                      <option value="" disabled>Select Age Range</option>
-                      <option value="Below 18">Below 18</option>
-                      <option value="Between 18-25">Between 18-25</option>
-                      <option value="Between 25-36">Between 25-36</option>
-                      <option value="Above 36">Above 36</option>
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    value={data.ageRange}
+                    onChange={val => selectData('ageRange', val)}
+                    options={[
+                      { label: 'Select Age Range', value: '' },
+                      { label: 'Below 18', value: 'Below 18' },
+                      { label: 'Between 18-25', value: 'Between 18-25' },
+                      { label: 'Between 25-36', value: 'Between 25-36' },
+                      { label: 'Above 36', value: 'Above 36' }
+                    ]}
+                    className="w-full"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">WhatsApp Number *</label>
@@ -475,37 +480,40 @@ _Action: Please review my CIY Academy application. Thank you!_`;
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Country *</label>
-                  <div className="relative">
-                    <Globe className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                    <select value={data.country} onChange={e => handleCountryChange(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-800 cursor-pointer">
-                      <option value="" disabled>Select Country</option>
-                      {COUNTRIES.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    value={data.country}
+                    onChange={val => handleCountryChange(val)}
+                    options={[
+                      { label: 'Select Country', value: '' },
+                      ...COUNTRIES.map(c => ({ label: c, value: c }))
+                    ]}
+                    className="w-full"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">State / Region *</label>
-                  <div className="relative">
-                    <MapPin className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
-                    {data.country && COUNTRY_STATES[data.country] ? (
-                      <select value={data.state} onChange={e => selectData('state', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all appearance-none text-slate-800 cursor-pointer">
-                        <option value="" disabled>Select State</option>
-                        {COUNTRY_STATES[data.country].map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    ) : (
+                  {data.country && COUNTRY_STATES[data.country] ? (
+                    <CustomDropdown
+                      value={data.state}
+                      onChange={val => selectData('state', val)}
+                      options={[
+                        { label: 'Select State', value: '' },
+                        ...COUNTRY_STATES[data.country].map(s => ({ label: s, value: s }))
+                      ]}
+                      className="w-full"
+                    />
+                  ) : (
+                    <div className="relative">
+                      <MapPin className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input 
                         type="text" 
                         value={data.state} 
                         onChange={e => selectData('state', e.target.value)} 
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all text-slate-800" 
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all text-slate-800 placeholder:text-slate-400" 
                         placeholder="Type State/Region..." 
                       />
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

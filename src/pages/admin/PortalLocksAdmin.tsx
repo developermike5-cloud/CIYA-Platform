@@ -55,6 +55,8 @@ import { safeStorage } from '../../utils/safeStorage';
 import { generateTimeBasedCode, verifyTimeBasedCode, getPasscodeSecondsLeft } from '../../utils/passcode';
 import CIYAMembershipBadge from '../../components/CIYAMembershipBadge';
 
+import CustomDropdown from '../../components/CustomDropdown';
+
 interface LockedSections {
   courses: boolean;
   prompts: boolean;
@@ -1584,18 +1586,19 @@ export default function PortalLocksAdmin() {
               </div>
               <div className="min-w-[200px]">
                 <label className="block text-[10px] uppercase font-black text-slate-400 mb-1">Select Course</label>
-                <select
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-bold text-xs rounded-xl p-2.5 outline-none focus:ring-1 focus:ring-indigo-500"
+                <CustomDropdown
                   value={selectedCourseId}
-                  onChange={(e) => setSelectedCourseId(e.target.value)}
-                >
-                  <option value="">-- Choose Course --</option>
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title} ({c.level || 'Beginner'})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedCourseId(val)}
+                  options={[
+                    { label: "-- Choose Course --", value: "" },
+                    ...courses.map(c => ({
+                      label: `${c.title} (${c.level || 'Beginner'})`,
+                      value: c.id
+                    }))
+                  ]}
+                  className="w-full"
+                  theme="light"
+                />
               </div>
             </div>
 
@@ -1831,19 +1834,17 @@ export default function PortalLocksAdmin() {
                         return (
                           <td key={dayIdx} className="p-4 text-center">
                             <div className="inline-flex items-center gap-1.5 justify-center">
-                              <select
+                              <CustomDropdown
                                 value={current}
-                                onChange={(e) => handleUpdateDayLock(course.id, dayIdx, e.target.value as any)}
-                                className={`p-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider border outline-none cursor-pointer ${
-                                  current === 'locked' ? 'bg-rose-50 border-rose-200 text-rose-700' :
-                                  current === 'unlocked' ? 'bg-emerald-50 border-emerald-200 text-emerald-850' :
-                                  'bg-blue-50 border-blue-200 text-blue-700'
-                                }`}
-                              >
-                                <option value="default">Default Rules</option>
-                                <option value="unlocked">Force Open 🔓</option>
-                                <option value="locked">Force Lock 🔒</option>
-                              </select>
+                                onChange={(val) => handleUpdateDayLock(course.id, dayIdx, val as any)}
+                                options={[
+                                  { label: "Default Rules", value: "default" },
+                                  { label: "Force Open 🔓", value: "unlocked" },
+                                  { label: "Force Lock 🔒", value: "locked" }
+                                ]}
+                                className="w-full min-w-[120px]"
+                                theme="light"
+                              />
                             </div>
                           </td>
                         );
@@ -2171,16 +2172,18 @@ export default function PortalLocksAdmin() {
 
                           <div className="space-y-1.5">
                             <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Minimum Screenshots Needed</label>
-                            <select
-                              value={config.minScreenshots}
-                              onChange={(e) => handleUpdateAssignmentSetting(dayKey, 'minScreenshots', Number(e.target.value))}
-                              className="w-full bg-white border border-slate-200 text-slate-800 font-bold text-xs rounded-lg p-2"
-                            >
-                              <option value="0">No screenshots required</option>
-                              <option value="1">At least 1 screenshot</option>
-                              <option value="2">At least 2 screenshots</option>
-                              <option value="3">At least 3 screenshots</option>
-                            </select>
+                            <CustomDropdown
+                              value={config.minScreenshots.toString()}
+                              onChange={(val) => handleUpdateAssignmentSetting(dayKey, 'minScreenshots', Number(val))}
+                              options={[
+                                { label: "No screenshots required", value: "0" },
+                                { label: "At least 1 screenshot", value: "1" },
+                                { label: "At least 2 screenshots", value: "2" },
+                                { label: "At least 3 screenshots", value: "3" }
+                              ]}
+                              className="w-full"
+                              theme="light"
+                            />
                           </div>
 
                           <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-100">
@@ -2198,18 +2201,20 @@ export default function PortalLocksAdmin() {
                               <span>Approval Processing Delay</span>
                               {!config.autoApprove && <span className="text-[9px] text-rose-500 font-extrabold font-mono">Requires Auto-Approval ON</span>}
                             </label>
-                            <select
+                            <CustomDropdown
                               disabled={!config.autoApprove}
                               value={config.approvalDelay || 'instant'}
-                              onChange={(e) => handleUpdateUnlockSetting ? handleUpdateAssignmentSetting(dayKey, 'approvalDelay', e.target.value) : undefined}
-                              className="w-full bg-white border border-slate-200 text-slate-850 font-bold text-xs rounded-lg p-2 disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-100 cursor-pointer disabled:cursor-not-allowed"
-                            >
-                              <option value="instant">Instant Approval (Immediate)</option>
-                              <option value="10m">10 Minutes Delay</option>
-                              <option value="20m">20 Minutes Delay</option>
-                              <option value="30m">30 Minutes Delay</option>
-                              <option value="1h">1 Hour Delay</option>
-                            </select>
+                              onChange={(val) => handleUpdateAssignmentSetting(dayKey, 'approvalDelay', val as any)}
+                              options={[
+                                { label: "Instant Approval (Immediate)", value: "instant" },
+                                { label: "10 Minutes Delay", value: "10m" },
+                                { label: "20 Minutes Delay", value: "20m" },
+                                { label: "30 Minutes Delay", value: "30m" },
+                                { label: "1 Hour Delay", value: "1h" }
+                              ]}
+                              className="w-full"
+                              theme="light"
+                            />
                           </div>
                         </div>
 
@@ -2258,20 +2263,22 @@ export default function PortalLocksAdmin() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="block text-[10px] uppercase font-black text-slate-500 mb-1">Select Timezone</label>
-                    <select
+                    <CustomDropdown
                       value={beginnersSettings.timezone}
-                      onChange={(e) => {
-                        const updated = { ...beginnersSettings, timezone: e.target.value };
+                      onChange={(val) => {
+                        const updated = { ...beginnersSettings, timezone: val };
                         setBeginnersSettings(updated);
                         setHasUnsavedChanges(true);
                         hasUnsavedChangesRef.current = true;
                       }}
-                      className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-bold text-xs rounded-xl p-2.5 outline-none"
-                    >
-                      <option value="UTC+1">UTC+1 (Nigeria Time)</option>
-                      <option value="UTC">UTC (Greenwich Mean Time)</option>
-                      <option value="UTC+2">UTC+2 (Eastern Europe)</option>
-                    </select>
+                      options={[
+                        { label: "UTC+1 (Nigeria Time)", value: "UTC+1" },
+                        { label: "UTC (Greenwich Mean Time)", value: "UTC" },
+                        { label: "UTC+2 (Eastern Europe)", value: "UTC+2" }
+                      ]}
+                      className="w-full"
+                      theme="light"
+                    />
                   </div>
                   
                   <div className="space-y-1 bg-slate-900 rounded-xl p-2 text-white flex flex-col justify-center items-center">
@@ -2440,14 +2447,16 @@ export default function PortalLocksAdmin() {
 
                     <div className="space-y-1">
                       <label className="block text-[10px] uppercase font-black text-slate-500">Progression Type</label>
-                      <select
+                      <CustomDropdown
                         value={config.type}
-                        onChange={(e) => handleUpdateUnlockSetting(dayKey, 'type', e.target.value as any)}
-                        className="w-full bg-white border border-slate-200 text-slate-900 font-bold text-xs rounded-xl p-2.5 outline-none cursor-pointer"
-                      >
-                        <option value="immediate">{dayIdx === 0 ? "Unlock Immediately on Course Start" : "Preceding Assignment Approved (Standard)"}</option>
-                        <option value="date_time">Schedule Unlock Date & Time</option>
-                      </select>
+                        onChange={(val) => handleUpdateUnlockSetting(dayKey, 'type', val as any)}
+                        options={[
+                          { label: dayIdx === 0 ? "Unlock Immediately on Course Start" : "Preceding Assignment Approved (Standard)", value: "immediate" },
+                          { label: "Schedule Unlock Date & Time", value: "date_time" }
+                        ]}
+                        className="w-full"
+                        theme="light"
+                      />
                     </div>
 
                     {config.type === 'date_time' && (
@@ -2647,18 +2656,19 @@ export default function PortalLocksAdmin() {
                   </div>
 
                   {enrolledAdvancedCourseOptions.length > 1 && (
-                    <select
+                    <CustomDropdown
                       value={advancedFilterCourse}
-                      onChange={(e) => setAdvancedFilterCourse(e.target.value)}
-                      className="py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
-                    >
-                      <option value="all">All Tracks ({advancedStudents.length})</option>
-                      {enrolledAdvancedCourseOptions.map((title) => (
-                        <option key={title} value={title}>
-                          {title}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => setAdvancedFilterCourse(val)}
+                      options={[
+                        { label: `All Tracks (${advancedStudents.length})`, value: "all" },
+                        ...enrolledAdvancedCourseOptions.map((title) => ({
+                          label: title,
+                          value: title
+                        }))
+                      ]}
+                      className="min-w-[200px]"
+                      theme="light"
+                    />
                   )}
 
                   <button
@@ -3742,7 +3752,7 @@ export function YearBadgePaymentFlow({
             <a
               href={waLink}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="w-full py-3 bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-md flex items-center justify-center gap-2 no-underline border-0"
             >
               💬 Message Admin on WhatsApp

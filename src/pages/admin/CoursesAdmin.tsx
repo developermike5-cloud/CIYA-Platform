@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
+import CustomDropdown from '../../components/CustomDropdown';
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy, Download, Upload } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
@@ -285,40 +286,41 @@ export default function CoursesAdmin() {
         <div className="flex flex-wrap items-center gap-2">
           <div>
             <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Filter by Skill</label>
-            <select
+            <CustomDropdown
               value={filterSkill}
-              onChange={e => setFilterSkill(e.target.value)}
-              className="bg-white border-2 border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 cursor-pointer transition-all"
-            >
-              <option value="all">All Skills Category</option>
-              {Object.entries(SKILLS).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </select>
+              options={[
+                { label: 'All Skills Category', value: 'all' },
+                ...Object.entries(SKILLS).map(([k, v]) => ({ label: v.label, value: k }))
+              ]}
+              onChange={val => setFilterSkill(val)}
+              className="w-44"
+            />
           </div>
           <div>
             <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Filter by Status</label>
-            <select
+            <CustomDropdown
               value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-              className="bg-white border-2 border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 cursor-pointer transition-all"
-            >
-              <option value="all">All Statuses</option>
-              <option value="published">Published</option>
-              <option value="draft">Draft Only</option>
-            </select>
+              options={[
+                { label: 'All Statuses', value: 'all' },
+                { label: 'Published', value: 'published' },
+                { label: 'Draft Only', value: 'draft' }
+              ]}
+              onChange={val => setFilterStatus(val)}
+              className="w-40"
+            />
           </div>
           <div>
             <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Filter by Duration</label>
-            <select
+            <CustomDropdown
               value={filterDuration}
-              onChange={e => setFilterDuration(e.target.value)}
-              className="bg-white border-2 border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 cursor-pointer transition-all"
-            >
-              <option value="all">All Durations</option>
-              <option value="standard">Standard</option>
-              <option value="express">Express</option>
-            </select>
+              options={[
+                { label: 'All Durations', value: 'all' },
+                { label: 'Standard', value: 'standard' },
+                { label: 'Express', value: 'express' }
+              ]}
+              onChange={val => setFilterDuration(val)}
+              className="w-40"
+            />
           </div>
         </div>
 

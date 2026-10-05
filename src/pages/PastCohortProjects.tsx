@@ -268,7 +268,7 @@ export default function PastCohortProjects() {
       <div className="absolute bottom-[-15%] left-[-10%] w-[600px] h-[600px] bg-amber-500/5 rounded-full blur-[180px] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(#0f766e_1px,transparent_1px)] [background-size:32px_32px] opacity-10 pointer-events-none" />
 
-      {/* LEFT SIDEBAR: Highly Convincing Cohort 3 Marketing Campaign */}
+      {/* LEFT SIDEBAR: Highly Convincing Cohort 4 Marketing Campaign */}
       <div className="w-full lg:w-[420px] shrink-0 border-b lg:border-b-0 lg:border-r border-teal-500/20 bg-slate-950/90 backdrop-blur-xl p-8 flex flex-col justify-between relative z-20">
         
         <div className="space-y-6">
@@ -292,7 +292,7 @@ export default function PastCohortProjects() {
           {/* Straightforward Conversion Copy */}
           <div className="space-y-4 text-slate-300 text-sm font-semibold leading-relaxed">
             <p>
-              Every single 3D rotating website you see in this live sphere was designed entirely by our graduated students in <span className="text-white font-extrabold">Cohort 1</span> and <span className="text-white font-extrabold">Cohort 2</span>.
+              Every single 3D rotating website you see in this live sphere was designed entirely by our graduated students in <span className="text-white font-extrabold">Cohort 1</span>, <span className="text-white font-extrabold">Cohort 2</span> and <span className="text-white font-extrabold">Cohort 3</span>.
             </p>
             
             <p className="bg-teal-950/50 border border-teal-800/40 p-3 rounded-xl text-teal-300 text-xs font-bold shadow-inner">

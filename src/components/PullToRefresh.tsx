@@ -5,9 +5,10 @@ import { RefreshCw } from 'lucide-react';
 interface PullToRefreshProps {
   onRefresh: () => Promise<void>;
   children: React.ReactNode;
+  disabled?: boolean;
 }
 
-export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children }) => {
+export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, disabled = false }) => {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -17,6 +18,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
   const PULL_THRESHOLD = 80;
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (disabled) return;
     if (containerRef.current && containerRef.current.scrollTop === 0) {
       startY.current = e.touches[0].pageY;
       isPulling.current = true;
@@ -24,7 +26,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isPulling.current || isRefreshing) return;
+    if (disabled || !isPulling.current || isRefreshing) return;
 
     const currentY = e.touches[0].pageY;
     const diff = currentY - startY.current;
@@ -33,11 +35,6 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
       // Apply resistance
       const distance = Math.min(diff * 0.4, PULL_THRESHOLD + 20);
       setPullDistance(distance);
-      
-      // Prevent default only if pulling down at the top
-      if (e.cancelable) {
-        // e.preventDefault(); // Might interfere with natural scroll, so we're careful
-      }
     } else {
       isPulling.current = false;
       setPullDistance(0);
@@ -45,7 +42,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
   };
 
   const handleTouchEnd = async () => {
-    if (!isPulling.current || isRefreshing) return;
+    if (disabled || !isPulling.current || isRefreshing) return;
     
     isPulling.current = false;
     
@@ -66,31 +63,33 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
   return (
     <div 
       ref={containerRef}
-      className="relative h-full overflow-y-auto"
+      className={`relative h-full ${disabled ? '' : 'overflow-y-auto'}`}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {/* Pull Indicator */}
-      <motion.div 
-        style={{ 
-          height: isRefreshing ? PULL_THRESHOLD : pullDistance,
-          opacity: Math.min(pullDistance / PULL_THRESHOLD, 1)
-        }}
-        className="flex items-center justify-center overflow-hidden bg-slate-900/50 backdrop-blur-sm"
-      >
-        <motion.div
-          animate={isRefreshing ? { rotate: 360 } : { rotate: (pullDistance / PULL_THRESHOLD) * 360 }}
-          transition={isRefreshing ? { repeat: Infinity, duration: 1, ease: "linear" } : { type: "spring" }}
-          className="text-emerald-400"
+      {!disabled && (
+        <motion.div 
+          style={{ 
+            height: isRefreshing ? PULL_THRESHOLD : pullDistance,
+            opacity: Math.min(pullDistance / PULL_THRESHOLD, 1)
+          }}
+          className="flex items-center justify-center overflow-hidden bg-slate-900/50 backdrop-blur-sm"
         >
-          <RefreshCw className="w-6 h-6" />
+          <motion.div
+            animate={isRefreshing ? { rotate: 360 } : { rotate: (pullDistance / PULL_THRESHOLD) * 360 }}
+            transition={isRefreshing ? { repeat: Infinity, duration: 1, ease: "linear" } : { type: "spring" }}
+            className="text-emerald-400"
+          >
+            <RefreshCw className="w-6 h-6" />
+          </motion.div>
         </motion.div>
-      </motion.div>
+      )}
 
       <motion.div
-        animate={{ y: isRefreshing ? 0 : 0 }} // Content doesn't need to move down, indicator is above
-        className="relative z-10"
+        animate={{ y: 0 }}
+        className={`relative z-10 ${disabled ? 'h-full' : ''}`}
       >
         {children}
       </motion.div>

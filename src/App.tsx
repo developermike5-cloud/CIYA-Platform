@@ -32,33 +32,60 @@ function AppContent() {
   const navigate = useNavigate();
   const locationRef = useRef(location.pathname);
   const { needRefresh, updateServiceWorker } = usePWAInstall();
+  const [user, setUser] = useState<any>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // Handle Updates: Auto-refresh when a new version is detected
+  // Track auth state for smart update logic
   useEffect(() => {
-    if (needRefresh) {
-      console.log('[PWA] Update detected. Refreshing for latest version...');
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setIsAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // Handle Updates: 
+  // - Unauthenticated users (Landing Page): Auto-refresh immediately for latest version
+  // - Authenticated users (Dashboard): Rely on the "Update Available" amber button
+  useEffect(() => {
+    if (!isAuthLoading && needRefresh && !user) {
+      console.log('[PWA] Unauthenticated user detected on update. Auto-refreshing...');
       updateServiceWorker();
     }
-  }, [needRefresh, updateServiceWorker]);
+  }, [needRefresh, user, isAuthLoading, updateServiceWorker]);
 
-  // Secondary Update Heartbeat (Fallback for mobile background tabs)
+  // Enhanced Update Detection: Check on focus, visibility change, and interval
   useEffect(() => {
-    const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
-    if (!isMobile) return;
-
-    // Check every 20 minutes for updates while the app is active
-    const updateInterval = setInterval(() => {
+    const checkUpdate = () => {
       if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistration().then(reg => {
           if (reg) {
             reg.update();
-            console.log('[PWA] Mobile background update heartbeat triggered.');
+            console.log('[PWA] Service worker update check triggered.');
           }
         });
       }
-    }, 20 * 60 * 1000);
+    };
 
-    return () => clearInterval(updateInterval);
+    // Check when user returns to tab
+    window.addEventListener('focus', checkUpdate);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkUpdate();
+    });
+
+    // Frequent heartbeat (every 5 mins on mobile, 10 on desktop)
+    const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
+    const intervalTime = isMobile ? 5 * 60 * 1000 : 10 * 60 * 1000;
+    const updateInterval = setInterval(checkUpdate, intervalTime);
+
+    // Immediate check on mount
+    checkUpdate();
+
+    return () => {
+      window.removeEventListener('focus', checkUpdate);
+      document.removeEventListener('visibilitychange', checkUpdate);
+      clearInterval(updateInterval);
+    };
   }, []);
 
   // Restore last visited path and handle deep links
@@ -120,13 +147,28 @@ function AppContent() {
     let unsubSignal: (() => void) | null = null;
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (unsubSignal) unsubSignal();
-      if (user) {
+      if (user && db) {
         // Correct path is settings/system_signals to match the rest of the app logic
         const signalRef = doc(db, 'settings', 'system_signals');
-        unsubSignal = onSnapshot(signalRef, () => {
-          // System signal received - this triggers reactivity in listeners that depend on these timestamps
+        unsubSignal = onSnapshot(signalRef, (snapshot) => {
+          if (!snapshot.exists()) return;
+          
+          const data = snapshot.data();
+          // Global toggle for simulated offline mode
+          if ('db_connection_disabled' in data) {
+            const isDisabled = !!data.db_connection_disabled;
+            const currentDisabled = safeStorage.getItem('ciya_db_connection_disabled') === 'true';
+            
+            if (isDisabled !== currentDisabled) {
+              safeStorage.setItem('ciya_db_connection_disabled', isDisabled ? 'true' : 'false');
+              // We don't force a reload, but we update the network state
+              import('./firebase').then(m => m.setFirestoreNetworkState(!isDisabled));
+            }
+          }
         }, (err) => {
-          console.warn("Soft handling system signals listener error in App.tsx:", err);
+          if (err.code !== 'permission-denied') {
+            console.warn("Soft handling system signals listener error in App.tsx:", err);
+          }
         });
       }
     });

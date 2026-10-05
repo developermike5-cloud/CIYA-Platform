@@ -1,6 +1,8 @@
 import React from 'react';
 import { Plus, Trash2, Check } from 'lucide-react';
 
+import CustomDropdown from './CustomDropdown';
+
 interface LpQuestionnaireFormProps {
   viewPerspective: string;
   hasSite: string;
@@ -284,10 +286,9 @@ export default function LpQuestionnaireForm({
                 {qL("Industry / Niche", "Business Industry / Niche")}
               </label>
               <div className="relative">
-                <select
+                <CustomDropdown
                   value={hasCustomIndustryOption ? 'Other' : (['Beauty', 'Fashion', 'Tech', 'Coaching & Consulting', 'Real Estate', 'Healthcare & Fitness', 'Creative Services', 'Agriculture', 'E-learning'].includes(industry) ? industry : (industry ? 'Other' : ''))}
-                  onChange={e => {
-                    const val = e.target.value;
+                  onChange={val => {
                     if (val === 'Other') {
                       setHasCustomIndustryOption(true);
                       setIndustry('');
@@ -296,14 +297,13 @@ export default function LpQuestionnaireForm({
                       setIndustry(val);
                     }
                   }}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium cursor-pointer"
-                >
-                  <option value="">-- Choose an Industry --</option>
-                  {['Beauty', 'Fashion', 'Tech', 'Coaching & Consulting', 'Real Estate', 'Healthcare & Fitness', 'Creative Services', 'Agriculture', 'E-learning'].map(ind => (
-                    <option key={ind} value={ind}>{ind}</option>
-                  ))}
-                  <option value="Other">Custom Industry / Niche...</option>
-                </select>
+                  options={[
+                    { label: '-- Choose an Industry --', value: '' },
+                    ...['Beauty', 'Fashion', 'Tech', 'Coaching & Consulting', 'Real Estate', 'Healthcare & Fitness', 'Creative Services', 'Agriculture', 'E-learning'].map(ind => ({ label: ind, value: ind })),
+                    { label: 'Custom Industry / Niche...', value: 'Other' }
+                  ]}
+                  className="w-full"
+                />
 
                 {(hasCustomIndustryOption || (!['Beauty', 'Fashion', 'Tech', 'Coaching & Consulting', 'Real Estate', 'Healthcare & Fitness', 'Creative Services', 'Agriculture', 'E-learning'].includes(industry) && industry !== '')) && (
                   <input 

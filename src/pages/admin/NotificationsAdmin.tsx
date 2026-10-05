@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, serverTimestamp, writeBatch, limit } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import CustomDropdown from '../../components/CustomDropdown';
 import { Mail, Settings, Plus, Trash2, Calendar, Send, Users, AlertCircle, RefreshCw, Layers } from 'lucide-react';
 
 interface NotificationTemplate {
@@ -291,17 +292,18 @@ export default function NotificationsAdmin() {
                   </div>
                   <div className="space-y-1">
                     <label className="block text-[10px] uppercase font-black text-slate-500">Event Cascade Trigger</label>
-                    <select
+                    <CustomDropdown
                       value={eventType}
-                      onChange={e => setEventType(e.target.value as any)}
-                      className="w-full bg-slate-50 border outline-none p-2.5 rounded-xl text-slate-800 focus:border-indigo-500 focus:bg-white"
-                    >
-                      <option value="none">Manual Trigger Only</option>
-                      <option value="user_joined">Automatic: New Student signup</option>
-                      <option value="assignment_submitted">Automatic: Assignment submitted</option>
-                      <option value="assignment_approved">Automatic: Assignment approved</option>
-                      <option value="assignment_disapproved">Automatic: Assignment disapproved</option>
-                    </select>
+                      options={[
+                        { label: 'Manual Trigger Only', value: 'none' },
+                        { label: 'Automatic: New Student signup', value: 'user_joined' },
+                        { label: 'Automatic: Assignment submitted', value: 'assignment_submitted' },
+                        { label: 'Automatic: Assignment approved', value: 'assignment_approved' },
+                        { label: 'Automatic: Assignment disapproved', value: 'assignment_disapproved' }
+                      ]}
+                      onChange={val => setEventType(val as any)}
+                      className="w-full"
+                    />
                   </div>
                 </div>
 
@@ -418,34 +420,34 @@ export default function NotificationsAdmin() {
           <form onSubmit={handleManualDispatch} className="space-y-4 text-xs font-semibold">
             <div className="space-y-1">
               <label className="block text-[10px] uppercase font-black text-slate-500">1. Select Target Recipient Studio</label>
-              <select
+              <CustomDropdown
                 value={selectedStudentId}
-                onChange={e => setSelectedStudentId(e.target.value)}
-                className="w-full bg-slate-50 border outline-none p-2.5 rounded-xl text-slate-800 focus:border-indigo-500 focus:bg-white"
-              >
-                <option value="all">📣 Global Broadcast Alert (All Students)</option>
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>
-                    👤 {s.fullName || 'Anonymous'} ({s.email})
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { label: '📣 Global Broadcast Alert (All Students)', value: 'all' },
+                  ...students.map(s => ({
+                    label: `👤 ${s.fullName || 'Anonymous'} (${s.email})`,
+                    value: s.id
+                  }))
+                ]}
+                onChange={val => setSelectedStudentId(val)}
+                className="w-full"
+              />
             </div>
 
             <div className="space-y-1">
               <label className="block text-[10px] uppercase font-black text-slate-500">2. Preload Template Template (Optional)</label>
-              <select
+              <CustomDropdown
                 value={selectedTemplateId}
-                onChange={e => handleApplyTemplate(e.target.value)}
-                className="w-full bg-slate-50 border outline-none p-2.5 rounded-xl text-slate-800 focus:border-indigo-500 focus:bg-white"
-              >
-                <option value="">-- Write Custom Message from Scratch --</option>
-                {templates.map(t => (
-                  <option key={t.id} value={t.id}>
-                    📄 Apply: {t.title}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { label: '-- Write Custom Message from Scratch --', value: '' },
+                  ...templates.map(t => ({
+                    label: `📄 Apply: ${t.title}`,
+                    value: t.id
+                  }))
+                ]}
+                onChange={val => handleApplyTemplate(val)}
+                className="w-full"
+              />
             </div>
 
             <div className="space-y-1">

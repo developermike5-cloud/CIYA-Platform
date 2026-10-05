@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
-import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where, limit } from 'firebase/firestore';
-import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock, X } from 'lucide-react';
+import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where, limit, onSnapshot } from 'firebase/firestore';
+import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock, X, ClipboardList, Archive } from 'lucide-react';
 import { safeStorage } from '../../utils/safeStorage';
 import LpQuestionnaireForm from '../../components/LpQuestionnaireForm';
 import EcQuestionnaireForm from '../../components/EcQuestionnaireForm';
 import PortfolioQuestionnaireForm from '../../components/PortfolioQuestionnaireForm';
+import CustomDropdown from '../../components/CustomDropdown';
 
 interface SavedForm {
   id: string;
@@ -24,15 +25,26 @@ interface AdminKycbQuestionnaireProps {
   userId?: string;
   userEmail?: string;
   defaultClientName?: string;
+  activeSubView?: 'form' | 'saved';
 }
 
 export default function AdminKycbQuestionnaire({
   isAdminMode = true,
   userId = '',
   userEmail = '',
-  defaultClientName = ''
+  defaultClientName = '',
+  activeSubView
 }: AdminKycbQuestionnaireProps = {}) {
   const [activeTab, setActiveTab] = useState<'lp' | 'ec' | 'portfolio'>('lp');
+  const [appSettings, setAppSettings] = useState<any>(null);
+  const [savedForms, setSavedForms] = useState<SavedForm[]>(() => {
+    try {
+      const cached = localStorage.getItem('ciya_cached_kycb_forms');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // Share link generator states
   const [userProfile] = useState<any>(() => {
@@ -62,6 +74,9 @@ export default function AdminKycbQuestionnaire({
     return Date.now() <= expiry;
   })();
 
+  const currentLimit = isPro ? (appSettings?.kycbProLimit ?? 10) : (appSettings?.kycbFreeLimit ?? 0);
+  const hasExceededLimit = savedForms.length >= currentLimit;
+
   const [shareType, setShareType] = useState<'lp' | 'ec' | 'portfolio'>('lp');
   const [shareTitle, setShareTitle] = useState(
     isPro ? 'Website Requirements Questionnaire' : 'CIYA Academy Website Requirements Form'
@@ -75,14 +90,6 @@ export default function AdminKycbQuestionnaire({
   const qL = (clientText: string, freelancerText: string) => {
     return viewPerspective === 'client' ? clientText : freelancerText;
   };
-  const [savedForms, setSavedForms] = useState<SavedForm[]>(() => {
-    try {
-      const cached = localStorage.getItem('ciya_cached_kycb_forms');
-      return cached ? JSON.parse(cached) : [];
-    } catch (e) {
-      return [];
-    }
-  });
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => {
     try {
@@ -93,6 +100,16 @@ export default function AdminKycbQuestionnaire({
     }
   });
   const [saving, setSaving] = useState(false);
+
+  // Settings listener
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'app'), (snap) => {
+      if (snap.exists()) {
+        setAppSettings(snap.data());
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Form Metadata
   const [clientName, setClientName] = useState(defaultClientName || '');
@@ -181,6 +198,11 @@ export default function AdminKycbQuestionnaire({
 
   // Perspective Toggle
   const [viewPerspective, setViewPerspective] = useState<'client' | 'freelancer'>('client');
+  const [localActiveSubView, setLocalActiveSubView] = useState<'form' | 'saved'>(activeSubView || 'form');
+
+  useEffect(() => {
+    if (activeSubView) setLocalActiveSubView(activeSubView);
+  }, [activeSubView]);
 
   // Landing Page specific states for the 12 sections
   const [lpOfferType, setLpOfferType] = useState<string[]>([]);
@@ -1097,6 +1119,12 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
       alert("Please fill in Client Name and Business Name before saving.");
       return;
     }
+
+    if (!currentId && hasExceededLimit) {
+      alert(`⚠️ You have reached your archive limit of ${currentLimit} forms. Please delete an old form to save a new one.`);
+      return;
+    }
+
     setSaving(true);
     const docData: any = {
       clientName,
@@ -1230,6 +1258,14 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
       handleFirestoreError(err, currentId ? OperationType.UPDATE : OperationType.CREATE, currentId ? `kycb_questionnaires/${currentId}` : 'kycb_questionnaires');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleUpdateGlobalSettings = async (updates: any) => {
+    try {
+      await updateDoc(doc(db, 'settings', 'app'), updates);
+    } catch (err) {
+      console.error("Failed to update global settings:", err);
     }
   };
 
@@ -1475,711 +1511,904 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 p-1 md:p-4 text-slate-800">
-      {/* Sidebar List of questionnaires */}
-      <div className="w-full lg:w-72 bg-white rounded-2xl border border-slate-200 p-4 shrink-0 shadow-sm flex flex-col gap-4">
-        <div className="flex justify-between items-center pb-2 border-b">
-          <span className="font-extrabold text-sm text-slate-900 tracking-wider">SAVED KYCB FORMS</span>
-          <span className="text-xs bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded-full">{savedForms.length}</span>
-        </div>
-
-        <button
-          onClick={resetForm}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[#1A3C6E] text-white rounded-xl text-xs font-black shadow-lg shadow-indigo-950/20 hover:bg-[#15325C] transition-all cursor-pointer"
-        >
-          <Plus className="w-4 h-4 text-amber-400" />
-          Create New Sheet
-        </button>
-
-        <div className="flex-1 overflow-y-auto max-h-[350px] lg:max-h-[600px] space-y-2 pr-1">
-          {loading ? (
-            <div className="py-4 text-center text-xs text-slate-400 font-bold">Syncing archives...</div>
-          ) : savedForms.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-400 font-semibold italic">No saved questionnaires securely stored.</div>
-          ) : (
-            savedForms.map(form => (
-              <div
-                key={form.id}
-                onClick={() => handleEdit(form)}
-                className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex justify-between items-start gap-2 relative group overflow-hidden ${
-                  currentId === form.id 
-                    ? 'border-[#1A3C6E] bg-slate-50 ring-1 ring-[#1A3C6E]' 
-                    : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <div className="space-y-1">
-                  <span className="text-[11px] uppercase tracking-wider font-extrabold text-[#D4A017] flex items-center gap-1">
-                    {form.type === 'lp' ? '✏️ LANDING PAGE' : (form.type === 'ec' ? '🛒 ECOMMERCE' : '💼 PORTFOLIO')}
-                  </span>
-                  <div className="font-extrabold text-[#1A3C6E] text-xs truncate max-w-[150px]">{form.clientName}</div>
-                  <div className="text-[10px] text-slate-400 font-bold truncate max-w-[150px]">{form.businessName}</div>
-                </div>
-                <button
-                  onClick={(e) => handleDelete(form.id, e)}
-                  aria-label="Delete questionnaire"
-                  className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* CLIENT LINK GENERATOR */}
-        <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 relative">
-          {!isPro && (
-            <div className="absolute inset-0 bg-white/95 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-center p-4 rounded-2xl border border-dashed border-amber-200">
-              <div className="p-3 bg-amber-50 rounded-full mb-3 text-amber-500 border border-amber-200 shadow-sm">
-                <Lock className="w-5 h-5" />
-              </div>
-              <h5 className="text-xs font-black text-slate-800 uppercase tracking-wider">Client Link Locked</h5>
-              <p className="text-[10px] text-slate-500 font-bold max-w-[200px] leading-relaxed mt-2">
-                The client link generator is reserved exclusively for students holding the <span className="text-amber-600 font-extrabold">CIYA Student Pro Badge</span>.
-              </p>
-              <div className="mt-4 text-[9px] font-black uppercase text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-150">
-                PRO MEMBERS ONLY
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <h4 className="text-xs font-black text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
-              <Link2 className="w-4 h-4 text-[#1A3C6E]" /> Client Share Link
-            </h4>
-            <p className="text-[10px] text-slate-400 font-bold leading-normal">
-              Generate a secure link for clients to fill out their design brief.
-            </p>
+    <div className="flex flex-col gap-6 p-1 md:p-4 text-slate-800">
+      {/* Branded Section Header */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-[#1A3C6E] flex items-center justify-center text-[#D4A017] shadow-lg shadow-indigo-900/20">
+            <ClipboardList className="w-6 h-6" />
           </div>
-
-          <div className="space-y-2 text-left">
-            <div>
-              <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">Target Form Profile</label>
-              <select
-                disabled={!isPro}
-                value={shareType}
-                onChange={(e) => setShareType(e.target.value as any)}
-                className="w-full text-xs font-bold border border-slate-200 rounded-xl px-2.5 py-2 focus:outline-none bg-slate-50 cursor-pointer disabled:opacity-50"
-              >
-                <option value="lp">✏️ Landing Page</option>
-                <option value="ec">🛒 eCommerce Store</option>
-                <option value="portfolio">💼 Portfolio Website</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">
-                Custom Form Title {isPro ? '✨' : '🔒'}
-              </label>
-              <input
-                type="text"
-                value={shareTitle}
-                disabled={!isPro}
-                onChange={(e) => setShareTitle(e.target.value)}
-                placeholder="e.g. Website Requirements Form"
-                className={`w-full text-xs font-semibold border rounded-xl px-2.5 py-2 focus:outline-none ${
-                  isPro 
-                    ? 'border-slate-200 bg-white text-slate-800' 
-                    : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">Developer Name</label>
-              <input
-                type="text"
-                disabled={!isPro}
-                value={shareStudent}
-                onChange={(e) => setShareStudent(e.target.value)}
-                placeholder="Your Name / Agency"
-                className="w-full text-xs font-semibold border border-slate-200 rounded-xl px-2.5 py-2 focus:outline-none bg-white text-slate-800 disabled:opacity-50"
-              />
-            </div>
+          <div>
+            <h2 className="text-xl md:text-2xl font-black text-[#1A3C6E] tracking-tight">
+              {isAdminMode ? 'KYCB Settings & Config' : 'KYCB Section'}
+            </h2>
           </div>
-
-          {linkCopied && (
-            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-center text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider animate-fadeIn">
-              Copied to Clipboard! ⚡ Send it to your Client!
-            </div>
-          )}
-
-          <button
-            type="button"
-            disabled={!isPro}
-            onClick={() => {
-              if (!isPro) return;
-              const origin = window.location.origin;
-              const params = new URLSearchParams();
-              params.set('type', shareType);
-              params.set('title', isPro ? shareTitle : 'CIYA Academy Website Requirements Form');
-              if (shareStudent) {
-                params.set('student', shareStudent);
-              }
-              const fullUrl = `${origin}/client-form?${params.toString()}`;
-              navigator.clipboard.writeText(fullUrl);
-              setLinkCopied(true);
-              setTimeout(() => setLinkCopied(false), 3000);
-            }}
-            className="w-full flex items-center justify-center gap-1.5 py-2.5 px-4 bg-teal-600 hover:bg-teal-700 hover:scale-[1.01] transition-all text-white rounded-xl text-xs font-black cursor-pointer shadow-md shadow-teal-700/10 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Link2 className="w-4 h-4" />
-            Generate & Copy Link
-          </button>
         </div>
+
+        {/* View Toggle - ONLY SHOW IN STUDENT MODE */}
+        {!isAdminMode && (
+          <div className="flex bg-slate-100 p-1 rounded-2xl self-start md:self-center border border-slate-200 shadow-inner">
+            <button
+              onClick={() => setLocalActiveSubView('form')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-200 border-0 cursor-pointer ${localActiveSubView === 'form' ? 'bg-[#1A3C6E] text-[#D4A017] shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              KYCB Form
+            </button>
+            <button
+              onClick={() => setLocalActiveSubView('saved')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-200 border-0 cursor-pointer ${localActiveSubView === 'saved' ? 'bg-[#1A3C6E] text-[#D4A017] shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
+            >
+              <Archive className="w-4 h-4" />
+              Saved Forms
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Main Questionnaire Canvas */}
-      <div className={`flex-1 rounded-3xl border p-4 md:p-8 shadow-sm transition-all duration-300 ${
-        activeTab === 'lp' 
-          ? 'bg-[#FCFDFF] border-slate-200' 
-          : activeTab === 'ec'
-            ? 'bg-[#FCFAF3] border-amber-200/50 shadow-amber-900/[0.01]'
-            : 'bg-[#FAFDFD] border-teal-200/40 shadow-teal-950/[0.01]'
-      }`}>
-        <div className="text-center md:text-left border-b border-slate-100 pb-5 mb-6">
-          <h1 className="text-xl md:text-2xl font-black text-[#1A3C6E] tracking-tight flex items-center justify-center md:justify-start gap-2">
-            <span className="p-1 px-2.5 bg-[#1A3C6E] text-[#D4A017] rounded-xl text-sm font-black">KYCB</span>
-            {qL("Know Your Client & Business", "Admin Portfolio Consulting Spec")}
-          </h1>
-          <p className="text-[11px] text-slate-400 font-bold mt-1 uppercase tracking-wider">
-            {qL("The ultimate design discovery & onboarding sheet", "Custom design parameters & commercial metrics tracker")}
-          </p>
-        </div>
+      {isAdminMode ? (
+        /* ADMIN SETTINGS VIEW */
+        <div className="max-w-4xl space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-8">
+            <div className="space-y-2">
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Saved Forms Limits</h3>
+              <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                Control how many KYCB questionnaires students can securely save to their archive before requiring a badge upgrade or hitting the platform ceiling.
+              </p>
+            </div>
 
-        {/* Global Metadata Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-left">
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Client Full Name *</label>
-            <input 
-              type="text" 
-              value={clientName} 
-              onChange={e => setClientName(e.target.value)} 
-              placeholder="e.g. Sandra Johnson" 
-              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Free Member Limit */}
+              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Student Tier</span>
+                    <span className="text-sm font-black text-slate-900">Free Members</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-2 uppercase tracking-wide">Max Saved Forms</label>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="number"
+                      min="0"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      value={appSettings?.kycbFreeLimit ?? 0}
+                      onChange={(e) => handleUpdateGlobalSettings({ kycbFreeLimit: parseInt(e.target.value) || 0 })}
+                    />
+                    <span className="text-xs font-bold text-slate-400 whitespace-nowrap">Forms Allowed</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pro Member Limit */}
+              <div className="p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-amber-500 shadow-sm">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider block">Student Tier</span>
+                    <span className="text-sm font-black text-[#1A3C6E]">CIYA Student Pro</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-indigo-700 mb-2 uppercase tracking-wide">Max Saved Forms</label>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="number"
+                      min="1"
+                      className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 text-sm font-black text-[#1A3C6E] focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      value={appSettings?.kycbProLimit ?? 10}
+                      onChange={(e) => handleUpdateGlobalSettings({ kycbProLimit: parseInt(e.target.value) || 0 })}
+                    />
+                    <span className="text-xs font-bold text-indigo-400 whitespace-nowrap">Forms Allowed</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-slate-100 flex items-center gap-3 text-emerald-600 bg-emerald-50/50 -mx-6 -mb-6 p-6 rounded-b-3xl">
+              <Check className="w-5 h-5" />
+              <span className="text-xs font-black uppercase tracking-wider">Settings are synced automatically across all student dashboards.</span>
+            </div>
           </div>
-          <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Date Completed</label>
-            <input 
-              type="date" 
-              value={dateCompleted} 
-              onChange={e => setDateCompleted(e.target.value)} 
-              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
-            />
+
+          {/* Daily Prompt Copies Limits */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 md:p-8 shadow-sm space-y-8">
+            <div className="space-y-2">
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Daily Prompt Copies</h3>
+              <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                Define the maximum number of prompt blueprints students can copy every 24 hours. These limits help manage platform usage and distinguish the Pro experience.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Free Member Prompt Limit */}
+              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Student Tier</span>
+                    <span className="text-sm font-black text-slate-900">Free Members</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-2 uppercase tracking-wide">Daily Copy Limit</label>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="number"
+                      min="0"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      value={appSettings?.promptsFreeLimit ?? 3}
+                      onChange={(e) => handleUpdateGlobalSettings({ promptsFreeLimit: parseInt(e.target.value) || 0 })}
+                    />
+                    <span className="text-xs font-bold text-slate-400 whitespace-nowrap">Copies Allowed</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pro Member Prompt Limit */}
+              <div className="p-5 bg-amber-50/30 rounded-2xl border border-amber-100 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-500 shadow-sm">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">Student Tier</span>
+                    <span className="text-sm font-black text-[#1A3C6E]">CIYA Student Pro</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-amber-700 mb-2 uppercase tracking-wide">Daily Copy Limit</label>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="number"
+                      min="1"
+                      className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 text-sm font-black text-[#1A3C6E] focus:ring-2 focus:ring-amber-500/20 outline-none"
+                      value={appSettings?.promptsProLimit ?? 100}
+                      onChange={(e) => handleUpdateGlobalSettings({ promptsProLimit: parseInt(e.target.value) || 0 })}
+                    />
+                    <span className="text-xs font-bold text-amber-400 whitespace-nowrap">Copies Allowed</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-slate-100 flex items-center gap-3 text-emerald-600 bg-emerald-50/50 -mx-6 -mb-6 p-6 rounded-b-3xl">
+              <Check className="w-5 h-5" />
+              <span className="text-xs font-black uppercase tracking-wider">Prompt usage limits are synced in real-time.</span>
+            </div>
           </div>
         </div>
-
-        {/* Toggle Mode Perspective Selector */}
-        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border border-slate-200/60 bg-slate-50/60 rounded-2xl p-4 mb-6 shadow-sm">
-          <div className="flex flex-col text-left">
-            <span className="text-xs font-black text-[#1A3C6E] tracking-tight uppercase">View Mode Perspective</span>
-            <span className="text-[10px] text-slate-400 font-bold">Swap questions framing for clients or freelancers</span>
+      ) : (
+        /* STUDENT VIEW (Questionnaire + Saved Forms) */
+        <div className="flex flex-col lg:flex-row gap-6">
+        {/* Sidebar List of questionnaires */}
+        {(localActiveSubView === 'saved') && (
+        <div className="w-full lg:w-72 bg-white rounded-2xl border border-slate-200 p-4 shrink-0 shadow-sm flex flex-col gap-4">
+          <div className="flex justify-between items-center pb-2 border-b">
+            <span className="font-extrabold text-sm text-slate-900 tracking-wider">SAVED FORMS</span>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${hasExceededLimit ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
+              {savedForms.length} / {currentLimit}
+            </span>
           </div>
-          <div className="flex bg-white border border-slate-200 p-1 rounded-xl shadow-inner shrink-0">
-            <button
-              type="button"
-              onClick={() => setViewPerspective('client')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                viewPerspective === 'client' 
-                  ? 'bg-[#1A3C6E] text-[#D4A017] shadow-sm font-black' 
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              👤 Client View
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewPerspective('freelancer')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                viewPerspective === 'freelancer' 
-                  ? 'bg-[#1A3C6E] text-[#D4A017] shadow-sm font-black' 
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              💼 Freelancer View
-            </button>
-          </div>
-        </div>
 
-        {/* Triple Tab Controls */}
-        <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-6">
           <button
-            type="button"
-            onClick={() => handleTabToggle('lp')}
-            className={`flex-1 py-3 px-3 text-center rounded-lg text-xs font-black transition-all cursor-pointer ${
-              activeTab === 'lp' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
+            onClick={resetForm}
+            disabled={hasExceededLimit}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-black shadow-lg transition-all cursor-pointer ${
+              hasExceededLimit 
+                ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none' 
+                : 'bg-[#1A3C6E] text-white shadow-indigo-950/20 hover:bg-[#15325C]'
             }`}
           >
-            ✏️ Landing Page
+            <Plus className={`w-4 h-4 ${hasExceededLimit ? 'text-slate-300' : 'text-amber-400'}`} />
+            {hasExceededLimit ? 'Limit Reached' : 'Create New Sheet'}
           </button>
-          <button
-            type="button"
-            onClick={() => handleTabToggle('ec')}
-            className={`flex-1 py-3 px-3 text-center rounded-lg text-xs font-black transition-all cursor-pointer ${
-              activeTab === 'ec' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
-            }`}
-          >
-            🛒 eCommerce Specifics
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabToggle('portfolio')}
-            className={`flex-1 py-3 px-3 text-center rounded-lg text-xs font-black transition-all cursor-pointer ${
-              activeTab === 'portfolio' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
-            }`}
-          >
-            💼 Portfolio Questionnaire
-          </button>
-        </div>
 
-        {/* Form Sections */}
-        <div className="space-y-6">
-          {activeTab === 'lp' ? (
-            <LpQuestionnaireForm
-              viewPerspective={viewPerspective || 'client'}
-              hasSite={hasSite}
-              setHasSite={setHasSite}
-              siteUrl={siteUrl}
-              setSiteUrl={setSiteUrl}
-              businessName={businessName}
-              setBusinessName={setBusinessName}
-              industry={industry}
-              setIndustry={setIndustry}
-              hasCustomIndustryOption={hasCustomIndustryOption}
-              setHasCustomIndustryOption={setHasCustomIndustryOption}
-              phone={phone}
-              setPhone={setPhone}
-              email={email}
-              setEmail={setEmail}
-              address={address}
-              setAddress={setAddress}
-              hasSocialMediaAsked={hasSocialMediaAsked}
-              setHasSocialMediaAsked={setHasSocialMediaAsked}
-              socialLinks={socialLinks}
-              setSocialLinks={setSocialLinks}
-              visitorActions={visitorActions}
-              setVisitorActions={setVisitorActions}
-              otherAction={otherAction}
-              setOtherAction={setOtherAction}
-              idealAge={idealAge}
-              setIdealAge={setIdealAge}
-              locations={locations}
-              setLocations={setLocations}
-              occupation={occupation}
-              setOccupation={setOccupation}
-              problemsSolved={problemsSolved}
-              setProblemsSolved={setProblemsSolved}
-              problemsSolvedDetail={problemsSolvedDetail}
-              setProblemsSolvedDetail={setProblemsSolvedDetail}
-              hasLogo={hasLogo}
-              setHasLogo={setHasLogo}
-              logoDesign={logoDesign}
-              setLogoDesign={setLogoDesign}
-              hasBrandColors={hasBrandColors}
-              setHasBrandColors={setHasBrandColors}
-              colorsCount={colorsCount}
-              setColorsCount={setColorsCount}
-              brandColors={brandColors}
-              setBrandColors={setBrandColors}
-              brandTones={brandTones}
-              setBrandTones={setBrandTones}
-              sectionsToInclude={sectionsToInclude}
-              setSectionsToInclude={setSectionsToInclude}
-              displayPricing={displayPricing}
-              setDisplayPricing={setDisplayPricing}
-              pricingRanges={pricingRanges}
-              setPricingRanges={setPricingRanges}
-              pricingDetail={pricingDetail}
-              setPricingDetail={setPricingDetail}
-              privacyPolicy={privacyPolicy}
-              setPrivacyPolicy={setPrivacyPolicy}
-              privacyPolicyPrep={privacyPolicyPrep}
-              setPrivacyPolicyPrep={setPrivacyPolicyPrep}
-              termsPolicy={termsPolicy}
-              setTermsPolicy={setTermsPolicy}
-              termsPolicyPrep={termsPolicyPrep}
-              setTermsPolicyPrep={setTermsPolicyPrep}
-              refundPolicy={refundPolicy}
-              setRefundPolicy={setRefundPolicy}
-              refundPolicyPrep={refundPolicyPrep}
-              setRefundPolicyPrep={setRefundPolicyPrep}
-              deadline={deadline}
-              setDeadline={setDeadline}
-              budgetRange={budgetRange}
-              setBudgetRange={setBudgetRange}
-              additionalNotes={additionalNotes}
-              setAdditionalNotes={setAdditionalNotes}
-              hasImages={hasImages}
-              setHasImages={setHasImages}
-              hasVideos={hasVideos}
-              setHasVideos={setHasVideos}
-              hasTestimonials={hasTestimonials}
-              setHasTestimonials={setHasTestimonials}
-              functionalFeatures={functionalFeatures}
-              setFunctionalFeatures={setFunctionalFeatures}
-              otherRequirements={otherRequirements}
-              setOtherRequirements={setOtherRequirements}
-              runPaidAds={runPaidAds}
-              setRunPaidAds={setRunPaidAds}
-              adPlatforms={adPlatforms}
-              setAdPlatforms={setAdPlatforms}
-              otherTraffic={otherTraffic}
-              setOtherTraffic={setOtherTraffic}
-              lpOfferType={lpOfferType}
-              setLpOfferType={setLpOfferType}
-              lpOfferMain={lpOfferMain}
-              setLpOfferMain={setLpOfferMain}
-              lpOfferServices={lpOfferServices}
-              setLpOfferServices={setLpOfferServices}
-              lpOfferServicesDetail={lpOfferServicesDetail}
-              setLpOfferServicesDetail={setLpOfferServicesDetail}
-              lpOfferPromo={lpOfferPromo}
-              setLpOfferPromo={setLpOfferPromo}
-              lpOfferPromoDetail={lpOfferPromoDetail}
-              setLpOfferPromoDetail={setLpOfferPromoDetail}
-              lpWhyChoose={lpWhyChoose}
-              setLpWhyChoose={setLpWhyChoose}
-              lpWhatMakesSpecial={lpWhatMakesSpecial}
-              setLpWhatMakesSpecial={setLpWhatMakesSpecial}
-              lpWhatMakesSpecialDetail={lpWhatMakesSpecialDetail}
-              setLpWhatMakesSpecialDetail={setLpWhatMakesSpecialDetail}
-              toggleMultiSelect={toggleMultiSelect}
-              updateArrayItem={updateArrayItem}
-              removeArrayItem={removeArrayItem}
-              addArrayItem={addArrayItem}
-            />
-          ) : activeTab === 'ec' ? (
-            <EcQuestionnaireForm
-              viewPerspective={viewPerspective || 'client'}
-              hasSite={hasSite}
-              setHasSite={setHasSite}
-              siteUrl={siteUrl}
-              setSiteUrl={setSiteUrl}
-              businessName={businessName}
-              setBusinessName={setBusinessName}
-              industry={industry}
-              setIndustry={setIndustry}
-              hasCustomIndustryOption={hasCustomIndustryOption}
-              setHasCustomIndustryOption={setHasCustomIndustryOption}
-              phone={phone}
-              setPhone={setPhone}
-              email={email}
-              setEmail={setEmail}
-              address={address}
-              setAddress={setAddress}
-              hasSocialMediaAsked={hasSocialMediaAsked}
-              setHasSocialMediaAsked={setHasSocialMediaAsked}
-              socialLinks={socialLinks}
-              setSocialLinks={setSocialLinks}
-              ecommerceType={ecommerceType}
-              setEcommerceType={setEcommerceType}
-              hasInventory={hasInventory}
-              setHasInventory={setHasInventory}
-              inventoryLocation={inventoryLocation}
-              setInventoryLocation={setInventoryLocation}
-              visitorActions={visitorActions}
-              setVisitorActions={setVisitorActions}
-              otherAction={otherAction}
-              setOtherAction={setOtherAction}
-              idealAge={idealAge}
-              setIdealAge={setIdealAge}
-              genderFocus={genderFocus}
-              setGenderFocus={setGenderFocus}
-              incomeLevel={incomeLevel}
-              setIncomeLevel={setIncomeLevel}
-              productInterests={productInterests}
-              setProductInterests={setProductInterests}
-              locations={locations}
-              setLocations={setLocations}
-              problemsSolved={problemsSolved}
-              setProblemsSolved={setProblemsSolved}
-              problemsSolvedDetail={problemsSolvedDetail}
-              setProblemsSolvedDetail={setProblemsSolvedDetail}
-              mainProducts={mainProducts}
-              setMainProducts={setMainProducts}
-              productCards={productCards}
-              setProductCards={setProductCards}
-              ecSpecialOffers={ecSpecialOffers}
-              setEcSpecialOffers={setEcSpecialOffers}
-              ecSpecialOffersDetail={ecSpecialOffersDetail}
-              setEcSpecialOffersDetail={setEcSpecialOffersDetail}
-              ecWhyBuy={ecWhyBuy}
-              setEcWhyBuy={setEcWhyBuy}
-              ecProductDiff={ecProductDiff}
-              setEcProductDiff={setEcProductDiff}
-              ecProductDiffDetail={ecProductDiffDetail}
-              setEcProductDiffDetail={setEcProductDiffDetail}
-              hasLogo={hasLogo}
-              setHasLogo={setHasLogo}
-              logoDesign={logoDesign}
-              setLogoDesign={setLogoDesign}
-              hasBrandColors={hasBrandColors}
-              setHasBrandColors={setHasBrandColors}
-              colorsCount={colorsCount}
-              setColorsCount={setColorsCount}
-              brandColors={brandColors}
-              setBrandColors={setBrandColors}
-              ecWebsiteStyle={ecWebsiteStyle}
-              setEcWebsiteStyle={setEcWebsiteStyle}
-              brandTones={brandTones}
-              setBrandTones={setBrandTones}
-              hasImages={hasImages}
-              setHasImages={setHasImages}
-              hasVideos={hasVideos}
-              setHasVideos={setHasVideos}
-              hasTestimonials={hasTestimonials}
-              setHasTestimonials={setHasTestimonials}
-              ecPages={ecPages}
-              setEcPages={setEcPages}
-              paymentOptions={paymentOptions}
-              setPaymentOptions={setPaymentOptions}
-              deliveryScope={deliveryScope}
-              setDeliveryScope={setDeliveryScope}
-              deliveryStates={deliveryStates}
-              setDeliveryStates={setDeliveryStates}
-              deliveryOptions={deliveryOptions}
-              setDeliveryOptions={setDeliveryOptions}
-              chargeDelivery={chargeDelivery}
-              setChargeDelivery={setChargeDelivery}
-              deliveryFee={deliveryFee}
-              setDeliveryFee={setDeliveryFee}
-              logisticsPartner={logisticsPartner}
-              setLogisticsPartner={setLogisticsPartner}
-              notificationMethods={notificationMethods}
-              setNotificationMethods={setNotificationMethods}
-              autoConf={autoConf}
-              setAutoConf={setAutoConf}
-              functionalFeatures={functionalFeatures}
-              setFunctionalFeatures={setFunctionalFeatures}
-              otherRequirements={otherRequirements}
-              setOtherRequirements={setOtherRequirements}
-              runPaidAds={runPaidAds}
-              setRunPaidAds={setRunPaidAds}
-              adPlatforms={adPlatforms}
-              setAdPlatforms={setAdPlatforms}
-              otherTraffic={otherTraffic}
-              setOtherTraffic={setOtherTraffic}
-              ecMarketingHelp={ecMarketingHelp}
-              setEcMarketingHelp={setEcMarketingHelp}
-              privacyPolicy={privacyPolicy}
-              setPrivacyPolicy={setPrivacyPolicy}
-              privacyPolicyPrep={privacyPolicyPrep}
-              setPrivacyPolicyPrep={setPrivacyPolicyPrep}
-              termsPolicy={termsPolicy}
-              setTermsPolicy={setTermsPolicy}
-              termsPolicyPrep={termsPolicyPrep}
-              setTermsPolicyPrep={setTermsPolicyPrep}
-              refundPolicy={refundPolicy}
-              setRefundPolicy={setRefundPolicy}
-              refundPolicyPrep={refundPolicyPrep}
-              setRefundPolicyPrep={setRefundPolicyPrep}
-              deadline={deadline}
-              setDeadline={setDeadline}
-              budgetRange={budgetRange}
-              setBudgetRange={setBudgetRange}
-              additionalNotes={additionalNotes}
-              setAdditionalNotes={setAdditionalNotes}
-              toggleMultiSelect={toggleMultiSelect}
-              updateArrayItem={updateArrayItem}
-              removeArrayItem={removeArrayItem}
-              addArrayItem={addArrayItem}
-            />
-          ) : (
-            <PortfolioQuestionnaireForm
-              viewPerspective={viewPerspective || 'client'}
-              hasSite={hasSite}
-              setHasSite={setHasSite}
-              siteUrl={siteUrl}
-              setSiteUrl={setSiteUrl}
-              businessName={businessName}
-              setBusinessName={setBusinessName}
-              phone={phone}
-              setPhone={setPhone}
-              email={email}
-              setEmail={setEmail}
-              address={address}
-              setAddress={setAddress}
-              hasSocialMediaAsked={hasSocialMediaAsked}
-              setHasSocialMediaAsked={setHasSocialMediaAsked}
-              socialLinks={socialLinks}
-              setSocialLinks={setSocialLinks}
-              portfolioProfession={portfolioProfession}
-              setPortfolioProfession={setPortfolioProfession}
-              portfolioProfessionOther={portfolioProfessionOther}
-              setPortfolioProfessionOther={setPortfolioProfessionOther}
-              portfolioTools={portfolioTools}
-              setPortfolioTools={setPortfolioTools}
-              portfolioToolsOther={portfolioToolsOther}
-              setPortfolioToolsOther={setPortfolioToolsOther}
-              portfolioYearsExperience={portfolioYearsExperience}
-              setPortfolioYearsExperience={setPortfolioYearsExperience}
-              portfolioStrengths={portfolioStrengths}
-              setPortfolioStrengths={setPortfolioStrengths}
-              portfolioPurposes={portfolioPurposes}
-              setPortfolioPurposes={setPortfolioPurposes}
-              portfolioVisitorActions={portfolioVisitorActions}
-              setPortfolioVisitorActions={setPortfolioVisitorActions}
-              portfolioTargetVisitors={portfolioTargetVisitors}
-              setPortfolioTargetVisitors={setPortfolioTargetVisitors}
-              portfolioTargetIndustries={portfolioTargetIndustries}
-              setPortfolioTargetIndustries={setPortfolioTargetIndustries}
-              portfolioFeaturedCount={portfolioFeaturedCount}
-              setPortfolioFeaturedCount={setPortfolioFeaturedCount}
-              portfolioPresentationStyles={portfolioPresentationStyles}
-              setPortfolioPresentationStyles={setPortfolioPresentationStyles}
-              portfolioProjects={portfolioProjects}
-              setPortfolioProjects={setPortfolioProjects}
-              portfolioHasImages={portfolioHasImages}
-              setPortfolioHasImages={setPortfolioHasImages}
-              portfolioBio={portfolioBio}
-              setPortfolioBio={setPortfolioBio}
-              portfolioDifferentiators={portfolioDifferentiators}
-              setPortfolioDifferentiators={setPortfolioDifferentiators}
-              portfolioDifferentiatorDetail={portfolioDifferentiatorDetail}
-              setPortfolioDifferentiatorDetail={setPortfolioDifferentiatorDetail}
-              portfolioHasPhoto={portfolioHasPhoto}
-              setPortfolioHasPhoto={setPortfolioHasPhoto}
-              portfolioShowEducation={portfolioShowEducation}
-              setPortfolioShowEducation={setPortfolioShowEducation}
-              portfolioEducationDetails={portfolioEducationDetails}
-              setPortfolioEducationDetails={setPortfolioEducationDetails}
-              portfolioShowExperience={portfolioShowExperience}
-              setPortfolioShowExperience={setPortfolioShowExperience}
-              portfolioExperienceDetails={portfolioExperienceDetails}
-              setPortfolioExperienceDetails={setPortfolioExperienceDetails}
-              portfolioShowServices={portfolioShowServices}
-              setPortfolioShowServices={setPortfolioShowServices}
-              portfolioServicesOffered={portfolioServicesOffered}
-              setPortfolioServicesOffered={setPortfolioServicesOffered}
-              portfolioServicesOther={portfolioServicesOther}
-              setPortfolioServicesOther={setPortfolioServicesOther}
-              portfolioShowPricing={portfolioShowPricing}
-              setPortfolioShowPricing={setPortfolioShowPricing}
-              portfolioPricingDetails={portfolioPricingDetails}
-              setPortfolioPricingDetails={setPortfolioPricingDetails}
-              portfolioTypicalProcess={portfolioTypicalProcess}
-              setPortfolioTypicalProcess={setPortfolioTypicalProcess}
-              portfolioHasTestimonials={portfolioHasTestimonials}
-              setPortfolioHasTestimonials={setPortfolioHasTestimonials}
-              portfolioTestimonialsList={portfolioTestimonialsList}
-              setPortfolioTestimonialsList={setPortfolioTestimonialsList}
-              portfolioNotableBrands={portfolioNotableBrands}
-              setPortfolioNotableBrands={setPortfolioNotableBrands}
-              portfolioHasAwards={portfolioHasAwards}
-              setPortfolioHasAwards={setPortfolioHasAwards}
-              portfolioAwardsDetails={portfolioAwardsDetails}
-              setPortfolioAwardsDetails={setPortfolioAwardsDetails}
-              portfolioHasLogo={portfolioHasLogo}
-              setPortfolioHasLogo={setPortfolioHasLogo}
-              portfolioLogoDesign={portfolioLogoDesign}
-              setPortfolioLogoDesign={setPortfolioLogoDesign}
-              portfolioHasBrandColors={portfolioHasBrandColors}
-              setPortfolioHasBrandColors={setPortfolioHasBrandColors}
-              portfolioColorsCount={portfolioColorsCount}
-              setPortfolioColorsCount={setPortfolioColorsCount}
-              portfolioBrandColors={portfolioBrandColors}
-              setPortfolioBrandColors={setPortfolioBrandColors}
-              portfolioVisualPersonalities={portfolioVisualPersonalities}
-              setPortfolioVisualPersonalities={setPortfolioVisualPersonalities}
-              portfolioInspirations={portfolioInspirations}
-              setPortfolioInspirations={setPortfolioInspirations}
-              portfolioInspirationDetail={portfolioInspirationDetail}
-              setPortfolioInspirationDetail={setPortfolioInspirationDetail}
-              portfolioPagesNeeded={portfolioPagesNeeded}
-              setPortfolioPagesNeeded={setPortfolioPagesNeeded}
-              portfolioPreferredStructure={portfolioPreferredStructure}
-              setPortfolioPreferredStructure={setPortfolioPreferredStructure}
-              portfolioHasBlog={portfolioHasBlog}
-              setPortfolioHasBlog={setPortfolioHasBlog}
-              portfolioBlogTopics={portfolioBlogTopics}
-              setPortfolioBlogTopics={setPortfolioBlogTopics}
-              portfolioHasCV={portfolioHasCV}
-              setPortfolioHasCV={setPortfolioHasCV}
-              portfolioFeaturesNeeded={portfolioFeaturesNeeded}
-              setPortfolioFeaturesNeeded={setPortfolioFeaturesNeeded}
-              portfolioContactPreferences={portfolioContactPreferences}
-              setPortfolioContactPreferences={setPortfolioContactPreferences}
-              portfolioAnimationLevel={portfolioAnimationLevel}
-              setPortfolioAnimationLevel={setPortfolioAnimationLevel}
-              portfolioHasNDA={portfolioHasNDA}
-              setPortfolioHasNDA={setPortfolioHasNDA}
-              portfolioTrafficSources={portfolioTrafficSources}
-              setPortfolioTrafficSources={setPortfolioTrafficSources}
-              portfolioWantsSEO={portfolioWantsSEO}
-              setPortfolioWantsSEO={setPortfolioWantsSEO}
-              portfolioCustomDomain={portfolioCustomDomain}
-              setPortfolioCustomDomain={setPortfolioCustomDomain}
-              portfolioDeadline={portfolioDeadline}
-              setPortfolioDeadline={setPortfolioDeadline}
-              portfolioBudget={portfolioBudget}
-              setPortfolioBudget={setPortfolioBudget}
-              portfolioDrivingEvent={portfolioDrivingEvent}
-              setPortfolioDrivingEvent={setPortfolioDrivingEvent}
-              portfolioAdditionalNotes={portfolioAdditionalNotes}
-              setPortfolioAdditionalNotes={setPortfolioAdditionalNotes}
-              toggleMultiSelect={toggleMultiSelect}
-              updateArrayItem={updateArrayItem}
-              removeArrayItem={removeArrayItem}
-              addArrayItem={addArrayItem}
-            />
-          )}
-        </div>
-
-        {/* Global form controls */}
-        <div className="mt-8 pt-4 border-t border-slate-200 flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 border text-slate-700 rounded-xl text-xs font-black cursor-pointer shadow-sm transition-all"
-            >
-              <Copy className="w-4 h-4 text-slate-500" />
-              {copied ? 'Copied to Clipboard!' : 'Copy Prompt Text'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowInstructionalModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black cursor-pointer shadow-md shadow-indigo-950/20 transition-all"
-            >
-              Instructional Prompt
-            </button>
+          <div className="flex-1 overflow-y-auto max-h-[350px] lg:max-h-[600px] space-y-2 pr-1">
+            {loading ? (
+              <div className="py-4 text-center text-xs text-slate-400 font-bold">Syncing archives...</div>
+            ) : savedForms.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400 font-semibold italic">No saved questionnaires securely stored.</div>
+            ) : (
+              savedForms.map(form => (
+                <div
+                  key={form.id}
+                  onClick={() => handleEdit(form)}
+                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex justify-between items-start gap-2 relative group overflow-hidden ${
+                    currentId === form.id 
+                      ? 'border-[#1A3C6E] bg-slate-50 ring-1 ring-[#1A3C6E]' 
+                      : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="space-y-1">
+                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-[#D4A017] flex items-center gap-1">
+                      {form.type === 'lp' ? '✏️ LANDING PAGE' : (form.type === 'ec' ? '🛒 ECOMMERCE' : '💼 PORTFOLIO')}
+                    </span>
+                    <div className="font-extrabold text-[#1A3C6E] text-xs truncate max-w-[150px]">{form.clientName}</div>
+                    <div className="text-[10px] text-slate-400 font-bold truncate max-w-[150px]">{form.businessName}</div>
+                  </div>
+                  <button
+                    onClick={(e) => handleDelete(form.id, e)}
+                    aria-label="Delete questionnaire"
+                    className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
 
-          <div className="flex gap-2">
-            {currentId && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2.5 border rounded-xl hover:bg-slate-50 text-xs font-bold transition-all cursor-pointer"
-              >
-                Cancel Edit
-              </button>
+          {/* CLIENT LINK GENERATOR */}
+          <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 relative">
+            {hasExceededLimit && (
+              <div className="absolute inset-0 bg-white/95 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-center p-4 rounded-2xl border border-dashed border-rose-200">
+                <div className="p-3 bg-rose-50 rounded-full mb-3 text-rose-500 border border-rose-200 shadow-sm">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <h5 className="text-xs font-black text-slate-800 uppercase tracking-wider">KYCB Archive Full</h5>
+                <p className="text-[10px] text-slate-500 font-bold max-w-[200px] leading-relaxed mt-2">
+                  {isPro 
+                    ? `You have reached your maximum limit of ${currentLimit} saved forms. Please delete an old form to generate a new client link.`
+                    : `Free members can save up to ${currentLimit} forms. Upgrade to CIYA Student Pro to increase your archive capacity!`}
+                </p>
+                {!isPro && (
+                  <div className="mt-4 text-[9px] font-black uppercase text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-150">
+                    UPGRADE TO PRO
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <h4 className="text-xs font-black text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
+                <Link2 className="w-4 h-4 text-[#1A3C6E]" /> Client Share Link
+              </h4>
+              <p className="text-[10px] text-slate-400 font-bold leading-normal">
+                Generate a secure link for clients to fill out their design brief.
+              </p>
+            </div>
+
+            <div className="space-y-2 text-left">
+              <div>
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1.5">Target Form Profile</label>
+                <CustomDropdown
+                  disabled={hasExceededLimit}
+                  value={shareType}
+                  options={[
+                    { label: '✏️ Landing Page', value: 'lp' },
+                    { label: '🛒 eCommerce Store', value: 'ec' },
+                    { label: '💼 Portfolio Website', value: 'portfolio' }
+                  ]}
+                  onChange={(val) => setShareType(val as any)}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                  Custom Form Title {isPro ? '✨' : '📝'}
+                </label>
+                <input
+                  type="text"
+                  value={shareTitle}
+                  disabled={hasExceededLimit}
+                  onChange={(e) => setShareTitle(e.target.value)}
+                  placeholder="e.g. Website Requirements Form"
+                  className={`w-full text-xs font-semibold border rounded-xl px-2.5 py-2 focus:outline-none ${
+                    !hasExceededLimit 
+                      ? 'border-slate-200 bg-white text-slate-800' 
+                      : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">Developer Name</label>
+                <input
+                  type="text"
+                  disabled={hasExceededLimit}
+                  value={shareStudent}
+                  onChange={(e) => setShareStudent(e.target.value)}
+                  placeholder="Your Name / Agency"
+                  className="w-full text-xs font-semibold border border-slate-200 rounded-xl px-2.5 py-2 focus:outline-none bg-white text-slate-800 disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            {linkCopied && (
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-center text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider animate-fadeIn">
+                Copied to Clipboard! ⚡ Send it to your Client!
+              </div>
             )}
 
             <button
               type="button"
-              onClick={resetFormDetails}
-              className="px-4 py-2.5 border rounded-xl hover:bg-slate-50 text-xs font-black text-slate-600 transition-all cursor-pointer"
+              disabled={hasExceededLimit}
+              onClick={() => {
+                if (hasExceededLimit) return;
+                const origin = window.location.origin;
+                const params = new URLSearchParams();
+                params.set('type', shareType);
+                params.set('title', shareTitle || 'CIYA Academy Website Requirements Form');
+                if (shareStudent) {
+                  params.set('student', shareStudent);
+                }
+                const fullUrl = `${origin}/client-form?${params.toString()}`;
+                navigator.clipboard.writeText(fullUrl);
+                setLinkCopied(true);
+                setTimeout(() => setLinkCopied(false), 3000);
+              }}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-4 bg-teal-600 hover:bg-teal-700 hover:scale-[1.01] transition-all text-white rounded-xl text-xs font-black cursor-pointer shadow-md shadow-teal-700/10 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              🧹 Clear draft inputs
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-950/10 cursor-pointer disabled:opacity-50"
-            >
-              <Save className="w-4 h-4 text-emerald-300 animate-pulse" />
-              {saving ? 'Saving...' : 'Save'}
+              <Link2 className="w-4 h-4" />
+              Generate & Copy Link
             </button>
           </div>
         </div>
+      )}
 
-        {/* Instructional Prompt Modal */}
-        {showInstructionalModal && (
+      {/* Main Questionnaire Canvas */}
+      {(localActiveSubView === 'form') && (
+        <div className={`flex-1 rounded-3xl border p-4 md:p-8 shadow-sm transition-all duration-300 ${
+          activeTab === 'lp' 
+            ? 'bg-[#FCFDFF] border-slate-200' 
+            : activeTab === 'ec'
+              ? 'bg-[#FCFAF3] border-amber-200/50 shadow-amber-900/[0.01]'
+              : 'bg-[#FAFDFD] border-teal-200/40 shadow-teal-950/[0.01]'
+        }`}>
+          <div className="text-center md:text-left border-b border-slate-100 pb-5 mb-6">
+            <h1 className="text-xl md:text-2xl font-black text-[#1A3C6E] tracking-tight flex items-center justify-center md:justify-start gap-2">
+              <span className="p-1 px-2.5 bg-[#1A3C6E] text-[#D4A017] rounded-xl text-sm font-black">KYCB</span>
+              {qL("Know Your Client & Business", "Portfolio Consulting Spec")}
+            </h1>
+          </div>
+
+          {/* Global Metadata Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-left">
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Client Full Name *</label>
+              <input 
+                type="text" 
+                value={clientName} 
+                onChange={e => setClientName(e.target.value)} 
+                placeholder="e.g. Sandra Johnson" 
+                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Date Completed</label>
+              <input 
+                type="date" 
+                value={dateCompleted} 
+                onChange={e => setDateCompleted(e.target.value)} 
+                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
+              />
+            </div>
+          </div>
+
+          {/* Toggle Mode Perspective Selector */}
+          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border border-slate-200/60 bg-slate-50/60 rounded-2xl p-4 mb-6 shadow-sm">
+            <div className="flex flex-col text-left">
+              <span className="text-xs font-black text-[#1A3C6E] tracking-tight uppercase">View Mode Perspective</span>
+              <span className="text-[10px] text-slate-400 font-bold">Swap questions framing for clients or freelancers</span>
+            </div>
+            <div className="flex bg-white border border-slate-200 p-1 rounded-xl shadow-inner shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewPerspective('client')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewPerspective === 'client' 
+                    ? 'bg-[#1A3C6E] text-[#D4A017] shadow-sm font-black' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                👤 Client View
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewPerspective('freelancer')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewPerspective === 'freelancer' 
+                    ? 'bg-[#1A3C6E] text-[#D4A017] shadow-sm font-black' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                💼 Freelancer View
+              </button>
+            </div>
+          </div>
+
+          {/* Triple Tab Controls */}
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-6">
+            <button
+              type="button"
+              onClick={() => handleTabToggle('lp')}
+              className={`flex-1 py-3 px-3 text-center rounded-lg text-xs font-black transition-all cursor-pointer ${
+                activeTab === 'lp' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
+              }`}
+            >
+              ✏️ Landing Page
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabToggle('ec')}
+              className={`flex-1 py-3 px-3 text-center rounded-lg text-xs font-black transition-all cursor-pointer ${
+                activeTab === 'ec' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
+              }`}
+            >
+              🛒 eCommerce Specifics
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabToggle('portfolio')}
+              className={`flex-1 py-3 px-3 text-center rounded-lg text-xs font-black transition-all cursor-pointer ${
+                activeTab === 'portfolio' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
+              }`}
+            >
+              💼 Portfolio Questionnaire
+            </button>
+          </div>
+
+          {/* Form Sections */}
+          <div className="space-y-6">
+            {activeTab === 'lp' ? (
+              <LpQuestionnaireForm
+                viewPerspective={viewPerspective || 'client'}
+                hasSite={hasSite}
+                setHasSite={setHasSite}
+                siteUrl={siteUrl}
+                setSiteUrl={setSiteUrl}
+                businessName={businessName}
+                setBusinessName={setBusinessName}
+                industry={industry}
+                setIndustry={setIndustry}
+                hasCustomIndustryOption={hasCustomIndustryOption}
+                setHasCustomIndustryOption={setHasCustomIndustryOption}
+                phone={phone}
+                setPhone={setPhone}
+                email={email}
+                setEmail={setEmail}
+                address={address}
+                setAddress={setAddress}
+                hasSocialMediaAsked={hasSocialMediaAsked}
+                setHasSocialMediaAsked={setHasSocialMediaAsked}
+                socialLinks={socialLinks}
+                setSocialLinks={setSocialLinks}
+                visitorActions={visitorActions}
+                setVisitorActions={setVisitorActions}
+                otherAction={otherAction}
+                setOtherAction={setOtherAction}
+                idealAge={idealAge}
+                setIdealAge={setIdealAge}
+                locations={locations}
+                setLocations={setLocations}
+                occupation={occupation}
+                setOccupation={setOccupation}
+                problemsSolved={problemsSolved}
+                setProblemsSolved={setProblemsSolved}
+                problemsSolvedDetail={problemsSolvedDetail}
+                setProblemsSolvedDetail={setProblemsSolvedDetail}
+                hasLogo={hasLogo}
+                setHasLogo={setHasLogo}
+                logoDesign={logoDesign}
+                setLogoDesign={setLogoDesign}
+                hasBrandColors={hasBrandColors}
+                setHasBrandColors={setHasBrandColors}
+                colorsCount={colorsCount}
+                setColorsCount={setColorsCount}
+                brandColors={brandColors}
+                setBrandColors={setBrandColors}
+                brandTones={brandTones}
+                setBrandTones={setBrandTones}
+                sectionsToInclude={sectionsToInclude}
+                setSectionsToInclude={setSectionsToInclude}
+                displayPricing={displayPricing}
+                setDisplayPricing={setDisplayPricing}
+                pricingRanges={pricingRanges}
+                setPricingRanges={setPricingRanges}
+                pricingDetail={pricingDetail}
+                setPricingDetail={setPricingDetail}
+                privacyPolicy={privacyPolicy}
+                setPrivacyPolicy={setPrivacyPolicy}
+                privacyPolicyPrep={privacyPolicyPrep}
+                setPrivacyPolicyPrep={setPrivacyPolicyPrep}
+                termsPolicy={termsPolicy}
+                setTermsPolicy={setTermsPolicy}
+                termsPolicyPrep={termsPolicyPrep}
+                setTermsPolicyPrep={setTermsPolicyPrep}
+                refundPolicy={refundPolicy}
+                setRefundPolicy={setRefundPolicy}
+                refundPolicyPrep={refundPolicyPrep}
+                setRefundPolicyPrep={setRefundPolicyPrep}
+                deadline={deadline}
+                setDeadline={setDeadline}
+                budgetRange={budgetRange}
+                setBudgetRange={setBudgetRange}
+                additionalNotes={additionalNotes}
+                setAdditionalNotes={setAdditionalNotes}
+                hasImages={hasImages}
+                setHasImages={setHasImages}
+                hasVideos={hasVideos}
+                setHasVideos={setHasVideos}
+                hasTestimonials={hasTestimonials}
+                setHasTestimonials={setHasTestimonials}
+                functionalFeatures={functionalFeatures}
+                setFunctionalFeatures={setFunctionalFeatures}
+                otherRequirements={otherRequirements}
+                setOtherRequirements={setOtherRequirements}
+                runPaidAds={runPaidAds}
+                setRunPaidAds={setRunPaidAds}
+                adPlatforms={adPlatforms}
+                setAdPlatforms={setAdPlatforms}
+                otherTraffic={otherTraffic}
+                setOtherTraffic={setOtherTraffic}
+                lpOfferType={lpOfferType}
+                setLpOfferType={setLpOfferType}
+                lpOfferMain={lpOfferMain}
+                setLpOfferMain={setLpOfferMain}
+                lpOfferServices={lpOfferServices}
+                setLpOfferServices={setLpOfferServices}
+                lpOfferServicesDetail={lpOfferServicesDetail}
+                setLpOfferServicesDetail={setLpOfferServicesDetail}
+                lpOfferPromo={lpOfferPromo}
+                setLpOfferPromo={setLpOfferPromo}
+                lpOfferPromoDetail={lpOfferPromoDetail}
+                setLpOfferPromoDetail={setLpOfferPromoDetail}
+                lpWhyChoose={lpWhyChoose}
+                setLpWhyChoose={setLpWhyChoose}
+                lpWhatMakesSpecial={lpWhatMakesSpecial}
+                setLpWhatMakesSpecial={setLpWhatMakesSpecial}
+                lpWhatMakesSpecialDetail={lpWhatMakesSpecialDetail}
+                setLpWhatMakesSpecialDetail={setLpWhatMakesSpecialDetail}
+                toggleMultiSelect={toggleMultiSelect}
+                updateArrayItem={updateArrayItem}
+                removeArrayItem={removeArrayItem}
+                addArrayItem={addArrayItem}
+              />
+            ) : activeTab === 'ec' ? (
+              <EcQuestionnaireForm
+                viewPerspective={viewPerspective || 'client'}
+                hasSite={hasSite}
+                setHasSite={setHasSite}
+                siteUrl={siteUrl}
+                setSiteUrl={setSiteUrl}
+                businessName={businessName}
+                setBusinessName={setBusinessName}
+                industry={industry}
+                setIndustry={setIndustry}
+                hasCustomIndustryOption={hasCustomIndustryOption}
+                setHasCustomIndustryOption={setHasCustomIndustryOption}
+                phone={phone}
+                setPhone={setPhone}
+                email={email}
+                setEmail={setEmail}
+                address={address}
+                setAddress={setAddress}
+                hasSocialMediaAsked={hasSocialMediaAsked}
+                setHasSocialMediaAsked={setHasSocialMediaAsked}
+                socialLinks={socialLinks}
+                setSocialLinks={setSocialLinks}
+                ecommerceType={ecommerceType}
+                setEcommerceType={setEcommerceType}
+                hasInventory={hasInventory}
+                setHasInventory={setHasInventory}
+                inventoryLocation={inventoryLocation}
+                setInventoryLocation={setInventoryLocation}
+                visitorActions={visitorActions}
+                setVisitorActions={setVisitorActions}
+                otherAction={otherAction}
+                setOtherAction={setOtherAction}
+                idealAge={idealAge}
+                setIdealAge={setIdealAge}
+                genderFocus={genderFocus}
+                setGenderFocus={setGenderFocus}
+                incomeLevel={incomeLevel}
+                setIncomeLevel={setIncomeLevel}
+                productInterests={productInterests}
+                setProductInterests={setProductInterests}
+                locations={locations}
+                setLocations={setLocations}
+                problemsSolved={problemsSolved}
+                setProblemsSolved={setProblemsSolved}
+                problemsSolvedDetail={problemsSolvedDetail}
+                setProblemsSolvedDetail={setProblemsSolvedDetail}
+                mainProducts={mainProducts}
+                setMainProducts={setMainProducts}
+                productCards={productCards}
+                setProductCards={setProductCards}
+                ecSpecialOffers={ecSpecialOffers}
+                setEcSpecialOffers={setEcSpecialOffers}
+                ecSpecialOffersDetail={ecSpecialOffersDetail}
+                setEcSpecialOffersDetail={setEcSpecialOffersDetail}
+                ecWhyBuy={ecWhyBuy}
+                setEcWhyBuy={setEcWhyBuy}
+                ecProductDiff={ecProductDiff}
+                setEcProductDiff={setEcProductDiff}
+                ecProductDiffDetail={ecProductDiffDetail}
+                setEcProductDiffDetail={setEcProductDiffDetail}
+                hasLogo={hasLogo}
+                setHasLogo={setHasLogo}
+                logoDesign={logoDesign}
+                setLogoDesign={setLogoDesign}
+                hasBrandColors={hasBrandColors}
+                setHasBrandColors={setHasBrandColors}
+                colorsCount={colorsCount}
+                setColorsCount={setColorsCount}
+                brandColors={brandColors}
+                setBrandColors={setBrandColors}
+                ecWebsiteStyle={ecWebsiteStyle}
+                setEcWebsiteStyle={setEcWebsiteStyle}
+                brandTones={brandTones}
+                setBrandTones={setBrandTones}
+                hasImages={hasImages}
+                setHasImages={setHasImages}
+                hasVideos={hasVideos}
+                setHasVideos={setHasVideos}
+                hasTestimonials={hasTestimonials}
+                setHasTestimonials={setHasTestimonials}
+                ecPages={ecPages}
+                setEcPages={setEcPages}
+                paymentOptions={paymentOptions}
+                setPaymentOptions={setPaymentOptions}
+                deliveryScope={deliveryScope}
+                setDeliveryScope={setDeliveryScope}
+                deliveryStates={deliveryStates}
+                setDeliveryStates={setDeliveryStates}
+                deliveryOptions={deliveryOptions}
+                setDeliveryOptions={setDeliveryOptions}
+                chargeDelivery={chargeDelivery}
+                setChargeDelivery={setChargeDelivery}
+                deliveryFee={deliveryFee}
+                setDeliveryFee={setDeliveryFee}
+                logisticsPartner={logisticsPartner}
+                setLogisticsPartner={setLogisticsPartner}
+                notificationMethods={notificationMethods}
+                setNotificationMethods={setNotificationMethods}
+                autoConf={autoConf}
+                setAutoConf={setAutoConf}
+                functionalFeatures={functionalFeatures}
+                setFunctionalFeatures={setFunctionalFeatures}
+                otherRequirements={otherRequirements}
+                setOtherRequirements={setOtherRequirements}
+                runPaidAds={runPaidAds}
+                setRunPaidAds={setRunPaidAds}
+                adPlatforms={adPlatforms}
+                setAdPlatforms={setAdPlatforms}
+                otherTraffic={otherTraffic}
+                setOtherTraffic={setOtherTraffic}
+                ecMarketingHelp={ecMarketingHelp}
+                setEcMarketingHelp={setEcMarketingHelp}
+                privacyPolicy={privacyPolicy}
+                setPrivacyPolicy={setPrivacyPolicy}
+                privacyPolicyPrep={privacyPolicyPrep}
+                setPrivacyPolicyPrep={setPrivacyPolicyPrep}
+                termsPolicy={termsPolicy}
+                setTermsPolicy={setTermsPolicy}
+                termsPolicyPrep={termsPolicyPrep}
+                setTermsPolicyPrep={setTermsPolicyPrep}
+                refundPolicy={refundPolicy}
+                setRefundPolicy={setRefundPolicy}
+                refundPolicyPrep={refundPolicyPrep}
+                setRefundPolicyPrep={setRefundPolicyPrep}
+                deadline={deadline}
+                setDeadline={setDeadline}
+                budgetRange={budgetRange}
+                setBudgetRange={setBudgetRange}
+                additionalNotes={additionalNotes}
+                setAdditionalNotes={setAdditionalNotes}
+                toggleMultiSelect={toggleMultiSelect}
+                updateArrayItem={updateArrayItem}
+                removeArrayItem={removeArrayItem}
+                addArrayItem={addArrayItem}
+              />
+            ) : (
+              <PortfolioQuestionnaireForm
+                viewPerspective={viewPerspective || 'client'}
+                hasSite={hasSite}
+                setHasSite={setHasSite}
+                siteUrl={siteUrl}
+                setSiteUrl={setSiteUrl}
+                businessName={businessName}
+                setBusinessName={setBusinessName}
+                phone={phone}
+                setPhone={setPhone}
+                email={email}
+                setEmail={setEmail}
+                address={address}
+                setAddress={setAddress}
+                hasSocialMediaAsked={hasSocialMediaAsked}
+                setHasSocialMediaAsked={setHasSocialMediaAsked}
+                socialLinks={socialLinks}
+                setSocialLinks={setSocialLinks}
+                portfolioProfession={portfolioProfession}
+                setPortfolioProfession={setPortfolioProfession}
+                portfolioProfessionOther={portfolioProfessionOther}
+                setPortfolioProfessionOther={setPortfolioProfessionOther}
+                portfolioTools={portfolioTools}
+                setPortfolioTools={setPortfolioTools}
+                portfolioToolsOther={portfolioToolsOther}
+                setPortfolioToolsOther={setPortfolioToolsOther}
+                portfolioYearsExperience={portfolioYearsExperience}
+                setPortfolioYearsExperience={setPortfolioYearsExperience}
+                portfolioStrengths={portfolioStrengths}
+                setPortfolioStrengths={setPortfolioStrengths}
+                portfolioPurposes={portfolioPurposes}
+                setPortfolioPurposes={setPortfolioPurposes}
+                portfolioVisitorActions={portfolioVisitorActions}
+                setPortfolioVisitorActions={setPortfolioVisitorActions}
+                portfolioTargetVisitors={portfolioTargetVisitors}
+                setPortfolioTargetVisitors={setPortfolioTargetVisitors}
+                portfolioTargetIndustries={portfolioTargetIndustries}
+                setPortfolioTargetIndustries={setPortfolioTargetIndustries}
+                portfolioFeaturedCount={portfolioFeaturedCount}
+                setPortfolioFeaturedCount={setPortfolioFeaturedCount}
+                portfolioPresentationStyles={portfolioPresentationStyles}
+                setPortfolioPresentationStyles={setPortfolioPresentationStyles}
+                portfolioProjects={portfolioProjects}
+                setPortfolioProjects={setPortfolioProjects}
+                portfolioHasImages={portfolioHasImages}
+                setPortfolioHasImages={setPortfolioHasImages}
+                portfolioBio={portfolioBio}
+                setPortfolioBio={setPortfolioBio}
+                portfolioDifferentiators={portfolioDifferentiators}
+                setPortfolioDifferentiators={setPortfolioDifferentiators}
+                portfolioDifferentiatorDetail={portfolioDifferentiatorDetail}
+                setPortfolioDifferentiatorDetail={setPortfolioDifferentiatorDetail}
+                portfolioHasPhoto={portfolioHasPhoto}
+                setPortfolioHasPhoto={setPortfolioHasPhoto}
+                portfolioShowEducation={portfolioShowEducation}
+                setPortfolioShowEducation={setPortfolioShowEducation}
+                portfolioEducationDetails={portfolioEducationDetails}
+                setPortfolioEducationDetails={setPortfolioEducationDetails}
+                portfolioShowExperience={portfolioShowExperience}
+                setPortfolioShowExperience={setPortfolioShowExperience}
+                portfolioExperienceDetails={portfolioExperienceDetails}
+                setPortfolioExperienceDetails={setPortfolioExperienceDetails}
+                portfolioShowServices={portfolioShowServices}
+                setPortfolioShowServices={setPortfolioShowServices}
+                portfolioServicesOffered={portfolioServicesOffered}
+                setPortfolioServicesOffered={setPortfolioServicesOffered}
+                portfolioServicesOther={portfolioServicesOther}
+                setPortfolioServicesOther={setPortfolioServicesOther}
+                portfolioShowPricing={portfolioShowPricing}
+                setPortfolioShowPricing={setPortfolioShowPricing}
+                portfolioPricingDetails={portfolioPricingDetails}
+                setPortfolioPricingDetails={setPortfolioPricingDetails}
+                portfolioTypicalProcess={portfolioTypicalProcess}
+                setPortfolioTypicalProcess={setPortfolioTypicalProcess}
+                portfolioHasTestimonials={portfolioHasTestimonials}
+                setPortfolioHasTestimonials={setPortfolioHasTestimonials}
+                portfolioTestimonialsList={portfolioTestimonialsList}
+                setPortfolioTestimonialsList={setPortfolioTestimonialsList}
+                portfolioNotableBrands={portfolioNotableBrands}
+                setPortfolioNotableBrands={setPortfolioNotableBrands}
+                portfolioHasAwards={portfolioHasAwards}
+                setPortfolioHasAwards={setPortfolioHasAwards}
+                portfolioAwardsDetails={portfolioAwardsDetails}
+                setPortfolioAwardsDetails={setPortfolioAwardsDetails}
+                portfolioHasLogo={portfolioHasLogo}
+                setPortfolioHasLogo={setPortfolioHasLogo}
+                portfolioLogoDesign={portfolioLogoDesign}
+                setPortfolioLogoDesign={setPortfolioLogoDesign}
+                portfolioHasBrandColors={portfolioHasBrandColors}
+                setPortfolioHasBrandColors={setPortfolioHasBrandColors}
+                portfolioColorsCount={portfolioColorsCount}
+                setPortfolioColorsCount={setPortfolioColorsCount}
+                portfolioBrandColors={portfolioBrandColors}
+                setPortfolioBrandColors={setPortfolioBrandColors}
+                portfolioVisualPersonalities={portfolioVisualPersonalities}
+                setPortfolioVisualPersonalities={setPortfolioVisualPersonalities}
+                portfolioInspirations={portfolioInspirations}
+                setPortfolioInspirations={setPortfolioInspirations}
+                portfolioInspirationDetail={portfolioInspirationDetail}
+                setPortfolioInspirationDetail={setPortfolioInspirationDetail}
+                portfolioPagesNeeded={portfolioPagesNeeded}
+                setPortfolioPagesNeeded={setPortfolioPagesNeeded}
+                portfolioPreferredStructure={portfolioPreferredStructure}
+                setPortfolioPreferredStructure={setPortfolioPreferredStructure}
+                portfolioHasBlog={portfolioHasBlog}
+                setPortfolioHasBlog={setPortfolioHasBlog}
+                portfolioBlogTopics={portfolioBlogTopics}
+                setPortfolioBlogTopics={setPortfolioBlogTopics}
+                portfolioHasCV={portfolioHasCV}
+                setPortfolioHasCV={setPortfolioHasCV}
+                portfolioFeaturesNeeded={portfolioFeaturesNeeded}
+                setPortfolioFeaturesNeeded={setPortfolioFeaturesNeeded}
+                portfolioContactPreferences={portfolioContactPreferences}
+                setPortfolioContactPreferences={setPortfolioContactPreferences}
+                portfolioAnimationLevel={portfolioAnimationLevel}
+                setPortfolioAnimationLevel={setPortfolioAnimationLevel}
+                portfolioHasNDA={portfolioHasNDA}
+                setPortfolioHasNDA={setPortfolioHasNDA}
+                portfolioTrafficSources={portfolioTrafficSources}
+                setPortfolioTrafficSources={setPortfolioTrafficSources}
+                portfolioWantsSEO={portfolioWantsSEO}
+                setPortfolioWantsSEO={setPortfolioWantsSEO}
+                portfolioCustomDomain={portfolioCustomDomain}
+                setPortfolioCustomDomain={setPortfolioCustomDomain}
+                portfolioDeadline={portfolioDeadline}
+                setPortfolioDeadline={setPortfolioDeadline}
+                portfolioBudget={portfolioBudget}
+                setPortfolioBudget={setPortfolioBudget}
+                portfolioDrivingEvent={portfolioDrivingEvent}
+                setPortfolioDrivingEvent={setPortfolioDrivingEvent}
+                portfolioAdditionalNotes={portfolioAdditionalNotes}
+                setPortfolioAdditionalNotes={setPortfolioAdditionalNotes}
+                toggleMultiSelect={toggleMultiSelect}
+                updateArrayItem={updateArrayItem}
+                removeArrayItem={removeArrayItem}
+                addArrayItem={addArrayItem}
+              />
+            )}
+          </div>
+
+          {/* Global form controls */}
+          <div className="mt-8 pt-4 border-t border-slate-200 flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 border text-slate-700 rounded-xl text-xs font-black cursor-pointer shadow-sm transition-all"
+              >
+                <Copy className="w-4 h-4 text-slate-500" />
+                {copied ? 'Copied to Clipboard!' : 'Copy Prompt Text'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowInstructionalModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black cursor-pointer shadow-md shadow-indigo-950/20 transition-all"
+              >
+                Instructional Prompt
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              {currentId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-4 py-2.5 border rounded-xl hover:bg-slate-50 text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancel Edit
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={resetFormDetails}
+                className="px-4 py-2.5 border rounded-xl hover:bg-slate-50 text-xs font-black text-slate-600 transition-all cursor-pointer"
+              >
+                🧹 Clear draft inputs
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-950/10 cursor-pointer disabled:opacity-50"
+              >
+                <Save className="w-4 h-4 text-emerald-300 animate-pulse" />
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )}
+
+    {/* Instructional Prompt Modal */}
+    {showInstructionalModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
               {/* Modal Header */}
@@ -2262,6 +2491,5 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
           </div>
         )}
       </div>
-    </div>
-  );
+    );
 }

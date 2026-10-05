@@ -4,6 +4,7 @@ import { db, auth, rtdb, handleFirestoreError, OperationType, getActiveDatabaseI
 import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
+import CustomDropdown from '../../components/CustomDropdown';
 import { Course } from '../../types';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
 import { uploadToCloudinary } from '../../utils/cloudinary';
@@ -1121,15 +1122,16 @@ export default function UsersAdmin() {
             {/* Change Active Cohort */}
             <div className="flex items-center gap-2 border-t sm:border-t-0 sm:border-l border-slate-200 pt-3 sm:pt-0 sm:pl-4">
               <span className="text-xs text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Active Cohort:</span>
-              <select
+              <CustomDropdown
                 value={cohortsConfig.activeCohort}
-                onChange={(e) => handleChangeActiveCohort(e.target.value)}
-                className="text-xs font-bold border border-slate-300 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-700 bg-white"
-              >
-                {cohortsConfig.cohortsList.map(cohort => (
-                  <option key={cohort} value={cohort}>{cohort}</option>
-                ))}
-              </select>
+                onChange={(val) => handleChangeActiveCohort(val)}
+                options={cohortsConfig.cohortsList.map(cohort => ({
+                  label: cohort,
+                  value: cohort
+                }))}
+                className="min-w-[140px]"
+                theme="indigo"
+              />
             </div>
           </div>
         </div>
@@ -1207,106 +1209,128 @@ export default function UsersAdmin() {
           </div>
           
           {/* Cohort filter */}
-          <select 
-            value={filterCohort} 
-            onChange={(e) => setFilterCohort(e.target.value)}
-            className="text-sm border border-indigo-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-700 font-bold bg-white"
-          >
-            <option value="All" className="text-slate-800">All Cohorts (Aggregated)</option>
-            {allAvailableCohorts.map(cohort => (
-              <option key={cohort} value={cohort} className="text-slate-800">
-                {cohort} {cohortsConfig.activeCohort === cohort ? "(Active)" : ""}
-              </option>
-            ))}
-          </select>
+          <CustomDropdown
+            value={filterCohort}
+            onChange={(val) => setFilterCohort(val)}
+            options={[
+              { label: "All Cohorts (Aggregated)", value: "All" },
+              ...allAvailableCohorts.map(cohort => ({
+                label: `${cohort} ${cohortsConfig.activeCohort === cohort ? "(Active)" : ""}`,
+                value: cohort
+              }))
+            ]}
+            className="min-w-[180px]"
+            theme="indigo"
+          />
 
-          <select 
-            value={sortDate} 
-            onChange={(e) => setSortDate(e.target.value)}
-            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
-          >
-            <option value="desc" className="text-slate-800">Date Registered (Newest)</option>
-            <option value="asc" className="text-slate-800">Date Registered (Oldest)</option>
-          </select>
+          <CustomDropdown
+            value={sortDate}
+            onChange={(val) => setSortDate(val)}
+            options={[
+              { label: "Date Registered (Newest)", value: "desc" },
+              { label: "Date Registered (Oldest)", value: "asc" }
+            ]}
+            className="min-w-[180px]"
+            theme="light"
+          />
 
-          <select 
-            value={filterApproval} 
-            onChange={(e) => setFilterApproval(e.target.value)}
-            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
-          >
-            <option value="" className="text-slate-800">All Approvals</option>
-            <option value="pending" className="text-slate-800">Pending Review</option>
-            <option value="approved" className="text-slate-800">Approved Applications</option>
-            <option value="disapproved" className="text-slate-800">Disapproved Applications</option>
-          </select>
+          <CustomDropdown
+            value={filterApproval}
+            onChange={(val) => setFilterApproval(val)}
+            options={[
+              { label: "All Approvals", value: "" },
+              { label: "Pending Review", value: "pending" },
+              { label: "Approved Applications", value: "approved" },
+              { label: "Disapproved Applications", value: "disapproved" }
+            ]}
+            className="min-w-[180px]"
+            theme="light"
+          />
 
-          <select 
-            value={filterGender} 
-            onChange={(e) => setFilterGender(e.target.value)}
-            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
-          >
-            <option value="" className="text-slate-800">All Genders</option>
-            <option value="male" className="text-slate-800">Male</option>
-            <option value="female" className="text-slate-800">Female</option>
-          </select>
+          <CustomDropdown
+            value={filterGender}
+            onChange={(val) => setFilterGender(val)}
+            options={[
+              { label: "All Genders", value: "" },
+              { label: "Male", value: "male" },
+              { label: "Female", value: "female" }
+            ]}
+            className="min-w-[140px]"
+            theme="light"
+          />
 
           {/* Age range filter */}
-          <select 
-            value={filterAgeRange} 
-            onChange={(e) => setFilterAgeRange(e.target.value)}
-            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
-          >
-            <option value="" className="text-slate-800">All Age Ranges</option>
-            {['15-20', '21-25', '26-30', '31-35', '36+'].map(age => (
-              <option key={age} value={age} className="text-slate-800">{age} years</option>
-            ))}
-          </select>
+          <CustomDropdown
+            value={filterAgeRange}
+            onChange={(val) => setFilterAgeRange(val)}
+            options={[
+              { label: "All Age Ranges", value: "" },
+              ...['15-20', '21-25', '26-30', '31-35', '36+'].map(age => ({
+                label: `${age} years`,
+                value: age
+              }))
+            ]}
+            className="min-w-[140px]"
+            theme="light"
+          />
 
           {/* Education level filter */}
-          <select 
-            value={filterEducationLevel} 
-            onChange={(e) => setFilterEducationLevel(e.target.value)}
-            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
-          >
-            <option value="" className="text-slate-800">All Education Levels</option>
-            {['SSCE', 'Undergraduate', 'Graduate'].map(edu => (
-              <option key={edu} value={edu} className="text-slate-800">{edu}</option>
-            ))}
-          </select>
+          <CustomDropdown
+            value={filterEducationLevel}
+            onChange={(val) => setFilterEducationLevel(val)}
+            options={[
+              { label: "All Education Levels", value: "" },
+              ...['SSCE', 'Undergraduate', 'Graduate'].map(edu => ({
+                label: edu,
+                value: edu
+              }))
+            ]}
+            className="min-w-[160px]"
+            theme="light"
+          />
 
           {/* Learning tool filter */}
-          <select 
-            value={filterLearningTool} 
-            onChange={(e) => setFilterLearningTool(e.target.value)}
-            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
-          >
-            <option value="" className="text-slate-800">All Learning Tools</option>
-            {['Mobile Phone', 'Laptop'].map(tool => (
-              <option key={tool} value={tool} className="text-slate-800">{tool}</option>
-            ))}
-          </select>
+          <CustomDropdown
+            value={filterLearningTool}
+            onChange={(val) => setFilterLearningTool(val)}
+            options={[
+              { label: "All Learning Tools", value: "" },
+              ...['Mobile Phone', 'Laptop'].map(tool => ({
+                label: tool,
+                value: tool
+              }))
+            ]}
+            className="min-w-[160px]"
+            theme="light"
+          />
 
-          <select 
-            value={filterCourse} 
-            onChange={(e) => setFilterCourse(e.target.value)}
-            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
-          >
-            <option value="" className="text-slate-800">All Path Options</option>
-            {uniqueCourses.map(c => (
-              <option key={c} value={c} className="text-slate-800">{c}</option>
-            ))}
-          </select>
+          <CustomDropdown
+            value={filterCourse}
+            onChange={(val) => setFilterCourse(val)}
+            options={[
+              { label: "All Path Options", value: "" },
+              ...uniqueCourses.map(c => ({
+                label: c,
+                value: c
+              }))
+            ]}
+            className="min-w-[180px]"
+            theme="light"
+          />
 
-          <select 
-            value={filterState} 
-            onChange={(e) => setFilterState(e.target.value)}
-            className="text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 bg-white"
-          >
-            <option value="" className="text-slate-800">All States</option>
-            {uniqueStates.map(s => (
-              <option key={s} value={s} className="text-slate-800">{s}</option>
-            ))}
-          </select>
+          <CustomDropdown
+            value={filterState}
+            onChange={(val) => setFilterState(val)}
+            options={[
+              { label: "All States", value: "" },
+              ...uniqueStates.map(s => ({
+                label: s,
+                value: s
+              }))
+            ]}
+            className="min-w-[160px]"
+            theme="light"
+          />
 
           <div className="flex items-center gap-1.5 border-l border-slate-200 pl-4 py-1">
             <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Date range:</span>
@@ -1650,10 +1674,10 @@ export default function UsersAdmin() {
                                   </div>
                                   <div>
                                     <span className="text-slate-400 block font-bold text-[9px] uppercase">Cohort Placement</span>
-                                    <select
+                                    <CustomDropdown
                                       value={u.cohort || 'Cohort 1'}
-                                      onChange={async (e) => {
-                                        const targetCohort = e.target.value;
+                                      onChange={async (val) => {
+                                        const targetCohort = val;
                                         try {
                                           await updateDoc(doc(db, 'users', u.id), {
                                             cohort: targetCohort,
@@ -1667,12 +1691,13 @@ export default function UsersAdmin() {
                                           alert("Failed to update cohort. Please try again.");
                                         }
                                       }}
-                                      className="mt-1 bg-slate-50 border border-slate-300 rounded px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500 w-full outline-none"
-                                    >
-                                      {allAvailableCohorts.map(cohort => (
-                                        <option key={cohort} value={cohort}>{cohort}</option>
-                                      ))}
-                                    </select>
+                                      options={allAvailableCohorts.map(cohort => ({
+                                        label: cohort,
+                                        value: cohort
+                                      }))}
+                                      className="w-full"
+                                      theme="light"
+                                    />
                                   </div>
 
                                   <div className="pt-2.5 border-t border-slate-150 mt-2.5">
@@ -1974,25 +1999,24 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center gap-4">
                                 <div className="flex-1">
                                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Select New Target Course Path</label>
-                                  <select
-                                    id={`course-select-${u.id}`}
-                                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                  <CustomDropdown
                                     value={selectedCourses[u.id] !== undefined ? selectedCourses[u.id] : (getUserRegisteredCourses(u)[0]?.id || "")}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
+                                    options={[
+                                      { label: '-- Choose a course pathway --', value: '', disabled: true },
+                                      ...allCourses.filter(c => !c.isCloned).map(course => ({
+                                        label: course.title,
+                                        value: course.id
+                                      }))
+                                    ]}
+                                    onChange={(val) => {
                                       setSelectedCourses(prev => ({ ...prev, [u.id]: val }));
                                       if (courseSwitchConfirmId === u.id) {
                                         setCourseSwitchConfirmId(null);
                                       }
                                     }}
-                                  >
-                                    <option value="" disabled>-- Choose a course pathway --</option>
-                                    {allCourses.filter(c => !c.isCloned).map(course => (
-                                      <option key={course.id} value={course.id}>
-                                        {course.title}
-                                      </option>
-                                    ))}
-                                  </select>
+                                    className="w-full"
+                                    theme="indigo"
+                                  />
                                 </div>
 
                                 <div className="flex flex-col gap-2 shrink-0 md:pt-4">

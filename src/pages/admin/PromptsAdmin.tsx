@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
 import { uploadToCloudinary } from '../../utils/cloudinary';
 import { promptsStore, FullPromptTemplate, ModularPromptTemplate } from '../../utils/promptsStore';
+import CustomDropdown from '../../components/CustomDropdown';
 import { 
   Plus, 
   Trash, 
@@ -781,7 +782,7 @@ export default function PromptsAdmin() {
             <Sparkles className="w-3.5 h-3.5" /> Dynamic Prompt Console
           </div>
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-            Academy Prompts & Templates Manager
+            Prompts & Templates Manager
           </h1>
           <p className="text-xs text-slate-400 leading-relaxed max-w-3xl font-semibold">
             Manage your prompts in complete isolation from the backend. Since everything here is loaded statically from the frontend files, students will access templates directly with <strong>zero database queries</strong>.
@@ -859,22 +860,21 @@ export default function PromptsAdmin() {
                   <Globe className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-800 text-base">Prompt Blueprint Templates ({filteredFullTemplates.length})</h3>
+                  <h3 className="font-extrabold text-slate-800 text-base">Prompt Blueprint Templates</h3>
                   <p className="text-xs text-slate-400 font-semibold mt-0.5">Define master prompts grouped by project categories.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 {/* Category filter pills */}
-                <select
+                <CustomDropdown
                   value={selectedCategoryFilter}
-                  onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                  className="bg-slate-100 border-0 outline-none text-xs font-bold text-slate-700 px-3.5 py-2.5 rounded-full cursor-pointer hover:bg-slate-200 transition-all"
-                >
-                  <option value="All">All Categories ({fullTemplates.length})</option>
-                  {allAvailableCategories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
+                  options={[
+                    { label: `All Categories (${fullTemplates.length})`, value: 'All' },
+                    ...allAvailableCategories.map(cat => ({ label: cat, value: cat }))
+                  ]}
+                  onChange={(val) => setSelectedCategoryFilter(val)}
+                  className="w-full min-w-[180px]"
+                />
 
                 <button
                   type="button"
@@ -957,7 +957,7 @@ export default function PromptsAdmin() {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-extrabold text-slate-800 text-base">Section Refinement Modular Templates ({modularTemplates.length})</h3>
+                <h3 className="font-extrabold text-slate-800 text-base">Section Refinement Modular Templates</h3>
                 <p className="text-xs text-slate-400 font-semibold mt-0.5">Define quick sub-prompts which focus on parts of the page (Hero, FAQ, Bento, etc.).</p>
               </div>
             </div>
@@ -1058,10 +1058,16 @@ export default function PromptsAdmin() {
 
                 <div>
                   <label className="block text-[10px] uppercase font-black text-slate-450 mb-1">Website Category</label>
-                  <select
+                  <CustomDropdown
                     value={editingFullTemplate.isCustomCategory ? '__custom__' : editingFullTemplate.category}
-                    onChange={e => {
-                      const val = e.target.value;
+                    options={[
+                      { label: 'Landing Page', value: 'Landing Page' },
+                      { label: 'eCommerce', value: 'eCommerce' },
+                      { label: 'Portfolio Website', value: 'Portfolio Website' },
+                      ...allAvailableCategories.filter(cat => cat !== 'Landing Page' && cat !== 'eCommerce' && cat !== 'Portfolio Website').map(cat => ({ label: cat, value: cat })),
+                      { label: '+ Add Custom Category...', value: '__custom__' }
+                    ]}
+                    onChange={val => {
                       if (val === '__custom__') {
                         setEditingFullTemplate({
                           ...editingFullTemplate,
@@ -1076,16 +1082,9 @@ export default function PromptsAdmin() {
                         });
                       }
                     }}
-                    className="w-full bg-white text-slate-900 border border-slate-350 shadow-sm rounded-xl p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans cursor-pointer"
-                  >
-                    <option value="Landing Page">Landing Page</option>
-                    <option value="eCommerce">eCommerce</option>
-                    <option value="Portfolio Website">Portfolio Website</option>
-                    {allAvailableCategories.filter(cat => cat !== 'Landing Page' && cat !== 'eCommerce' && cat !== 'Portfolio Website').map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                    <option value="__custom__">+ Add Custom Category...</option>
-                  </select>
+                    className="w-full"
+                    theme="indigo"
+                  />
 
                   {/* CUSTOM CATEGORY INPUT */}
                   {editingFullTemplate.isCustomCategory && (
@@ -1300,10 +1299,16 @@ export default function PromptsAdmin() {
 
                 <div>
                   <label className="block text-[10px] uppercase font-black text-slate-455 mb-1">Target Category</label>
-                  <select
+                  <CustomDropdown
                     value={editingModTemplate.isCustomCategory ? '__custom__' : editingModTemplate.category}
-                    onChange={e => {
-                      const val = e.target.value;
+                    options={[
+                      { label: 'Landing Page', value: 'Landing Page' },
+                      { label: 'eCommerce', value: 'eCommerce' },
+                      { label: 'Portfolio Website', value: 'Portfolio Website' },
+                      ...allAvailableCategories.filter(cat => cat !== 'Landing Page' && cat !== 'eCommerce' && cat !== 'Portfolio Website').map(cat => ({ label: cat, value: cat })),
+                      { label: '+ Add Custom Category...', value: '__custom__' }
+                    ]}
+                    onChange={val => {
                       if (val === '__custom__') {
                         setEditingModTemplate({
                           ...editingModTemplate,
@@ -1318,16 +1323,9 @@ export default function PromptsAdmin() {
                         });
                       }
                     }}
-                    className="w-full bg-white text-slate-900 border border-slate-350 shadow-sm rounded-xl p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans cursor-pointer"
-                  >
-                    <option value="Landing Page">Landing Page</option>
-                    <option value="eCommerce">eCommerce</option>
-                    <option value="Portfolio Website">Portfolio Website</option>
-                    {allAvailableCategories.filter(cat => cat !== 'Landing Page' && cat !== 'eCommerce' && cat !== 'Portfolio Website').map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                    <option value="__custom__">+ Add Custom Category...</option>
-                  </select>
+                    className="w-full"
+                    theme="indigo"
+                  />
 
                   {/* CUSTOM CATEGORY INPUT */}
                   {editingModTemplate.isCustomCategory && (

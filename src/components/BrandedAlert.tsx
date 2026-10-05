@@ -42,8 +42,34 @@ export function BrandedAlertContainer() {
     };
 
     window.addEventListener('ciya-branded-alert', handleAlertEvent);
+
+    // Listen for Firestore connectivity issues
+    const handleFirestoreError = (e: any) => {
+      const info = e.detail;
+      const errorMsg = info.error || '';
+      
+      if (errorMsg.toLowerCase().includes('could not reach cloud firestore backend') || errorMsg.toLowerCase().includes('offline')) {
+        setActiveAlert({
+          title: 'Connection Issue',
+          message: 'The platform is having trouble reaching the database. You can continue using the app in offline mode, and changes will sync once your connection stabilizes.',
+          type: 'warning'
+        });
+      }
+    };
+
+    window.addEventListener('firestore-general-error', handleFirestoreError);
+    window.addEventListener('firestore-quota-exceeded', () => {
+      setActiveAlert({
+        title: 'Quota Exceeded',
+        message: 'The daily usage limit for the database has been reached. Please try again tomorrow.',
+        type: 'warning'
+      });
+    });
+
     return () => {
       window.removeEventListener('ciya-branded-alert', handleAlertEvent);
+      window.removeEventListener('firestore-general-error', handleFirestoreError);
+      window.removeEventListener('firestore-quota-exceeded', () => {});
     };
   }, []);
 

@@ -4,7 +4,8 @@ import { promptsStore } from '../utils/promptsStore';
 import staticFullPrompts from '../data/full_prompts.json';
 import staticModularPrompts from '../data/modular_prompts.json';
 import { db } from '../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import CustomDropdown from './CustomDropdown';
 import { 
   Play, 
   Pause,
@@ -27,7 +28,9 @@ import {
   Maximize2,
   X,
   AlertTriangle,
-  RotateCw
+  RotateCw,
+  Wand2,
+  Loader2
 } from 'lucide-react';
 
 interface TemplateItem {
@@ -561,8 +564,100 @@ export default function PromptGenerator({
   const [isShowingLinkPreview, setIsShowingLinkPreview] = useState(false);
   const [isShowingText, setIsShowingText] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  
+  // AI Tailoring states
+  const [isTailoring, setIsTailoring] = useState(false);
+  const [tailoredPrompt, setTailoredPrompt] = useState<string | null>(null);
+  const [tailoringError, setTailoringError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTailoredPrompt(null);
+    setTailoringError(null);
+  }, [selectedTemplate]);
 
   const previewLink = selectedTemplate?.videoUrl || selectedTemplate?.link1 || selectedTemplate?.link2;
+
+  // Function to fetch latest KYCB and call tailoring API
+  const handleTailorPrompt = async () => {
+    if (!selectedTemplate || !currentUser) return;
+    
+    setIsTailoring(true);
+    setTailoringError(null);
+    
+    try {
+      // 1. Fetch latest saved KYCB from Firestore
+      const q = query(
+        collection(db, 'kycb_questionnaires'),
+        where('userId', '==', currentUser.uid),
+        orderBy('createdAt', 'desc'),
+        limit(1)
+      );
+      
+      const qSnap = await getDocs(q);
+      
+      if (qSnap.empty) {
+        setTailoringError("No saved KYCB form found. Please fill out your KYCB form first in the KYCB section!");
+        setIsTailoring(false);
+        return;
+      }
+      
+      const kycbData = qSnap.docs[0].data();
+      
+      // 2. Format the KYCB data for the AI (heuristic summary)
+      let businessInfo = `Business Name: ${kycbData.businessName || 'N/A'}\n`;
+      businessInfo += `Industry: ${kycbData.industry || 'N/A'}\n`;
+      businessInfo += `Client Name: ${kycbData.clientName || 'N/A'}\n`;
+      businessInfo += `Phone: ${kycbData.phone || 'N/A'}\n`;
+      businessInfo += `Email: ${kycbData.email || 'N/A'}\n`;
+      businessInfo += `Location: ${kycbData.address || 'N/A'}\n`;
+      
+      if (kycbData.brandColors) {
+        businessInfo += `Brand Colors: ${kycbData.brandColors.join(', ')}\n`;
+      }
+      
+      if (kycbData.visitorActions) {
+        businessInfo += `Target Actions: ${kycbData.visitorActions.join(', ')}\n`;
+      }
+      
+      if (kycbData.idealAge) {
+        businessInfo += `Target Audience: ${kycbData.idealAge.join(', ')}\n`;
+      }
+      
+      if (kycbData.lpOfferMain) {
+        businessInfo += `Main Offer: ${kycbData.lpOfferMain}\n`;
+      }
+
+      // 3. Call the backend AI tailoring endpoint
+      const response = await fetch("/api/ai/compile-smart-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessInfo,
+          websiteType: selectedTemplate.category,
+          referenceTemplate: selectedTemplate.template
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.error) {
+        throw new Error(result.message || result.error);
+      }
+      
+      if (result.prompt) {
+        setTailoredPrompt(result.prompt);
+        setIsShowingText(true);
+      } else {
+        throw new Error("Received an empty tailored prompt from AI.");
+      }
+      
+    } catch (err: any) {
+      console.error("AI Tailoring failed:", err);
+      setTailoringError(err.message || "Failed to tailor prompt with AI. Please check your connection and try again.");
+    } finally {
+      setIsTailoring(false);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = promptsStore.subscribe((data) => {
@@ -626,8 +721,10 @@ export default function PromptGenerator({
   const { lastResetTimestamp } = getPromptResetTimestamps(resetTimeStr);
   const rawCopies = Array.isArray(userProfile?.promptCopies) ? userProfile.promptCopies : [];
   const currentDayCopies = rawCopies.filter((t: number) => t >= lastResetTimestamp);
-  const remainingCopies = Math.max(0, 3 - currentDayCopies.length);
-  const hasExceededLimit = currentDayCopies.length >= 3;
+  
+  const dailyLimit = hasYearBadge ? (appSettings?.promptsProLimit ?? 100) : (appSettings?.promptsFreeLimit ?? 3);
+  const remainingCopies = Math.max(0, dailyLimit - currentDayCopies.length);
+  const hasExceededLimit = currentDayCopies.length >= dailyLimit;
 
   // Check if currently selected template is among the first 3 templates in currentTabTemplates (free for everyone)
   const selectedTemplateIndexInTab = currentTabTemplates.findIndex(t => t.id === selectedTemplate?.id);
@@ -695,14 +792,16 @@ export default function PromptGenerator({
       return;
     }
 
-    // Limit check for pro members
-    if (currentDayCopies.length >= 3) {
-      alert(`⚠️ You have reached your daily copy limit of 3 prompts. It will reset at ${resetTimeStr}.`);
+    // Limit check
+    const dailyLimit = hasYearBadge ? (appSettings?.promptsProLimit ?? 100) : (appSettings?.promptsFreeLimit ?? 3);
+    if (currentDayCopies.length >= dailyLimit) {
+      alert(`⚠️ You have reached your daily copy limit of ${dailyLimit} prompts. It will reset at ${resetTimeStr}.`);
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(selectedTemplate.template);
+      const textToCopy = tailoredPrompt || selectedTemplate.template;
+      await navigator.clipboard.writeText(textToCopy);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
 
@@ -772,18 +871,7 @@ export default function PromptGenerator({
         {/* Left column: Template Directory */}
         <div className="w-full lg:w-1/2 flex flex-col gap-6 text-left">
           <div>
-            <div className="flex items-center gap-2.5 mb-2">
-              <span className="p-1.5 px-3 rounded-full text-xs font-black uppercase bg-indigo-50 border border-indigo-150 text-indigo-700 tracking-wider">
-                Academy Prompt Templates
-              </span>
-              <span className="text-sm font-bold text-slate-400">
-                {currentTabTemplates.length} of {templates.length} templates available
-              </span>
-            </div>
-            <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Prompt Templates Directory</h2>
-            <p className="text-sm md:text-base text-slate-500 font-medium leading-relaxed mt-2">
-              Interact with custom layout structures developed by coaches. Select a template below, cycle through them using the arrow buttons on both sides of the screen simulator, and copy the production prompt text directly!
-            </p>
+            <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Prompt templates</h2>
           </div>
 
           {/* TAB SELECTORS - FULL VS MODULAR */}
@@ -856,26 +944,25 @@ export default function PromptGenerator({
                 {/* Dropdown Selector */}
                 <div className="flex-1 min-w-0 flex flex-col items-center">
                   <span className="text-[10px] uppercase tracking-widest text-indigo-400 font-extrabold mb-1.5">
-                    Select Prompt Template ({filteredTemplates.length} available)
+                    Select Prompt Template
                   </span>
-                  <select
+                  <CustomDropdown
                     value={selectedTemplate?.id || ''}
-                    onChange={(e) => {
-                      const found = filteredTemplates.find(t => t.id === e.target.value);
-                      if (found) handleSelectTemplate(found);
-                    }}
-                    className="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-3 py-2.5 outline-none text-xs md:text-sm font-black cursor-pointer text-center truncate focus:border-indigo-500 transition-all"
-                  >
-                    {filteredTemplates.map((tpl) => {
+                    options={filteredTemplates.map((tpl) => {
                       const tabIdx = currentTabTemplates.findIndex(t => t.id === tpl.id);
                       const isFree = tabIdx >= 0 && tabIdx < 3;
-                      return (
-                        <option key={tpl.id} value={tpl.id} className="bg-slate-900 text-white text-xs md:text-sm font-semibold text-left">
-                          {isFree ? `🌟 ${tpl.name} (Free Access)` : tpl.name}
-                        </option>
-                      );
+                      return {
+                        label: isFree ? `🌟 ${tpl.name} (Free Access)` : tpl.name,
+                        value: tpl.id
+                      };
                     })}
-                  </select>
+                    onChange={(val) => {
+                      const found = filteredTemplates.find(t => t.id === val);
+                      if (found) handleSelectTemplate(found);
+                    }}
+                    theme="dark"
+                    className="w-full"
+                  />
                 </div>
               </div>
 
@@ -930,7 +1017,7 @@ export default function PromptGenerator({
                           <a
                             href={selectedTemplate.link1}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className="flex items-center justify-between p-3.5 bg-white hover:bg-indigo-50 border border-indigo-100 text-indigo-700 font-black rounded-xl transition-all cursor-pointer text-xs md:text-sm"
                           >
                             <span className="truncate pr-4">Reference Attachment A</span>
@@ -941,7 +1028,7 @@ export default function PromptGenerator({
                           <a
                             href={selectedTemplate.link2}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className="flex items-center justify-between p-3.5 bg-white hover:bg-indigo-50 border border-indigo-100 text-indigo-700 font-black rounded-xl transition-all cursor-pointer text-xs md:text-sm"
                           >
                             <span className="truncate pr-4">Reference Attachment B</span>
@@ -1043,17 +1130,61 @@ export default function PromptGenerator({
                     ) : (
                       <div className="absolute inset-0 bg-slate-950 p-4 pt-8 flex flex-col justify-between z-10 text-white animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <div className="flex-1 overflow-y-auto pr-1 space-y-3 pt-2">
-                          <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2 mb-2">
-                            <FileText className="w-3.5 h-3.5 text-indigo-400" />
-                            <span className="font-extrabold text-[10px] tracking-wider uppercase text-slate-400">Prompt Template Body</span>
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+                            <div className="flex items-center gap-1.5">
+                              <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                              <span className="font-extrabold text-[10px] tracking-wider uppercase text-slate-400">
+                                {tailoredPrompt ? 'Tailored AI Prompt' : 'Prompt Template Body'}
+                              </span>
+                            </div>
+                            {tailoredPrompt && (
+                              <button 
+                                onClick={() => setTailoredPrompt(null)}
+                                className="text-[9px] font-black text-indigo-400 hover:text-indigo-300 transition-colors uppercase border-0 bg-transparent cursor-pointer"
+                              >
+                                Reset to Template
+                              </button>
+                            )}
                           </div>
-                          <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
-                            {selectedTemplate?.template}
-                          </p>
+                          
+                          {isTailoring ? (
+                            <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
+                              <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                              <div className="space-y-1">
+                                <p className="text-[11px] font-black text-white uppercase tracking-widest">Tailoring for your business</p>
+                                <p className="text-[9px] text-slate-500 font-medium">Gemini is merging your KYCB with this blueprint...</p>
+                              </div>
+                            </div>
+                          ) : tailoringError ? (
+                            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-center space-y-3 my-4">
+                              <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto" />
+                              <p className="text-[10px] text-rose-200 font-bold leading-relaxed">{tailoringError}</p>
+                              <button 
+                                onClick={handleTailorPrompt}
+                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black uppercase rounded-lg transition-all border-0 cursor-pointer"
+                              >
+                                Try Again
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
+                              {tailoredPrompt || selectedTemplate?.template}
+                            </p>
+                          )}
                         </div>
 
                         {/* Copy Prompt triggers with tracking */}
                         <div className="pt-3 border-t border-slate-900 bg-slate-950 space-y-2">
+                          {!tailoredPrompt && !isTailoring && !tailoringError && (
+                            <button
+                              onClick={handleTailorPrompt}
+                              className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-[10px] font-black uppercase rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 transition-all border-0 cursor-pointer active:scale-95 mb-1"
+                            >
+                              <Wand2 className="w-3.5 h-3.5 text-amber-300" />
+                              Tailor with my KYCB (AI)
+                            </button>
+                          )}
+
                           <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold px-1 uppercase tracking-wider">
                             <span>Daily Copy Tracker</span>
                             <span className={hasExceededLimit ? "text-rose-400 font-extrabold" : "text-emerald-400 font-extrabold"}>

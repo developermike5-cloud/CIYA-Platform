@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router';
+import CustomDropdown from '../../components/CustomDropdown';
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Download, Upload, ArrowRight, CheckCircle, Copy, Info, RefreshCw, AlertCircle, EyeOff, ShieldCheck } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
@@ -377,28 +378,28 @@ export default function AdvancedCoursesAdmin() {
         <div className="flex items-center gap-2">
           <div>
             <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Filter by Skill</label>
-            <select
+            <CustomDropdown
               value={filterSkill}
-              onChange={e => setFilterSkill(e.target.value)}
-              className="bg-white border-2 border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 cursor-pointer transition-all"
-            >
-              <option value="all">All Skills</option>
-              {Object.entries(SKILLS).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </select>
+              options={[
+                { label: 'All Skills', value: 'all' },
+                ...Object.entries(SKILLS).map(([k, v]) => ({ label: v.label, value: k }))
+              ]}
+              onChange={val => setFilterSkill(val)}
+              className="w-40"
+            />
           </div>
           <div>
             <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Filter by Status</label>
-            <select
+            <CustomDropdown
               value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-              className="bg-white border-2 border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500 cursor-pointer transition-all"
-            >
-              <option value="all">All Statuses</option>
-              <option value="published">Published Only</option>
-              <option value="draft">Drafts Only</option>
-            </select>
+              options={[
+                { label: 'All Statuses', value: 'all' },
+                { label: 'Published Only', value: 'published' },
+                { label: 'Drafts Only', value: 'draft' }
+              ]}
+              onChange={val => setFilterStatus(val)}
+              className="w-40"
+            />
           </div>
         </div>
 

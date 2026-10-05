@@ -1,6 +1,8 @@
 import React from 'react';
 import { Plus, Trash2, Check } from 'lucide-react';
 
+import CustomDropdown from './CustomDropdown';
+
 interface PortfolioQuestionnaireFormProps {
   viewPerspective: string;
   hasSite: string;
@@ -732,16 +734,17 @@ export default function PortfolioQuestionnaireForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">Number of featured projects</label>
-              <select
+              <CustomDropdown
                 value={portfolioFeaturedCount}
-                onChange={e => setPortfolioFeaturedCount(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white cursor-pointer"
-              >
-                <option value="3-4">3–4 (focused, curated)</option>
-                <option value="5-6">5–6 (standard)</option>
-                <option value="7-10">7–10 (comprehensive)</option>
-                <option value="10+">10+ (full archive)</option>
-              </select>
+                onChange={val => setPortfolioFeaturedCount(val)}
+                options={[
+                  { label: '3–4 (focused, curated)', value: '3-4' },
+                  { label: '5–6 (standard)', value: '5-6' },
+                  { label: '7–10 (comprehensive)', value: '7-10' },
+                  { label: '10+ (full archive)', value: '10+' }
+                ]}
+                className="w-full"
+              />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">Presentation Style</label>
@@ -1467,15 +1470,16 @@ export default function PortfolioQuestionnaireForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">Preferred Structure Layout</label>
-              <select
+              <CustomDropdown
                 value={portfolioPreferredStructure}
-                onChange={e => setPortfolioPreferredStructure(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white cursor-pointer"
-              >
-                <option value="single-page">Single-page scroll (fast impressions, best for simplicity)</option>
-                <option value="multi-page">Multi-page site (separate pages per section, best for large portfolios)</option>
-                <option value="hybrid">Hybrid (one-page home + separate case studies, most popular)</option>
-              </select>
+                onChange={val => setPortfolioPreferredStructure(val)}
+                options={[
+                  { label: 'Single-page scroll (fast impressions, best for simplicity)', value: 'single-page' },
+                  { label: 'Multi-page site (separate pages per section, best for large portfolios)', value: 'multi-page' },
+                  { label: 'Hybrid (one-page home + separate case studies, most popular)', value: 'hybrid' }
+                ]}
+                className="w-full"
+              />
             </div>
 
             <div>
@@ -1576,15 +1580,16 @@ export default function PortfolioQuestionnaireForm({
 
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">Animation & Scroll Effects</label>
-              <select
+              <CustomDropdown
                 value={portfolioAnimationLevel}
-                onChange={e => setPortfolioAnimationLevel(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white cursor-pointer"
-              >
-                <option value="minimal">Minimal — subtle fades (extremely fast-loading, highly professional)</option>
-                <option value="moderate">Moderate — smooth scroll reveals (standard modern look)</option>
-                <option value="rich">Rich — immersive interactions (great for highly creative roles)</option>
-              </select>
+                onChange={val => setPortfolioAnimationLevel(val)}
+                options={[
+                  { label: 'Minimal — subtle fades (extremely fast-loading, highly professional)', value: 'minimal' },
+                  { label: 'Moderate — smooth scroll reveals (standard modern look)', value: 'moderate' },
+                  { label: 'Rich — immersive interactions (great for highly creative roles)', value: 'rich' }
+                ]}
+                className="w-full"
+              />
             </div>
           </div>
 

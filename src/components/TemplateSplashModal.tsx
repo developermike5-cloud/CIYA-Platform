@@ -78,7 +78,7 @@ export default function TemplateSplashModal({
                 </div>
                 <div>
                   <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-amber-700 transition-colors">
-                    AI Prompt Templates Lab
+                    Prompt templates
                   </h4>
                 </div>
               </div>
@@ -86,13 +86,6 @@ export default function TemplateSplashModal({
               <div className="w-7 h-7 rounded-full bg-slate-100 group-hover:bg-amber-500 group-hover:text-slate-950 text-slate-400 flex items-center justify-center transition-colors shrink-0">
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-black text-amber-600">
-              <span>Open Prompt Engineering Lab</span>
-              <span className="flex items-center gap-1 text-[11px] group-hover:translate-x-1 transition-transform">
-                Launch Lab <ArrowRight className="w-3.5 h-3.5" />
-              </span>
             </div>
           </div>
 
@@ -111,7 +104,7 @@ export default function TemplateSplashModal({
                 </div>
                 <div>
                   <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-indigo-600 transition-colors">
-                    KYCB Business Sheets & Forms
+                    KYCB form
                   </h4>
                 </div>
               </div>
@@ -119,13 +112,6 @@ export default function TemplateSplashModal({
               <div className="w-7 h-7 rounded-full bg-slate-100 group-hover:bg-indigo-600 group-hover:text-white text-slate-400 flex items-center justify-center transition-colors shrink-0">
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-black text-indigo-600">
-              <span>Open KYCB Forms & Data</span>
-              <span className="flex items-center gap-1 text-[11px] group-hover:translate-x-1 transition-transform">
-                Launch Questionnaire <ArrowRight className="w-3.5 h-3.5" />
-              </span>
             </div>
           </div>
         </div>

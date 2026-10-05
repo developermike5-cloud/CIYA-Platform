@@ -469,6 +469,17 @@ async function startServer() {
       res.json(parsed);
     } catch (err: any) {
       console.error("AI Lesson Gen failed absolutely:", err);
+      const isQuotaError = err.message?.toLowerCase().includes('quota') || 
+                          err.message?.toLowerCase().includes('rate limit') ||
+                          err.message?.toLowerCase().includes('resource_exhausted') ||
+                          err.status === 429;
+      
+      if (isQuotaError) {
+        return res.status(429).json({ 
+          error: "AI Quota Exceeded", 
+          message: "The AI service is currently at its usage limit. Please try again in a few minutes or use the manual importer fallback below." 
+        });
+      }
       res.status(500).json({ error: err.message || "Failed to generate lesson metadata via Gemini AI." });
     }
   });
@@ -540,6 +551,17 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
       res.json({ prompt: generatedText });
     } catch (err: any) {
       console.error("Smart prompt compilation failed:", err);
+      const isQuotaError = err.message?.toLowerCase().includes('quota') || 
+                          err.message?.toLowerCase().includes('rate limit') ||
+                          err.message?.toLowerCase().includes('resource_exhausted') ||
+                          err.status === 429;
+
+      if (isQuotaError) {
+        return res.status(429).json({ 
+          error: "AI Quota Exceeded", 
+          message: "The AI generation limit has been reached. Please wait a moment and try again." 
+        });
+      }
       res.status(500).json({ error: err.message || "Failed to compile tailored developer prompt." });
     }
   });

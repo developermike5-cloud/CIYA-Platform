@@ -5,7 +5,7 @@ import { ref as dbRef, onValue } from 'firebase/database';
 import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link, useLocation } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../types';
-import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText, Wifi, WifiOff, Award, ChevronRight, MoreHorizontal, Smartphone, Download, RefreshCw } from 'lucide-react';
+import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText, Wifi, WifiOff, Award, ChevronRight, MoreHorizontal, Smartphone, Download, RefreshCw, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 import LoginModal from '../components/LoginModal';
@@ -25,6 +25,7 @@ import { uploadToCloudinary } from '../utils/cloudinary';
 import { coursesStore } from '../utils/coursesStore';
 import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
 import CIYAMembershipBadge from '../components/CIYAMembershipBadge';
+import CustomDropdown from '../components/CustomDropdown';
 import { verifyTimeBasedCode, getPasscodeSecondsLeft } from '../utils/passcode';
 import { FRONTEND_YEAR_BADGE_SETTINGS } from '../constants/badgeSettings';
 import { staticLeaderboardData } from '../utils/leaderboardData';
@@ -252,24 +253,19 @@ function CourseLevelFilterBar({
         <span>📚</span> Syllabus Level:
       </span>
 
-      <select
+      <CustomDropdown
         value={courseLevelFilter}
-        onChange={(e) => {
-          const val = e.target.value as 'beginner' | 'advanced';
-          setCourseLevelFilter(val);
+        onChange={(val) => {
+          setCourseLevelFilter(val as 'beginner' | 'advanced');
           safeStorage.setItem('ciya_course_level_filter', val);
         }}
-        className="bg-white border border-slate-300 text-xs font-black text-slate-800 rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer uppercase tracking-wider select-none appearance-none pr-7 shadow-xs"
-        style={{
-          backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'right 8px center',
-          backgroundSize: '12px',
-        }}
-      >
-        <option value="beginner">Beginner's Course</option>
-        <option value="advanced">Advance Course</option>
-      </select>
+        options={[
+          { label: "Beginner's Course", value: "beginner" },
+          { label: "Advance Course", value: "advanced" }
+        ]}
+        className="min-w-[180px]"
+        theme="light"
+      />
     </div>
   );
 }
@@ -4494,6 +4490,7 @@ export default function StudentDashboard() {
   const [submittingAssignment, setSubmittingAssignment] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [expandedAssignments, setExpandedAssignments] = useState<Record<number, boolean>>({});
+  const [kycbSubView, setKycbSubView] = useState<'form' | 'saved'>('form');
 
   const uploadToSupabaseStorage = async (
     file: File, 
@@ -5200,6 +5197,14 @@ export default function StudentDashboard() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
+  const [isBuzzChatActive, setIsBuzzChatActive] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return !!params.get('groupId');
+  });
+
+  const handleActiveChatChange = React.useCallback((active: boolean) => {
+    setIsBuzzChatActive(active);
+  }, []);
 
   // Auto-open login if guest in PWA mode
   useEffect(() => {
@@ -6423,11 +6428,11 @@ export default function StudentDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans overflow-x-hidden">
+    <div className="h-screen h-[100dvh] bg-slate-50 flex font-sans overflow-hidden">
       {showCongratsPopup && <FallingFlowers />}
       
-      {/* Desktop Sidebar navigation (hidden on mobile, native bottom nav is used instead) */}
-      <aside className="hidden md:flex md:w-64 bg-slate-900 border-r border-slate-800 flex-col md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-30 shrink-0 overflow-y-auto">
+      {/* Desktop Sidebar navigation (hidden on mobile, or when chat is active) */}
+      <aside className={`hidden md:flex md:w-64 bg-slate-900 border-r border-slate-800 flex-col md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-30 shrink-0 overflow-y-auto ${isBuzzChatActive ? 'hidden md:hidden' : ''}`}>
         <div className="p-6 flex flex-col gap-1 relative">
           <Link to="/" className="hover:opacity-85 transition-opacity">
             <BrandingLogo size="sm" />
@@ -6474,7 +6479,7 @@ export default function StudentDashboard() {
             className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'prompts' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
           >
             <div className="flex items-center gap-3">
-              <Sparkles className="w-4 h-4 text-teal-400" />
+              <Lightbulb className="w-4 h-4 text-amber-400" />
               <span>Prompt Template</span>
             </div>
             {!isAdmin && appSettings?.lockedSections?.prompts && (
@@ -6497,6 +6502,20 @@ export default function StudentDashboard() {
               )}
             </button>
           )}
+
+          <button 
+            type="button"
+            onClick={() => handleViewChange('buzz', null)}
+            className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'buzz' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
+          >
+            <div className="flex items-center gap-3">
+              <MessageCircle className="w-4 h-4 text-emerald-400" />
+              <span>CIYA Buzz Chat</span>
+            </div>
+            {!isAdmin && appSettings?.lockedSections?.buzz && (
+              <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            )}
+          </button>
 
           <button 
             type="button"
@@ -6617,9 +6636,27 @@ export default function StudentDashboard() {
 
       {/* Main Container */}
       <main className={`flex-1 flex flex-col items-stretch overflow-hidden transition-all duration-500 relative ${courseLevelFilter === 'advanced' ? 'bg-gradient-to-br from-purple-100/30 via-indigo-50/40 to-fuchsia-100/20' : 'bg-slate-50/50'}`}>
-        <PullToRefresh onRefresh={async () => window.location.reload()}>
+        {/* Global Update Banner (High visibility on mobile) */}
+        {needRefresh && (
+          <div className="bg-amber-600 text-white px-4 py-2.5 flex items-center justify-between gap-3 shadow-lg z-[60] sticky top-0 md:top-auto">
+            <div className="flex items-center gap-2.5 text-[11px] font-black uppercase tracking-wider min-w-0">
+              <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin-slow" />
+              </div>
+              <span className="truncate">New Academy Update Available</span>
+            </div>
+            <button 
+              onClick={() => updateServiceWorker()}
+              className="bg-white text-amber-700 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase shadow-sm active:scale-95 transition-all cursor-pointer border-0 shrink-0"
+            >
+              Update Now
+            </button>
+          </div>
+        )}
+
+        <PullToRefresh onRefresh={async () => window.location.reload()} disabled={isBuzzChatActive}>
         {/* Responsive Header: Traditional Blue Native Bar matching sidebar branding */}
-        <header className="h-14 md:h-20 bg-slate-900 border-b border-slate-800 text-white flex items-center justify-between px-3.5 sm:px-6 shrink-0 sticky top-0 z-40 shadow-md">
+        <header className={`h-14 md:h-20 bg-slate-900 border-b border-slate-800 text-white flex items-center justify-between px-3.5 sm:px-6 shrink-0 sticky top-0 z-40 shadow-md ${isBuzzChatActive ? 'hidden' : 'flex'}`}>
           {/* Mobile view branding (Left) */}
           <div className="flex md:hidden items-center min-w-0 z-10">
             <Link to="/" className="hover:opacity-85 transition-opacity shrink-0 flex items-center">
@@ -6670,7 +6707,7 @@ export default function StudentDashboard() {
                             ? 'KYCB Workspace (Know Your Client & Business)'
                             : currentView === 'blog'
                               ? 'CIYA News & Resource Desk'
-                              : 'Prompt Template Lab'}
+                              : 'Prompt templates'}
               </h2>
             </div>
           </div>
@@ -6795,7 +6832,7 @@ export default function StudentDashboard() {
 
             {/* Desktop Auth Controls */}
             <div className="hidden md:block">
-              {isGuest ? (
+              {isGuest && (
                 <button 
                   onClick={handleLogin} 
                   className="text-xs font-black text-emerald-300 hover:text-white bg-emerald-500/20 hover:bg-emerald-500/30 px-5 py-2.5 rounded-full border border-emerald-500/30 cursor-pointer flex items-center gap-1.5 transition-colors"
@@ -6803,26 +6840,19 @@ export default function StudentDashboard() {
                   <UserIcon className="w-3.5 h-3.5" />
                   Sign In
                 </button>
-              ) : (
-                <button 
-                  onClick={handleLogout} 
-                  className="text-xs font-bold text-slate-400 hover:text-white border-0 bg-transparent cursor-pointer"
-                >
-                  Sign out
-                </button>
               )}
             </div>
           </div>
         </header>
         
         {/* Core content scroll container */}
-        <div className="flex-1 p-3 sm:p-6 md:p-8 pb-28 md:pb-8 relative">
+        <div className={`flex-1 relative flex flex-col ${isBuzzChatActive ? 'p-0 pb-0 h-full min-h-0' : 'p-3 sm:p-6 md:p-8 pb-28 md:pb-8'}`}>
           <motion.div
             key={currentView}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="w-full"
+            className={`w-full ${isBuzzChatActive ? 'h-full flex flex-col min-h-0' : ''}`}
           >
           {currentView === 'buzz' ? (
             <StudentBuzz
@@ -6830,6 +6860,7 @@ export default function StudentDashboard() {
               userProfile={userProfile}
               isAdmin={isAdmin}
               onLoginRequest={handleLogin}
+              onActiveChatChange={handleActiveChatChange}
             />
           ) : currentView === 'blog' ? (
             <StudentBlog isLocked={!isAdmin && appSettings?.lockedSections?.blog} />
@@ -6848,12 +6879,27 @@ export default function StudentDashboard() {
                 </div>
               </div>
             ) : (
-              <AdminKycbQuestionnaire
-                isAdminMode={false}
-                userId={currentUser?.uid}
-                userEmail={currentUser?.email || userProfile?.email || ''}
-                defaultClientName={userProfile?.fullName || currentUser?.displayName || ''}
-              />
+              <div className="max-w-5xl mx-auto space-y-6 text-left font-sans my-4">
+                {/* KYCB HEADER */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-inner">
+                      <FileText className="w-7 h-7" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Know Your Client & Business</h2>
+                    </div>
+                  </div>
+                </div>
+
+                <AdminKycbQuestionnaire
+                  isAdminMode={false}
+                  userId={currentUser?.uid}
+                  userEmail={currentUser?.email || userProfile?.email || ''}
+                  defaultClientName={userProfile?.fullName || currentUser?.displayName || ''}
+                  activeSubView={kycbSubView}
+                />
+              </div>
             )
           ) : currentView === 'prompts' ? (
             <PromptGenerator 
@@ -7462,20 +7508,19 @@ export default function StudentDashboard() {
                       {/* Day Selection dropdown */}
                       <div className="space-y-1.5">
                         <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Select Assignment Day</label>
-                        <select
-                          value={submitDayIndex}
-                          onChange={(e) => setSubmitDayIndex(Number(e.target.value))}
-                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-2xl py-3 px-4 font-bold text-xs focus:border-indigo-500 outline-none transition-all shadow-inner border-box cursor-pointer"
-                        >
-                          {Array.from({ length: daysList.length || 5 }).map((_, idx) => {
+                        <CustomDropdown
+                          value={submitDayIndex.toString()}
+                          onChange={(val) => setSubmitDayIndex(Number(val))}
+                          options={Array.from({ length: daysList.length || 5 }).map((_, idx) => {
                             const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id, appSettings);
-                            return (
-                              <option key={idx} value={idx}>
-                                {isUnlocked ? "🔓" : "🔒"} Day {idx + 1}: {daysList[idx]?.title || `Module Study Checklist`} {!isUnlocked && " (Locked)"}
-                              </option>
-                            );
+                            return {
+                              label: `${isUnlocked ? "🔓" : "🔒"} Day ${idx + 1}: ${daysList[idx]?.title || "Module Study Checklist"}${!isUnlocked ? " (Locked)" : ""}`,
+                              value: idx.toString()
+                            };
                           })}
-                        </select>
+                          className="w-full"
+                          theme="indigo"
+                        />
                       </div>
 
                       {isDaySelectedLocked ? (
@@ -7545,7 +7590,7 @@ export default function StudentDashboard() {
                                         <span className="text-slate-400 font-extrabold uppercase tracking-wider text-[9px] block">Workspace Screenshots</span>
                                         <div className="flex gap-2 flex-wrap">
                                           {displayImages.map((src, i) => (
-                                            <a href={src} target="_blank" rel="noreferrer" key={i} className="relative block w-16 h-16 rounded-xl border border-slate-200 overflow-hidden bg-slate-100 hover:border-indigo-400 cursor-zoom-in transition-all">
+                                            <a href={src} target="_blank" rel="noopener noreferrer" key={i} className="relative block w-16 h-16 rounded-xl border border-slate-200 overflow-hidden bg-slate-100 hover:border-indigo-400 cursor-zoom-in transition-all">
                                               <img src={src} className="w-full h-full object-cover" alt="Screenshot" referrerPolicy="no-referrer" />
                                             </a>
                                           ))}
@@ -7557,7 +7602,7 @@ export default function StudentDashboard() {
                               })()}
                               {matchedSubForSelectedDay.fileUrl && (
                                 <p className="font-mono text-indigo-600 mt-1">
-                                  🔗 Link: <a href={matchedSubForSelectedDay.fileUrl} target="_blank" rel="noreferrer" className="underline">{matchedSubForSelectedDay.fileUrl}</a>
+                                  🔗 Link: <a href={matchedSubForSelectedDay.fileUrl} target="_blank" rel="noopener noreferrer" className="underline">{matchedSubForSelectedDay.fileUrl}</a>
                                 </p>
                               )}
                               {(() => {
@@ -8172,10 +8217,11 @@ export default function StudentDashboard() {
       </main>
 
       {/* Mobile Native App Bottom Navigation Bar */}
-      <nav 
-        className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] px-2 pt-1 pb-[max(env(safe-area-inset-bottom),10px)] select-none transition-all duration-300"
-        aria-label="Mobile Navigation"
-      >
+      {(!isBuzzChatActive || currentView !== 'buzz') && (
+        <nav 
+          className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] px-2 pt-1 pb-[max(env(safe-area-inset-bottom),10px)] select-none transition-all duration-300"
+          aria-label="Mobile Navigation"
+        >
         <div className="grid grid-cols-5 items-center max-w-lg mx-auto relative">
           {/* 1. Explore (Directly shows dashboard catalog; clicking course opens splash card) */}
           {(() => {
@@ -8413,6 +8459,7 @@ export default function StudentDashboard() {
           })()}
         </div>
       </nav>
+      )}
 
       {/* Mobile Native App Action Bottom Sheet (More Hub) */}
       {isMobileMenuOpen && (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, triggerSystemSignal } from '../../firebase';
+import CustomDropdown from '../../components/CustomDropdown';
 import { BookOpen, Plus, Trash2, Edit2, Link as LinkIcon, Image as ImageIcon, Send, RefreshCw, X, Eye, FileText, Bold, Italic, Heading1, Heading2, Heading3, List, ListOrdered, Highlighter, Pilcrow, Megaphone, Download, Upload } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { preprocessMarkdown, stripMarkdown } from '../../utils/markdownUtils';
@@ -980,15 +981,17 @@ export default function BlogAdmin() {
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
                     Category Type
                   </label>
-                  <select
+                  <CustomDropdown
                     value={annCategory}
-                    onChange={(e) => setAnnCategory(e.target.value as any)}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-semibold rounded-xl py-3 px-4 text-xs focus:border-amber-500 outline-none transition-all shadow-inner"
-                  >
-                    <option value="Blog">Blog Post Announcement</option>
-                    <option value="Report">Major Report Announcement</option>
-                    <option value="General">General Broadcast</option>
-                  </select>
+                    options={[
+                      { label: 'Blog Post Announcement', value: 'Blog' },
+                      { label: 'Major Report Announcement', value: 'Report' },
+                      { label: 'General Broadcast', value: 'General' }
+                    ]}
+                    onChange={(val) => setAnnCategory(val as any)}
+                    className="w-full"
+                    theme="amber"
+                  />
                 </div>
 
                 {/* Announcement Title/Text */}
