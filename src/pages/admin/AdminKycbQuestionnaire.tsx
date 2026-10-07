@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where, limit, onSnapshot } from 'firebase/firestore';
-import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock, X, ClipboardList, Archive } from 'lucide-react';
+import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock, X, ClipboardList, Archive, ChevronDown, RefreshCw, FileText } from 'lucide-react';
 import { safeStorage } from '../../utils/safeStorage';
 import LpQuestionnaireForm from '../../components/LpQuestionnaireForm';
 import EcQuestionnaireForm from '../../components/EcQuestionnaireForm';
@@ -100,12 +100,30 @@ export default function AdminKycbQuestionnaire({
     }
   });
   const [saving, setSaving] = useState(false);
+  const [savingGlobal, setSavingGlobal] = useState(false);
+
+  // Local states for global settings to prevent instant Firestore writes on every keystroke
+  const [localKycbFreeLimit, setLocalKycbFreeLimit] = useState(0);
+  const [localKycbProLimit, setLocalKycbProLimit] = useState(10);
+  const [localPromptsFreeLimit, setLocalPromptsFreeLimit] = useState(3);
+  const [localPromptsProLimit, setLocalPromptsProLimit] = useState(100);
+  const [globalSettingsSaved, setGlobalSettingsSaved] = useState(false);
+
+  // Gemini state
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [activeButtonView, setActiveButtonView] = useState<'manual' | 'auto'>('manual');
+  const [manualDropdownOpen, setManualDropdownOpen] = useState(false);
 
   // Settings listener
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'app'), (snap) => {
       if (snap.exists()) {
-        setAppSettings(snap.data());
+        const data = snap.data();
+        setAppSettings(data);
+        setLocalKycbFreeLimit(data.kycbFreeLimit ?? 0);
+        setLocalKycbProLimit(data.kycbProLimit ?? 10);
+        setLocalPromptsFreeLimit(data.promptsFreeLimit ?? 3);
+        setLocalPromptsProLimit(data.promptsProLimit ?? 100);
       }
     });
     return () => unsub();
@@ -1261,11 +1279,75 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
     }
   };
 
-  const handleUpdateGlobalSettings = async (updates: any) => {
+  const handleUpdateGlobalSettings = async (updates?: any) => {
+    setSavingGlobal(true);
     try {
-      await updateDoc(doc(db, 'settings', 'app'), updates);
+      const payload = updates || {
+        kycbFreeLimit: localKycbFreeLimit,
+        kycbProLimit: localKycbProLimit,
+        promptsFreeLimit: localPromptsFreeLimit,
+        promptsProLimit: localPromptsProLimit
+      };
+      await updateDoc(doc(db, 'settings', 'app'), payload);
+      setGlobalSettingsSaved(true);
+      setTimeout(() => setGlobalSettingsSaved(false), 3000);
     } catch (err) {
       console.error("Failed to update global settings:", err);
+      alert("Failed to save settings. Please check your permissions.");
+    } finally {
+      setSavingGlobal(false);
+    }
+  };
+
+  const handleAiGenerate = async () => {
+    if (aiGenerating) return;
+    setAiGenerating(true);
+    try {
+      const businessInfo = generatePromptText();
+      const websiteType = activeTab === 'lp' ? 'landing' : (activeTab === 'ec' ? 'ecommerce' : 'portfolio');
+      
+      const response = await fetch('/api/ai/compile-smart-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          businessInfo, 
+          websiteType,
+          // We don't send a specific reference template here, 
+          // let the server use its internal logic or we could pick one from full_prompts if needed.
+        }),
+      });
+
+      const result = await response.json();
+      if (result.error) throw new Error(result.message || result.error);
+
+      if (result.prompt) {
+        // Copy to clipboard and notify
+        navigator.clipboard.writeText(result.prompt);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 5000);
+        alert("AI Master Prompt Generated & Copied to Clipboard! ⚡\n\nYou can now paste this directly into your preferred AI (ChatGPT, Gemini, Claude, Cursor, v0) to build your website.");
+      }
+    } catch (err: any) {
+      console.error("AI Generation failed:", err);
+      let errorMsg = err.message || "Failed to generate master prompt via Gemini.";
+      
+      // Specifically handle the 402 / Resource Exhausted / Credits Depleted error
+      if (errorMsg.includes("credits are depleted") || errorMsg.includes("402") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
+        errorMsg = "AI Credit Limit Reached: The platform's AI quota is temporarily full or credits are depleted. Please use the 'Manual Mode' below to copy your KYC and Instructions manually.";
+      }
+      
+      // Specifically handle Vertex AI API not enabled error
+      if (errorMsg.includes("aiplatform.googleapis.com") || errorMsg.includes("403") || errorMsg.includes("Forbidden")) {
+        if (errorMsg.includes("Permission") || errorMsg.includes("predict")) {
+          errorMsg = "AI Access Denied: The app needs permission to use your Google Cloud project. Please ensure you have linked your API Key to the correct Billing Project in AI Studio Settings.";
+        } else {
+          errorMsg = "AI Service Not Activated: The Vertex AI API needs to be enabled in your Google Cloud Console for this project. Please visit the API dashboard to enable 'Vertex AI API' and retry in 2 minutes.";
+        }
+      }
+      
+      alert(errorMsg);
+    } finally {
+      setAiGenerating(false);
     }
   };
 
@@ -1575,9 +1657,9 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                     <input 
                       type="number"
                       min="0"
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                      value={appSettings?.kycbFreeLimit ?? 0}
-                      onChange={(e) => handleUpdateGlobalSettings({ kycbFreeLimit: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      value={localKycbFreeLimit}
+                      onChange={(e) => setLocalKycbFreeLimit(parseInt(e.target.value) || 0)}
                     />
                     <span className="text-xs font-bold text-slate-400 whitespace-nowrap">Forms Allowed</span>
                   </div>
@@ -1601,9 +1683,9 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                     <input 
                       type="number"
                       min="1"
-                      className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 text-sm font-black text-[#1A3C6E] focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                      value={appSettings?.kycbProLimit ?? 10}
-                      onChange={(e) => handleUpdateGlobalSettings({ kycbProLimit: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-2.5 text-sm font-black text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      value={localKycbProLimit}
+                      onChange={(e) => setLocalKycbProLimit(parseInt(e.target.value) || 0)}
                     />
                     <span className="text-xs font-bold text-indigo-400 whitespace-nowrap">Forms Allowed</span>
                   </div>
@@ -1611,9 +1693,20 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
               </div>
             </div>
 
-            <div className="pt-6 border-t border-slate-100 flex items-center gap-3 text-emerald-600 bg-emerald-50/50 -mx-6 -mb-6 p-6 rounded-b-3xl">
-              <Check className="w-5 h-5" />
-              <span className="text-xs font-black uppercase tracking-wider">Settings are synced automatically across all student dashboards.</span>
+            <div className="pt-6 border-t border-slate-100 flex items-center justify-between gap-3 text-emerald-600 bg-emerald-50/50 -mx-6 -mb-6 p-6 rounded-b-3xl">
+              <div className="flex items-center gap-2">
+                <Check className="w-5 h-5" />
+                <span className="text-xs font-black uppercase tracking-wider">Settings are synced automatically across all student dashboards.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleUpdateGlobalSettings()}
+                disabled={savingGlobal}
+                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 disabled:opacity-50"
+              >
+                {savingGlobal ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {globalSettingsSaved ? 'Settings Saved! ✓' : 'Save All Settings'}
+              </button>
             </div>
           </div>
 
@@ -1644,9 +1737,9 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                     <input 
                       type="number"
                       min="0"
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                      value={appSettings?.promptsFreeLimit ?? 3}
-                      onChange={(e) => handleUpdateGlobalSettings({ promptsFreeLimit: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-black text-slate-800 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      value={localPromptsFreeLimit}
+                      onChange={(e) => setLocalPromptsFreeLimit(parseInt(e.target.value) || 0)}
                     />
                     <span className="text-xs font-bold text-slate-400 whitespace-nowrap">Copies Allowed</span>
                   </div>
@@ -1670,9 +1763,9 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                     <input 
                       type="number"
                       min="1"
-                      className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 text-sm font-black text-[#1A3C6E] focus:ring-2 focus:ring-amber-500/20 outline-none"
-                      value={appSettings?.promptsProLimit ?? 100}
-                      onChange={(e) => handleUpdateGlobalSettings({ promptsProLimit: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-white border border-amber-200 rounded-xl px-4 py-2.5 text-sm font-black text-slate-800 focus:ring-2 focus:ring-amber-500/20 outline-none"
+                      value={localPromptsProLimit}
+                      onChange={(e) => setLocalPromptsProLimit(parseInt(e.target.value) || 0)}
                     />
                     <span className="text-xs font-bold text-amber-400 whitespace-nowrap">Copies Allowed</span>
                   </div>
@@ -1680,9 +1773,20 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
               </div>
             </div>
 
-            <div className="pt-6 border-t border-slate-100 flex items-center gap-3 text-emerald-600 bg-emerald-50/50 -mx-6 -mb-6 p-6 rounded-b-3xl">
-              <Check className="w-5 h-5" />
-              <span className="text-xs font-black uppercase tracking-wider">Prompt usage limits are synced in real-time.</span>
+            <div className="pt-6 border-t border-slate-100 flex items-center justify-between gap-3 text-emerald-600 bg-emerald-50/50 -mx-6 -mb-6 p-6 rounded-b-3xl">
+              <div className="flex items-center gap-2">
+                <Check className="w-5 h-5" />
+                <span className="text-xs font-black uppercase tracking-wider">Prompt usage limits are synced in real-time.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleUpdateGlobalSettings()}
+                disabled={savingGlobal}
+                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 disabled:opacity-50"
+              >
+                {savingGlobal ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {globalSettingsSaved ? 'Settings Saved! ✓' : 'Save All Settings'}
+              </button>
             </div>
           </div>
         </div>
@@ -2352,55 +2456,141 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
           </div>
 
           {/* Global form controls */}
-          <div className="mt-8 pt-4 border-t border-slate-200 flex flex-wrap gap-4 items-center justify-between">
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 border text-slate-700 rounded-xl text-xs font-black cursor-pointer shadow-sm transition-all"
-              >
-                <Copy className="w-4 h-4 text-slate-500" />
-                {copied ? 'Copied to Clipboard!' : 'Copy Prompt Text'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowInstructionalModal(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black cursor-pointer shadow-md shadow-indigo-950/20 transition-all"
-              >
-                Instructional Prompt
-              </button>
-            </div>
-
-            <div className="flex gap-2">
-              {currentId && (
+          <div className="mt-8 pt-4 border-t border-slate-200">
+            <div className="flex flex-col sm:flex-row gap-6 items-center justify-between">
+              {/* Auto vs Manual Tabs */}
+              <div className="flex bg-slate-100 p-1 rounded-2xl shadow-inner w-full sm:w-auto">
                 <button
                   type="button"
-                  onClick={resetForm}
-                  className="px-4 py-2.5 border rounded-xl hover:bg-slate-50 text-xs font-bold transition-all cursor-pointer"
+                  onClick={() => setActiveButtonView('manual')}
+                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    activeButtonView === 'manual' 
+                      ? 'bg-white text-[#1A3C6E] shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
                 >
-                  Cancel Edit
+                  <ClipboardList className="w-4 h-4" />
+                  Manual Mode
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveButtonView('auto')}
+                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    activeButtonView === 'auto' 
+                      ? 'bg-[#1A3C6E] text-[#D4A017] shadow-md' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  AI Auto Mode
+                </button>
+              </div>
+
+              {activeButtonView === 'manual' ? (
+                <div className="relative w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setManualDropdownOpen(!manualDropdownOpen)}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black cursor-pointer shadow-lg transition-all active:scale-95"
+                  >
+                    Manage KYC Draft
+                    <ChevronDown className={`w-4 h-4 transition-transform ${manualDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {manualDropdownOpen && (
+                    <div className="absolute bottom-full right-0 mb-3 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden z-30 animate-in slide-in-from-bottom-2 duration-200">
+                      <div className="p-2 space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => { handleCopy(); setManualDropdownOpen(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left rounded-xl transition-all group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                            <Copy className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-slate-800">{copied ? 'Copied!' : 'Copy KYC Text'}</span>
+                            <span className="text-[10px] text-slate-400 font-bold">Raw data for AI chatbots</span>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setShowInstructionalModal(true); setManualDropdownOpen(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left rounded-xl transition-all group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-slate-800">Copy AI Instructions</span>
+                            <span className="text-[10px] text-slate-400 font-bold">Merge KYC with templates</span>
+                          </div>
+                        </button>
+
+                        <div className="h-px bg-slate-100 my-1 mx-2" />
+
+                        <button
+                          type="button"
+                          onClick={() => { handleSave(); setManualDropdownOpen(false); }}
+                          disabled={saving}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left rounded-xl transition-all group disabled:opacity-50"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                            <Save className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-slate-800">{saving ? 'Saving...' : 'Save Current Work'}</span>
+                            <span className="text-[10px] text-slate-400 font-bold">Store securely in archives</span>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { resetFormDetails(); setManualDropdownOpen(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-rose-50 text-left rounded-xl transition-all group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-rose-800">Clear Draft Inputs</span>
+                            <span className="text-[10px] text-rose-400 font-bold">Reset this entire form</span>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleAiGenerate}
+                    disabled={aiGenerating}
+                    className="w-full flex items-center justify-center gap-3 px-8 py-3 bg-gradient-to-r from-[#1A3C6E] to-indigo-600 hover:from-[#15325C] hover:to-indigo-700 text-white rounded-xl text-sm font-black cursor-pointer shadow-xl shadow-indigo-900/20 transition-all active:scale-95 disabled:opacity-50 group"
+                  >
+                    {aiGenerating ? (
+                      <>
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                        AI is compiling your Master Prompt...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5 text-[#D4A017] group-hover:animate-pulse" />
+                        Generate Master Prompt with Gemini
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
-
-              <button
-                type="button"
-                onClick={resetFormDetails}
-                className="px-4 py-2.5 border rounded-xl hover:bg-slate-50 text-xs font-black text-slate-600 transition-all cursor-pointer"
-              >
-                🧹 Clear draft inputs
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-950/10 cursor-pointer disabled:opacity-50"
-              >
-                <Save className="w-4 h-4 text-emerald-300 animate-pulse" />
-                {saving ? 'Saving...' : 'Save'}
-              </button>
             </div>
+            
+            {activeButtonView === 'auto' && !aiGenerating && (
+              <p className="text-[10px] text-center text-slate-400 font-bold mt-4 uppercase tracking-widest animate-fadeIn">
+                Gemini will scan your KYC data and compile it into a high-fidelity Master prompt automatically.
+              </p>
+            )}
           </div>
         </div>
       )}

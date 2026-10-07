@@ -990,11 +990,14 @@ function isDayUnlockedUnified(
   days: any[],
   completedKeys: string[],
   dbSubmissions: any[] = [],
+  isAdmin: boolean = false,
   isCloned: boolean = false,
   userProfile?: any,
   courseId?: string,
   appSettings?: any
 ) {
+  if (isAdmin) return true;
+
   // Determine student's existing progress or organic unlocking for this day di
   const hasSubmissionsForThisDay = dbSubmissions.some((sub: any) => sub.dayIndex >= di);
   const dayVideos = days[di]?.videos || [];
@@ -1175,7 +1178,7 @@ function isLessonUnlockedUnified(
   if (isAdmin) return true;
 
   // 1. Check if the day di is unlocked on a day-level
-  const isDayUnlocked = isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, isCloned, userProfile, courseId, appSettings);
+  const isDayUnlocked = isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, isAdmin, isCloned, userProfile, courseId, appSettings);
   if (!isDayUnlocked) return false;
 
   // If quizzes are bypassed globally, return true immediately!
@@ -3048,7 +3051,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
             {/* 1. Selected Day card at the top */}
             {days.map((d, di) => {
               if (activeDayIdx !== di) return null;
-              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId, appSettings);
+              const isDayCoveredOrUnlocked = isAdmin || di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId, appSettings);
               
               const isPrecedingApproved = di === 0 || dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
               const isYearBadgeLocked = !isAdmin && isPrecedingApproved && !isBadgeActive(userProfile) && (
@@ -3326,7 +3329,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                         <button
                           type="button"
                           onClick={() => {
-                            const isDayUnlocked = di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId, appSettings);
+                            const isDayUnlocked = isAdmin || di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId, appSettings);
 
                             const allVideosPassed = isDayUnlocked || (d.videos || []).every((v, vi) => {
                               const currentKey = `${di}-${vi}`;
@@ -3400,7 +3403,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                 <div className="grid grid-cols-1 gap-4">
                   {days.map((d, di) => {
                     if (activeDayIdx === di) return null;
-                    const isDayUnlocked = di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, !!course.isCloned, userProfile, courseId, appSettings);
+                    const isDayUnlocked = isAdmin || di === 0 || isDayUnlockedUnified(di, days, completedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId, appSettings);
                     
                     const isPrecedingApproved = di === 0 || dbSubmissions.some((sub: any) => sub.dayIndex === di - 1 && sub.status === 'Approved');
                     const isYearBadgeLocked = !isAdmin && isPrecedingApproved && !isBadgeActive(userProfile) && (
@@ -5354,7 +5357,7 @@ export default function StudentDashboard() {
 
     // Check duplicate submissions check
     const existingSub = allMySubmissions.find(s => s.courseId === registeredCourse.id && s.dayIndex === submitDayIndex);
-    if (existingSub) {
+    if (existingSub && !isAdmin) {
       if (existingSub.status !== 'Disapproved') {
         alert(`You have already submitted an assignment for Day ${submitDayIndex + 1} which is currently in '${existingSub.status}' status. You cannot submit multiple assignments for the same day unless disapproved.`);
         return;
@@ -5370,7 +5373,7 @@ export default function StudentDashboard() {
     const lastUnlockedDayIdx = (() => {
       let lastIdx = 0;
       for (let idx = 0; idx < daysList.length; idx++) {
-        const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id, appSettings);
+        const isUnlocked = isAdmin || idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, isAdmin, !!registeredCourse.isCloned, userProfile, registeredCourse.id, appSettings);
         if (isUnlocked) {
           lastIdx = idx;
         }
@@ -7488,7 +7491,7 @@ export default function StudentDashboard() {
                   const lastUnlockedDayIdx = (() => {
                     let lastIdx = 0;
                     for (let idx = 0; idx < daysList.length; idx++) {
-                      const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id, appSettings);
+                      const isUnlocked = isAdmin || idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, isAdmin, !!registeredCourse.isCloned, userProfile, registeredCourse.id, appSettings);
                       if (isUnlocked) {
                         lastIdx = idx;
                       }
@@ -7512,7 +7515,7 @@ export default function StudentDashboard() {
                           value={submitDayIndex.toString()}
                           onChange={(val) => setSubmitDayIndex(Number(val))}
                           options={Array.from({ length: daysList.length || 5 }).map((_, idx) => {
-                            const isUnlocked = idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, !!registeredCourse.isCloned, userProfile, registeredCourse.id, appSettings);
+                            const isUnlocked = isAdmin || idx === 0 || isDayUnlockedUnified(idx, daysList, completedKeys, allMySubmissions, isAdmin, !!registeredCourse.isCloned, userProfile, registeredCourse.id, appSettings);
                             return {
                               label: `${isUnlocked ? "🔓" : "🔒"} Day ${idx + 1}: ${daysList[idx]?.title || "Module Study Checklist"}${!isUnlocked ? " (Locked)" : ""}`,
                               value: idx.toString()

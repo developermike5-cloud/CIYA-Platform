@@ -9,6 +9,7 @@ import { createServer as createViteServer } from "vite";
 // Safe directory name resolution for ESM / CommonJS hybrid environment
 const currentDir = process.cwd();
 import { GoogleGenAI, Type } from "@google/genai";
+import { VertexAI } from '@google-cloud/vertexai';
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -17,6 +18,12 @@ const ai = new GoogleGenAI({
       'User-Agent': 'aistudio-build',
     }
   }
+});
+
+// Initialize Vertex AI for GCP Credit usage
+const vertex_ai = new VertexAI({
+  project: 'gen-lang-client-0862975917',
+  location: 'europe-west2'
 });
 
 const responseSchema = {
@@ -378,41 +385,70 @@ async function startServer() {
 
   app.post("/api/ai/youtube-lesson-gen", async (req, res) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        return res.status(200).json({ 
-          error: "GEMINI_API_KEY environment variable is not configured." 
-        });
-      }
-      
       const { url, checkType } = req.body;
       if (!url) {
         return res.status(400).json({ error: "A valid YouTube URL is required." });
       }
 
-      // We will try gemini-3.5-flash first, then try gemini-flash-latest and gemini-3.1-flash-lite as fallback.
-      const modelsToTry = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
-      let lastError: any = null;
+      // Prioritize Vertex AI for GCP Credit usage
+      const modelsToTry = ["gemini-1.5-pro", "gemini-1.5-flash"];
       let generatedText = "";
 
       for (const modelName of modelsToTry) {
         try {
-          const response = await ai.models.generateContent({
+          const generativeModel = vertex_ai.getGenerativeModel({
             model: modelName,
-            contents: `Analyze this YouTube link: ${url}. Selected check type is '${checkType || 'none'}'. Help the instructor build a highly professional, educational syllabus card for CIYA.`,
-            config: {
-              systemInstruction: "You are an expert AI instructional designer. Based on the video context, keywords in the link, and instructional design principles, generate lesson metadata and a list of 2 or 3 fun/useful engagement checks matching the specified checkType. Do not include empty fields for the unused types. Make sure options array has exactly 4 items for MCQ.",
-              responseMimeType: "application/json",
-              responseSchema: responseSchema
-            }
           });
-          if (response.text) {
-            generatedText = response.text;
-            break; // Success!
+
+          const systemInstruction = "You are an expert AI instructional designer. Based on the video context, keywords in the link, and instructional design principles, generate lesson metadata and a list of 2 or 3 fun/useful engagement checks matching the specified checkType. Do not include empty fields for the unused types. Make sure options array has exactly 4 items for MCQ.";
+          const prompt = `Analyze this YouTube link: ${url}. Selected check type is '${checkType || 'none'}'. Help the instructor build a highly professional, educational syllabus card for CIYA.`;
+
+          const resp = await generativeModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: responseSchema as any,
+            },
+            systemInstruction: {
+              role: 'system',
+              parts: [{ text: systemInstruction }],
+            },
+          });
+
+          const text = resp.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            generatedText = text;
+            break;
           }
         } catch (err: any) {
-          console.warn(`Model ${modelName} failed, trying fallback if available...`, err);
-          lastError = err;
+          console.warn(`Vertex AI Model ${modelName} failed, trying fallback...`, err);
+        }
+      }
+
+      // If Vertex AI fails, try standard Gemini API as secondary fallback
+      if (!generatedText) {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (apiKey) {
+          const stdModels = ["gemini-3.8-flash", "gemini-3.5-flash"];
+          for (const modelName of stdModels) {
+            try {
+              const response = await ai.models.generateContent({
+                model: modelName,
+                contents: `Analyze this YouTube link: ${url}. Selected check type is '${checkType || 'none'}'. Help the instructor build a highly professional, educational syllabus card for CIYA.`,
+                config: {
+                  systemInstruction: "You are an expert AI instructional designer. Based on the video context, keywords in the link, and instructional design principles, generate lesson metadata and a list of 2 or 3 fun/useful engagement checks matching the specified checkType. Do not include empty fields for the unused types. Make sure options array has exactly 4 items for MCQ.",
+                  responseMimeType: "application/json",
+                  responseSchema: responseSchema
+                }
+              });
+              if (response.text) {
+                generatedText = response.text;
+                break;
+              }
+            } catch (err: any) {
+              console.warn(`Standard Gemini Model ${modelName} failed...`, err);
+            }
+          }
         }
       }
 
@@ -486,20 +522,13 @@ async function startServer() {
 
   app.post("/api/ai/compile-smart-prompt", async (req, res) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        return res.status(200).json({ 
-          error: "GEMINI_API_KEY environment variable is not configured." 
-        });
-      }
-
       const { businessInfo, websiteType, referenceTemplate } = req.body;
       if (!businessInfo) {
         return res.status(400).json({ error: "businessInfo is required." });
       }
 
-      // We will try gemini-3.5-flash first
-      const modelsToTry = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+      // Prioritize Vertex AI for GCP Credit usage
+      const modelsToTry = ["gemini-1.5-pro", "gemini-1.5-flash"];
       let generatedText = "";
 
       const systemInstruction = `You are an expert Prompt Engineer, Senior Web Architect, and Brand Strategist.
@@ -527,20 +556,54 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
 
       for (const modelName of modelsToTry) {
         try {
-          const response = await ai.models.generateContent({
+          const generativeModel = vertex_ai.getGenerativeModel({
             model: modelName,
-            contents: contents,
-            config: {
-              systemInstruction: systemInstruction,
-              temperature: 0.3,
-            }
           });
-          if (response.text) {
-            generatedText = response.text;
+
+          const resp = await generativeModel.generateContent({
+            contents: [{ role: 'user', parts: [{ text: contents }] }],
+            generationConfig: {
+              temperature: 0.3,
+            },
+            systemInstruction: {
+              role: 'system',
+              parts: [{ text: systemInstruction }],
+            },
+          });
+
+          const text = resp.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            generatedText = text;
             break;
           }
         } catch (err: any) {
-          console.warn(`Model ${modelName} failed for compile-smart-prompt, trying fallback...`, err);
+          console.warn(`Vertex AI Model ${modelName} failed for compile-smart-prompt, trying fallback...`, err);
+        }
+      }
+
+      // Fallback to standard Gemini API if Vertex fails
+      if (!generatedText) {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (apiKey) {
+          const stdModels = ["gemini-3.8-flash", "gemini-3.5-flash"];
+          for (const modelName of stdModels) {
+            try {
+              const response = await ai.models.generateContent({
+                model: modelName,
+                contents: contents,
+                config: {
+                  systemInstruction: systemInstruction,
+                  temperature: 0.3,
+                }
+              });
+              if (response.text) {
+                generatedText = response.text;
+                break;
+              }
+            } catch (err: any) {
+              console.warn(`Standard Gemini Model ${modelName} failed for compile-smart-prompt...`, err);
+            }
+          }
         }
       }
 

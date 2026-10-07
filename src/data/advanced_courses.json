@@ -924,6 +924,156 @@
               "headline": "Did you know?",
               "body": "Although Google advertises $300 in \"free credit\" to attract new cloud users, any unused portion of the credit automatically expires after exactly 90 days, regardless of how little money was actually spent"
             }
+          },
+          {
+            "id": "adv2-v5",
+            "title": "INITIATING EMAIL & PASSWORD AUTHENTICATION FLOW",
+            "video_url": "https://youtu.be/ti0953TvM_E",
+            "url": "https://youtu.be/ti0953TvM_E",
+            "duration": "12:45 min",
+            "description": "Learn how to implement a secure email and password login system using Firebase Authentication. This lesson covers setting up the auth provider in the Firebase console and writing the frontend logic to handle signups and logins.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "type": "tf",
+                "statement": "Firebase handles password hashing and security automatically, so developers don't need to manually scramble passwords before sending them to the server.",
+                "answer": true,
+                "explanation": "Firebase Auth is a managed service that takes care of all security best practices, including hashing, so you can focus on the user experience."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Using managed authentication like Firebase reduces the risk of data breaches by 90% compared to building custom login systems from scratch."
+            }
+          },
+          {
+            "id": "adv2-v6",
+            "title": "SETTING UP GOOGLE AUTH AUTHENTICATION FLOW",
+            "video_url": "https://youtu.be/e3jbbXFugiU",
+            "url": "https://youtu.be/e3jbbXFugiU",
+            "duration": "15:20 min",
+            "description": "A step-by-step walkthrough of integrating Google Sign-In into your React application. You'll learn how to enable the Google provider, configure the OAuth consent screen, and handle the redirect/popup flow.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Which of these is NOT a step in setting up Google Auth?",
+                "options": [
+                  "Enabling the provider in Firebase Console",
+                  "Configuring the OAuth consent screen in Google Cloud",
+                  "Manually generating RSA keys for every user",
+                  "Implementing the signInWithPopup function in React"
+                ],
+                "correct": 2,
+                "explanation": "Firebase handles all the complex key management and handshake logic for you."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Offering social login options like Google can increase conversion rates on your signup page by up to 40%."
+            }
+          },
+          {
+            "id": "adv2-v7",
+            "title": "BEGINNING FIRESTORE DATABASE INTEGRATION",
+            "video_url": "https://youtu.be/v7gF4yQIzRw",
+            "url": "https://youtu.be/v7gF4yQIzRw",
+            "duration": "18:10 min",
+            "description": "Start building your application's data layer. This lesson covers initializing Firestore in your project, understanding collections and documents, and performing basic CRUD operations.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "type": "tf",
+                "statement": "Firestore is a relational database where you must define strict table schemas before adding any data.",
+                "answer": false,
+                "explanation": "Firestore is a NoSQL document database, allowing for a flexible, schema-less structure that can evolve as your app grows."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Firestore's real-time listeners allow your app to update automatically across all devices the moment a piece of data changes in the cloud."
+            }
+          },
+          {
+            "id": "adv2-v8",
+            "title": "SYNCING USER DATABASE INFO TO FIRESTORE",
+            "video_url": "https://youtu.be/MA-RrDRqIbc",
+            "url": "https://youtu.be/MA-RrDRqIbc",
+            "duration": "14:30 min",
+            "description": "Connect your authentication flow with your database. Learn how to automatically create a user profile document in Firestore the moment a new student signs up.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "What is the best unique identifier to use for a user's document in Firestore?",
+                "options": [
+                  "Their full name",
+                  "Their current IP address",
+                  "The Firebase Auth UID (Unique ID)",
+                  "A random 4-digit number"
+                ],
+                "correct": 2,
+                "explanation": "Using the Auth UID ensures that the user's login record is perfectly synced with their database profile."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Syncing user data to Firestore allows you to track personalized progress, preferences, and custom settings that persist even if the user clears their browser cache."
+            }
+          },
+          {
+            "id": "adv2-v9",
+            "title": "BUILDING AN ADMIN DASHBOARD WITH PERMISSIONS",
+            "video_url": "https://youtu.be/2Ux1siUu5xY",
+            "url": "https://youtu.be/2Ux1siUu5xY",
+            "duration": "22:15 min",
+            "description": "Learn how to build a restricted area for site administrators. This lesson covers role-based access control (RBAC), setting up admin flags in Firestore, and protecting routes in React.",
+            "resources": "",
+            "checkType": "tf",
+            "check": [
+              {
+                "type": "tf",
+                "statement": "Hiding the admin link in the navigation menu is enough to completely secure an admin dashboard from malicious users.",
+                "answer": false,
+                "explanation": "Security must be enforced at the data level using Firestore Security Rules and route protection, as URLs can still be accessed directly."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "A well-designed admin dashboard can save business owners dozens of hours a week by automating content updates and user management tasks."
+            }
+          },
+          {
+            "id": "adv2-v10",
+            "title": "FIRESTORE RESOURCE MANAGEMENT: PAGINATION & SORTING",
+            "video_url": "https://youtu.be/XVIF-8yt3pQ",
+            "url": "https://youtu.be/XVIF-8yt3pQ",
+            "duration": "19:40 min",
+            "description": "Master advanced data querying. Learn how to handle large collections by implementing pagination, sorting data by timestamps, and filtering results for a professional user experience.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Why is pagination important for large databases?",
+                "options": [
+                  "It makes the website text look bigger on mobile phones",
+                  "It prevents the app from loading thousands of records at once, improving speed and reducing costs",
+                  "It allows users to delete data more quickly",
+                  "It changes the color of the database console"
+                ],
+                "correct": 1,
+                "explanation": "Pagination ensures your app only fetches the data it needs for the current view, keeping it lightning-fast and cost-effective."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Implementing proper pagination can reduce your database read costs by over 95% for apps with large user bases."
+            }
           }
         ]
       },

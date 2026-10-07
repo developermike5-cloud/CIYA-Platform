@@ -206,6 +206,8 @@ export const rtdb = rtdbInstance;
 
 // Note: Global synchronization hook via Firestore moved to App.tsx to avoid initialization races
 
+let isLocalToggleInitiated = false;
+
 export async function setGlobalDbConnectionDisabled(disabled: boolean) {
   isLocalToggleInitiated = true;
   
