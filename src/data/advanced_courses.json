@@ -26,7 +26,7 @@
         "title": "MODULE 1: BACKEND FUNDAMENTALS",
         "description": "Understanding system architecture, databases, secure backend proxies, and how multi-user states interact with the frontend.",
         "assignment": {
-          "prompt": "MODULE 1 FINAL ASSIGNMENT\nUnderstanding Modern Web Application Architecture\n\nCongratulations on completing Module 1\n\nBefore moving into the practical sessions in Module 2, your goal is to prove that you understand how a complete full-stack application works, even before writing any backend code.\n\nComplete all the tasks below.\n\nTask 1 – Analyze Your Favorite App (20 Marks)\n\nChoose one application you use regularly.\n\nThen answer the following questions:\n\nWhat is the frontend of this application?\nWhat backend activities happen behind the scenes?\nWhat information do you think is stored in the database?\nWhat files are likely stored in cloud storage?\nWhat APIs do you think this application uses?\nWhat type of users does the application have?\nWhat authentication methods does it likely support?\n\n\nTask 2 – Do further research and list different types of backend platforms developers use for the following (30 Marks)\n\nAuthentication\nDatabase\nStorage\nPayment Gateway\nMaps API\nEmail Service\nPush Notifications\nAnalytics\n\nExplain why you think each service is needed.\n\n\n\nTask 3 – Backend Thinking Challenge (20 Marks)\n\nImagine you're building an Online School Portal.\n\nSeparate the following into the correct backend service.\n\n                                                                                                             Authentication\t         Database\t                 Storage\nStudent Profile Picture\t\t\t\nStudent Name\t\t\t\nPassword\t\t\t\nMathematics Result\t\t\t\nGraduation Video\t\t\t\nSchool Logo\t\t\t\nParent Phone Number\t\t\t\nPDF Report Card\t\t\t\nEmail Address\t\t\t\nPDF\t\n\n\t\t\nTask 4 – Explain Like You're Teaching Someone (15 Marks)\n\nIn your own words, explain the following concepts as if you were teaching a complete beginner.\n\nBackend\nAPI\nDatabase\nAuthentication\nCloud Storage\nHosting\n\nUse simple language.\n\nAvoid copying definitions from Google or any AI\n\n\n\nTask 5 – Build Your Own System Design (15 Marks)\n\nChoose one of the following:\n\nHospital Management System\nE-commerce Website\nHotel Booking System\nEstate Management Portal\nChurch Management System\nSchool Portal\n\nThen answer:\n\nWhat information will your database store?\nWhat files will cloud storage store?\nWho are the users?\nWhat authentication methods will you use?\nWhat pages will the frontend have?\nWhat backend services will your application need?\nSubmission Format\n\nSubmit your assignment as a texts format in the assignment submission page\n\nTotal Marks\n\nTask\t                                                                        Marks\nFavorite App Analysis\t                                           20\nBackend types lists\t                                               30\nBackend Thinking Challenge                                20\nExplain the Concepts\t                                           15\nSystem Design\t                                                       15\nTotal\t                                                                           100 Marks\n\n\n\n\n\nRemember, this assignment is not about being 100% correct.\n\nIn Module 2, you'll begin turning these ideas into real, working applications with Firebase. Good luck!",
+          "prompt": "MODULE 1 FINAL ASSIGNMENT\nUnderstanding Modern Web Application Architecture\n\nCongratulations on completing Module 1\n\nBefore moving into the practical sessions in Module 2, your goal is to prove that you understand how a complete full-stack application works, even before writing any backend code.\n\nComplete all the tasks below.\n\nTask 1 – Analyze Your Favorite App (20 Marks)\n\nChoose one application you use regularly.\n\nExamples:\n\nWhatsApp\nFacebook\nInstagram\nTikTok\nJumia\nAmazon\nNetflix\nOpay\nPalmPay\nUber\nBolt\nSpotify\nGmail\n\nThen answer the following questions:\n\nWhat is the frontend of this application?\nWhat backend activities happen behind the scenes?\nWhat information do you think is stored in the database?\nWhat files are likely stored in cloud storage?\nWhat APIs do you think this application uses?\nWhat type of users does the application have?\nWhat authentication methods does it likely support?\n\n\nTask 2 – Do further research and list different types of backend platforms developers use for the following (30 Marks)\n\nAuthentication\nDatabase\nStorage\nPayment Gateway\nMaps API\nEmail Service\nPush Notifications\nAnalytics\n\nExplain why you think each service is needed.\n\n\n\nTask 3 – Backend Thinking Challenge (20 Marks)\n\nImagine you're building an Online School Portal.\n\nSeparate the following into the correct backend service.\n\n                                                                                                             Authentication\t         Database\t                 Storage\nStudent Profile Picture\t\t\t\nStudent Name\t\t\t\nPassword\t\t\t\nMathematics Result\t\t\t\nGraduation Video\t\t\t\nSchool Logo\t\t\t\nParent Phone Number\t\t\t\nPDF Report Card\t\t\t\nEmail Address\t\t\t\nPDF\t\n\n\t\t\nTask 4 – Explain Like You're Teaching Someone (15 Marks)\n\nIn your own words, explain the following concepts as if you were teaching a complete beginner.\n\nBackend\nAPI\nDatabase\nAuthentication\nCloud Storage\nHosting\n\nUse simple language.\n\nAvoid copying definitions from Google or any AI\n\n\n\nTask 5 – Build Your Own System Design (15 Marks)\n\nChoose one of the following:\n\nHospital Management System\nE-commerce Website\nHotel Booking System\nEstate Management Portal\nChurch Management System\nSchool Portal\n\nThen answer:\n\nWhat information will your database store?\nWhat files will cloud storage store?\nWho are the users?\nWhat authentication methods will you use?\nWhat pages will the frontend have?\nWhat backend services will your application need?\nSubmission Format\n\nSubmit your assignment as a texts format in the assignment submission page\n\n1. By copying the questions one after the other and putting their answers under them\n2. By not skipping any question or not giving full detailed answers\n\n\nTotal Marks\n\nTask\t                                                                        Marks\nFavorite App Analysis\t                                           20\nBackend types lists\t                                               30\nBackend Thinking Challenge                                20\nExplain the Concepts\t                                           15\nSystem Design\t                                                       15\nTotal\t                                                                           100 Marks\n\n\n\n\n\nRemember, this assignment is not about being 100% correct.\n\nIt is designed to help you think like a software engineer.\n\nModule 1 was all about understanding how systems work together. If you can analyze an application, identify its components, and explain how data flows through it, you've built the mindset you'll need for the practical lessons ahead.\n\nIn Module 2, you'll begin turning these ideas into real, working applications with Firebase. Good luck!",
           "dueNote": "Take your time and complete the assignment, submit on time to speed up your learning journey"
         },
         "videos": [
@@ -603,7 +603,7 @@
                 "question": "Question 3: What specific roles do GitHub and Netlify play in the automated deployment pipeline?",
                 "options": [
                   "GitHub designs user interfaces, while Netlify manages user passwords",
-                  "GitHub acts as a digital warehouse storing the source code, while Netlify acts as the hosting provider that publishes it to web servers",
+                  "GitHub acts as a digital warehouse storing the source code, while Netlify acts as the hosting provider that builds and publishes it to web servers",
                   "GitHub tracks financial records, while Netlify fixes broken internet routers",
                   "GitHub serves as the primary domain name registrar, while Netlify is a physical database"
                 ],
@@ -644,7 +644,7 @@
       },
       {
         "dayNumber": 2,
-        "title": "MODULE 2: FIREBASE INTEGRATION & AUTHENTICATION",
+        "title": "DAY 2: FIREBASE SETUP",
         "description": "",
         "assignment": {
           "prompt": "The Module 2 assignment is very straightforward.\n\nSelect one of your existing website projects that is entirely frontend and do the following:\n\n1. Set up a Firebase backend account manually for it\n2. Connect the backend account to the frontend \n3. Initiate the email & password authentication flow\n4. Set up Google auth authentication flow\n5. Ensure both Auths are working because they will be tested\n6. Begin the Firestore Database Integration after auth setup\n7. Ensure all users' database info is synced to Firestore\n8. Set up an admin dashboard with different admin power and permission\n9. Execute Firestore resource management using pagination, sorting, filtering, and searching for a collection\n10. Create an email and password for a super admin account, which the coach will use to test everything you did and certify you before going on to Module 3",
@@ -926,160 +926,910 @@
             }
           },
           {
-            "id": "adv2-v5",
-            "title": "INITIATING EMAIL & PASSWORD AUTHENTICATION FLOW",
-            "video_url": "https://youtu.be/ti0953TvM_E",
-            "url": "https://youtu.be/ti0953TvM_E",
-            "duration": "12:45 min",
-            "description": "Learn how to implement a secure email and password login system using Firebase Authentication. This lesson covers setting up the auth provider in the Firebase console and writing the frontend logic to handle signups and logins.",
-            "resources": "",
-            "checkType": "tf",
-            "check": [
-              {
-                "type": "tf",
-                "statement": "Firebase handles password hashing and security automatically, so developers don't need to manually scramble passwords before sending them to the server.",
-                "answer": true,
-                "explanation": "Firebase Auth is a managed service that takes care of all security best practices, including hashing, so you can focus on the user experience."
-              }
-            ],
-            "funFact": {
-              "headline": "Did you know?",
-              "body": "Using managed authentication like Firebase reduces the risk of data breaches by 90% compared to building custom login systems from scratch."
-            }
-          },
-          {
-            "id": "adv2-v6",
-            "title": "SETTING UP GOOGLE AUTH AUTHENTICATION FLOW",
-            "video_url": "https://youtu.be/e3jbbXFugiU",
-            "url": "https://youtu.be/e3jbbXFugiU",
-            "duration": "15:20 min",
-            "description": "A step-by-step walkthrough of integrating Google Sign-In into your React application. You'll learn how to enable the Google provider, configure the OAuth consent screen, and handle the redirect/popup flow.",
+            "id": "euvd0x2",
+            "title": "MANUAL & AUTOMATED WAYS OF CREATING A FIREBASE BACKEND PROJECT",
+            "video_url": "https://youtu.be/2WtMNpxA3_s",
+            "url": "https://youtu.be/2WtMNpxA3_s",
+            "duration": "26:21 min",
+            "description": "To follow along smoothly with this lesson, you should be comfortable with three key concepts:\n\nThe Difference Between Front-End and Back-End: Understanding that a website interface (front-end) and a database server (back-end) cannot function in isolation—they must be explicitly connected to pass data back and forth.\n\nFirebase Platform Navigation: Basic familiarity with creating a project inside the Firebase Console dashboard and navigating to project settings to manage connected applications.\n\nAPI Keys & SDK Configuration: Knowing what software credentials (SDK snippets and public API keys) look like and how they act as the \"bridge\" allowing your app to talk to database services.",
             "resources": "",
             "checkType": "mcq",
             "check": [
               {
                 "type": "mcq",
-                "question": "Which of these is NOT a step in setting up Google Auth?",
+                "question": "Question 1: What major distinction is given between setting up a Firebase backend manually versus using an automated AI setup?",
                 "options": [
-                  "Enabling the provider in Firebase Console",
-                  "Configuring the OAuth consent screen in Google Cloud",
-                  "Manually generating RSA keys for every user",
-                  "Implementing the signInWithPopup function in React"
-                ],
-                "correct": 2,
-                "explanation": "Firebase handles all the complex key management and handshake logic for you."
-              }
-            ],
-            "funFact": {
-              "headline": "Did you know?",
-              "body": "Offering social login options like Google can increase conversion rates on your signup page by up to 40%."
-            }
-          },
-          {
-            "id": "adv2-v7",
-            "title": "BEGINNING FIRESTORE DATABASE INTEGRATION",
-            "video_url": "https://youtu.be/v7gF4yQIzRw",
-            "url": "https://youtu.be/v7gF4yQIzRw",
-            "duration": "18:10 min",
-            "description": "Start building your application's data layer. This lesson covers initializing Firestore in your project, understanding collections and documents, and performing basic CRUD operations.",
-            "resources": "",
-            "checkType": "tf",
-            "check": [
-              {
-                "type": "tf",
-                "statement": "Firestore is a relational database where you must define strict table schemas before adding any data.",
-                "answer": false,
-                "explanation": "Firestore is a NoSQL document database, allowing for a flexible, schema-less structure that can evolve as your app grows."
-              }
-            ],
-            "funFact": {
-              "headline": "Did you know?",
-              "body": "Firestore's real-time listeners allow your app to update automatically across all devices the moment a piece of data changes in the cloud."
-            }
-          },
-          {
-            "id": "adv2-v8",
-            "title": "SYNCING USER DATABASE INFO TO FIRESTORE",
-            "video_url": "https://youtu.be/MA-RrDRqIbc",
-            "url": "https://youtu.be/MA-RrDRqIbc",
-            "duration": "14:30 min",
-            "description": "Connect your authentication flow with your database. Learn how to automatically create a user profile document in Firestore the moment a new student signs up.",
-            "resources": "",
-            "checkType": "mcq",
-            "check": [
-              {
-                "type": "mcq",
-                "question": "What is the best unique identifier to use for a user's document in Firestore?",
-                "options": [
-                  "Their full name",
-                  "Their current IP address",
-                  "The Firebase Auth UID (Unique ID)",
-                  "A random 4-digit number"
-                ],
-                "correct": 2,
-                "explanation": "Using the Auth UID ensures that the user's login record is perfectly synced with their database profile."
-              }
-            ],
-            "funFact": {
-              "headline": "Did you know?",
-              "body": "Syncing user data to Firestore allows you to track personalized progress, preferences, and custom settings that persist even if the user clears their browser cache."
-            }
-          },
-          {
-            "id": "adv2-v9",
-            "title": "BUILDING AN ADMIN DASHBOARD WITH PERMISSIONS",
-            "video_url": "https://youtu.be/2Ux1siUu5xY",
-            "url": "https://youtu.be/2Ux1siUu5xY",
-            "duration": "22:15 min",
-            "description": "Learn how to build a restricted area for site administrators. This lesson covers role-based access control (RBAC), setting up admin flags in Firestore, and protecting routes in React.",
-            "resources": "",
-            "checkType": "tf",
-            "check": [
-              {
-                "type": "tf",
-                "statement": "Hiding the admin link in the navigation menu is enough to completely secure an admin dashboard from malicious users.",
-                "answer": false,
-                "explanation": "Security must be enforced at the data level using Firestore Security Rules and route protection, as URLs can still be accessed directly."
-              }
-            ],
-            "funFact": {
-              "headline": "Did you know?",
-              "body": "A well-designed admin dashboard can save business owners dozens of hours a week by automating content updates and user management tasks."
-            }
-          },
-          {
-            "id": "adv2-v10",
-            "title": "FIRESTORE RESOURCE MANAGEMENT: PAGINATION & SORTING",
-            "video_url": "https://youtu.be/XVIF-8yt3pQ",
-            "url": "https://youtu.be/XVIF-8yt3pQ",
-            "duration": "19:40 min",
-            "description": "Master advanced data querying. Learn how to handle large collections by implementing pagination, sorting data by timestamps, and filtering results for a professional user experience.",
-            "resources": "",
-            "checkType": "mcq",
-            "check": [
-              {
-                "type": "mcq",
-                "question": "Why is pagination important for large databases?",
-                "options": [
-                  "It makes the website text look bigger on mobile phones",
-                  "It prevents the app from loading thousands of records at once, improving speed and reducing costs",
-                  "It allows users to delete data more quickly",
-                  "It changes the color of the database console"
+                  "Automated setups only work on mobile devices, while manual setups only work on desktop screens",
+                  "Manual setup gives you custom project names and full control, whereas automated setup generates generic auto-provisioned names (like gen-client-xxx) that cause long-term project confusion",
+                  "Manual setup takes several weeks to complete, while automated setup finishes in one second",
+                  "Manual setups automatically delete all web browser app history cache records"
                 ],
                 "correct": 1,
-                "explanation": "Pagination ensures your app only fetches the data it needs for the current view, keeping it lightning-fast and cost-effective."
+                "explanation": "The presenter highlights that auto-provisioned AI setups repeatedly name resources with generic handles like gen-client, making it difficult to manage professional client projects compared to clear manual naming."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What warning does the presenter share regarding using automated AI coding agents for client projects?",
+                "options": [
+                  "Automated setups should only be used for practice/training projects because they grant less configuration control and create messy naming conventions",
+                  "The AI agent will cause the entire application server to crash permanently",
+                  "Embedded players will automatically delete your WhatsApp booking form fields",
+                  "AI agents refuse to read text prompts written in English"
+                ],
+                "correct": 0,
+                "explanation": "The video explicitly advises using AI automated setup strictly for learning or practice, recommending manual setup for paid client deliverables to maintain clean organization and full technical control."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: Where can you retrieve your SDK configuration snippet in Firebase if you forget to copy it during initial registration?",
+                "options": [
+                  "Inside your computer's hidden system download folder",
+                  "Inside the desktop recycle bin folder",
+                  "By navigating to Project Settings under the General tab in the Firebase Console",
+                  "By contacting Google support via email"
+                ],
+                "correct": 2,
+                "explanation": "The video shows that if you close the prompt without copying the credentials, you can easily access them anytime under the General section of Project Settings."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: How can a creator set up automatic Firebase integration directly inside Google AI Studio?",
+                "options": [
+                  "By writing a completely new initial prompt from scratch using raw machine code",
+                  "By clicking the Integrations tab in settings or enabling the Firebase pop-up prompt within the workspace",
+                  "By deleting the device's web browser app history cache records",
+                  "By leaving a feedback complaint ticket inside a chat support panel"
+                ],
+                "correct": 1,
+                "explanation": "The presenter walks through enabling Firebase either through the interactive prompt modal or by going to workspace Settings under the Integration tab."
               }
             ],
             "funFact": {
               "headline": "Did you know?",
-              "body": "Implementing proper pagination can reduce your database read costs by over 95% for apps with large user bases."
+              "body": "Every time you let an AI automatically provision a Firebase backend for you, it creates generic backend names starting with \"gen-client\"—meaning if you build 50 AI projects, they will all share identical generic naming structures unless you manually configure them yourself!"
+            }
+          },
+          {
+            "id": "mf5thy5",
+            "title": "HOW TO SETUP EMAIL & PASSWORD AUTHENTICATION",
+            "video_url": "https://youtu.be/Ll2PKUodkBA",
+            "url": "https://youtu.be/Ll2PKUodkBA",
+            "duration": "23:55 min",
+            "description": "Basic Understanding of Web Authentication Concepts: Familiarity with how users sign in and authenticate on web platforms (e.g., using email/password vs. social sign-in providers like Google or Facebook).\n\nFirebase Console Fundamentals: Basic awareness of Firebase services, specifically navigating product categories such as the Authentication dashboard and managing backend database settings.\n\nWeb Hosting & Sandbox Preview Environments: Understanding the difference between static production hosting (requiring code commits via GitHub) and interactive development preview sandboxes (like Google AI Studio preview links).",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What core distinction is highlighted between using native Email & Password authentication versus Google Sign-In?",
+                "options": [
+                  "Email and password sign-in costs extra licensing fees, whereas Google Sign-In is completely free",
+                  "Google Sign-In relies on existing mobile/browser device authentication, reducing password-related vulnerabilities and forgotten password friction",
+                  "Email and password authentication only works on desktop browsers, while Google Sign-In is mobile-only",
+                  "Google Sign-In automatically changes the primary language of the website"
+                ],
+                "correct": 1,
+                "explanation": "The video explains that Google Sign-In leverages the user's active device session, eliminating password fatigue and reducing security risks associated with weak or forgotten credentials."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What security recommendation does the presenter share regarding standalone Email & Password sign-ups for production applications?",
+                "options": [
+                  "Email and password systems automatically crash the website server if more than ten users sign up",
+                  "Developers should layer extra security like Multi-Factor Authentication (MFA/SMS verification) to protect against unauthorized access and account vulnerabilities",
+                  "Standard password forms automatically delete user database records after 24 hours",
+                  "Firebase does not allow email and password sign-ups without a paid enterprise plan"
+                ],
+                "correct": 1,
+                "explanation": "The presenter notes that because basic email and password setups lack external verification layers, adding multi-factor authentication (such as SMS verification codes) is critical for protecting sensitive actions and user data."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How does the presenter quickly generate and test user registration without creating real permanent email accounts?",
+                "options": [
+                  "By entering fake phone numbers directly into the browser URL bar",
+                  "By restarting the local internet router network to force a new IP address",
+                  "By using a temporary disposable email generator service (Temp Mail) to create temporary test mailboxes",
+                  "By manually typing thousands of lines of random JavaScript code into the console"
+                ],
+                "correct": 2,
+                "explanation": "The presentation demonstrates using a disposable email service (Temp Mail) to rapidly generate temporary addresses with set lifetimes, allowing seamless sign-up testing without cluttering real inboxes."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What key distinction is made between live static Firebase hosting and the Google AI Studio preview link during development?",
+                "options": [
+                  "Live Firebase hosting updates automatically without pushing code, while AI Studio requires manual server reboots",
+                  "Firebase hosting requires users to pay per click, whereas AI Studio is restricted to mobile devices",
+                  "GitHub repositories cannot connect to live Firebase hosting environments",
+                  "Changes made in the AI Studio environment reflect immediately via its cloud sandbox, whereas live Firebase hosting requires code to be pushed to GitHub to display updates"
+                ],
+                "correct": 3,
+                "explanation": "The video highlights that AI Studio sandbox links provide real-time express backend updates, whereas static production hosting relies on GitHub deployment pipelines to display code revisions."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: How can an administrator manage or restrict a user who is performing suspicious activity on the platform?",
+                "options": [
+                  "By navigating to the Firebase Authentication dashboard to disable the user's account, delete their entry, or trigger a password reset flow using their unique UID",
+                  "By deleting the device's web browser cache files locally",
+                  "By changing the color scheme of the front-end login button",
+                  "By writing a completely new initial text prompt in the chat box"
+                ],
+                "correct": 0,
+                "explanation": "The presenter shows that every registered user receives a unique User ID (UID) in the Firebase console, allowing administrators to delete, disable, or reset access for specific accounts directly from the management panel."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "When you register a user with Firebase, Google automatically generates a completely unique User ID (UID) for that individual, which acts as the core security foundation determining exactly what data that specific user is authorized to see or modify across your entire application platform!"
+            }
+          },
+          {
+            "id": "j5bhdk2",
+            "title": "SETTING UP EMAIL & PASSWORD AUTH VERIFICATION LINK",
+            "video_url": "https://youtu.be/tiwm1lPZJAc",
+            "url": "https://youtu.be/tiwm1lPZJAc",
+            "duration": "24:22 min",
+            "description": "Basic Understanding of Authentication Workflows: Students should understand the core difference between account registration (sign-up), identity verification, and user session authorization (logging in).\n\nFundamental Web Application Security Principles: Familiarity with sensitive user data handling, such as preventing the public exposure of unique backend identifiers (user.uid) and enforcing security protocols before allowing account dashboard access.\n\nDomain Name & DNS Fundamentals: Basic knowledge of how domains, custom URLs, and DNS records operate so that dynamic system emails can be configured with proper sender branding and clean action links.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What major security flaw does the presenter highlight when testing an unverified user account sign-up?",
+                "options": [
+                  "The password is automatically emailed to the user in plain text.",
+                  "The application lets unverified users access the account dashboard without clicking the verification link first.",
+                  "Firebase charges a fee every time an email verification link is sent.",
+                  "The sign-up form causes the entire application server to crash."
+                ],
+                "correct": 1,
+                "explanation": "The presenter points out that allowing unverified users to enter the account dashboard defeats the purpose of sending an email verification link in the first place."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: Why is displaying the raw user.uid string on the front-end interface considered bad practice?",
+                "options": [
+                  "It exposes sensitive internal backend identifiers that should never be shown to the user.",
+                  "It prevents the web application from sending password reset emails.",
+                  "It changes the primary language and styling of the website.",
+                  "It automatically locks the user out of their browser session."
+                ],
+                "correct": 0,
+                "explanation": "The presenter stresses that internal user IDs (uid) are sensitive backend system data and should be cleaned up or removed from user-facing screens to protect security and interface quality."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: Why should a developer configure a resend cooldown timer on email verification buttons?",
+                "options": [
+                  "To prevent users from clicking the link repeatedly and generating excessive email requests or system abuse.",
+                  "Because Firebase restricts verification emails to only one per month.",
+                  "To force the browser to restart after every sign-up attempt.",
+                  "To automatically convert email links into local WebM video files."
+                ],
+                "correct": 0,
+                "explanation": "The presenter explains that without a countdown timer (such as 30 or 60 seconds), users can continuously spam verification requests, causing potential system rate-limiting issues."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What is the primary purpose of adding standard sender details like \"Support\" and using a \"no-reply\" email address in Firebase email templates?",
+                "options": [
+                  "To make dynamic verification emails look clean and official while preventing unnecessary user replies.",
+                  "To ensure that verification links automatically open in a mobile app rather than a browser.",
+                  "To bypass all domain name connection and DNS setup requirements.",
+                  "To allow users to reply directly to the database administrator."
+                ],
+                "correct": 0,
+                "explanation": "Setting official sender names (e.g., CR Support) and leaving the address as no-reply gives system emails a professional look and prevents users from replying to automated templates."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What must be done before a standard email verification link displays your actual web application's URL instead of a default Firebase handler link?",
+                "options": [
+                  "You must rewrite the entire frontend codebase in C++.",
+                  "You must connect your custom domain name and configure its corresponding DNS records.",
+                  "You must delete the user's authentication profile from the console.",
+                  "You must send a physical letter to the domain registrar."
+                ],
+                "correct": 1,
+                "explanation": "The tutorial explains that custom domains must be connected and verified via DNS records so that action links seamlessly direct users back to your official brand website."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Default automated backends generated by AI tools can inadvertently leak sensitive database user keys and grant unverified accounts full access to internal dashboards unless a human developer actively audits and enforces custom security rules."
+            }
+          },
+          {
+            "id": "e5bwre8",
+            "title": "FIREBASE AUTHENTICATION FEATURE SETTINGS & PASSWORD RESET LINK",
+            "video_url": "https://youtu.be/6kHUEgy-3xk",
+            "url": "https://youtu.be/6kHUEgy-3xk",
+            "duration": "25:24 min",
+            "description": "User Identity & State Management: Understanding how a web application tracks user login states (e.g., authenticated vs. unauthenticated users) and handles user identifier session tokens.\n\nPassword Recovery Mechanics: Basic knowledge of how self-service account recovery workflows operate, specifically how a secure, single-use token or link is generated and sent via email to verify identity before granting access to set a new password.\n\nFirebase Console Navigation & Auth Settings: Familiarity with the Firebase Authentication dashboard, including standard email provider configurations, security settings, and action code templates for password resets.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What is the primary purpose of configuring the Password Reset Link settings in Firebase Authentication?",
+                "options": [
+                  "To automatically erase all user accounts from the database every 30 days",
+                  "To allow users to securely reset forgotten passwords through a verified email link without exposing raw user data",
+                  "To eliminate the need for users to ever enter a password when logging into the application",
+                  "To force every user to re-register their account with a new email address"
+                ],
+                "correct": 1,
+                "explanation": "Password reset settings in Firebase allow users to request an automated recovery link via email, verifying identity safely before updating the user credentials in the database."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: Why should custom email templates for password resets be customized with your brand's support details?",
+                "options": [
+                  "To prevent standard recovery emails from looking like suspicious spam and to ensure users trust the link",
+                  "Because Firebase prevents password reset links from delivering if the brand name exceeds 5 characters",
+                  "To bypass all email provider anti-spam rules permanently without needing DNS records",
+                  "To convert the email body text automatically into an interactive video file"
+                ],
+                "correct": 0,
+                "explanation": "Customizing the sender name and template context ensures that password reset requests appear professional and recognizable, reducing the likelihood that users ignore or flag them as phishing attempts."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How does the application handle a password reset request when a user submits their registered email address?",
+                "options": [
+                  "It generates a unique action code link and dispatches an automated recovery message to the user's inbox",
+                  "It immediately displays the user's old password on the public screen for convenience",
+                  "It deletes the associated user record and creates a brand-new profile automatically",
+                  "It sends a physical text code to the user's home landline telephone"
+                ],
+                "correct": 0,
+                "explanation": "Triggering a password reset generates an action code link via Firebase Auth services, which is emailed to the user so they can securely enter a new password on your app."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What security feature prevents malicious scripts from spamming password reset email requests for a single account?",
+                "options": [
+                  "Enforcing rate-limiting and request cooldown timers on the password reset submission form",
+                  "Disabling the password reset feature permanently for all users",
+                  "Requiring users to type their password before requesting a password reset",
+                  "Forcing users to solve 50 manual math equations before sending an email"
+                ],
+                "correct": 0,
+                "explanation": "Implementing cooldown periods and rate-limiting prevents automated abuse of reset request endpoints, protecting both the application's email quota and the user's inbox from spamming."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What happens when a user opens a valid password reset link delivered to their email?",
+                "options": [
+                  "They are automatically logged into every web application stored on their web browser",
+                  "They are directed to a secure action page where they can enter and confirm their new password credentials",
+                  "The browser re-routes them to a blank search engine page with no confirmation",
+                  "The application permanently locks their IP address from future visits"
+                ],
+                "correct": 1,
+                "explanation": "The action link routes the user to a secure verification handler where they input their new password, updating their credentials in Firebase backend storage upon submission."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Automated password reset flows don't just send a link—they execute temporary, single-use cryptographic tokens that automatically expire, guaranteeing that even if a reset link is intercepted later, it cannot be reused to compromise an account."
+            }
+          },
+          {
+            "id": "zbg30em",
+            "title": "HOW TO SETUP FIREBASE GOOGLE AUTH PART 1",
+            "video_url": "https://youtu.be/dW1Cohu6dY8",
+            "url": "https://youtu.be/dW1Cohu6dY8",
+            "duration": "24:15 min",
+            "description": "OAuth 2.0 & Third-Party Sign-In Concepts: Basic understanding of federated authentication—how users log in using external identity providers (like Google) without creating a new password.\n\nFirebase Auth Provider Management: Familiarity with enabling and configuring sign-in methods within the Firebase Console under the Authentication menu.\n\nApplication Client ID & OAuth Consent Credentials: Basic awareness of how web applications verify identity with Google Cloud services using client IDs and project support emails.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What primary advantage does enabling Google Sign-In offer over traditional email/password authentication?",
+                "options": [
+                  "It allows users to log in with a single click using their existing Google account, removing password creation friction.",
+                  "It automatically pays the developer a commission every time a user signs up.",
+                  "It forces users to upload five profile pictures before accessing the dashboard.",
+                  "It completely eliminates the need to host the web application on a server."
+                ],
+                "correct": 0,
+                "explanation": "Google Auth acts as a OAuth provider that lets users authenticate seamlessly with one click using credentials they already possess, streamlining registration."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What essential step must be performed in the Firebase Console before Google Authentication will function on the front end?",
+                "options": [
+                  "Disabling all other login methods, including email and password authentication.",
+                  "Enabling the Google Sign-In provider under authentication sign-in methods and assigning a project support email.",
+                  "Buying a paid Google Workspace enterprise plan for every prospective website visitor.",
+                  "Formatting the web application's main CSS style file into raw JSON format."
+                ],
+                "correct": 1,
+                "explanation": "Before Google Auth works in code, it must be toggled on in the Firebase Authentication console and configured with a designated project support email address."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: Why is configuring Authorized Domains inside Firebase Auth settings critical during Google Sign-In setup?",
+                "options": [
+                  "It prevents unauthorized third-party websites from using your Firebase credentials to log users into their own apps.",
+                  "It converts standard Google login buttons into animated WebM background videos.",
+                  "It automatically deletes inactive user accounts after 24 hours.",
+                  "It forces all mobile app visitors to download a desktop web browser."
+                ],
+                "correct": 0,
+                "explanation": "Authorized Domains act as a security whitelist, ensuring that Google Sign-In popups only execute when requested from domains approved by the project owner."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: How can a Firebase communicate with the front end during a Google authentication attempt?",
+                "options": [
+                  "By opening a secure Google popup or redirect window that returns an authentication token and user profile object.",
+                  "By sending a physical SMS text message to the developer's personal mobile phone.",
+                  "By restarting the user's web browser automatically without saving progress.",
+                  "By requiring the developer to manually approve each user in the console in real time."
+                ],
+                "correct": 0,
+                "explanation": "Firebase handles the Google OAuth flow via popups or redirects, returning standard user profile objects (email, display name, photo URL) directly to the web app upon success."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What happens when a user signs up with Google using an email that matches an unverified account created via password?",
+                "options": [
+                  "Firebase links or handles the identity credentials according to project account-linking security rules to prevent duplicate profiles.",
+                  "The database crashes and wipes all stored user records instantly.",
+                  "Google automatically charges the user a account migration fee.",
+                  "The application permanently locks out both email addresses from future logins."
+                ],
+                "correct": 0,
+                "explanation": "Firebase Authentication automatically manages identity provider collisions and account linking based on your security preferences to ensure clean user state management."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Integrating Google Auth doesn't just simplify sign-in—it completely offloads user password security to Google's multi-billion dollar infrastructure, virtually protecting your application from brute-force password breaches on day one."
+            }
+          },
+          {
+            "id": "qembd7i",
+            "title": "HOW TO SETUP FIREBASE GOOGLE AUTH PART",
+            "video_url": "https://youtu.be/tspeHhKmFFQ",
+            "url": "https://youtu.be/tspeHhKmFFQ",
+            "duration": "11:05 min",
+            "description": "Authorized Domain Whitelisting in Firebase: Understanding how Firebase blocks authentication calls unless the requesting web URL (preview link, development domain, or custom domain) is explicitly registered in the Auth security settings.\n\nAutomated vs. Manual Backend Provisioning: Familiarity with the trade-offs of letting AI tools auto-create backend infrastructure versus manually configuring Firebase and Google Cloud project settings.\n\nGoogle Cloud OAuth Consent Configuration: Basic awareness of how app names, support emails, and brand logos are set up in the Google Cloud Console to display properly inside login popups.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What major distinction is given between auto-generated AI backends and manually created Firebase backends?",
+                "options": [
+                  "Auto-generated backends cost extra money per login attempt, whereas manual backends are free.",
+                  "Auto-generated backends display messy, default project names in the Google OAuth popup, whereas manual setup lets you customize your brand name.",
+                  "Auto-generated backends only function on desktop browsers, while manual backends only work on mobile devices.",
+                  "Auto-generated backends completely disable Google Sign-In for all users."
+                ],
+                "correct": 1,
+                "explanation": "The presenter demonstrates that letting AI tools auto-create backends leaves users seeing generic, unbranded app IDs in the Google login popup, making manual project setup necessary for professional branding."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: Why did the Google Sign-In attempt initially fail when testing on the development link?",
+                "options": [
+                  "The development preview URL had not been added to the Authorized Domains list inside Firebase Authentication settings.",
+                  "The web browser lost its internet connection during the login popup load.",
+                  "Google Sign-In was permanently banned on all development environments by Firebase.",
+                  "The presenter entered an incorrect password for the test Gmail account."
+                ],
+                "correct": 0,
+                "explanation": "The video shows that Google Auth popup calls get blocked by Firebase until the exact development or preview URL domain is whitelisted in the Authorized Domains console panel."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How does Firebase distinguish accounts created through Google Sign-In from standard email/password accounts in its dashboard?",
+                "options": [
+                  "It stores Google Sign-In users in a completely separate database file.",
+                  "It automatically deletes email/password accounts whenever a Google user signs up.",
+                  "It displays a distinct provider icon (such as the Google logo badge) next to the user entry in the Authentication table.",
+                  "It converts all Google user accounts into anonymous guest sessions."
+                ],
+                "correct": 2,
+                "explanation": "Inside the Firebase Auth console user table, each registered user displays their specific provider badge (Google icon vs. email envelope) to clarify how they authenticated."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What warning does the presenter share regarding browser popup behavior during Google authentication?",
+                "options": [
+                  "Browser popup blockers can stop the Google OAuth window from appearing, making popup handling crucial for smooth sign-ins.",
+                  "Popups automatically leak the user's private credit card records to the website owner.",
+                  "Google popups force the web browser app history cache to wipe clean.",
+                  "Popups rewrite the application codebase into raw database strings."
+                ],
+                "correct": 0,
+                "explanation": "The presenter notes that strict popup settings in user browsers can intercept the Google OAuth window, so developers must account for popups or fallback redirects."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: Why does implementing Google Authentication require less custom security programming compared to standard password forms?",
+                "options": [
+                  "Google handles identity verification, credential hashing, and security checks directly through its own secure infrastructure.",
+                  "Google Auth completely disables all database security rules automatically.",
+                  "Users who log in with Google are legally prohibited from logging out.",
+                  "Google Auth automatically converts website code into encrypted text."
+                ],
+                "correct": 0,
+                "explanation": "The video explains that leveraging Google OAuth offloads complex security tasks like password storage and identity verification directly to Google's battle-tested security system."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Allowing an AI to auto-generate your Firebase backend exposes ugly, auto-generated backend IDs directly to your users inside the Google Sign-In popup—proving that real branding still demands manual human developer setup in the console."
+            }
+          },
+          {
+            "id": "av3hi6t",
+            "title": "INTRO TO SQL AND NOSQL DATABASE",
+            "video_url": "https://youtu.be/f3gdBeT1bWA",
+            "url": "https://youtu.be/f3gdBeT1bWA",
+            "duration": "24:02min",
+            "description": "Basic Data Storage Concepts: Understanding how web applications save user information permanently beyond immediate web browser sessions using backend databases.\n\nTable vs. Document Structures: Familiarity with the fundamental structural differences between relational databases organized in rigid rows and columns versus non-relational document databases organized in flexible JSON-like objects.\n\nPrimary Keys & Document Identifiers: Knowledge of how database records use unique identifiers (such as auto-generated IDs or primary keys) to locate, reference, and update individual data items.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What major structural distinction is given between SQL (Relational) and NoSQL (Non-Relational) databases?",
+                "options": [
+                  "SQL databases can only store numerical values, while NoSQL databases can only store text strings.",
+                  "SQL databases store data in strict, pre-defined tables with fixed columns and rows, whereas NoSQL databases store data in flexible document trees or key-value structures.",
+                  "SQL databases require a high-speed satellite internet connection, while NoSQL databases work completely offline without internet.",
+                  "NoSQL databases charge users a monthly subscription per record, whereas SQL databases are always free."
+                ],
+                "correct": 1,
+                "explanation": "Relational SQL databases rely on strict schemas organized into tables with rows and columns, whereas NoSQL databases (like Firebase Firestore) use flexible, document-based models to hold dynamic data."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: Why do modern web applications and AI tools frequently favor NoSQL document databases like Firebase Firestore during rapid development?",
+                "options": [
+                  "Because NoSQL allows developers to add dynamic fields to records on the fly without having to redefine rigid database schemas beforehand.",
+                  "Because NoSQL databases automatically generate physical printouts of database records every hour.",
+                  "Because SQL databases cannot be connected to web applications hosted on custom domain names.",
+                  "Because NoSQL completely replaces the need for user authentication security rules."
+                ],
+                "correct": 0,
+                "explanation": "NoSQL document structures provide high schema flexibility, enabling developers to expand or alter data attributes dynamically as app requirements evolve without altering fixed table schemas."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How are data records uniquely located and organized inside a NoSQL document database system?",
+                "options": [
+                  "By searching through random text strings pasted inside standard user chat bubbles.",
+                  "By running automated antivirus scans across the browser's local cache storage.",
+                  "By typing out manually formatted paper spreadsheets into the server hardware console.",
+                  "By using unique document IDs organized under designated paths called Collections."
+                ],
+                "correct": 3,
+                "explanation": "In NoSQL systems like Firestore, data items exist as individual \"Documents\" grouped inside top-level containers called \"Collections,\" each identified by a unique Document ID string."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What database warning does the presenter highlight when choosing between relational tables and non-relational document structures for scalable apps?",
+                "options": [
+                  "Relational SQL databases will automatically crash if more than ten users register on the website at once.",
+                  "NoSQL databases erase all stored application records every time the server restarts.",
+                  "Relational tables require complex JOIN operations across multiple tables for complex queries, whereas NoSQL optimizes for horizontal scaling and rapid document fetching.",
+                  "SQL databases can only be read on desktop computers and cannot send data to mobile apps."
+                ],
+                "correct": 2,
+                "explanation": "The presenter clarifies that SQL databases rely heavily on relational links and complex joins, whereas NoSQL document databases scale horizontally with ease for high-read applications."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: How does a developer update or attach additional attributes to an existing NoSQL database document?",
+                "options": [
+                  "By deleting the entire database project and building a new backend console from scratch.",
+                  "By writing or updating specific field key-value pairs directly on the document without disrupting unaffected fields.",
+                  "By submitting a manual request ticket through the web host's domain registrar service.",
+                  "By clearing the user's local web browser app history cache."
+                ],
+                "correct": 1,
+                "explanation": "In NoSQL document databases, fields can be dynamically injected, updated, or merged into existing documents using simple key-value pairings without breaking existing data structures."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Unlike traditional SQL databases that force every single user record to follow the exact same rigid column layout, NoSQL document databases allow two records in the same collection to have completely different fields without breaking the application."
+            }
+          },
+          {
+            "id": "yx1abz6",
+            "title": "SETTING UP CLOUD FIRESTORE DATABASE MANUALLY AND AUTOMATEDLY",
+            "video_url": "https://youtu.be/pO3sYpkTeyQ",
+            "url": "https://youtu.be/pO3sYpkTeyQ",
+            "duration": "17:44 min",
+            "description": "Authentication vs. Database Roles: Understanding that user authentication (like Google Sign-In or Email/Password) only manages access credentials and user IDs, whereas Cloud Firestore (a NoSQL database) is required to permanently store user profile details like full names, gender, and custom settings.\n\nServer Location & Latency: Basic awareness that choosing a cloud database server center closer to your target audience (e.g., selecting London over distant locations when targeting West African users) reduces latency and speeds up data fetching.\n\nDatabase Rules & Account Restrictions: Familiarity with how security and policy configurations—such as password length limits or security rules—enforce validation constraints during account sign-up and backend data submission.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What major distinction is given between Firebase Authentication and Cloud Firestore database storage?",
+                "options": [
+                  "Firebase Authentication changes the primary language structure of the website text.",
+                  "Cloud Firestore links cost money to configure, while Firebase Authentication is always completely free.",
+                  "Firebase Authentication only acts as a security gate to open/close user sessions, whereas Cloud Firestore permanently stores full profile details like names and custom user data.",
+                  "Firebase Authentication only works on desktop screens, while Cloud Firestore only works on mobile devices."
+                ],
+                "correct": 2,
+                "explanation": "The presenter clarifies that authentication merely manages the login access \"lock and key\" (user ID and email), while Cloud Firestore is the NoSQL database needed to store rich profile information."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What database selection recommendation does the presenter give when creating a Firestore database manually versus letting the AI agent automate it?",
+                "options": [
+                  "Manual setups cause the whole application server to crash immediately.",
+                  "Manual configurations wipe out all website WhatsApp booking forms automatically.",
+                  "Most online videos incorrectly select the Standard Edition, whereas letting the AI agent automate the setup defaults to the superior Enterprise Edition.",
+                  "AI agents cannot read voice-based prompts when creating databases."
+                ],
+                "correct": 2,
+                "explanation": "The presenter notes that human developers often mistakenly select the restricted Standard Edition, whereas Google AI Studio automatically configures the broader, more robust Enterprise Edition."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How should a developer select the geographic server location when setting up Cloud Firestore?",
+                "options": [
+                  "By choosing a data center location as geographically close to the target end-users as possible, which cannot be changed after creation.",
+                  "By typing out thousands of lines of JavaScript file strings into the chat bubble.",
+                  "By restarting the local internet router network twice before clicking save.",
+                  "By pasting a public TikTok video sharing URL directly into the editor."
+                ],
+                "correct": 0,
+                "explanation": "Selecting a server region close to your user base optimizes response speed and latency; importantly, once a Firestore location is set, it cannot be altered."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: How can a non-coder trigger automated Firestore setup without knowing exact technical terminology?",
+                "options": [
+                  "By clicking the share button, opening the browser history list, and clearing all app cache records.",
+                  "By leaving a feedback complaint ticket inside the WhatsApp chat panel.",
+                  "By deleting the device's internet browser history records completely.",
+                  "By describing the desired outcome in natural plain language (e.g., asking the AI agent to save user profile details to the backend)."
+                ],
+                "correct": 3,
+                "explanation": "AI agents are intelligent enough to infer database configuration steps (initiating Firestore) directly from plain human descriptions without needing exact technical database buzzwords."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What caused the sign-up failure during the live temporary email testing demonstration in the video?",
+                "options": [
+                  "The internet router network was completely disconnected.",
+                  "The tested password hit the maximum 12-character constraint defined in the Firebase authentication settings policy.",
+                  "The user character was imaginary and downloaded for training demonstration purposes.",
+                  "The database server in London ran out of storage space."
+                ],
+                "correct": 1,
+                "explanation": "During the test run, entering a 12-character password triggered a policy validation edge-case based on the strict password policy set in Firebase Authentication."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "Once you select and lock in a geographic data center location for your Cloud Firestore database, Google Firebase makes it impossible to change that server region ever again for that project."
+            }
+          },
+          {
+            "id": "rl0ed8u",
+            "title": "HOW TO SYNC FIRESTORE DATABASE WITH THE FRONTEND",
+            "video_url": "https://youtu.be/PKzP44E34mM",
+            "url": "https://youtu.be/PKzP44E34mM",
+            "duration": "26:54 min",
+            "description": "UID (Unique Identifier) Matching: Understanding that Firebase Authentication assigns every signed-up user a unique string of characters (a UID) that acts like a digital fingerprint, linking their authentication session directly to their personal document in Cloud Firestore.\n\nAuthentication vs. Authorization: Recognizing that authentication verifies who a user is (logging in with email/password), whereas authorization uses database security rules to define what data that authenticated user is permitted to read or edit.\n\nFrontend-to-Backend Syncing: Basic familiarity with how user input on a web form (such as delivery addresses, phone numbers, and profile details) gets sent from the user interface and written into specific document fields within backend NoSQL collections.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: How does Cloud Firestore uniquely connect a signed-in user to their personal database profile document?",
+                "options": [
+                  "By matching the user's IP address with their device MAC address.",
+                  "By assigning a unique, non-duplicable User ID (UID) generated during authentication as the Firestore document key.",
+                  "By charging users a monthly fee for every database search query they make.",
+                  "By requiring users to re-enter their phone number every time they view a product."
+                ],
+                "correct": 1,
+                "explanation": "The video demonstrates that Firebase generates a unique UID for each user (acting like a digital fingerprint), which serves as the document key inside the \"users\" Firestore collection."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What primary distinction is drawn between Authentication and Authorization within Firebase?",
+                "options": [
+                  "Authentication verifies who the user is at the login door, while Authorization defines what data that user has permission to read or modify inside the database.",
+                  "Authentication requires paid subscriptions, whereas Authorization is always free.",
+                  "Authentication only functions on desktop computers, while Authorization only runs on mobile apps.",
+                  "Authentication deletes all user records every 24 hours automatically."
+                ],
+                "correct": 0,
+                "explanation": "The presenter explains using a security guard analogy: Authentication verifies your identity (ID badge at the entrance), while Authorization (security rules) determines which room/data you are permitted to access inside the building."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: Why are backend database document keys often stored as auto-generated UID strings rather than full human names like \"Goodness Paul\"?",
+                "options": [
+                  "Because human names can be duplicated across different accounts, whereas UIDs guarantee absolute uniqueness across the system.",
+                  "Because typing names causes the entire application server to crash.",
+                  "Because Google AI Studio cannot process spaces between names.",
+                  "Because NoSQL databases automatically erase text field names after saving."
+                ],
+                "correct": 0,
+                "explanation": "Multiple users can share the same human name, but UIDs are strictly unique per account, preventing database collisions and account data mixing."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: How can a developer enforce strict user input rules (such as restricting Nigerian phone numbers strictly to 11 digits) without writing complex manual code?",
+                "options": [
+                  "By restarting the local internet router before filling out web forms.",
+                  "By deleting the browser history cache after every profile submission.",
+                  "By leaving a feedback complaint ticket inside the WhatsApp chat panel.",
+                  "By prompting the AI agent in natural language to set exact validation constraints on the input form."
+                ],
+                "correct": 3,
+                "explanation": "The presenter highlights that developers can simply prompt the AI agent with specific validation rules (e.g., minimum and maximum 11 digits for Nigerian phone numbers) to handle form constraints cleanly."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What built-in feature on the e-commerce user profile was converted from a static hardcoded number into a dynamic Firestore-driven value?",
+                "options": [
+                  "The total number of website visitors on the homepage.",
+                  "The user's accumulated reward points balance (e.g., granting 150 points upon new sign-up).",
+                  "The total number of items stored in the public shopping cart.",
+                  "The global price of all listed grocery items."
+                ],
+                "correct": 1,
+                "explanation": "The static 1,650 points shown on the old interface was converted into a dynamic database field that updates per user, automatically awarding new users 150 reward points upon registration."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "In a Firebase backend, two users can share the exact same full name and profile details, but their system-generated UID acts like a digital fingerprint that makes it impossible for their database records to ever collide or mix up."
+            }
+          },
+          {
+            "id": "uiikceq",
+            "title": "FIRESTORE CRUD OPERATIONS",
+            "video_url": "https://youtu.be/U01XG4qyvRY",
+            "url": "https://youtu.be/U01XG4qyvRY",
+            "duration": "20:41 min",
+            "description": "Authentication vs. Authorization:  You must understand that authentication verifies who a user is (e.g., signing in), whereas authorization defines what permissions and actions that authenticated user is allowed to perform on the application.\n\nThe Principles of CRUD Operations & Database Rules:  You need foundational clarity on CRUD (Create, Read, Update, Delete) actions , as well as how backend security rules restrict these operations (such as grouping Create, Update, and Delete into write permissions) \n\nStatic (Frontend) vs. Dynamic (Backend) Data Management: You should know the difference between hardcoded frontend assets—which require code updates and re-deployments to change—and database-driven backends, which reflect changes live immediately across user interfaces",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What primary distinction is drawn between authentication and authorization when managing user access?",
+                "options": [
+                  "Authentication verifies user identity, while authorization specifies the permissions and actions a user can perform",
+                  "Authentication controls database billing, while authorization updates CSS layout grids.",
+                  "Authorization applies only to non-registered users, whereas authentication is reserved for super admins.",
+                  "Authentication stores local browser history cache, while authorization sends real-time email notifications."
+                ],
+                "correct": 0,
+                "explanation": "Authentication establishes that a user has logged in, whereas authorization determines their exact permissions and boundaries within the application system [02:59]."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What operational limitation is placed on the Manager role compared to the Super Admin regarding product management?",
+                "options": [
+                  "The Manager can only view user profiles but cannot access any store products.",
+                  "The Manager can update, delete, and read products, but lacks permission to create new products .",
+                  "The Manager can create unlimited products but cannot modify existing prices.",
+                  "The Manager has permanent rights to delete the Super Admin’s primary account."
+                ],
+                "correct": 1,
+                "explanation": "The presenter specifies that while the Super Admin holds complete creation rights, the Manager is strictly restricted to updating, deleting, and reading existing database items"
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: Why does the presenter advocate moving hardcoded product sections from the frontend to the Firestore backend?",
+                "options": [
+                  "Hardcoded frontend changes require manual code edits and hosting re-deployments, whereas backend updates reflect live instantly",
+                  "Frontend assets consume paid server bandwidth on every single button click.",
+                  "Firestore automatically converts all backend product entries into high-resolution promo videos.",
+                  "Storing data on the frontend causes local Wi-Fi routers to automatically disconnect."
+                ],
+                "correct": 0,
+                "explanation": "Frontend changes force developers to rewrite code and push updates through hosting platforms, while database-driven backend updates take effect immediately on live sites"
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: In the database security rules demonstration, which role possesses immutable rights and complete CRUD access across the entire application?",
+                "options": [
+                  "The Sales Representative",
+                  "The Principal Supervisor",
+                  "The Super Admin",
+                  "The Guest Visitor"
+                ],
+                "correct": 2,
+                "explanation": "The Super Admin account is permanently defined as immutable (cannot be deleted or overwritten by lower roles) and retains unrestricted CRUD permissions"
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What happens when a database user attempts an action that violates the configured Firestore security rules?",
+                "options": [
+                  "The application automatically resets all user accounts to default factory settings.",
+                  "The browser generates an \"insufficient permission\" error and blocks the unauthorized operation",
+                  "The database automatically emails the user a temporary override password.",
+                  "The frontend styling converts all application text into raw JavaScript strings."
+                ],
+                "correct": 1,
+                "explanation": "When database security rules prohibit an requested operation, Firebase triggers an \"insufficient permission\" error to protect the system [09:43]."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "\"Database security rules act like an unyielding soldier who strictly obeys the last order given—meaning if you accidentally write a rule blocking yourself as the owner from updating your website, the database will strictly enforce it and lock you out"
+            }
+          },
+          {
+            "id": "f1adglk",
+            "title": "HOW TO SETUP AN ADMIN DASHBOARD USING CRUD",
+            "video_url": "https://youtu.be/HFYm-T-mAA8",
+            "url": "https://youtu.be/HFYm-T-mAA8",
+            "duration": "19:29 min",
+            "description": "Static vs. Dynamic Data Architecture: You need to understand the difference between hardcoded frontend elements (which require developer code edits to change) and dynamic backend-served collections (which update real-time across user devices without needing page reloads).\n\nCRUD Operation Hierarchy: You should have foundational knowledge of CRUD (Create, Read, Update, Delete) permissions and how restricting specific CRUD actions forms role-based access levels for different users.\n\nRole-Based Authorization & Role Enforcement: You must understand how backend authorization rules map user emails or IDs to administrative tiers (such as Super Admin, Manager, Supervisor, and Sales Rep) to control dashboard feature visibility and action rights.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What happens on the live website when the Super Admin updates the price of an item in the backend product catalog?",
+                "options": [
+                  "The developer must push the updated codebase to GitHub before changes take effect.",
+                  "The new price updates immediately across all active user screens live without requiring a page refresh.",
+                  "The whole application server shuts down for ten minutes to re-index product prices.",
+                  "The price updates only for desktop users while remaining unchanged on mobile devices."
+                ],
+                "correct": 1,
+                "explanation": "The presenter demonstrates changing a product price to 15,000 in the dashboard, showing that backend-driven updates reflect instantly on all live active client screens without manual code deployment or page refreshing."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: How does the system visually adapt the Admin Dashboard interface when a Manager logs in compared to a Super Admin?",
+                "options": [
+                  "The Manager sees the entire dashboard styled in black and white mode.",
+                  "The \"Create New Product\" button is disabled and hidden because the Manager is restricted from creating items.",
+                  "The Manager's interface disables all product search bars and delete options.",
+                  "The Manager receives a continuous popup asking for secondary email verification."
+                ],
+                "correct": 1,
+                "explanation": "Because the Manager role is granted only Read, Update, and Delete rights, the system removes the ability/button to create new products from their admin view."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: What administrative restrictions apply to the Supervisor role within the demonstration system?",
+                "options": [
+                  "The Supervisor can only perform Read and Delete actions, meaning the Edit/Update button is completely removed from their view.",
+                  "The Supervisor can create new items and update prices but cannot read customer profiles.",
+                  "The Supervisor holds full immutable control over the Super Admin's email account.",
+                  "The Supervisor is restricted from seeing any product images in the store catalog."
+                ],
+                "correct": 0,
+                "explanation": "The Supervisor is given only Read and Delete rights, causing the system to automatically strip away the Edit button from their product management list."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What is the functional limitation of the Sales Representative role when accessing the Admin Dashboard?",
+                "options": [
+                  "The Sales Rep can edit product prices but cannot delete catalog items.",
+                  "The Sales Rep can create products but cannot read customer accounts.",
+                  "The Sales Rep possesses Read-Only rights, meaning they cannot Add, Edit, or Delete any catalog entries.",
+                  "The Sales Rep is logged out automatically every sixty seconds."
+                ],
+                "correct": 2,
+                "explanation": "The Sales Rep sits at the lowest authorization tier with Read-Only permissions, meaning all operational buttons (Add, Edit, Delete) are disabled/hidden for them."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What immediate effect occurs when the Super Admin revokes administrative authorization from an existing staff member's email?",
+                "options": [
+                  "The user's device screen locks until they contact customer support.",
+                  "The user's access to the Admin Dashboard and its navigation buttons is instantly stripped away in real time.",
+                  "The backend automatically deletes all past transactions made by that staff member.",
+                  "The user's web browser history cache is cleared completely."
+                ],
+                "correct": 1,
+                "explanation": "When the presenter clicks to revoke authorization for Manager Goodness Paul, the Admin Center navigation button disappears instantly from his interface without requiring a manually triggered refresh."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "\"Because dynamic database systems communicate with the frontend in real time, granting or revoking user admin privileges updates their visible interface and capabilities instantly across active screens without needing a page refresh or code re-deployment.\""
+            }
+          },
+          {
+            "id": "g61p1xq",
+            "title": "HOW TO MANAGE FIRESTORE DAILY SPARK LIMIT",
+            "video_url": "https://youtu.be/FKApfLuLMkI",
+            "url": "https://youtu.be/FKApfLuLMkI",
+            "duration": "29:46 min",
+            "description": "Firebase Pricing Tiers & Billing Structure: You need a foundational understanding of Firebase's free Spark Plan versus its pay-as-you-go Blaze Plan, specifically knowing how resource quotas and billing thresholds are enforced on cloud databases.\n\nFirestore Read, Write, and Delete Operations: You should understand how database queries trigger read and write operations, as every document fetch or update counts directly toward daily usage limits.\n\nDatabase Querying & State Optimization: You need knowledge of efficient querying techniques—such as batch fetching, caching, and limiting real-time listeners—to avoid triggering unnecessary infinite loops or excessive database calls that exhaust quotas rapidly.",
+            "resources": "",
+            "checkType": "mcq",
+            "check": [
+              {
+                "type": "mcq",
+                "question": "Question 1: What primary constraint distinguishes Firebase's free Spark Plan from the paid Blaze Plan when using Firestore?",
+                "options": [
+                  "The Spark Plan limits daily read, write, and delete operations to fixed quotas, whereas the Blaze Plan charges dynamically for usage beyond those thresholds.",
+                  "The Spark Plan only supports desktop web browsers, while the Blaze Plan works exclusively on mobile apps.",
+                  "The Spark Plan automatically deletes all stored user data every 24 hours.",
+                  "The Spark Plan disables database security rules, requiring manual encryption scripts."
+                ],
+                "correct": 0,
+                "explanation": "Firebase's Spark Plan provides a generous free daily quota of reads, writes, and deletes; exceeding these limits pauses database operations until the daily quota resets or the project upgrades to the Blaze Plan."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 2: What common frontend coding mistake causes a developer to rapidly exhaust their Firestore daily Spark quota within minutes?",
+                "options": [
+                  "Uploading high-resolution PNG images to standard UI layout grids.",
+                  "Placing real-time database listeners inside unoptimized component render loops, causing thousands of continuous re-fetches.",
+                  "Enabling dark mode themes on user account dashboards.",
+                  "Adding multiple administrative roles inside the security rules panel."
+                ],
+                "correct": 1,
+                "explanation": "Unbound real-time listeners or fetching data inside infinite UI render loops trigger endless continuous database reads, consuming thousands of free daily quota units in a very short time."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 3: How can a developer monitor their project's daily quota consumption before hitting the hard usage ceiling?",
+                "options": [
+                  "By clearing local web browser cache and restarting the device.",
+                  "By checking the Usage & Billing tab inside the Firebase Console to track daily reads, writes, and bandwidth metrics in real time.",
+                  "By emailing Google Cloud support every time a new feature is deployed.",
+                  "By converting all database collections into static JSON files on the frontend."
+                ],
+                "correct": 1,
+                "explanation": "The Firebase Console provides a dedicated Usage tab that visually tracks daily quota metrics, enabling developers to monitor resource utilization and detect abnormal spikes before reaching limits."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 4: What best practice should be implemented on the frontend to minimize unnecessary Firestore database reads?",
+                "options": [
+                  "Hardcoding user credentials inside HTML form fields.",
+                  "Implementing client-side caching or state management to reuse fetched data rather than re-querying the database on every page navigation.",
+                  "Deleting backend indexes to prevent automatic collection sorting.",
+                  "Switching database communication protocols from HTTPS to standard HTTP."
+                ],
+                "correct": 1,
+                "explanation": "Caching query results locally in memory or browser storage prevents duplicate database read requests whenever a user navigates between pages or components."
+              },
+              {
+                "type": "mcq",
+                "question": "Question 5: What happens to a live web application when its Firestore database exceeds the daily Spark free quota and has no billing plan attached?",
+                "options": [
+                  "Firebase permanently deletes the entire project and all associated user accounts.",
+                  "The application automatically upgrades to a paid plan and charges the owner's bank account.",
+                  "Database operations are temporarily suspended, causing read/write calls to fail until the daily quota resets at midnight UTC.",
+                  "The application redirects all visitors to the official Firebase documentation homepage."
+                ],
+                "correct": 2,
+                "explanation": "Reaching the free daily quota threshold on the Spark Plan temporarily blocks incoming database reads and writes, throwing quota error codes until the daily counter resets."
+              }
+            ],
+            "funFact": {
+              "headline": "Did you know?",
+              "body": "\"A single unhandled infinite loop in a frontend component listener can trigger tens of thousands of Firestore reads in just a few seconds, completely burning through an entire day's free Spark allowance before you even notice.\""
             }
           }
         ]
       },
       {
         "dayNumber": 3,
-        "title": "MODULE 3: CLOUDINARY SETUP",
+        "title": "DAY 3: CLOUDINARY SETUP",
         "description": "",
         "assignment": {
           "prompt": "Integrate Cloudinary into your existing project submitted for the Module 2 assignment and ensure the following are configured:\n\n1. Preset upload configuration\n2. API upload configuration\n3. Media file upload validation rules for storage management.\n\nTest everything rigorously, ensuring Firestore and Cloudinary are well synced",
@@ -1615,7 +2365,7 @@
         ]
       }
     ],
-    "updatedAt": "2026-10-05T08:37:19.000Z",
+    "updatedAt": "2026-10-08T07:41:00.000Z",
     "id": "advanced-ai-mastery",
     "createdAt": "2026-07-16T03:00:00.000Z"
   }
