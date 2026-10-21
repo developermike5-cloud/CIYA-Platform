@@ -25,3 +25,9 @@ All configuration is managed using system secrets. For local development or depl
 To prevent high payload overheads and maintain lean Firestore storage:
 *   **Image Stripping:** A periodic maintenance routine `cleanUpOldGlobalSubmissions` scans student assignments that are older than 3 days and strips heavy base64 images, replacing them with standard completion checkboxes.
 *   **24-Hour Cooldown Gate:** To avoid running expensive collections scans repeatedly on every dashboard mount or tab switch, this cleanup is gated behind a **24-hour client-side cooldown** using `localStorage` keyed uniquely by user `uid`.
+
+---
+
+## 🚀 Deploy Previews
+
+Every pull request opened against `main` automatically gets a Netlify deploy preview, with a unique preview URL posted on the PR. Use it to test changes end to end before merging and deploying to production.
