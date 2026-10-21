@@ -40,6 +40,13 @@ service cloud.firestore {
       return existing().userId == request.auth.uid;
     }
 
+    // SECURITY: mirrors the admin toggle in UsersAdmin (settings/app.autoApprovalEnabled).
+    // While it is on, students may self-activate; while it is off, only admins may.
+    function isAutoApprovalOn() {
+      return exists(/databases/$(database)/documents/settings/app) &&
+        get(/databases/$(database)/documents/settings/app).data.get('autoApprovalEnabled', false) == true;
+    }
+
     // Entity Validation: Course
     function isValidCourse(data) {
       return data.keys().hasAll(['title']) 
@@ -224,8 +231,13 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if true;
-      allow list: if true;
+      // SECURITY: profiles (WhatsApp, adminCode, payment references) are no longer world-readable.
+      // A signed-in user can read only their own profile; admins can read anyone.
+      // list stays open to signed-in users because the signup referral lookup queries users
+      // by myReferralCode (Onboarding / LoginModal). Move that lookup behind a trusted
+      // backend to close the signed-in read gap fully.
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn();
       allow create: if isSignedIn() 
                     && (request.auth.uid == userId || isAdmin())
                     && isValidUserProfile(incoming())
@@ -236,6 +248,13 @@ service cloud.firestore {
                         && (incoming().createdAt == request.time || !('createdAt' in incoming()))
                         && (incoming().updatedAt == request.time || !('updatedAt' in incoming()))
                       )
+                      // SECURITY: a new self-created profile starts Pending/locked unless the
+                      // admin's auto-approval setting is on.
+                      && (isAutoApprovalOn() || (
+                        incoming().get('approvalStatus', 'Pending') == 'Pending'
+                        && incoming().get('isActivated', false) == false
+                        && incoming().get('isDashboardUnlocked', false) == false
+                      ))
                     );
       allow update: if isSignedIn() 
                     && (
@@ -251,8 +270,14 @@ service cloud.firestore {
                        )
                        && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt || !('updatedAt' in incoming()))
                        && incoming().diff(existing()).affectedKeys().hasOnly([
-                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'country', 'cohort', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'approvalStatus', 'isDashboardUnlocked', 'adminCode', 'progress', 'registeredCourses', 'congratulatedCourses', 'completedCoursesOverride', 'manualDayUnlock', 'updatedAt', 'badgePaymentRequestStatus', 'hasYearBadge', 'badgeExpiresAt', 'badgeStatus', 'badgePlan', 'badgePrice', 'badgeApprovedAt', 'badgeTxRef', 'paymentReference', 'membershipId', 'promptCopies', 'photoURL', 'avatarUrl'
+                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'country', 'cohort', 'referralCode', 'myReferralCode', 'isActivated', 'isDashboardUnlocked', 'progress', 'registeredCourses', 'congratulatedCourses', 'completedCoursesOverride', 'manualDayUnlock', 'updatedAt', 'badgePaymentRequestStatus', 'hasYearBadge', 'badgeExpiresAt', 'badgeStatus', 'badgePlan', 'badgePrice', 'badgeApprovedAt', 'badgeTxRef', 'paymentReference', 'membershipId', 'promptCopies', 'photoURL', 'avatarUrl'
                        ])
+                       // SECURITY: approvalStatus, adminCode and referralsCount can only be
+                       // changed by an admin (branch above).
+                       && !incoming().diff(existing()).affectedKeys().hasAny(['approvalStatus', 'adminCode', 'referralsCount'])
+                       // SECURITY: self-activation / self-unlock only while the admin's
+                       // auto-approval setting is on.
+                       && (incoming().diff(existing()).affectedKeys().hasAny(['isActivated', 'isDashboardUnlocked']) ? isAutoApprovalOn() : true)
                       )
                       ||
                       (
@@ -260,6 +285,10 @@ service cloud.firestore {
                        && incoming().diff(existing()).affectedKeys().hasOnly(['isActivated', 'referralsCount', 'updatedAt'])
                        && incoming().isActivated == true
                        && incoming().referralsCount == existing().get('referralsCount', 0) + 1
+                       // SECURITY: only the user who actually redeemed this referral code
+                       // (their own profile stores it as referralCode) may activate the referrer.
+                       && existing().get('myReferralCode', '') != ''
+                       && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('referralCode', '').lower() == existing().get('myReferralCode', '').lower()
                       )
                     );
       allow delete: if isAdmin();
@@ -317,7 +346,9 @@ service cloud.firestore {
 
     match /notifications/{notificationId} {
       allow read, list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('userId', '') == 'all' || isAdmin());
-      allow create: if isSignedIn();
+      // SECURITY: students may only create notifications addressed to themselves
+      // (e.g. assignment graded); broadcasts and others' notifications are admin-only.
+      allow create: if isSignedIn() && (isAdmin() || incoming().userId == request.auth.uid);
       allow update: if isSignedIn()
                     && (incoming().userId == request.auth.uid || isAdmin());
       allow delete: if isAdmin();
@@ -353,7 +384,8 @@ service cloud.firestore {
     }
 
     match /buzz_groups/{groupId} {
-      allow read, list: if true;
+      // SECURITY: no anonymous reads.
+      allow read, list: if isSignedIn();
       allow create: if (isSignedIn() && groupId == 'personal_' + request.auth.uid && incoming().get('isPersonal', false) == true && incoming().get('ownerUid', '') == request.auth.uid)
                     || ((isAdmin() || isBaseAdmin()) && isValidBuzzGroup(incoming()));
       allow update: if (isAdmin() || isBaseAdmin())
@@ -362,7 +394,8 @@ service cloud.firestore {
       allow delete: if isAdmin() || isBaseAdmin();
 
       match /messages/{messageId} {
-        allow read, list: if true;
+        // SECURITY: no anonymous reads.
+        allow read, list: if isSignedIn();
         allow create: if isSignedIn()
           && isValidBuzzMessage(incoming())
           && incoming().senderUid == request.auth.uid
