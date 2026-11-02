@@ -2119,9 +2119,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
           const newProfileData = {
             fullName: currentUser.displayName || currentUser.email?.split('@')[0] || 'CIYA Scholar',
             email: currentUser.email,
-            approvalStatus: 'Approved',
-            isActivated: true,
-            isDashboardUnlocked: true,
+            approvalStatus: safeStorage.getItem('ciya_auto_approval_enabled') === 'true' ? 'Approved' : 'Pending',
+            isActivated: safeStorage.getItem('ciya_auto_approval_enabled') === 'true',
+            isDashboardUnlocked: safeStorage.getItem('ciya_auto_approval_enabled') === 'true',
             cohort: 'Cohort 1',
             progress: progressMap,
             createdAt: serverTimestamp(),
@@ -4272,7 +4272,7 @@ export default function StudentDashboard() {
       try {
         const parsed = normalizeProfileData(JSON.parse(cachedProfile));
         const cachedAutoApprove = safeStorage.getItem('ciya_auto_approval_enabled');
-        if (cachedAutoApprove !== 'false' && (parsed.approvalStatus === 'Pending' || !parsed.approvalStatus)) {
+        if (cachedAutoApprove === 'true' && (parsed.approvalStatus === 'Pending' || !parsed.approvalStatus)) {
           parsed.approvalStatus = 'Approved';
           parsed.isDashboardUnlocked = true;
           parsed.isActivated = true;
@@ -4949,7 +4949,7 @@ export default function StudentDashboard() {
           const data = snapshot.data();
           setAppSettings(data);
           safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
-          safeStorage.setItem('ciya_auto_approval_enabled', data.autoApprovalEnabled !== false ? 'true' : 'false');
+          safeStorage.setItem('ciya_auto_approval_enabled', data.autoApprovalEnabled === true ? 'true' : 'false');
         }
       }, (error) => {
         console.warn("Soft handling direct real-time settings app listener error:", error);
@@ -4973,7 +4973,7 @@ export default function StudentDashboard() {
     const autoApproveIfNeeded = (profile: any) => {
       if (!profile) return profile;
       const cachedAutoApprove = safeStorage.getItem('ciya_auto_approval_enabled');
-      const isAutoApproveOn = cachedAutoApprove !== 'false';
+      const isAutoApproveOn = cachedAutoApprove === 'true';
       if (isAutoApproveOn && (profile.approvalStatus === 'Pending' || !profile.approvalStatus) && profile.role !== 'super_admin') {
         const approvedProfile = {
           ...profile,
@@ -9028,9 +9028,9 @@ export default function StudentDashboard() {
                         const newProfileData = {
                           fullName: currentUser.displayName || currentUser.email?.split('@')[0] || 'CIYA Scholar',
                           email: currentUser.email || '',
-                          approvalStatus: 'Approved',
-                          isActivated: true,
-                          isDashboardUnlocked: true,
+                          approvalStatus: safeStorage.getItem('ciya_auto_approval_enabled') === 'true' ? 'Approved' : 'Pending',
+                          isActivated: safeStorage.getItem('ciya_auto_approval_enabled') === 'true',
+                          isDashboardUnlocked: safeStorage.getItem('ciya_auto_approval_enabled') === 'true',
                           cohort: userProfile?.cohort || 'Cohort 1',
                           recommendedPath: userProfile?.recommendedPath || advancedPaymentCourse.title,
                           courseType: userProfile?.courseType || advancedPaymentCourse.title,

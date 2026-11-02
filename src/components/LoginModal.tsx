@@ -168,7 +168,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           console.warn("Could not fetch active cohort settings during direct signup:", cohortErr);
         }
 
-        let autoApprovalEnabled = true;
+        // SECURITY: default off; only the admin's settings/app.autoApprovalEnabled can turn it on.
+        let autoApprovalEnabled = false;
         try {
           const cachedAutoApprove = safeGetItem('ciya_auto_approval_enabled');
           if (cachedAutoApprove === 'false') {

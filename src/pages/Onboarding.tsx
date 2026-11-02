@@ -283,7 +283,8 @@ export default function Onboarding() {
 
     let isActivated = false;
     let activeCohort = 'Cohort 1';
-    let autoApprovalEnabled = true;
+    // SECURITY: default off; only the admin's settings/app.autoApprovalEnabled can turn it on.
+    let autoApprovalEnabled = false;
     try {
       const cachedAutoApprove = safeStorage.getItem('ciya_auto_approval_enabled');
       if (cachedAutoApprove === 'false') {
