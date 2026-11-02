@@ -413,6 +413,18 @@ service cloud.firestore {
       }
     }
 
+    // Course Enrollments: students create their enrollment & payment proofs; admins review & toggle approval
+    match /enrollments/{enrollmentId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isAdmin() || isBaseAdmin() || 
+        resource.data.userId == request.auth.uid ||
+        incoming().userId == request.auth.uid
+      );
+      allow delete: if isAdmin() || isBaseAdmin();
+    }
+
     // Collection Group rule for 'Favourite' messages view
     match /{path=**}/messages/{messageId} {
       allow read, list: if isSignedIn();
