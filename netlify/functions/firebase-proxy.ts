@@ -82,7 +82,7 @@ function findFirestoreRelease(releases: any[], database?: string): string | null
     .map((r: any) => r.name as string)
     .filter((n) => n.includes("/releases/cloud.firestore"));
   if (db) {
-    const named = matches.filter((n) => n.includes(`/database/${db}`));
+    const named = matches.filter((n) => n.endsWith(`/releases/cloud.firestore/${db}`));
     if (named.length) return named[0];
     return null;
   }
@@ -122,7 +122,7 @@ export async function handler(event: any) {
       const release = q.release;
       if (!release) return json(400, { error: "release query param required" });
       const relRes = await googleFetch(
-        `${RULES_API}/projects/${projectId}/releases/${encodeURIComponent(release)}`
+        `${RULES_API}/projects/${projectId}/releases/${release}`
       );
       const rel = await relRes.json();
       if (!relRes.ok) return json(relRes.status, rel);
@@ -158,7 +158,7 @@ export async function handler(event: any) {
       const created = await createRes.json();
       if (!createRes.ok) return json(createRes.status, created);
       const patchRes = await googleFetch(
-        `${RULES_API}/projects/${projectId}/releases/${encodeURIComponent(release)}`,
+        `${RULES_API}/projects/${projectId}/releases/${release}`,
         { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rulesetName: created.name }) }
       );
       const patched = await patchRes.json();
