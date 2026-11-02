@@ -153,7 +153,7 @@ export async function handler(event: any) {
       const createRes = await googleFetch(`${RULES_API}/projects/${projectId}/rulesets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: [{ name: "firestore.rules", content: body.rules }] }),
+        body: JSON.stringify({ source: { files: [{ name: "firestore.rules", content: body.rules }] } }),
       });
       const created = await createRes.json();
       if (!createRes.ok) return json(createRes.status, created);
