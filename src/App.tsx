@@ -6,6 +6,7 @@ import { auth, db } from './firebase';
 import Home from './pages/Home';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminLayout from './pages/admin/AdminLayout';
+import AdminManagement from './pages/admin/AdminManagement';
 import CoursesAdmin from './pages/admin/CoursesAdmin';
 import AdvancedCoursesAdmin from './pages/admin/AdvancedCoursesAdmin';
 import CourseEdit from './pages/admin/CourseEdit';
@@ -197,6 +198,7 @@ function AppContent() {
           <Route path="advanced-courses" element={<AdvancedCoursesAdmin />} />
           <Route path="course/:id" element={<CourseEdit />} />
           <Route path="users" element={<UsersAdmin />} />
+          <Route path="admins" element={<AdminManagement />} />
           <Route path="kycb" element={<AdminKycbQuestionnaire />} />
           <Route path="prompts" element={<PromptsAdmin />} />
           <Route path="assignments" element={<AssignmentsAdmin />} />

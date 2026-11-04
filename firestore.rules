@@ -35,6 +35,14 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
+
+    // Permission helper: the admin record must explicitly grant this power.
+    // 'all' is the superadmin wildcard. Base admin always passes.
+    function adminPerm(p) {
+      return isAdmin() && (isBaseAdmin()
+        || get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('role', '') == 'superadmin'
+        || get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('permissions', []).hasAny(['all', p]));
+    }
     
     function isOwner() {
       return existing().userId == request.auth.uid;
@@ -213,24 +221,29 @@ service cloud.firestore {
 
     // Collections Routes
     match /admins/{adminId} {
-      // Only root admin or the user themselves can read their admin record
-      allow read: if isSignedIn() && (request.auth.uid == adminId || isBaseAdmin());
-      allow create: if isBaseAdmin()
+      // Any signed-in admin can see the admin team; non-admins can only read their own record
+      allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow create: if (isBaseAdmin() || adminPerm('manage_admins'))
                     && isValidId(adminId)
                     && isValidAdminConfig(incoming());
-      allow update: if isBaseAdmin()
-                    && isValidAdminConfig(incoming());
-      allow delete: if isBaseAdmin();
+      allow update: if (isBaseAdmin() || adminPerm('manage_admins'))
+                    && isValidAdminConfig(incoming())
+                    || (isSignedIn()
+                        && request.auth.uid == adminId
+                        && existing().get('mustChangePassword', false) == true
+                        && incoming().get('mustChangePassword', true) == false
+                        && incoming().diff(existing()).affectedKeys().hasOnly(['mustChangePassword', 'passwordChangedAt']));
+      allow delete: if isBaseAdmin() || adminPerm('manage_admins');
     }
 
     match /users/{userId} {
       allow read: if true;
       allow list: if true;
       allow create: if isSignedIn() 
-                    && (request.auth.uid == userId || isAdmin())
+                    && (request.auth.uid == userId || isBaseAdmin() || adminPerm('manage_students') || adminPerm('manage_notifications'))
                     && isValidUserProfile(incoming())
                     && (
-                      isAdmin() ||
+                      isBaseAdmin() || adminPerm('manage_students') || adminPerm('manage_notifications') ||
                       (
                         (request.auth.token.email != null && incoming().email.lower() == request.auth.token.email.lower())
                         && (incoming().createdAt == request.time || !('createdAt' in incoming()))
@@ -262,28 +275,28 @@ service cloud.firestore {
                        && incoming().referralsCount == existing().get('referralsCount', 0) + 1
                       )
                     );
-      allow delete: if isAdmin();
+      allow delete: if isBaseAdmin() || adminPerm('manage_students');
     }
 
     match /courses/{courseId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if adminPerm('manage_courses');
     }
 
     match /kycb_questionnaires/{questionnaireId} {
-      allow read: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
-      allow list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || adminPerm('manage_kycb'));
+      allow list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || adminPerm('manage_kycb'));
       allow create: if isSignedIn()
-                    && (incoming().get('userId', '') == request.auth.uid || isAdmin())
+                    && (incoming().get('userId', '') == request.auth.uid || adminPerm('manage_kycb'))
                     && isValidId(questionnaireId)
                     && isValidKycbQuestionnaire(incoming())
                     && incoming().createdAt == request.time;
       allow update: if isSignedIn()
-                    && (resource.data.get('userId', '') == request.auth.uid || isAdmin())
-                    && (incoming().get('userId', '') == request.auth.uid || isAdmin())
+                    && (resource.data.get('userId', '') == request.auth.uid || adminPerm('manage_kycb'))
+                    && (incoming().get('userId', '') == request.auth.uid || adminPerm('manage_kycb'))
                     && isValidKycbQuestionnaire(incoming())
                     && (incoming().createdAt == request.time || incoming().createdAt == resource.data.createdAt);
-      allow delete: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || adminPerm('manage_kycb'));
     }
 
     match /saved_prompts/{promptId} {
@@ -311,40 +324,40 @@ service cloud.firestore {
                     && incoming().userId == request.auth.uid
                     && incoming().createdAt == request.time;
       allow update: if isSignedIn()
-                    && (isAdmin() || (incoming().userId == request.auth.uid && existing().get('userId', '') == request.auth.uid && (existing().status == "Pending" || existing().status == "Disapproved")));
-      allow delete: if isAdmin();
+                    && (adminPerm('manage_assignments') || (incoming().userId == request.auth.uid && existing().get('userId', '') == request.auth.uid && (existing().status == "Pending" || existing().status == "Disapproved")));
+      allow delete: if adminPerm('manage_assignments');
     }
 
     match /notifications/{notificationId} {
       allow read, list: if isSignedIn() && (resource.data.get('userId', '') == request.auth.uid || resource.data.get('userId', '') == 'all' || isAdmin());
       allow create: if isSignedIn();
       allow update: if isSignedIn()
-                    && (incoming().userId == request.auth.uid || isAdmin());
-      allow delete: if isAdmin();
+                    && (incoming().userId == request.auth.uid || adminPerm('manage_notifications'));
+      allow delete: if adminPerm('manage_notifications');
     }
 
     match /notification_templates/{templateId} {
       allow read, list: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if adminPerm('manage_notifications');
     }
 
     match /blog/{postId} {
       allow read: if true;
-      allow create: if isAdmin()
+      allow create: if adminPerm('manage_blog')
                     && isValidId(postId)
                     && isValidBlogPost(incoming())
                     && incoming().createdAt == request.time
                     && incoming().updatedAt == request.time;
-      allow update: if isAdmin()
+      allow update: if adminPerm('manage_blog')
                     && isValidBlogPost(incoming())
                     && incoming().createdAt == existing().createdAt
                     && incoming().updatedAt == request.time;
-      allow delete: if isAdmin();
+      allow delete: if adminPerm('manage_blog');
     }
 
     match /settings/{settingsDoc} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if adminPerm('manage_settings') || adminPerm('manage_leaderboard') || adminPerm('manage_kycb');
     }
 
     match /system_signals/{docId} {

@@ -198,7 +198,127 @@ export async function handler(event: any) {
       }
     }
 
-    return json(400, { error: "unknown op", ops: ["ping", "rules-list", "rules-get", "rules-deploy", "google"] });
+    if (op === "invite-admin") {
+      // Invite-based admin provisioning. Authenticated by the signed-in superadmin's
+      // Firebase ID token (NOT the proxy key), so the browser can call it without
+      // holding any secret. Only superadmins / manage_admins may invite.
+      const idToken = event.headers["x-firebase-id-token"] || event.headers["X-Firebase-Id-Token"];
+      const body = event.body ? JSON.parse(event.body) : {};
+      const email = String(body.email || "").trim().toLowerCase();
+      const role = String(body.role || "CIYA Admin").trim() || "CIYA Admin";
+      const permissions: string[] = Array.isArray(body.permissions)
+        ? body.permissions.filter((p: unknown) => typeof p === "string" && p.length <= 60)
+        : [];
+      const tempPassword = String(body.tempPassword || "");
+      const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "(default)";
+
+      if (!idToken) return json(401, { error: "missing id token" });
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json(400, { error: "invalid email" });
+      if (tempPassword.length < 8) return json(400, { error: "tempPassword must be at least 8 characters" });
+
+      // 1. Verify the caller's identity token through Google itself
+      const webKey = process.env.VITE_FIREBASE_API_KEY;
+      if (!webKey) return json(503, { error: "VITE_FIREBASE_API_KEY is not configured" });
+      const callerRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${webKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      const caller = await callerRes.json();
+      if (!callerRes.ok || !caller.users || !caller.users.length) {
+        return json(401, { error: "invalid id token" });
+      }
+      const callerUid: string = caller.users[0].localId;
+      const callerEmail: string = String(caller.users[0].email || "").toLowerCase();
+
+      // 2. Check the caller's admin record grants manage_admins (or wildcard)
+      const callerDocRes = await googleFetch(
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/admins/${callerUid}`
+      );
+      if (!callerDocRes.ok) return json(403, { error: "caller has no admin record" });
+      const callerDoc = await callerDocRes.json();
+      const fieldsToValues = (f: any): any => {
+        if (f === null || f === undefined) return null;
+        if (f.stringValue !== undefined) return f.stringValue;
+        if (f.booleanValue !== undefined) return f.booleanValue;
+        if (f.integerValue !== undefined) return Number(f.integerValue);
+        if (f.doubleValue !== undefined) return Number(f.doubleValue);
+        if (f.arrayValue !== undefined) return (f.arrayValue.values || []).map(fieldsToValues);
+        if (f.mapValue !== undefined) {
+          const o: Record<string, any> = {};
+          Object.keys(f.mapValue.fields || {}).forEach((k) => (o[k] = fieldsToValues(f.mapValue.fields[k])));
+          return o;
+        }
+        return null;
+      };
+      const callerData = fieldsToValues(callerDoc.fields) || {};
+      const callerPerms: string[] = Array.isArray(callerData.permissions) ? callerData.permissions : [];
+      const canInvite =
+        callerData.role === "superadmin" ||
+        callerPerms.includes("all") ||
+        callerPerms.includes("manage_admins") ||
+        callerEmail === "developermike5@gmail.com";
+      if (!canInvite) return json(403, { error: "caller cannot invite admins" });
+
+      // 3. Find or create the invitee's auth account and set the temporary password
+      let uid: string | null = null;
+      let created = false;
+      const lk = await googleFetch(`https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:lookup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: [email] }),
+      });
+      if (lk.ok) {
+        const lj = await lk.json();
+        if (lj.users && lj.users.length) uid = lj.users[0].localId;
+      }
+      if (!uid) {
+        const cr = await googleFetch(`https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password: tempPassword, emailVerified: false }),
+        });
+        if (!cr.ok) {
+          return json(cr.status, { error: "could not create the account", detail: await cr.text() });
+        }
+        uid = (await cr.json()).localId;
+        created = true;
+      } else {
+        const up = await googleFetch(`https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:update`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ localId: uid, password: tempPassword }),
+        });
+        if (!up.ok) {
+          return json(up.status, { error: "could not set the temporary password", detail: await up.text() });
+        }
+      }
+
+      // 4. Upsert the admins record with the granted powers and the first-login flag
+      const now = new Date().toISOString();
+      const docBody = {
+        fields: {
+          email: { stringValue: email },
+          role: { stringValue: role },
+          permissions: { arrayValue: { values: permissions.map((p) => ({ stringValue: p })) } },
+          mustChangePassword: { booleanValue: true },
+          invitedBy: { stringValue: callerEmail },
+          invitedAt: { stringValue: now },
+          updatedAt: { stringValue: now },
+        },
+      };
+      const wr = await googleFetch(
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/admins/${uid}`,
+        { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(docBody) }
+      );
+      if (!wr.ok) {
+        return json(wr.status, { error: "could not write the admin record", detail: await wr.text() });
+      }
+
+      return json(200, { ok: true, uid, created, email });
+    }
+
+    return json(400, { error: "unknown op", ops: ["ping", "rules-list", "rules-get", "rules-deploy", "google", "invite-admin"] });
   } catch (err: any) {
     return json(500, { error: err.message || String(err) });
   }

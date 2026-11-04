@@ -77,11 +77,24 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
           navigate('/admin');
         } else {
-          const docSnap = await getDoc(doc(db, 'users', user.uid));
-          if (docSnap.exists()) {
-            navigate('/dashboard');
-          } else {
-            navigate('/onboarding');
+          // Invited admins with a temporary password must change it before any dashboard
+          let routed = false;
+          try {
+            const adminSnap = await getDoc(doc(db, 'admins', user.uid));
+            if (adminSnap.exists() && adminSnap.data()?.mustChangePassword === true) {
+              navigate('/admin');
+              routed = true;
+            }
+          } catch (e) {
+            console.warn('admin check on login failed:', e);
+          }
+          if (!routed) {
+            const docSnap = await getDoc(doc(db, 'users', user.uid));
+            if (docSnap.exists()) {
+              navigate('/dashboard');
+            } else {
+              navigate('/onboarding');
+            }
           }
         }
         onClose();

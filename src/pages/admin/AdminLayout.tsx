@@ -5,6 +5,7 @@ import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User 
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { Menu, X, Database, Wifi, WifiOff } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
+import FirstLoginPasswordGate from '../../components/FirstLoginPasswordGate';
 
 export default function AdminLayout() {
   const [user, setUser] = useState<any>(() => {
@@ -42,6 +43,7 @@ export default function AdminLayout() {
     };
   }, []);
 
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -92,6 +94,12 @@ export default function AdminLayout() {
             const adminDocSnap = await getDoc(adminDocRef);
             if (adminDocSnap.exists()) {
               const data = adminDocSnap.data();
+              // Invited admins with a temporary password must change it before seeing anything
+              if (data?.mustChangePassword === true) {
+                setNeedsPasswordChange(true);
+                setLoading(false);
+                return;
+              }
               const userData = {
                 uid: currentUser.uid,
                 email: currentUser.email,
@@ -197,6 +205,36 @@ export default function AdminLayout() {
     navigate('/?login=true');
   };
 
+  // Mandatory first-login password change blocks EVERYTHING, including the dashboard
+  if (needsPasswordChange) {
+    return (
+      <FirstLoginPasswordGate
+        email={user?.email || 'admin'}
+        onCleared={async () => {
+          setNeedsPasswordChange(false);
+          // Reload the admin record so permissions come through fresh
+          try {
+            const snap = await getDoc(doc(db, 'admins', user.uid));
+            if (snap.exists()) {
+              const data = snap.data();
+              const userData = {
+                uid: user.uid,
+                email: user.email,
+                role: 'admin',
+                permissions: data?.permissions || [],
+                adminRole: data?.role || 'CIYA Admin'
+              };
+              safeSetItem('ciya_cached_user', JSON.stringify(userData));
+              setUser(userData);
+            }
+          } catch {
+            // fall through; the listener will refresh state
+          }
+        }}
+      />
+    );
+  }
+
   if (loading) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading...</div>;
   }
@@ -209,50 +247,46 @@ export default function AdminLayout() {
   const userPermissions = user?.permissions || [];
   const activeRole = user?.adminRole || (isSuperAdmin ? 'Super Admin' : 'CIYA Admin');
 
-  const canManageCourses = isSuperAdmin || userPermissions.includes('manage_courses');
-  const canManageStudents = isSuperAdmin || userPermissions.includes('manage_students');
+  // A power covers an admin area only when the admin record explicitly grants it.
+  // 'all' is the superadmin wildcard.
+  const can = (power: string) => isSuperAdmin || userPermissions.includes('all') || userPermissions.includes(power);
+  const canManageCourses = can('manage_courses');
+  const canManageStudents = can('manage_students');
 
-  // Secure URL routes
+  // Every admin area, the power it needs, and where a matching admin lands
+  const AREAS: { test: (p: string) => boolean; power: string; land: string }[] = [
+    { test: (p) => p === '/admin' || p.startsWith('/admin/course') || p.startsWith('/admin/courses') || p.startsWith('/admin/advanced-courses'), power: 'manage_courses', land: '/admin' },
+    { test: (p) => p.startsWith('/admin/users'), power: 'manage_students', land: '/admin/users' },
+    { test: (p) => p.startsWith('/admin/assignments'), power: 'manage_assignments', land: '/admin/assignments' },
+    { test: (p) => p.startsWith('/admin/notifications'), power: 'manage_notifications', land: '/admin/notifications' },
+    { test: (p) => p.startsWith('/admin/leaderboard'), power: 'manage_leaderboard', land: '/admin/leaderboard' },
+    { test: (p) => p.startsWith('/admin/locks'), power: 'manage_settings', land: '/admin/locks' },
+    { test: (p) => p.startsWith('/admin/blog'), power: 'manage_blog', land: '/admin/blog' },
+    { test: (p) => p.startsWith('/admin/groups'), power: 'manage_buzz', land: '/admin/groups' },
+    { test: (p) => p.startsWith('/admin/kycb'), power: 'manage_kycb', land: '/admin/kycb' },
+    { test: (p) => p.startsWith('/admin/prompts'), power: 'manage_prompts', land: '/admin/prompts' },
+    { test: (p) => p.startsWith('/admin/admins'), power: 'manage_admins', land: '/admin/admins' }
+  ];
+
   const path = location.pathname;
-  const isAtCourses = path === '/admin' || path.startsWith('/admin/course');
-  const isAtStudents = path.startsWith('/admin/users');
+  const denied = () => (
+    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center">
+      <div className="bg-white p-8 rounded-xl shadow-md max-w-sm">
+        <span className="text-3xl">🔒</span>
+        <h1 className="text-xl font-bold mt-4 text-slate-800">Access Denied</h1>
+        <p className="text-slate-600 mt-2 text-sm font-medium">Your admin powers do not cover this area.</p>
+        <Link to="/dashboard" className="mt-6 inline-block w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded text-sm transition-colors">
+          Go to Student Portal
+        </Link>
+      </div>
+    </div>
+  );
 
-  if (isAtCourses && !canManageCourses) {
-    if (canManageStudents) {
-      return <Navigate to="/admin/users" />;
-    } else {
-      return (
-        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center">
-          <div className="bg-white p-8 rounded-xl shadow-md max-w-sm">
-            <span className="text-3xl">🔒</span>
-            <h1 className="text-xl font-bold mt-4 text-slate-800">Access Denied</h1>
-            <p className="text-slate-600 mt-2 text-sm font-medium">You do not have permission to manage default courses.</p>
-            <Link to="/dashboard" className="mt-6 inline-block w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded text-sm transition-colors">
-              Go to Student Portal
-            </Link>
-          </div>
-        </div>
-      );
-    }
-  }
-
-  if (isAtStudents && !canManageStudents) {
-    if (canManageCourses) {
-      return <Navigate to="/admin" />;
-    } else {
-      return (
-        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center">
-          <div className="bg-white p-8 rounded-xl shadow-md max-w-sm">
-            <span className="text-3xl">🔒</span>
-            <h1 className="text-xl font-bold mt-4 text-slate-800">Access Denied</h1>
-            <p className="text-slate-600 mt-2 text-sm font-medium">You do not have permission to manage students.</p>
-            <Link to="/dashboard" className="mt-6 inline-block w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded text-sm transition-colors">
-              Go to Student Portal
-            </Link>
-          </div>
-        </div>
-      );
-    }
+  const currentArea = AREAS.find((a) => a.test(path));
+  if (currentArea && !can(currentArea.power)) {
+    // Send them to the first area their powers actually cover
+    const firstAllowed = AREAS.find((a) => can(a.power));
+    return firstAllowed ? <Navigate to={firstAllowed.land} /> : denied();
   }
 
   return (
@@ -345,61 +379,87 @@ export default function AdminLayout() {
             </Link>
           )}
 
-          <Link 
-            to="/admin/assignments" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/assignments') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-          >
-            📥 Assignments Inbox
-          </Link>
+          {can('manage_assignments') && (
+            <Link 
+              to="/admin/assignments" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/assignments') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+            >
+              📥 Assignments Inbox
+            </Link>
+          )}
 
-          <Link 
-            to="/admin/notifications" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/notifications') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-          >
-            📢 Notifications Console
-          </Link>
+          {can('manage_notifications') && (
+            <Link 
+              to="/admin/notifications" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/notifications') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+            >
+              📢 Notifications Console
+            </Link>
+          )}
 
-          <Link 
-            to="/admin/leaderboard" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/leaderboard') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-          >
-            🏆 Course Leaderboards
-          </Link>
+          {can('manage_leaderboard') && (
+            <Link 
+              to="/admin/leaderboard" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/leaderboard') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+            >
+              🏆 Course Leaderboards
+            </Link>
+          )}
 
-          <Link 
-            to="/admin/locks" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/locks') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-          >
-            ⚙️ Settings & Portal Locks
-          </Link>
+          {can('manage_settings') && (
+            <Link 
+              to="/admin/locks" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/locks') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+            >
+              ⚙️ Settings & Portal Locks
+            </Link>
+          )}
 
-          <Link 
-            to="/admin/blog" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/blog') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-          >
-            📰 CIYA Blog Desk
-          </Link>
+          {can('manage_blog') && (
+            <Link 
+              to="/admin/blog" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/blog') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+            >
+              📰 CIYA Blog Desk
+            </Link>
+          )}
 
-          <Link 
-            to="/admin/groups" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/groups') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-          >
-            💬 Student Buzz & Groups
-          </Link>
+          {can('manage_buzz') && (
+            <Link 
+              to="/admin/groups" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/groups') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+            >
+              💬 Student Buzz & Groups
+            </Link>
+          )}
 
-          <Link 
-            to="/admin/kycb" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/kycb') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-          >
-            KYCB Questionnaire
-          </Link>
+          {can('manage_kycb') && (
+            <Link 
+              to="/admin/kycb" 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block px-4 py-2 rounded-md ${location.pathname.startsWith('/admin/kycb') ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+            >
+              KYCB Questionnaire
+            </Link>
+          )}
+
+          {can('manage_admins') && (
+            <div className="pt-2 border-t border-slate-800">
+              <Link 
+                to="/admin/admins" 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`block px-4 py-2 rounded-md text-sm font-bold ${location.pathname.startsWith('/admin/admins') ? 'bg-indigo-600 text-white' : 'text-indigo-300 hover:bg-slate-800 hover:text-white'}`}
+              >
+                🛡️ Admin Team
+              </Link>
+            </div>
+          )}
 
           <div className="pt-2 border-t border-slate-800">
             <Link 
