@@ -93,13 +93,17 @@ function findFirestoreRelease(releases: any[], database?: string): string | null
 export async function handler(event: any) {
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, body: "" };
 
-  const expected = process.env.FIREBASE_PROXY_KEY;
-  const provided = event.headers["x-proxy-key"] || event.headers["X-Proxy-Key"];
-  if (!expected) return json(503, { error: "FIREBASE_PROXY_KEY is not configured" });
-  if (provided !== expected) return json(401, { error: "unauthorized" });
-
   const op = (event.queryStringParameters || {}).op;
   const q = event.queryStringParameters || {};
+
+  // invite-admin authenticates with the caller's Firebase ID token instead of the
+  // proxy key, so it works from the app without any secret in the browser.
+  if (op !== "invite-admin") {
+    const expected = process.env.FIREBASE_PROXY_KEY;
+    const provided = event.headers["x-proxy-key"] || event.headers["X-Proxy-Key"];
+    if (!expected) return json(503, { error: "FIREBASE_PROXY_KEY is not configured" });
+    if (provided !== expected) return json(401, { error: "unauthorized" });
+  }
 
   try {
     const sa = loadServiceAccount();
