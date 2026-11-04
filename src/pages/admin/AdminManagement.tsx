@@ -333,7 +333,7 @@ export default function AdminManagement() {
       {/* Add admin modal */}
       {showAdd && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => !inviting && setShowAdd(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white text-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-slate-800">Add a New Admin</h2>
             <p className="text-sm text-slate-500 mt-1">
               Set up the account, grant their powers, and they get a temporary password. They must change it on first sign-in.
@@ -345,7 +345,7 @@ export default function AdminManagement() {
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full bg-white text-slate-900 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="name@example.com"
                   required
                 />
@@ -357,7 +357,7 @@ export default function AdminManagement() {
                   type="text"
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full bg-white text-slate-900 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="CIYA Admin"
                 />
               </div>

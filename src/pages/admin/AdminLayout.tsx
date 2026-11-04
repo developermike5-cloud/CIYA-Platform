@@ -271,7 +271,7 @@ export default function AdminLayout() {
   const path = location.pathname;
   const denied = () => (
     <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center">
-      <div className="bg-white p-8 rounded-xl shadow-md max-w-sm">
+      <div className="bg-white text-slate-900 p-8 rounded-xl shadow-md max-w-sm">
         <span className="text-3xl">🔒</span>
         <h1 className="text-xl font-bold mt-4 text-slate-800">Access Denied</h1>
         <p className="text-slate-600 mt-2 text-sm font-medium">Your admin powers do not cover this area.</p>

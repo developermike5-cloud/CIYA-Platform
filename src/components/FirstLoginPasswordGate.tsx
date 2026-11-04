@@ -61,7 +61,7 @@ export default function FirstLoginPasswordGate({ email, onCleared }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8">
+      <div className="bg-white text-slate-900 w-full max-w-md rounded-2xl shadow-2xl p-8">
         <div className="flex justify-center mb-4">
           <BrandingLogo size="md" />
         </div>
@@ -77,7 +77,7 @@ export default function FirstLoginPasswordGate({ email, onCleared }: Props) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-white text-slate-900 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="At least 8 characters"
               autoFocus
               required
@@ -89,7 +89,7 @@ export default function FirstLoginPasswordGate({ email, onCleared }: Props) {
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-white text-slate-900 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="Type it again"
               required
             />
