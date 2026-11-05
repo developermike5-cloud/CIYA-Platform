@@ -4322,8 +4322,26 @@ export default function StudentDashboard() {
   };
 
   const [authChecking, setAuthChecking] = useState(() => {
+    // A pending first-login (invited admin still on a temporary password) holds the
+    // loading screen until routing sends them back to the password gate
+    if (safeStorage.getItem('ciya_pending_first_login')) return true;
     return !safeStorage.getItem('ciya_cached_user');
   });
+
+  // Back-button guard: a pending first-login can never land on this dashboard
+  useEffect(() => {
+    try {
+      const marker = safeStorage.getItem('ciya_pending_first_login');
+      if (!marker) return;
+      const cached = safeStorage.getItem('ciya_cached_user');
+      const cachedUid = cached ? (JSON.parse(cached).uid || '') : '';
+      if (!cachedUid || marker === cachedUid) {
+        navigate('/admin');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
 
   const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
 
@@ -5638,6 +5656,13 @@ export default function StudentDashboard() {
 
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        // A pending first-login (invited admin still on a temporary password) must
+        // never reach any dashboard, including this one, even via Back
+        const pendingFirstLogin = safeStorage.getItem('ciya_pending_first_login');
+        if (pendingFirstLogin && pendingFirstLogin === user.uid) {
+          navigate('/admin');
+          return;
+        }
         // 1. Instantly set current user to unblock state
         setCurrentUser(user);
         

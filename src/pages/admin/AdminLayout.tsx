@@ -60,6 +60,7 @@ export default function AdminLayout() {
             adminRole: 'Super Admin'
           };
           safeSetItem('ciya_cached_user', JSON.stringify(userData));
+          safeRemoveItem('ciya_pending_first_login');
           setUser(userData);
           setLoading(false);
 
@@ -96,10 +97,14 @@ export default function AdminLayout() {
               const data = adminDocSnap.data();
               // Invited admins with a temporary password must change it before seeing anything
               if (data?.mustChangePassword === true) {
+                // Remember the pending first-login so Back-button navigation
+                // can never drop the admin into a dashboard before the flag clears
+                safeSetItem('ciya_pending_first_login', currentUser.uid);
                 setNeedsPasswordChange(true);
                 setLoading(false);
                 return;
               }
+              safeRemoveItem('ciya_pending_first_login');
               const userData = {
                 uid: currentUser.uid,
                 email: currentUser.email,
@@ -115,6 +120,9 @@ export default function AdminLayout() {
             }
           } catch (err: any) {
             handleFirestoreError(err, OperationType.GET, `admins/${currentUser.uid}`);
+            if (safeGetItem('ciya_pending_first_login') === currentUser.uid) {
+              setNeedsPasswordChange(true);
+            }
             
             const errMsg = err?.message || String(err);
             if (errMsg.toLowerCase().includes('offline') || !navigator.onLine) {
@@ -136,6 +144,7 @@ export default function AdminLayout() {
       } else {
         // ALWAYS clear cached user and reset state if Firebase says they are not authenticated!
         safeRemoveItem('ciya_cached_user');
+        safeRemoveItem('ciya_pending_first_login');
         setUser(null);
         setLoading(false);
       }
@@ -211,6 +220,7 @@ export default function AdminLayout() {
       <FirstLoginPasswordGate
         email={user?.email || 'admin'}
         onCleared={async () => {
+          safeRemoveItem('ciya_pending_first_login');
           setNeedsPasswordChange(false);
           // Reload the admin record so permissions come through fresh
           try {
