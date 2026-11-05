@@ -161,9 +161,14 @@ export async function handler(event: any) {
       });
       const created = await createRes.json();
       if (!createRes.ok) return json(createRes.status, created);
+      // Google's Release.patch expects the resource wrapped in a "release" field,
+      // with the full release name in the body (and the raw slash, not %2F).
+      const releaseBody = {
+        release: { name: `projects/${projectId}/releases/${release}`, rulesetName: created.name },
+      };
       const patchRes = await googleFetch(
         `${RULES_API}/projects/${projectId}/releases/${release}`,
-        { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rulesetName: created.name }) }
+        { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(releaseBody) }
       );
       const patched = await patchRes.json();
       if (!patchRes.ok) return json(patchRes.status, patched);
