@@ -110,7 +110,17 @@ service cloud.firestore {
         && (data.get('manualDayUnlock', {}) is map)
         && (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 5000)
         && (data.get('avatarUrl', '') is string && data.get('avatarUrl', '').size() <= 5000)
-        && (data.get('role', '') is string && data.get('role', '').size() <= 100);
+        && (data.get('role', '') is string && data.get('role', '').size() <= 100)
+        && (data.get('track', '') is string && data.get('track', '').size() <= 200)
+        && (data.get('occupation', '') is string && data.get('occupation', '').size() <= 500)
+        && (data.get('paymentProofUrl', '') is string && data.get('paymentProofUrl', '').size() <= 2000)
+        && (data.get('paymentSubmittedAt', '') is string && data.get('paymentSubmittedAt', '').size() <= 200)
+        && (data.get('paymentRejectReason', '') is string && data.get('paymentRejectReason', '').size() <= 2000)
+        && (data.get('paymentApprovedAt', '') is string && data.get('paymentApprovedAt', '').size() <= 200)
+        && (data.get('enrollmentStatus', '') is string && data.get('enrollmentStatus', '').size() <= 200)
+        && (data.get('aiEnrollmentStatus', '') is string && data.get('aiEnrollmentStatus', '').size() <= 200)
+        && (data.get('enrolledCourses', []) is list)
+        && (data.get('courseEnrollments', {}) is map);
     }
     
     // Entity Validation: KycbQuestionnaire
@@ -264,7 +274,7 @@ service cloud.firestore {
                        )
                        && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt || !('updatedAt' in incoming()))
                        && incoming().diff(existing()).affectedKeys().hasOnly([
-                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'country', 'cohort', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'approvalStatus', 'isDashboardUnlocked', 'adminCode', 'progress', 'registeredCourses', 'congratulatedCourses', 'completedCoursesOverride', 'manualDayUnlock', 'updatedAt', 'badgePaymentRequestStatus', 'hasYearBadge', 'badgeExpiresAt', 'badgeStatus', 'badgePlan', 'badgePrice', 'badgeApprovedAt', 'badgeTxRef', 'paymentReference', 'membershipId', 'promptCopies', 'photoURL', 'avatarUrl'
+                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'country', 'cohort', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'approvalStatus', 'isDashboardUnlocked', 'adminCode', 'progress', 'registeredCourses', 'congratulatedCourses', 'completedCoursesOverride', 'manualDayUnlock', 'updatedAt', 'badgePaymentRequestStatus', 'hasYearBadge', 'badgeExpiresAt', 'badgeStatus', 'badgePlan', 'badgePrice', 'badgeApprovedAt', 'badgeTxRef', 'paymentReference', 'membershipId', 'promptCopies', 'photoURL', 'avatarUrl', 'track', 'occupation', 'paymentProofUrl', 'paymentSubmittedAt', 'paymentRejectReason', 'paymentApprovedAt', 'enrollmentStatus', 'aiEnrollmentStatus', 'enrolledCourses', 'courseEnrollments'
                        ])
                       )
                       ||
@@ -391,6 +401,18 @@ service cloud.firestore {
           );
         allow delete: if isAdmin() || isBaseAdmin() || (isSignedIn() && existing().senderUid == request.auth.uid);
       }
+    }
+
+    // Course Enrollments: students create their enrollment & payment proofs; admins review & toggle approval
+    match /enrollments/{enrollmentId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isAdmin() || isBaseAdmin() || 
+        resource.data.userId == request.auth.uid ||
+        incoming().userId == request.auth.uid
+      );
+      allow delete: if isAdmin() || isBaseAdmin();
     }
 
     // Collection Group rule for 'Favourite' messages view
