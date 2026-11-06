@@ -8,6 +8,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminManagement from './pages/admin/AdminManagement';
 import CoursesHub from './pages/admin/CoursesHub';
+import MasterclassCoursesAdmin from './pages/admin/MasterclassCoursesAdmin';
 import CourseStudentsAdmin from './pages/admin/CourseStudentsAdmin';
 import CourseEdit from './pages/admin/CourseEdit';
 import UsersAdmin from './pages/admin/UsersAdmin';
@@ -196,7 +197,7 @@ function AppContent() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<CoursesHub />} />
           <Route path="advanced-courses" element={<CoursesHub />} />
-          <Route path="masterclass-courses" element={<CoursesHub />} />
+          <Route path="masterclass-courses" element={<MasterclassCoursesAdmin />} />
           <Route path="course/:id" element={<CourseEdit />} />
           <Route path="users" element={<UsersAdmin />} />
           <Route path="admins" element={<AdminManagement />} />

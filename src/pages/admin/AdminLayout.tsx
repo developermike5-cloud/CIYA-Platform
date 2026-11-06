@@ -3,7 +3,7 @@ import { Outlet, Navigate, Link, useLocation, useNavigate } from 'react-router';
 import { auth, db, getActiveDatabaseId, setActiveDatabaseId, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, setGlobalDbConnectionDisabled, safeGetItem, safeSetItem, safeRemoveItem } from '../../firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
-import { Menu, X, Database, Wifi, WifiOff } from 'lucide-react';
+import { Menu, X, Database, Wifi, WifiOff, ChevronDown, ChevronRight } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 import FirstLoginPasswordGate from '../../components/FirstLoginPasswordGate';
 
@@ -24,6 +24,7 @@ export default function AdminLayout() {
   });
 
   const [loading, setLoading] = useState(true);
+  const [coursesMenuOpen, setCoursesMenuOpen] = useState(false);
 
   const [dbNetworkEnabled, setDbNetworkEnabled] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -263,6 +264,10 @@ export default function AdminLayout() {
   const canManageCourses = can('manage_courses');
   const isCourseArea = location.pathname === '/admin' || location.pathname.startsWith('/admin/course') || location.pathname.startsWith('/admin/courses') || location.pathname.startsWith('/admin/advanced-courses') || location.pathname.startsWith('/admin/masterclass-courses');
   const canManageStudents = can('manage_students');
+  const isMasterclassPage = location.pathname.startsWith('/admin/masterclass-courses');
+  useEffect(() => {
+    if (isCourseArea) setCoursesMenuOpen(true);
+  }, [isCourseArea]);
 
   // Every admin area, the power it needs, and where a matching admin lands
   const AREAS: { test: (p: string) => boolean; power: string; land: string }[] = [
@@ -363,13 +368,33 @@ export default function AdminLayout() {
         </div>
         <nav className="flex-1 px-4 space-y-2 mt-4">
           {canManageCourses && (
-            <Link
-              to="/admin"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`block px-4 py-2 rounded-md ${isCourseArea ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-            >
-              Courses
-            </Link>
+            <div>
+              <button
+                onClick={() => setCoursesMenuOpen((o) => !o)}
+                className={`w-full flex items-center justify-between px-4 py-2 rounded-md ${isCourseArea ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+              >
+                Courses
+                {coursesMenuOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              {coursesMenuOpen && (
+                <div className="mt-1 ml-3 space-y-1">
+                  {[
+                    { to: '/admin', label: 'Beginner Courses' },
+                    { to: '/admin/advanced-courses', label: 'Advanced Courses' },
+                    { to: '/admin/masterclass-courses', label: 'Masterclass' },
+                  ].map((item) => (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`block px-4 py-2 rounded-md text-sm ${location.pathname === item.to ? 'bg-indigo-600' : 'hover:bg-slate-800 text-slate-300'}`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           {canManageStudents && (
             <Link 
