@@ -1452,10 +1452,19 @@ function checkAndMarkCourseCompleted(profile: any, course: any, currentUser: any
     safeStorage.setItem('ciya_cached_profile', JSON.stringify(finalProfile));
 
     const userRef = doc(db, 'users', currentUser.uid);
-    updateDoc(userRef, {
+    const completionUpdates: Record<string, any> = {
       [`progress.${courseId}.completedAt`]: completedTime,
       updatedAt: serverTimestamp()
-    }).then(() => {
+    };
+    const isAdvCourse = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass';
+    if (!isAdvCourse) {
+      const slot: any = (profile as any).beginnerEnrollment;
+      if (!slot || !slot.courseId || slot.courseId === courseId) {
+        completionUpdates['beginnerEnrollment'] = { courseId, completed: true };
+        (finalProfile as any).beginnerEnrollment = { courseId, completed: true };
+      }
+    }
+    updateDoc(userRef, completionUpdates).then(() => {
       if (showToastFn) {
         showToastFn("Congratulations! You have completed the course! 🎉");
       }
@@ -2057,6 +2066,23 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
       const expressClone = courses.find(c => c.clonedFromId === courseId && c.isCloned && c.durationMode === 'express');
       
+      // Beginner (free) courses: server-side one-at-a-time rule mirrored here.
+      // The same rule is enforced by Firestore security rules via the beginnerEnrollment slot.
+      const targetCourse = courses.find(c => c.id === courseId);
+      const isAdvCourse = !!targetCourse && (
+        targetCourse.tier === 'advanced' || targetCourse.tier === 'masterclass' ||
+        targetCourse.level === 'Advanced' || targetCourse.level === 'Masterclass'
+      );
+      let beginnerSlot: { courseId: string; completed: boolean } | null = null;
+      if (targetCourse && !isAdvCourse) {
+        const slot: any = userProfile?.beginnerEnrollment;
+        if (slot && slot.courseId && slot.courseId !== courseId && !slot.completed) {
+          alert("Access Restricted: You already have a free (Beginner) course in progress. You must complete it 100% before starting another Beginner course. Paid courses are not affected.");
+          return;
+        }
+        beginnerSlot = { courseId, completed: false };
+      }
+
       const progressUpdates: Record<string, any> = {};
       progressUpdates[courseId] = {
         ...(userProfile?.progress?.[courseId] || {}),
@@ -2075,6 +2101,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       // Optimistic local update to state and cache to ensure instant enrollment in the UI
       const updatedProfile = {
         ...userProfile,
+        ...(beginnerSlot ? { beginnerEnrollment: beginnerSlot } : {}),
         progress: {
           ...(userProfile?.progress || {}),
           ...progressUpdates
@@ -2089,6 +2116,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         [`progress.${courseId}.createdAt`]: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
+      if (beginnerSlot) {
+        dbUpdates['beginnerEnrollment'] = beginnerSlot;
+      }
 
       if (track === 'express' && expressClone) {
         dbUpdates[`progress.${expressClone.id}.durationMode`] = 'express';
@@ -2124,6 +2154,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
             isDashboardUnlocked: true,
             cohort: 'Cohort 1',
             progress: progressMap,
+            ...(beginnerSlot ? { beginnerEnrollment: beginnerSlot } : {}),
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           };
@@ -5270,8 +5301,10 @@ export default function StudentDashboard() {
         const isRegistered = registeredCoursesList.some(r => r.id === cId);
         const isAdv = targetCourse.tier === 'advanced' || targetCourse.tier === 'masterclass' || targetCourse.level === 'Advanced' || targetCourse.level === 'Masterclass';
         if (!isAdv) {
-          if (!isRegistered && !hasCompletedFirstCourse) {
-            alert("Access Restricted: You must fully complete your first assigned course path from onboarding (100% video lessons completed) before enrolling or switching to other curriculum tracks.");
+          const slot: any = userProfile?.beginnerEnrollment;
+          const slotBlocks = !!slot && !!slot.courseId && slot.courseId !== cId && !slot.completed;
+          if (!isRegistered && (!hasCompletedFirstCourse || slotBlocks)) {
+            alert("Access Restricted: You must fully complete your current free (Beginner) course 100% before enrolling in another Beginner course. Paid courses are not affected.");
             return;
           }
         }

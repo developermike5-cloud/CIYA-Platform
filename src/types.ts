@@ -98,6 +98,7 @@ export interface UserProfile {
   progress?: Record<string, any>;
   registeredCourses?: string[];
   enrolledCourses?: string[];
+  beginnerEnrollment?: { courseId?: string; completed?: boolean; startedAt?: string };
   badgePurchased?: boolean;
   badgeStatus?: string;
   kycbCompleted?: boolean;

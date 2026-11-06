@@ -261,11 +261,12 @@ export default function AdminLayout() {
   // 'all' is the superadmin wildcard.
   const can = (power: string) => isSuperAdmin || userPermissions.includes('all') || userPermissions.includes(power);
   const canManageCourses = can('manage_courses');
+  const isCourseArea = location.pathname === '/admin' || location.pathname.startsWith('/admin/course') || location.pathname.startsWith('/admin/courses') || location.pathname.startsWith('/admin/advanced-courses') || location.pathname.startsWith('/admin/masterclass-courses');
   const canManageStudents = can('manage_students');
 
   // Every admin area, the power it needs, and where a matching admin lands
   const AREAS: { test: (p: string) => boolean; power: string; land: string }[] = [
-    { test: (p) => p === '/admin' || p.startsWith('/admin/course') || p.startsWith('/admin/courses') || p.startsWith('/admin/advanced-courses'), power: 'manage_courses', land: '/admin' },
+    { test: (p) => p === '/admin' || p.startsWith('/admin/course') || p.startsWith('/admin/courses') || p.startsWith('/admin/advanced-courses') || p.startsWith('/admin/masterclass-courses'), power: 'manage_courses', land: '/admin' },
     { test: (p) => p.startsWith('/admin/users'), power: 'manage_students', land: '/admin/users' },
     { test: (p) => p.startsWith('/admin/assignments'), power: 'manage_assignments', land: '/admin/assignments' },
     { test: (p) => p.startsWith('/admin/notifications'), power: 'manage_notifications', land: '/admin/notifications' },
@@ -362,22 +363,13 @@ export default function AdminLayout() {
         </div>
         <nav className="flex-1 px-4 space-y-2 mt-4">
           {canManageCourses && (
-            <>
-              <Link 
-                to="/admin" 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`block px-4 py-2 rounded-md ${location.pathname === '/admin' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-              >
-                Courses (Beginner)
-              </Link>
-              <Link 
-                to="/admin/advanced-courses" 
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`block px-4 py-2 rounded-md ${location.pathname === '/admin/advanced-courses' ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
-              >
-                Advanced Course Builder
-              </Link>
-            </>
+            <Link
+              to="/admin"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`block px-4 py-2 rounded-md ${isCourseArea ? 'bg-indigo-600' : 'hover:bg-slate-800'}`}
+            >
+              Courses
+            </Link>
           )}
           {canManageStudents && (
             <Link 

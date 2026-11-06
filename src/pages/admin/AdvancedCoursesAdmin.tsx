@@ -15,20 +15,21 @@ function Badge({ text, color, bg }: { text: string, color: string, bg: string })
   return <span style={{ background: bg, color, fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, display: "inline-block" }}>{text}</span>;
 }
 
-function TierBadge({ tier }: { tier: string }) {
+function TierBadge({ tier, price }: { tier: string, price?: number }) {
+  const t = (tier || '').toLowerCase();
+  const paid = Number(price) > 0 ? ` · \u20a6${Number(price).toLocaleString()}` : ' \u00b7 price not set';
   const m: Record<string, [string, string, string]> = {
-    beginner: ["#0d9488", "#ccfbf1", "Beginner · Free"],
-    advanced: ["#7c3aed", "#ede9fe", "Advanced · ₦15k"],
-    masterclass: ["#d97706", "#fef3c7", "Masterclass · ₦30k"],
-    Beginner: ["#0d9488", "#ccfbf1", "Beginner · Free"],
-    Advanced: ["#7c3aed", "#ede9fe", "Advanced · ₦15k"],
-    Masterclass: ["#d97706", "#fef3c7", "Masterclass · ₦30k"]
+    beginner: ["#0d9488", "#ccfbf1", "Beginner \u00b7 Free"],
+    advanced: ["#7c3aed", "#ede9fe", `Advanced${paid}`],
+    masterclass: ["#d97706", "#fef3c7", `Masterclass${paid}`]
   };
-  const [c, b, t] = m[tier] || ["#7c3aed", "#ede9fe", "Advanced"];
-  return <Badge text={t} color={c} bg={b} />;
+  const [c, b, lab] = m[t] || ["#64748b", "#f1f5f9", tier];
+  return <Badge text={lab} color={c} bg={b} />;
 }
 
-export default function AdvancedCoursesAdmin() {
+const TIER_LABEL: Record<string, string> = { advanced: 'Advanced', masterclass: 'Masterclass' };
+
+export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'advanced' | 'masterclass' }) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [filterSkill, setFilterSkill] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -46,14 +47,20 @@ export default function AdvancedCoursesAdmin() {
 
   // Load and subscribe to advanced courses only
   useEffect(() => {
-    const updateAdvancedList = () => {
-      const all = coursesStore.getAdvancedCourses();
-      setCourses(all);
+    const updateTierList = () => {
+      const all = coursesStore.getCourses();
+      const tierCourses = all.filter(c => {
+        const lvl = (c.level || '').toLowerCase();
+        const t = (c.tier || '').toLowerCase();
+        if (tier === 'masterclass') return t === 'masterclass' || lvl === 'masterclass';
+        return t === 'advanced' || lvl === 'advanced';
+      });
+      setCourses(tierCourses);
     };
 
-    updateAdvancedList();
+    updateTierList();
     const unsubscribe = coursesStore.subscribe(() => {
-      updateAdvancedList();
+      updateTierList();
     });
 
     return () => unsubscribe();
@@ -71,11 +78,11 @@ export default function AdvancedCoursesAdmin() {
   // Export as JSON file download
   const handleExport = () => {
     try {
-      const advancedList = coursesStore.getAdvancedCourses();
+      const advancedList = courses;
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(advancedList, null, 2));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", "advanced_courses.json");
+      downloadAnchor.setAttribute("download", `${tier === "masterclass" ? "masterclass_courses" : "advanced_courses"}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
@@ -297,7 +304,7 @@ export default function AdvancedCoursesAdmin() {
           <ShieldCheck className="w-64 h-64 text-indigo-400" />
         </div>
         <div className="relative z-10 space-y-3 max-w-3xl">
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">Advanced Course Control Hub</h1>
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight">{TIER_LABEL[tier]} Course Control Hub</h1>
           <p className="text-xs md:text-sm text-slate-300 font-medium leading-relaxed">
             Manage your high-tier advanced curriculum in complete isolation from the backend. Since everything here is loaded statically from the frontend file <code className="text-indigo-200 bg-indigo-950/60 px-1.5 py-0.5 rounded font-mono">advanced_courses.json</code>, students will download it directly as static code—resulting in <strong>zero database queries</strong> and <strong>zero Firestore limit warnings</strong>.
           </p>
@@ -416,7 +423,7 @@ export default function AdvancedCoursesAdmin() {
       {filteredCourses.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border shadow-sm border-slate-200">
           <div className="text-4xl mb-3">🎓</div>
-          <h4 className="text-base font-black text-slate-700">No Advanced Courses Added Yet</h4>
+          <h4 className="text-base font-black text-slate-700">No {TIER_LABEL[tier]} Courses Added Yet</h4>
           <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed font-medium">
             Click "Create Advanced Track" above or upload an existing course JSON file to get started designing!
           </p>
@@ -459,7 +466,7 @@ export default function AdvancedCoursesAdmin() {
                             <Badge text={sk.label} color={sk.color} bg={sk.bg} />
                           )}
                           <div className="flex gap-1 flex-wrap">
-                            <TierBadge tier={c.tier || 'advanced'} />
+                            <TierBadge tier={c.tier || 'advanced'} price={c.price} />
                             <span className={`px-2 py-0.5 rounded text-[10px] items-center font-bold ${
                               isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
                             }`}>

@@ -7,8 +7,7 @@ import Home from './pages/Home';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminManagement from './pages/admin/AdminManagement';
-import CoursesAdmin from './pages/admin/CoursesAdmin';
-import AdvancedCoursesAdmin from './pages/admin/AdvancedCoursesAdmin';
+import CoursesHub from './pages/admin/CoursesHub';
 import CourseEdit from './pages/admin/CourseEdit';
 import UsersAdmin from './pages/admin/UsersAdmin';
 import AdminKycbQuestionnaire from './pages/admin/AdminKycbQuestionnaire';
@@ -194,8 +193,9 @@ function AppContent() {
         <Route path="/kycb" element={<ClientKycbForm />} />
 
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<CoursesAdmin />} />
-          <Route path="advanced-courses" element={<AdvancedCoursesAdmin />} />
+          <Route index element={<CoursesHub />} />
+          <Route path="advanced-courses" element={<CoursesHub />} />
+          <Route path="masterclass-courses" element={<CoursesHub />} />
           <Route path="course/:id" element={<CourseEdit />} />
           <Route path="users" element={<UsersAdmin />} />
           <Route path="admins" element={<AdminManagement />} />

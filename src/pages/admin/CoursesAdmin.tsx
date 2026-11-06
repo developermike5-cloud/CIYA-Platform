@@ -28,17 +28,16 @@ function Badge({ text, color, bg }: { text: string, color: string, bg: string })
   return <span style={{ background: bg, color, fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, display: "inline-block" }}>{text}</span>;
 }
 
-function TierBadge({ tier }: { tier: string }) {
+function TierBadge({ tier, price }: { tier: string, price?: number }) {
+  const t = (tier || '').toLowerCase();
+  const paid = Number(price) > 0 ? ` · \u20a6${Number(price).toLocaleString()}` : ' \u00b7 price not set';
   const m: Record<string, [string, string, string]> = {
-    beginner: ["#0d9488", "#ccfbf1", "Beginner · Free"],
-    advanced: ["#7c3aed", "#ede9fe", "Advanced · ₦15k"],
-    masterclass: ["#d97706", "#fef3c7", "Masterclass · ₦30k"],
-    Beginner: ["#0d9488", "#ccfbf1", "Beginner · Free"],
-    Advanced: ["#7c3aed", "#ede9fe", "Advanced · ₦15k"],
-    Masterclass: ["#d97706", "#fef3c7", "Masterclass · ₦30k"]
+    beginner: ["#0d9488", "#ccfbf1", "Beginner \u00b7 Free"],
+    advanced: ["#7c3aed", "#ede9fe", `Advanced${paid}`],
+    masterclass: ["#d97706", "#fef3c7", `Masterclass${paid}`]
   };
-  const [c, b, t] = m[tier] || ["#64748b", "#f1f5f9", tier];
-  return <Badge text={t} color={c} bg={b} />;
+  const [c, b, lab] = m[t] || ["#64748b", "#f1f5f9", tier];
+  return <Badge text={lab} color={c} bg={b} />;
 }
 
 export default function CoursesAdmin() {
@@ -406,7 +405,7 @@ export default function CoursesAdmin() {
                           <Badge text={sk.label} color={sk.color} bg={sk.bg} />
                         )}
                         <div className="flex gap-1">
-                          <TierBadge tier={c.tier || 'beginner'} />
+                          <TierBadge tier={c.tier || 'beginner'} price={c.price} />
                           <span className={`px-2 py-0.5 rounded text-[10px] items-center font-bold ${
                             isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
                           }`}>
