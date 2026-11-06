@@ -1,7 +1,10 @@
 import json, urllib.request, urllib.error
 
 PROXY = "https://ciyacademy.netlify.app/.netlify/functions/firebase-proxy"
-KEYH = {"x-proxy-key": "9c69a58bf25104d8f0fa0ea0a88b293efb4f61bc438be61b960f2e5ef295c37d", "Content-Type": "application/json"}
+import os
+KEYH = {"x-proxy-key": os.environ.get("CIYA_PROXY_KEY", ""), "Content-Type": "application/json"}
+if not KEYH["x-proxy-key"]:
+    raise SystemExit("Set the CIYA_PROXY_KEY environment variable to run these tests")
 def pg(url, method, body=None):
     b = {"url": url, "method": method}
     if body is not None: b["body"] = body
