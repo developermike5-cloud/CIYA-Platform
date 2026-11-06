@@ -492,7 +492,14 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap text-right text-xs font-medium">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
+                        <Link
+                                                    to={`/admin/courses/${c.id}/students`}
+                                                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all"
+                                                    title="View this course's students"
+                                                  >
+                                                    👥 Students
+                                                  </Link>
+                                                      <button
                             type="button"
                             onClick={() => handleToggleLock(c.id!, !!c.isLocked)}
                             className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] cursor-pointer transition-all ${

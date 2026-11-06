@@ -8,6 +8,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminManagement from './pages/admin/AdminManagement';
 import CoursesHub from './pages/admin/CoursesHub';
+import CourseStudentsAdmin from './pages/admin/CourseStudentsAdmin';
 import CourseEdit from './pages/admin/CourseEdit';
 import UsersAdmin from './pages/admin/UsersAdmin';
 import AdminKycbQuestionnaire from './pages/admin/AdminKycbQuestionnaire';
@@ -209,6 +210,7 @@ function AppContent() {
           <Route path="groups" element={<BuzzGroupsAdmin />} />
           <Route path="courses/new" element={<CourseEdit />} />
           <Route path="courses/:courseId" element={<CourseEdit />} />
+          <Route path="courses/:courseId/students" element={<CourseStudentsAdmin />} />
         </Route>
       </Routes>
     </div>

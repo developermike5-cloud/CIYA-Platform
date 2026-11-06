@@ -441,7 +441,14 @@ export default function CoursesAdmin() {
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-1.5 text-xs font-bold">
-                        <button
+                        <Link
+                                                  to={`/admin/courses/${c.id}/students`}
+                                                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all"
+                                                  title="View this course's students"
+                                                >
+                                                  👥 Students
+                                                </Link>
+                                                  <button
                           type="button"
                           onClick={() => handleToggleLock(c.id!, !!c.isLocked)}
                           className={`px-3 py-1.5 rounded-lg border font-bold text-xs cursor-pointer transition-all ${
