@@ -49,6 +49,11 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const isCourseArea = location.pathname === '/admin' || location.pathname.startsWith('/admin/course') || location.pathname.startsWith('/admin/courses') || location.pathname.startsWith('/admin/advanced-courses') || location.pathname.startsWith('/admin/masterclass-courses');
+  useEffect(() => {
+    if (isCourseArea) setCoursesMenuOpen(true);
+  }, [isCourseArea]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
@@ -262,12 +267,7 @@ export default function AdminLayout() {
   // 'all' is the superadmin wildcard.
   const can = (power: string) => isSuperAdmin || userPermissions.includes('all') || userPermissions.includes(power);
   const canManageCourses = can('manage_courses');
-  const isCourseArea = location.pathname === '/admin' || location.pathname.startsWith('/admin/course') || location.pathname.startsWith('/admin/courses') || location.pathname.startsWith('/admin/advanced-courses') || location.pathname.startsWith('/admin/masterclass-courses');
   const canManageStudents = can('manage_students');
-  const isMasterclassPage = location.pathname.startsWith('/admin/masterclass-courses');
-  useEffect(() => {
-    if (isCourseArea) setCoursesMenuOpen(true);
-  }, [isCourseArea]);
 
   // Every admin area, the power it needs, and where a matching admin lands
   const AREAS: { test: (p: string) => boolean; power: string; land: string }[] = [
