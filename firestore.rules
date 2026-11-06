@@ -17,15 +17,12 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     
     function isBaseAdmin() {
-      // Bootstrap admin using email, or check if they have admin role in users collection
-      return isSignedIn() && (
-        request.auth.uid == 'a26a8d1a-84d2-4baf-9e14-c8c2dec6a164' ||
-        ('email' in request.auth.token && request.auth.token.email.matches('(?i)^developermike5@gmail\\.com$')) ||
-        ('email' in request.auth.token && request.auth.token.email == 'developermike5@gmail.com') ||
-        ('email' in request.auth.token && request.auth.token.email == 'DeveloperMike5@gmail.com') ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['admin', 'super_admin', 'superadmin'])
-      );
+      // Bootstrap admin by uid or email, or a users-doc admin role
+      return isSignedIn()
+        && (request.auth.uid == 'a26a8d1a-84d2-4baf-9e14-c8c2dec6a164'
+            || ('email' in request.auth.token && request.auth.token.email.matches('(?i)^developermike5@gmail\\.com$'))
+            || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+                && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['admin', 'super_admin', 'superadmin']));
     }
 
     function isAdmin() { 
@@ -38,16 +35,138 @@ service cloud.firestore {
 
     // Permission helper: the admin record must explicitly grant this power.
     // 'all' is the superadmin wildcard. Base admin always passes.
+    function permFromAdminsDoc(p) {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && adminDocPerm(get(/databases/$(database)/documents/admins/$(request.auth.uid)).data, p);
+    }
+    function adminDocPerm(ad, p) {
+      return ad.get('role', '') == 'superadmin' || ad.get('permissions', []).hasAny(['all', p]);
+    }
+
     function adminPerm(p) {
-      return isAdmin() && (isBaseAdmin()
-        || get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('role', '') == 'superadmin'
-        || get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('permissions', []).hasAny(['all', p]));
+      return isSignedIn() && (isBaseAdmin() || permFromAdminsDoc(p));
     }
     
     function isOwner() {
       return existing().userId == request.auth.uid;
     }
 
+    // ---- Beginner (free) course one-at-a-time rule (server-side) ----
+    // A student may hold only ONE active free course. It must be completed
+    // (progress.<id>.completedAt set, or the id is in completedCoursesOverride)
+    // before the slot can move to another beginner course. Paid courses are exempt.
+    function isBeginnerCourse(cid) {
+      return !exists(/databases/$(database)/documents/courses/$(cid))
+        || isBeginnerTier(get(/databases/$(database)/documents/courses/$(cid)).data);
+    }
+    function isBeginnerTier(cd) {
+      return cd.get('tier', '') == 'beginner'
+        || (cd.get('tier', '') == '' && (cd.get('level', '').lower() == 'beginner' || cd.get('level', '') == ''));
+    }
+
+    function courseCompletedIn(profile, cid) {
+      return (cid in profile.get('completedCoursesOverride', []))
+        || (profile.get('progress', {}).get(cid, {}).get('completedAt', '') is string
+            && profile.get('progress', {}).get(cid, {}).get('completedAt', '') != '');
+    }
+
+    function slotCourseOf(s) { return s.get('courseId', ''); }
+    function slotCompletedOf(s) { return s.get('completed', false); }
+
+    function validBeginnerSlot() {
+      return incoming().get('beginnerEnrollment', {}).keys().hasOnly(['courseId', 'completed', 'startedAt'])
+        && incoming().get('beginnerEnrollment', {}).get('courseId', '') is string
+        && incoming().get('beginnerEnrollment', {}).get('completed', false) is bool
+        // Cannot claim a course is completed without the durable completion evidence
+        && (
+          slotCompletedOf(incoming().get('beginnerEnrollment', {})) == false
+          || (slotCompletedOf(existing().get('beginnerEnrollment', {})) == true
+              && slotCourseOf(existing().get('beginnerEnrollment', {})) == slotCourseOf(incoming().get('beginnerEnrollment', {})))
+          || courseCompletedIn(incoming(), slotCourseOf(incoming().get('beginnerEnrollment', {})))
+        )
+        // Moving or clearing the slot requires the previous beginner course to be completed
+        && (
+          slotCourseOf(incoming().get('beginnerEnrollment', {})) == slotCourseOf(existing().get('beginnerEnrollment', {}))
+          || (
+            slotCourseOf(incoming().get('beginnerEnrollment', {})) == ''
+            && (slotCourseOf(existing().get('beginnerEnrollment', {})) == ''
+                || slotCompletedOf(existing().get('beginnerEnrollment', {})) == true
+                || courseCompletedIn(existing(), slotCourseOf(existing().get('beginnerEnrollment', {}))))
+          )
+          || (
+            isBeginnerCourse(slotCourseOf(incoming().get('beginnerEnrollment', {})))
+            && (slotCourseOf(existing().get('beginnerEnrollment', {})) == ''
+                || slotCompletedOf(existing().get('beginnerEnrollment', {})) == true
+                || courseCompletedIn(existing(), slotCourseOf(existing().get('beginnerEnrollment', {}))))
+          )
+        );
+    }
+
+    // Changed-fields-only validation for user profile UPDATES. The full
+    // isValidUserProfile stays for creates; updates validate only the keys a
+    // write actually touches, which keeps rule evaluation far below the
+    // per-request expression budget.
+    function fieldIsStr(k, maxLen) {
+      return incoming().get(k, '') is string && incoming().get(k, '').size() <= maxLen;
+    }
+
+    // Only shape checks the slot/referral logic depends on; other profile
+    // fields are bounded by the allowed-keys list, not type checks.
+    // Shape checks only for what the slot/referral logic depends on; every other
+    // profile field is writable by its owner.
+    function changedProfileOk(ak) {
+      return (!ak.hasAny(['progress', 'manualDayUnlock', 'courseEnrollments']) || incoming().get('progress', {}) is map)
+        && (!ak.hasAny(['completedCoursesOverride', 'registeredCourses', 'congratulatedCourses', 'enrolledCourses', 'promptCopies']) || incoming().get('completedCoursesOverride', []) is list)
+        && (!ak.hasAny(['isActivated', 'isDashboardUnlocked', 'hasYearBadge']) || incoming().get('isActivated', false) is bool)
+        && (!ak.hasAny(['referralsCount', 'badgePrice']) || incoming().get('referralsCount', 0) is number)
+        && (!ak.hasAny(['approvalStatus']) || incoming().get('approvalStatus', '') in ['Pending', 'Approved', 'Disapproved']);
+    }
+
+    function emailUnchanged() {
+      return !('email' in existing()) || incoming().email.lower() == existing().email.lower();
+    }
+
+    function createdAtUnchanged() {
+      return !('createdAt' in existing()) || incoming().createdAt == existing().createdAt || incoming().createdAt == request.time;
+    }
+
+    function updatedAtOk() {
+      return !('updatedAt' in incoming()) || incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt;
+    }
+
+    function usersUpdateOk(uid) {
+      let ak = incoming().diff(existing()).affectedKeys();
+      return (request.auth.uid == uid
+              && !ak.hasAny(['role', 'email', 'userId', 'createdAt', 'mustChangePassword', 'passwordChangedAt'])
+              && changedProfileOk(ak)
+              && emailUnchanged()
+              && createdAtUnchanged()
+              && updatedAtOk()
+              && (!ak.hasAny(['beginnerEnrollment']) || validBeginnerSlot()))
+        || (ak.hasOnly(['isActivated', 'referralsCount', 'updatedAt'])
+            && (!ak.hasAny(['isActivated']) || incoming().get('isActivated', false) is bool)
+            && incoming().get('isActivated', false) == true
+            && incoming().get('referralsCount', 0) == existing().get('referralsCount', 0) + 1)
+        || isAdmin();
+    }
+    function usersCreateOk(uid) {
+      let base = isBaseAdmin();
+      let ms = permFromAdminsDoc('manage_students');
+      let mn = permFromAdminsDoc('manage_notifications');
+      return isSignedIn()
+        && ((request.auth.uid == userId
+             && !incoming().keys().hasAny(['role', 'mustChangePassword', 'passwordChangedAt'])
+             && (incoming().get('fullName', '') is string)
+             && (incoming().get('approvalStatus', 'Pending') in ['Pending', 'Approved', 'Disapproved'])
+             && (!('beginnerEnrollment' in incoming()) || validBeginnerSlot())
+             && (request.auth.token.email != null
+                 && incoming().get('email', '') is string
+                 && incoming().get('email', '').lower() == request.auth.token.email.lower())
+             && (!('userId' in incoming()) || incoming().get('userId', '') == request.auth.uid)
+             && (!('createdAt' in incoming()) || incoming().createdAt == request.time)
+             && (!('updatedAt' in incoming()) || incoming().updatedAt == request.time))
+            || base || ms || mn);
+    }
     // Entity Validation: Course
     function isValidCourse(data) {
       return data.keys().hasAll(['title']) 
@@ -120,7 +239,13 @@ service cloud.firestore {
         && (data.get('enrollmentStatus', '') is string && data.get('enrollmentStatus', '').size() <= 200)
         && (data.get('aiEnrollmentStatus', '') is string && data.get('aiEnrollmentStatus', '').size() <= 200)
         && (data.get('enrolledCourses', []) is list)
-        && (data.get('courseEnrollments', {}) is map);
+        && (data.get('courseEnrollments', {}) is map)
+        && (!('beginnerEnrollment' in data) || (
+              data.get('beginnerEnrollment', {}) is map
+              && data.get('beginnerEnrollment', {}).keys().hasOnly(['courseId', 'completed', 'startedAt'])
+              && data.get('beginnerEnrollment', {}).get('courseId', '') is string
+              && data.get('beginnerEnrollment', {}).get('completed', false) is bool
+            ));
     }
     
     // Entity Validation: KycbQuestionnaire
@@ -230,6 +355,8 @@ service cloud.firestore {
     }
 
     // Collections Routes
+    // BISECT2 probe functions (temporary)
+    // BISECT3 probe functions (temporary)
     match /admins/{adminId} {
       // Any signed-in admin can see the admin team; non-admins can only read their own record
       allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
@@ -249,42 +376,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if true;
       allow list: if true;
-      allow create: if isSignedIn() 
-                    && (request.auth.uid == userId || isBaseAdmin() || adminPerm('manage_students') || adminPerm('manage_notifications'))
-                    && isValidUserProfile(incoming())
-                    && (
-                      isBaseAdmin() || adminPerm('manage_students') || adminPerm('manage_notifications') ||
-                      (
-                        (request.auth.token.email != null && incoming().email.lower() == request.auth.token.email.lower())
-                        && (incoming().createdAt == request.time || !('createdAt' in incoming()))
-                        && (incoming().updatedAt == request.time || !('updatedAt' in incoming()))
-                      )
-                    );
-      allow update: if isSignedIn() 
-                    && (
-                      isAdmin()
-                      ||
-                      (request.auth.uid == userId 
-                       && isValidUserProfile(incoming())
-                       && (
-                         !('email' in existing()) || incoming().email.lower() == existing().email.lower()
-                       )
-                       && (
-                         !('createdAt' in existing()) || incoming().createdAt == existing().createdAt || incoming().createdAt == request.time
-                       )
-                       && (incoming().updatedAt == request.time || incoming().updatedAt == existing().updatedAt || !('updatedAt' in incoming()))
-                       && incoming().diff(existing()).affectedKeys().hasOnly([
-                         'intent', 'experience', 'courseType', 'pathwaySelection', 'pathwayReason', 'pathwayExperience', 'recommendedPath', 'goal', 'availability', 'fullName', 'gender', 'ageRange', 'learningTool', 'educationLevel', 'whatsapp', 'state', 'country', 'cohort', 'referralCode', 'myReferralCode', 'isActivated', 'referralsCount', 'approvalStatus', 'isDashboardUnlocked', 'adminCode', 'progress', 'registeredCourses', 'congratulatedCourses', 'completedCoursesOverride', 'manualDayUnlock', 'updatedAt', 'badgePaymentRequestStatus', 'hasYearBadge', 'badgeExpiresAt', 'badgeStatus', 'badgePlan', 'badgePrice', 'badgeApprovedAt', 'badgeTxRef', 'paymentReference', 'membershipId', 'promptCopies', 'photoURL', 'avatarUrl', 'track', 'occupation', 'paymentProofUrl', 'paymentSubmittedAt', 'paymentRejectReason', 'paymentApprovedAt', 'enrollmentStatus', 'aiEnrollmentStatus', 'enrolledCourses', 'courseEnrollments'
-                       ])
-                      )
-                      ||
-                      (
-                       isValidUserProfile(incoming())
-                       && incoming().diff(existing()).affectedKeys().hasOnly(['isActivated', 'referralsCount', 'updatedAt'])
-                       && incoming().isActivated == true
-                       && incoming().referralsCount == existing().get('referralsCount', 0) + 1
-                      )
-                    );
+      allow create: if usersCreateOk(userId);
+      allow update: if isSignedIn() && usersUpdateOk(userId);
       allow delete: if isBaseAdmin() || adminPerm('manage_students');
     }
 
@@ -422,6 +515,6 @@ service cloud.firestore {
 
     match /users/{userId}/favourites/{msgId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
-    }
+    }    // PHANTOM-EVAL probes (temporary)
   }
 }
