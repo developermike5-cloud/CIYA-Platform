@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import CustomDropdown from '../../components/CustomDropdown';
 import RowActionsDropdown, { actionIcons } from '../../components/admin/RowActionsDropdown';
+import CourseRosterSlideover from '../../components/admin/CourseRosterSlideover';
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy, Download, Upload } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
@@ -52,6 +53,7 @@ export default function CoursesAdmin() {
   
   // Custom non-blocking modal dialog states for sandboxed iframes
   const [cloneDialogCourse, setCloneDialogCourse] = useState<Course | null>(null);
+  const [studentsPanelCourse, setStudentsPanelCourse] = useState<Course | null>(null);
   const [cloneDialogName, setCloneDialogName] = useState<string>('');
   const [deleteDialogCourse, setDeleteDialogCourse] = useState<Course | null>(null);
   const [isPerformingAction, setIsPerformingAction] = useState(false);
@@ -442,13 +444,14 @@ export default function CoursesAdmin() {
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-1.5 text-xs font-bold">
-                        <Link
-                                                  to={`/admin/courses/${c.id}/students`}
-                                                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all"
+                        <button
+                                                  type="button"
+                                                  onClick={() => setStudentsPanelCourse(c)}
+                                                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer"
                                                   title="View this course's students"
                                                 >
                                                   👥 Students
-                                                </Link>
+                                                </button>
                                                   <Link
                           to={`/admin/courses/${c.id}`}
                           className="px-3 py-1.5 bg-white border-2 border-slate-300 rounded-lg text-slate-800 font-extrabold hover:bg-slate-50 transition-all shadow-sm"
@@ -572,6 +575,12 @@ export default function CoursesAdmin() {
           </div>
         </div>
       )}
+
+      <CourseRosterSlideover
+        open={!!studentsPanelCourse}
+        onClose={() => setStudentsPanelCourse(null)}
+        course={studentsPanelCourse}
+      />
     </div>
   );
 }

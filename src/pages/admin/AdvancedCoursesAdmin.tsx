@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router';
 import CustomDropdown from '../../components/CustomDropdown';
 import RowActionsDropdown, { actionIcons } from '../../components/admin/RowActionsDropdown';
+import CourseRosterSlideover from '../../components/admin/CourseRosterSlideover';
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Download, Upload, ArrowRight, CheckCircle, Copy, Info, RefreshCw, AlertCircle, EyeOff, ShieldCheck } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
@@ -38,6 +39,7 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
   // Non-blocking modal states
   const [deleteDialogCourse, setDeleteDialogCourse] = useState<Course | null>(null);
   const [cloneDialogCourse, setCloneDialogCourse] = useState<Course | null>(null);
+  const [studentsPanelCourse, setStudentsPanelCourse] = useState<Course | null>(null);
   const [cloneDialogName, setCloneDialogName] = useState<string>('');
   const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [isPerformingAction, setIsPerformingAction] = useState(false);
@@ -493,13 +495,14 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap text-right text-xs font-medium">
                         <div className="flex items-center justify-end gap-1.5">
-                        <Link
-                                                    to={`/admin/courses/${c.id}/students`}
-                                                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all"
+                        <button
+                                                    type="button"
+                                                    onClick={() => setStudentsPanelCourse(c)}
+                                                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer"
                                                     title="View this course's students"
                                                   >
                                                     👥 Students
-                                                  </Link>
+                                                  </button>
                           <Link
                             to={`/admin/courses/${c.id}`}
                             title="Edit syllabus curriculum"
@@ -653,6 +656,12 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
           </div>
         </div>
       )}
+
+      <CourseRosterSlideover
+        open={!!studentsPanelCourse}
+        onClose={() => setStudentsPanelCourse(null)}
+        course={studentsPanelCourse}
+      />
     </div>
   );
 }
