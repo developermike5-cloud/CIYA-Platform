@@ -1420,7 +1420,7 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                 Use this panel to immediately re-route the student's assigned learning curriculum. This will update the student's homepage, milestones, and active lessons instantly.
                               </p>
 
-                              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center gap-4">
+                              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-3">
                                 <div className="flex-1">
                                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Select New Target Course Path</label>
                                   <CustomDropdown
@@ -1443,8 +1443,8 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                   />
                                 </div>
 
-                                <div className="flex flex-col gap-2 shrink-0 md:pt-4">
-                                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700 font-semibold">
+                                <div className="flex flex-col gap-2">
+                                  <label className="flex items-start gap-2 cursor-pointer select-none text-xs text-slate-700 font-semibold">
                                     <input
                                       type="checkbox"
                                       id={`clear-progress-chk-${u.id}`}
@@ -1476,7 +1476,7 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                       setCourseSwitchConfirmId(null);
                                       handleSwitchCourse(u.id, selectedId, clearProgress);
                                     }}
-                                    className={`px-4 py-2 font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-md transition-all duration-200 border-0 cursor-pointer text-center ${
+                                    className={`px-4 py-2 w-full font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-md transition-all duration-200 border-0 cursor-pointer text-center ${
                                       courseSwitchConfirmId === u.id
                                         ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
                                         : 'bg-indigo-600 hover:bg-indigo-750 text-white'
