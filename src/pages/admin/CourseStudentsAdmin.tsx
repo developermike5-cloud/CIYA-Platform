@@ -4,7 +4,8 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { Course, UserProfile } from '../../types';
 import { coursesStore } from '../../utils/coursesStore';
-import { Search, ArrowLeft, Users } from 'lucide-react';
+import { Search, ArrowLeft, Users, Mail, Phone, MapPin, Cake, GraduationCap, Clock, Target, Trophy, BookOpen } from 'lucide-react';
+import SlideOver from '../../components/admin/SlideOver';
 
 function relDate(v: any): string {
   if (!v) return '-';
@@ -52,6 +53,7 @@ export default function CourseStudentsAdmin() {
   const [course, setCourse] = useState<Course | null>(null);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [search, setSearch] = useState('');
+  const [detailRow, setDetailRow] = useState<Row | null>(null);
 
   // Course comes from the shared store (already loaded inside the admin area)
   useEffect(() => {
@@ -193,7 +195,14 @@ export default function CourseStudentsAdmin() {
                   return (
                     <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <div className="font-extrabold text-sm text-slate-800">{u.fullName || u.displayName || 'Student'}</div>
+                        <button
+                          type="button"
+                          onClick={() => setDetailRow(r)}
+                          title="View full student details"
+                          className="text-left font-extrabold text-sm text-indigo-700 hover:text-indigo-900 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                        >
+                          {u.fullName || u.displayName || 'Student'}
+                        </button>
                         <div className="text-[11px] text-slate-400 font-medium">{u.email || '-'}</div>
                       </td>
                       <td className="px-5 py-4 whitespace-nowrap">
@@ -238,11 +247,86 @@ export default function CourseStudentsAdmin() {
                     <td colSpan={7} className="px-5 py-10 text-center text-sm font-bold text-slate-400">Loading students…</td>
                   </tr>
                 )}
-              </tbody>
+</tbody>
             </table>
           </div>
         </div>
       </div>
+
+      {detailRow && (() => {
+        const du: any = detailRow.user;
+        const stat = (label: string, value: React.ReactNode, icon?: React.ReactNode) => (
+          <div key={label} className="bg-white rounded-xl border border-slate-200 p-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+              {icon}{label}
+            </div>
+            <div className="mt-1 text-sm font-bold text-slate-800">{value}</div>
+          </div>
+        );
+        const field = (label: string, value: React.ReactNode) => (
+          <div key={label} className="flex items-start justify-between gap-3 py-2 border-b border-slate-100 last:border-0">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide shrink-0">{label}</span>
+            <span className="text-xs font-bold text-slate-800 text-right">{value || '-'}</span>
+          </div>
+        );
+        return (
+          <SlideOver
+            open={!!detailRow}
+            onClose={() => setDetailRow(null)}
+            title={du.fullName || du.displayName || 'Student'}
+            subtitle={du.email || ''}
+            maxWidth="max-w-md"
+          >
+            {/* Overview strip */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {stat('Progress', `${detailRow.pct}%`, <GraduationCap className="w-3 h-3" />)}
+              {stat('Lessons watched', `${detailRow.watched}/${detailRow.totalVideos}`, <BookOpen className="w-3 h-3" />)}
+              {stat('Assignments', `${detailRow.attempted}/${detailRow.totalAssignments}`, <Target className="w-3 h-3" />)}
+              {stat('Days done', detailRow.totalDays ? `${detailRow.daysDone}/${detailRow.totalDays}` : '-', <Trophy className="w-3 h-3" />)}
+            </div>
+
+            {/* Progress bar */}
+            <div className="bg-white rounded-xl border border-slate-200 p-3 mb-4">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Course progress</div>
+              <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full rounded-full bg-indigo-500" style={{ width: `${detailRow.pct}%` }} />
+              </div>
+              <div className="mt-2 grid grid-cols-1 gap-1 text-xs font-bold text-slate-600">
+                <div>Currently on: <span className="text-slate-900">{detailRow.position}</span></div>
+                {detailRow.completedAt && <div className="text-emerald-600">Course finished {relDate(detailRow.completedAt)}</div>}
+                <div className="text-slate-400">Last activity: {relDate(detailRow.lastActivity)}</div>
+              </div>
+            </div>
+
+            {/* Profile details */}
+            <div className="bg-white rounded-xl border border-slate-200 p-3 mb-4">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Student details</div>
+              {field('Email', du.email)}
+              {field('Phone', du.phone || du.whatsapp)}
+              {field('Cohort', du.cohort)}
+              {field('Gender', du.gender)}
+              {field('Location', du.state)}
+              {field('Experience', du.experience)}
+              {field('Joined', du.createdAt ? relDate(du.createdAt) : null)}
+              {field('Status', du.approvalStatus || 'Pending')}
+            </div>
+
+            {/* Paid tier */}
+            <div className="bg-white rounded-xl border border-slate-200 p-3">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Paid tier</div>
+              {detailRow.paidCourses.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {detailRow.paidCourses.map((pc, i) => (
+                    <span key={i} className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-violet-100 text-violet-800">{pc}</span>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-xs font-bold text-slate-300">Not enrolled in any paid course</span>
+              )}
+            </div>
+          </SlideOver>
+        );
+      })()}
     </div>
   );
 }

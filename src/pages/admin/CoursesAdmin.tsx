@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import CustomDropdown from '../../components/CustomDropdown';
+import RowActionsDropdown, { actionIcons } from '../../components/admin/RowActionsDropdown';
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy, Download, Upload } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
@@ -448,63 +449,48 @@ export default function CoursesAdmin() {
                                                 >
                                                   👥 Students
                                                 </Link>
-                                                  <button
-                          type="button"
-                          onClick={() => handleToggleLock(c.id!, !!c.isLocked)}
-                          className={`px-3 py-1.5 rounded-lg border font-bold text-xs cursor-pointer transition-all ${
-                            c.isLocked
-                              ? 'border-teal-200 bg-teal-50 text-teal-800 font-extrabold'
-                              : 'border-orange-200 bg-orange-50 text-orange-850 font-extrabold'
-                          }`}
-                          title={c.isLocked ? "Click to Unlock this Course" : "Click to Lock this Course"}
-                        >
-                          {c.isLocked ? '🔓 Unlock' : '🔒 Lock'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePublish(c.id!, isPublished)}
-                          className={`px-3 py-1.5 rounded-lg border font-bold text-xs cursor-pointer transition-all ${
-                            isPublished
-                              ? 'border-amber-205 bg-amber-50 text-amber-700'
-                              : 'border-emerald-202 bg-emerald-50 text-emerald-700 font-extrabold'
-                          }`}
-                        >
-                          {isPublished ? 'Unpublish' : 'Publish'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCloneDialogCourse(c);
-                            setCloneDialogName(`${c.title} (Clone)`);
-                          }}
-                          className="px-3 py-1.5 bg-indigo-50 border-2 border-indigo-200 rounded-lg text-indigo-700 font-extrabold hover:bg-indigo-100 transition-all shadow-sm flex items-center gap-1 cursor-pointer"
-                          title="Clone/duplicate this course"
-                        >
-                          <Copy className="w-3.5 h-3.5 shrink-0" />
-                          Clone
-                        </button>
-                        <Link
+                                                  <Link
                           to={`/admin/courses/${c.id}`}
                           className="px-3 py-1.5 bg-white border-2 border-slate-300 rounded-lg text-slate-800 font-extrabold hover:bg-slate-50 transition-all shadow-sm"
                         >
                           Edit
                         </Link>
-                        <button
-                          type="button"
-                          onClick={() => handleExportSingle(c)}
-                          className="p-1.5 text-slate-600 hover:text-teal-700 hover:bg-teal-50 hover:border-teal-200 border border-transparent rounded-lg transition-all cursor-pointer"
-                          title="Export single course JSON"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteDialogCourse(c)}
-                          className="p-1.5 text-red-500 hover:bg-red-50 hover:border-red-200 border border-transparent rounded-lg transition-all cursor-pointer"
-                          title="Click to delete course permanently"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <RowActionsDropdown
+                          label="Actions"
+                          actions={[
+                            {
+                              label: c.isLocked ? 'Unlock course' : 'Lock course',
+                              icon: c.isLocked ? actionIcons.unlock : actionIcons.lock,
+                              onClick: () => handleToggleLock(c.id!, !!c.isLocked),
+                              title: c.isLocked ? 'Unlock this course' : 'Lock this course',
+                            },
+                            {
+                              label: isPublished ? 'Unpublish' : 'Publish',
+                              icon: isPublished ? actionIcons.unpublish : actionIcons.publish,
+                              onClick: () => handleTogglePublish(c.id!, isPublished),
+                            },
+                            {
+                              label: 'Clone course',
+                              icon: actionIcons.clone,
+                              onClick: () => {
+                                setCloneDialogCourse(c);
+                                setCloneDialogName(`${c.title} (Clone)`);
+                              },
+                            },
+                            {
+                              label: 'Export JSON',
+                              icon: actionIcons.export,
+                              onClick: () => handleExportSingle(c),
+                            },
+                            {
+                              label: 'Delete course',
+                              icon: actionIcons.delete,
+                              danger: true,
+                              onClick: () => setDeleteDialogCourse(c),
+                              title: 'Delete this course permanently',
+                            },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>

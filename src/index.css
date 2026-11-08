@@ -54,3 +54,15 @@ body.template-modal-open nav {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+/* Fo: slide-over panel + overlay animations */
+@keyframes fo-slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes fo-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fo-sl-panel { animation: fo-slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.fo-sl-overlay { animation: fo-fade-in 0.2s ease; }

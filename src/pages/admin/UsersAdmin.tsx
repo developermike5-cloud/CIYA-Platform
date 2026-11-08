@@ -5,6 +5,8 @@ import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 import CustomDropdown from '../../components/CustomDropdown';
+import RowActionsDropdown, { actionIcons } from '../../components/admin/RowActionsDropdown';
+import SlideOver from '../../components/admin/SlideOver';
 import { Course } from '../../types';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
 import { uploadToCloudinary } from '../../utils/cloudinary';
@@ -206,7 +208,7 @@ export default function UsersAdmin() {
   };
 
   // Actions Toggle & States
-  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, 'approve' | 'disapprove' | 'delete' | null>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -694,15 +696,7 @@ export default function UsersAdmin() {
     }
   };
 
-  const handleDeleteClick = async (userId: string) => {
-    if (deleteConfirmId !== userId) {
-      setDeleteConfirmId(userId);
-      setTimeout(() => {
-        setDeleteConfirmId(prev => prev === userId ? null : prev);
-      }, 4000); // 4 seconds window to confirm
-      return;
-    }
-    setDeleteConfirmId(null);
+  const performDelete = async (userId: string) => {
     setActionLoading(prev => ({ ...prev, [userId]: 'delete' }));
     try {
       const userToDelete = users.find(u => u.id === userId);
@@ -711,7 +705,7 @@ export default function UsersAdmin() {
       }
       await deleteDoc(doc(db, 'users', userId));
       setUsers(prev => prev.filter(u => u.id !== userId));
-      if (expandedUserId === userId) setExpandedUserId(null);
+      if (detailUserId === userId) setDetailUserId(null);
     } catch (error) {
       console.error("Error deleting user application:", error);
     } finally {
@@ -1047,6 +1041,519 @@ export default function UsersAdmin() {
 
     return result;
   }, [cohortFilteredUsers, searchTerm, filterState, filterCourse, filterStatus, filterApproval, filterGender, sortDate, filterStartDate, filterEndDate, filterAgeRange, filterEducationLevel, filterLearningTool]);
+
+  const renderUserDetailsBody = (u: any) => {
+    const row = (label: string, value: React.ReactNode) => (
+      <div key={label} className="flex items-start justify-between gap-3 py-1.5">
+        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide shrink-0">{label}</span>
+        <span className="text-xs font-bold text-slate-800 text-right break-words">{value || '-'}</span>
+      </div>
+    );
+    const section = (title: string, children: React.ReactNode) => (
+      <div key={title} className="bg-white rounded-xl border border-slate-200 p-4">
+        <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">{title}</div>
+        {children}
+      </div>
+    );
+    const statusChip = u.approvalStatus === 'Approved' ? (
+      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 shrink-0">Approved</span>
+    ) : u.approvalStatus === 'Disapproved' ? (
+      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 shrink-0">Disapproved</span>
+    ) : (
+      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 shrink-0">Pending</span>
+    );
+    return (
+      <div className="space-y-4">
+        <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-black text-slate-900 text-sm truncate">{u.fullName || u.displayName || 'Student'}</div>
+            <div className="text-xs text-slate-500 font-semibold truncate">{u.email || '-'}</div>
+          </div>
+          {statusChip}
+        </div>
+
+        {section('Profile & Account', (
+          <>
+            <div className="divide-y divide-slate-100">
+              {row('Email', u.email)}
+              {row('WhatsApp / Phone', u.whatsapp || u.phone)}
+              {row('Gender', u.gender)}
+              {row('State', u.state)}
+              {row('Experience level', u.experience)}
+              {row('Commitment availability', u.availability)}
+              {row('Joined', u.createdAt ? formatFirestoreDateTime(u.createdAt) : null)}
+            </div>
+            <div className="mt-3">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cohort placement</div>
+              <CustomDropdown
+                                      value={u.cohort || 'Cohort 1'}
+                                      onChange={async (val) => {
+                                        const targetCohort = val;
+                                        try {
+                                          await updateDoc(doc(db, 'users', u.id), {
+                                            cohort: targetCohort,
+                                            updatedAt: serverTimestamp()
+                                          });
+                                          await triggerSystemSignal('user_signals', u.id);
+                                          setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, cohort: targetCohort } : usr));
+                                          alert(`Moved student to ${targetCohort} successfully!`);
+                                        } catch (err) {
+                                          console.error("Error moving student cohort:", err);
+                                          alert("Failed to update cohort. Please try again.");
+                                        }
+                                      }}
+                                      options={allAvailableCohorts.map(cohort => ({
+                                        label: cohort,
+                                        value: cohort
+                                      }))}
+                                      className="w-full"
+                                      theme="light"
+                                    />
+            </div>
+            <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+              <span className="text-slate-500 font-semibold">Role:</span>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                u.email?.toLowerCase() === 'developermike5@gmail.com'
+                  ? 'bg-purple-100 text-purple-800'
+                  : admins.includes(u.id)
+                    ? 'bg-indigo-100 text-indigo-800'
+                    : 'bg-slate-100 text-slate-700'
+              }`}>
+                {u.email?.toLowerCase() === 'developermike5@gmail.com'
+                  ? 'Super Admin 👑'
+                  : admins.includes(u.id)
+                    ? `${adminsData[u.id]?.role || 'CIYA Admin'} 💻`
+                    : 'Student 🎓'}
+              </span>
+            </div>
+          </>
+        ))}
+
+        {section('Application Answers', (
+          <>
+            <div className="divide-y divide-slate-100">
+              {row('What are you building CIYA Academy for?', u.intent)}
+              {row('Primary learning goal', u.goal)}
+              {row('Knowledge / tools background', u.pathwayExperience || u.experience)}
+              {row('Reason for choosing this pathway', u.pathwayReason)}
+              {row('System suggested path', u.recommendedPath)}
+              {row('Choice selections', u.courseType ? `${u.courseType}${u.pathwaySelection ? ` (${u.pathwaySelection})` : ''}` : null)}
+            </div>
+            {Array.isArray(u.registeredCourses) && u.registeredCourses.length > 0 && (
+              <div className="mt-3">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Registered courses</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {u.registeredCourses.filter((rc: string) => rc && rc.trim()).map((rc: string, idx: number) => {
+                    const lower = rc.trim().toLowerCase();
+                    const matched = allCourses.find(c => (c.id && String(c.id).toLowerCase() === lower) || (c.title && String(c.title).toLowerCase() === lower));
+                    const title = matched?.title || rc;
+                    const isAdv = matched
+                      ? (matched.tier === 'advanced' || matched.tier === 'masterclass' || matched.level === 'Advanced' || matched.level === 'Masterclass')
+                      : (lower.includes('adv') || lower.includes('masterclass'));
+                    return (
+                      <span key={idx} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase ${isAdv ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'}`}>
+                        {isAdv ? '⚡' : '📘'} {title}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        ))}
+
+        {section('Access & Admin Controls', (
+          <>
+            <div className="mb-3">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">🔑 Training Activation Code</div>
+              <div className="flex gap-2 items-center text-xs flex-wrap">
+                <input
+                  type="text"
+                  placeholder="No code set"
+                  value={editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || '')}
+                  onChange={(e) => setEditingCodes(prev => ({ ...prev, [u.id]: e.target.value.toUpperCase() }))}
+                  className="bg-white border-2 border-slate-300 rounded px-2.5 py-1 text-xs font-mono font-bold text-slate-950 focus:outline-none focus:border-indigo-600 w-36 shadow-sm transition-all"
+                />
+                <button
+                  onClick={() => handleUpdateAdminCode(u.id, editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || ''))}
+                  className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 rounded transition-colors cursor-pointer"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    const code = editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || '');
+                    if (code) {
+                      navigator.clipboard.writeText(code);
+                      alert(`Copied activation code: ${code}`);
+                    }
+                  }}
+                  className="text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded transition-colors cursor-pointer"
+                  disabled={!(editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || ''))}
+                >
+                  Copy
+                </button>
+              </div>
+              {codeSuccessId === u.id && (
+                <span className="text-[10px] font-bold text-emerald-600 block mt-1">✓ Code saved successfully!</span>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between text-xs py-2 border-t border-slate-100">
+              <span className="text-slate-500 font-semibold">Dashboard access:</span>
+              <button
+                onClick={() => handleToggleDashboardUnlock(u.id, u.isDashboardUnlocked === true)}
+                className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                  u.isDashboardUnlocked ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                }`}
+              >
+                {u.isDashboardUnlocked ? '🔓 Access Active (Lock)' : '🔒 Locked (Unlock)'}
+              </button>
+            </div>
+
+            {isSuperAdmin && u.email?.toLowerCase() !== 'developermike5@gmail.com' && (
+              <div className="py-2 border-t border-slate-100 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-semibold">Admin access:</span>
+                  <button
+                    onClick={() => handleToggleAdminStatus(u)}
+                    className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                      admins.includes(u.id) ? 'bg-rose-100 text-rose-800 hover:bg-rose-200' : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'
+                    }`}
+                  >
+                    {admins.includes(u.id) ? '🔒 Revoke Admin Power' : '🔑 Upgrade to Admin'}
+                  </button>
+                </div>
+                {admins.includes(u.id) && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Custom Admin Role/Title</label>
+                        {adminDrafts[u.id] !== undefined && (
+                          <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            UNSAVED EDITS ⚠️
+                          </span>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        className="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-teal-500 w-full"
+                        placeholder="e.g. CIYA Admin, Content Editor"
+                        value={getAdminRoleValue(u.id)}
+                        onChange={(e) => handleDraftRoleChange(u.id, e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Grant Specific Powers</span>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-700 select-none">
+                        <input
+                          type="checkbox"
+                          checked={getAdminPermissionsValue(u.id).includes('manage_courses')}
+                          onChange={() => handleDraftTogglePermission(u.id, 'manage_courses')}
+                          className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
+                        />
+                        Course Management
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-700 select-none">
+                        <input
+                          type="checkbox"
+                          checked={getAdminPermissionsValue(u.id).includes('manage_students')}
+                          onChange={() => handleDraftTogglePermission(u.id, 'manage_students')}
+                          className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
+                        />
+                        Student & Stats Management
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-700 select-none">
+                        <input
+                          type="checkbox"
+                          checked={getAdminPermissionsValue(u.id).includes('manage_branding')}
+                          onChange={() => handleDraftTogglePermission(u.id, 'manage_branding')}
+                          className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
+                        />
+                        Branding & Logo Management
+                      </label>
+                    </div>
+                    <div className="pt-2 border-t border-slate-200 flex justify-end">
+                      <button
+                        type="button"
+                        disabled={savingAdminId === u.id}
+                        onClick={() => handleSaveAdminPrivileges(u.id, u.email)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-black transition-all flex items-center gap-1 cursor-pointer ${
+                          adminDrafts[u.id] !== undefined ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                        }`}
+                      >
+                        {savingAdminId === u.id ? 'Saving...' : adminDrafts[u.id] !== undefined ? '💾 Save Privileges' : '✓ Privileges Synced'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="py-2 border-t border-slate-100">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">🏷️ Year badge</div>
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className={`text-xs font-black ${u.hasYearBadge ? 'text-amber-700' : 'text-slate-400'}`}>
+                  {u.hasYearBadge ? 'Badge Active (Paid/Granted)' : 'No Badge Active'}
+                </span>
+                <button
+                                        type="button"
+                                        onClick={async () => {
+                                          const nextVal = !u.hasYearBadge;
+                                          try {
+                                            const updateData: any = {
+                                              hasYearBadge: nextVal,
+                                              updatedAt: serverTimestamp()
+                                            };
+
+                                            if (nextVal) {
+                                              const year = new Date().getFullYear();
+                                              const randNum = Math.floor(1000 + Math.random() * 9000);
+                                              const membershipId = u.membershipId || `CIYA-PRO-${year}-${randNum}`;
+                                              const startDate = Date.now();
+                                              const expiryDate = startDate + 30 * 24 * 60 * 60 * 1000;
+
+                                              updateData.badgePaymentRequestStatus = 'Approved';
+                                              updateData.badgePurchaseDate = startDate;
+                                              updateData.badgeExpiryDate = expiryDate;
+                                              updateData.membershipId = membershipId;
+
+                                              // Send Notification
+                                              await addDoc(collection(db, 'notifications'), {
+                                                userId: u.id,
+                                                title: 'Upgraded to CIYA Student Pro! 🎖️🚀',
+                                                message: `Congratulations! Your payment has been approved and confirmed by the Academy Admin. You have been officially upgraded to "CIYA Student Pro" and are now a member of the elite CIYA ecosystem!
+
+Your exclusive benefits include:
+• 🏷️ Verified CIYA Badge: Displayed on your profile page.
+• 📁 Profile Photo Upload: Customize your badge with a professional photo before download.
+• 🚀 30-Day Ecosystem Membership: Valid from ${new Date(startDate).toLocaleDateString()} to ${new Date(expiryDate).toLocaleDateString()}.
+• 🎓 Advanced Syllabus Access: Access to specialized courses, assignments, and practical training templates.
+• 💻 Netlify Verified Link: Host and showcase your projects with premium support.
+
+Please go to your profile now to see your "CIYA badge" reflected, upload your photo, and download your high-resolution badge PNG to celebrate your status!`,
+                                                type: 'badge_upgrade',
+                                                isRead: false,
+                                                triggeredBy: 'Academy Admin Office',
+                                                createdAt: serverTimestamp()
+                                              });
+                                            }
+
+                                            await updateDoc(doc(db, 'users', u.id), updateData);
+                                            await triggerSystemSignal('user_signals', u.id);
+                                            setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, hasYearBadge: nextVal, membershipId: nextVal ? updateData.membershipId : usr.membershipId } : usr));
+                                            alert(`Year badge ${nextVal ? 'granted' : 'revoked'} successfully!`);
+                                          } catch (err) {
+                                            console.error(err);
+                                            alert("Failed to update Year Badge status.");
+                                          }
+                                        }}
+                                        className={`px-2.5 py-1 rounded text-[10px] font-black uppercase transition-all border-0 cursor-pointer ${
+                                          u.hasYearBadge 
+                                            ? 'bg-amber-150 text-amber-900 hover:bg-amber-200' 
+                                            : 'bg-slate-200 hover:bg-slate-300 text-slate-750'
+                                        }`}
+                                      >
+                                        {u.hasYearBadge ? 'Revoke Badge' : 'Grant Badge'}
+                                      </button>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">🎓 Course completion override</div>
+              {allCourses.length === 0 ? (
+                <p className="text-slate-400 text-xs italic">No courses in the system yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {allCourses.map(course => {
+                    const isCompleted = (Array.isArray(u.completedCoursesOverride) && u.completedCoursesOverride.includes(course.id || '')) || false;
+                    return (
+                      <div key={course.id} className="flex items-center justify-between bg-slate-50/50 p-2 rounded-xl border border-slate-200 text-xs">
+                        <span className="font-extrabold text-slate-800 truncate pr-2" title={course.title}>{course.title}</span>
+                        <button
+                                                type="button"
+                                                onClick={async () => {
+                                                  try {
+                                                    const currentCompleted = Array.isArray(u.completedCoursesOverride) ? u.completedCoursesOverride : [];
+                                                    let nextCompleted: string[];
+                                                    if (isCompleted) {
+                                                      nextCompleted = currentCompleted.filter(id => id !== course.id);
+                                                    } else {
+                                                      nextCompleted = [...currentCompleted, course.id || ''];
+                                                    }
+                                                    await updateDoc(doc(db, 'users', u.id), {
+                                                      completedCoursesOverride: nextCompleted,
+                                                      updatedAt: serverTimestamp()
+                                                    });
+                                                    await triggerSystemSignal('user_signals', u.id);
+                                                    setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, completedCoursesOverride: nextCompleted } : usr));
+                                                  } catch (err) {
+                                                    console.error("Error overriding course complete:", err);
+                                                    alert("Failed to update course override complete. Please try again.");
+                                                  }
+                                                }}
+                                                className={`shrink-0 px-2 py-1 rounded text-[9px] font-black uppercase transition-all border-0 cursor-pointer ${
+                                                  isCompleted 
+                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                                    : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                                                }`}
+                                              >
+                                                {isCompleted ? "✓ Completed" : "Mark Completed"}
+                                              </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        ))}
+
+        {section('Courses & Unlock Overrides', (
+          <>
+                                        {/* Course Switcher Section */}
+                            <div className="mt-6 pt-6 border-t border-slate-200">
+                              <h4 className="font-extrabold uppercase text-[10px] text-indigo-700 tracking-wider flex items-center gap-1.5 mb-3 bg-indigo-50 px-2.5 py-1 rounded-md inline-flex select-none">
+                                <span>🎓</span> Administrative Course Switcher (Change Active Pathway)
+                              </h4>
+                              <p className="text-xs text-slate-500 mb-4 font-semibold leading-relaxed">
+                                Use this panel to immediately re-route the student's assigned learning curriculum. This will update the student's homepage, milestones, and active lessons instantly.
+                              </p>
+
+                              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center gap-4">
+                                <div className="flex-1">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Select New Target Course Path</label>
+                                  <CustomDropdown
+                                    value={selectedCourses[u.id] !== undefined ? selectedCourses[u.id] : (getUserRegisteredCourses(u)[0]?.id || "")}
+                                    options={[
+                                      { label: '-- Choose a course pathway --', value: '', disabled: true },
+                                      ...allCourses.filter(c => !c.isCloned).map(course => ({
+                                        label: course.title,
+                                        value: course.id
+                                      }))
+                                    ]}
+                                    onChange={(val) => {
+                                      setSelectedCourses(prev => ({ ...prev, [u.id]: val }));
+                                      if (courseSwitchConfirmId === u.id) {
+                                        setCourseSwitchConfirmId(null);
+                                      }
+                                    }}
+                                    className="w-full"
+                                    theme="indigo"
+                                  />
+                                </div>
+
+                                <div className="flex flex-col gap-2 shrink-0 md:pt-4">
+                                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700 font-semibold">
+                                    <input
+                                      type="checkbox"
+                                      id={`clear-progress-chk-${u.id}`}
+                                      checked={clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : false}
+                                      onChange={(e) => {
+                                        setClearProgressMap(prev => ({ ...prev, [u.id]: e.target.checked }));
+                                      }}
+                                      className="accent-indigo-600 rounded bg-white w-4 h-4"
+                                    />
+                                    <span>Reset progress of this target course only (Warning: Wipes progress for this specific course)</span>
+                                  </label>
+                                  <button
+                                    type="button"
+                                    id={`btn-course-switch-${u.id}`}
+                                    onClick={() => {
+                                      const selectedId = selectedCourses[u.id] !== undefined ? selectedCourses[u.id] : (getUserRegisteredCourses(u)[0]?.id || "");
+                                      const clearProgress = clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : false;
+
+                                      if (!selectedId) {
+                                        alert("Please select a target course first.");
+                                        return;
+                                      }
+
+                                      if (courseSwitchConfirmId !== u.id) {
+                                        setCourseSwitchConfirmId(u.id);
+                                        return;
+                                      }
+
+                                      setCourseSwitchConfirmId(null);
+                                      handleSwitchCourse(u.id, selectedId, clearProgress);
+                                    }}
+                                    className={`px-4 py-2 font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-md transition-all duration-200 border-0 cursor-pointer text-center ${
+                                      courseSwitchConfirmId === u.id
+                                        ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
+                                        : 'bg-indigo-600 hover:bg-indigo-750 text-white'
+                                    }`}
+                                  >
+                                    {courseSwitchConfirmId === u.id ? '⚠️ Click again to CONFIRM! ⚠️' : 'Change Course Path Now'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+
+                                        {/* Registered Courses & Manual Lesson Unlock Override Section */}
+                            <div className="mt-6 pt-6 border-t border-slate-200">
+                              <h4 className="font-extrabold uppercase text-[10px] text-indigo-700 tracking-wider flex items-center gap-1.5 mb-3 bg-indigo-50 px-2.5 py-1 rounded-md inline-flex select-none">
+                                <span>📚</span> Registered Courses & Manual Lesson Unlock Override
+                              </h4>
+                              <p className="text-xs text-slate-500 mb-4 font-semibold leading-relaxed">
+                                Click on any Day (D1 - D5) to manually approve and unlock that day's lessons and assignments for this student, bypassing quiz checks and prerequisite watch requirements.
+                              </p>
+                              
+                              {getUserRegisteredCourses(u).length === 0 ? (
+                                <div className="bg-white border rounded-xl p-4 text-center text-xs text-slate-400 font-bold uppercase tracking-wider">
+                                  No registered courses found matching student's onboarding pathway.
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {getUserRegisteredCourses(u).map(course => {
+                                    const days = course.days || [];
+                                    return (
+                                      <div key={course.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 transition-colors">
+                                        <div className="space-y-0.5">
+                                          <span className="text-[9px] font-black uppercase text-indigo-600 tracking-wider">Course Pathway</span>
+                                          <h5 className="font-extrabold text-slate-900 text-xs truncate max-w-[200px]" title={course.title}>{course.title}</h5>
+                                          <p className="text-[10px] text-slate-400 font-semibold">ID: {course.id} • {days.length} days total</p>
+                                        </div>
+                                        
+                                        <div className="flex flex-wrap gap-1.5 items-center">
+                                          {[0, 1, 2, 3, 4].map((dayIdx) => {
+                                            const dayNumber = dayIdx + 1;
+                                            const isUnlocked = u.manualDayUnlock?.[course.id || '']?.[dayIdx] === true;
+                                            
+                                            return (
+                                              <button
+                                                key={dayIdx}
+                                                type="button"
+                                                onClick={() => handleToggleDayUnlock(u.id, course.id || '', dayIdx, isUnlocked)}
+                                                className={`h-8 px-2.5 text-xs font-black rounded-lg border flex items-center gap-1 transition-all shadow-sm cursor-pointer select-none ${
+                                                  isUnlocked
+                                                    ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+                                                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                                                }`}
+                                                title={`Toggle Day ${dayNumber} Manual Unlock Override`}
+                                              >
+                                                <span>D{dayNumber}</span>
+                                                {isUnlocked ? (
+                                                  <span className="text-[9px] font-bold">✓</span>
+                                                ) : (
+                                                  <span className="text-slate-400 text-[9px] font-bold">🔒</span>
+                                                )}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          
+          </>
+        ))}
+      </div>
+    );
+  };
+
 
   return (
     <div>
@@ -1438,12 +1945,11 @@ export default function UsersAdmin() {
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
                 {filteredUsers.map((u) => {
-                  const isUserExpanded = expandedUserId === u.id;
                   const isAppPending = !u.approvalStatus || u.approvalStatus === 'Pending';
                   
                   return (
                     <React.Fragment key={u.id}>
-                      <tr className={`hover:bg-slate-50/50 transition-colors ${isUserExpanded ? 'bg-indigo-50/20' : ''}`}>
+                      <tr className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-4 py-3">
                           <div className="font-bold text-slate-900 leading-tight mb-1">{u.fullName || '-'}</div>
                           <div className="text-slate-500 text-xs">{u.gender ? `${u.gender} • ` : ''}{u.state || '-'}</div>
@@ -1456,16 +1962,6 @@ export default function UsersAdmin() {
                             </div>
                           )}
                           
-                          <div className="mt-2.5">
-                            <button
-                              onClick={() => setExpandedUserId(isUserExpanded ? null : u.id)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 hover:border-indigo-300 rounded-lg cursor-pointer transition-all shadow-sm"
-                            >
-                              {isUserExpanded ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                              <span>{isUserExpanded ? 'Hide Details' : 'Show Full Details'}</span>
-                            </button>
-                          </div>
-
                           {u.adminCode && (
                             <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                               <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/60 rounded font-mono font-black text-xs select-all shadow-sm">
@@ -1562,569 +2058,53 @@ export default function UsersAdmin() {
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {/* Expand Row details */}
-                            <button 
-                              onClick={() => setExpandedUserId(isUserExpanded ? null : u.id)}
-                              title={isUserExpanded ? "Hide Details" : "Show Full Details"}
-                              className={`p-1.5 rounded transition-all ${isUserExpanded ? 'bg-slate-200 text-slate-800' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                          <div className="flex items-center justify-center gap-2">
+                            <RowActionsDropdown
+                              label="Actions"
+                              actions={[
+                                {
+                                  label: 'Approve application',
+                                  icon: actionIcons.approve,
+                                  success: true,
+                                  title: 'Approve User Application',
+                                  disabled: u.approvalStatus === 'Approved' || (actionLoading[u.id] !== undefined && actionLoading[u.id] !== null),
+                                  onClick: () => handleApprove(u.id),
+                                },
+                                {
+                                  label: 'Disapprove application',
+                                  icon: actionIcons.disapprove,
+                                  danger: true,
+                                  title: 'Disapprove User Application',
+                                  disabled: u.approvalStatus === 'Disapproved' || (actionLoading[u.id] !== undefined && actionLoading[u.id] !== null),
+                                  onClick: () => handleDisapprove(u.id),
+                                },
+                                {
+                                  label: 'Delete record',
+                                  icon: actionIcons.delete,
+                                  danger: true,
+                                  title: 'Delete student record',
+                                  disabled: actionLoading[u.id] !== undefined && actionLoading[u.id] !== null,
+                                  onClick: () => {
+                                    if (window.confirm(`Delete ${(u.fullName || u.email || 'this student')}\'s record permanently? This cannot be undone.`)) {
+                                      performDelete(u.id);
+                                    }
+                                  },
+                                },
+                              ]}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setDetailUserId(u.id)}
+                              className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 font-bold text-xs hover:bg-indigo-100 transition-all cursor-pointer shadow-sm"
+                              title="View full student details"
                             >
-                              {isUserExpanded ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-
-                            {/* Approve */}
-                            <button 
-                              disabled={u.approvalStatus === 'Approved' || (actionLoading[u.id] !== undefined && actionLoading[u.id] !== null)}
-                              onClick={() => handleApprove(u.id)}
-                              title="Approve User Application"
-                              className={`p-1.5 rounded transition-all ${
-                                u.approvalStatus === 'Approved' 
-                                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed' 
-                                  : 'bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100'
-                              }`}
-                            >
-                              <Check className="w-4 h-4 stroke-[3]" />
-                            </button>
-
-                            {/* Disapprove */}
-                            <button 
-                              disabled={u.approvalStatus === 'Disapproved' || (actionLoading[u.id] !== undefined && actionLoading[u.id] !== null)}
-                              onClick={() => handleDisapprove(u.id)}
-                              title="Disapprove User Application"
-                              className={`p-1.5 rounded transition-all ${
-                                u.approvalStatus === 'Disapproved' 
-                                  ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed' 
-                                  : 'bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100'
-                              }`}
-                            >
-                              <X className="w-4 h-4 stroke-[3]" />
-                            </button>
-
-                            {/* Delete Button (Double click to confirm) */}
-                            <button 
-                              disabled={actionLoading[u.id] !== undefined && actionLoading[u.id] !== null}
-                              onClick={() => handleDeleteClick(u.id)}
-                              title={deleteConfirmId === u.id ? "Click again to confirm delete" : "Delete student record"}
-                              className={`px-2 py-1.5 text-xs font-bold rounded transition-all duration-200 ${
-                                deleteConfirmId === u.id 
-                                  ? 'bg-rose-600 text-white animate-pulse' 
-                                  : 'bg-slate-100 text-rose-600 border border-slate-200 hover:bg-rose-50'
-                              }`}
-                            >
-                              {deleteConfirmId === u.id ? "Confirm?" : <Trash2 className="w-4 h-4" />}
+                              See Full Details
                             </button>
                           </div>
                         </td>
                       </tr>
 
-                      {/* Expandable row: Question & Answers metadata */}
-                      {isUserExpanded && (
-                        <tr className="bg-slate-50/50">
-                          <td colSpan={6} className="px-6 py-4 border-t border-b border-indigo-100/50">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-                              <div className="space-y-1.5">
-                                <h4 className="font-extrabold uppercase text-[10px] text-indigo-700 tracking-wider flex items-center gap-1 mb-1 bg-indigo-50 px-2 py-0.5 rounded-md inline-block">
-                                  <span>🎯</span> Motivation & Intent
-                                </h4>
-                                <p className="text-slate-700 text-xs leading-relaxed">
-                                  <strong className="text-slate-800 font-semibold">What are you building CIYA Academy for?</strong> <br/>
-                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-200 block mt-1">{u.intent || 'Not answered'}</span>
-                                </p>
-                                <p className="text-slate-700 text-xs leading-relaxed mt-2">
-                                  <strong className="text-slate-800 font-semibold">Primary target learning goal:</strong> <br/>
-                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-200 block mt-1">{u.goal || 'Not answered'}</span>
-                                </p>
-                              </div>
 
-                              <div className="space-y-1.5">
-                                <h4 className="font-extrabold uppercase text-[10px] text-teal-700 tracking-wider flex items-center gap-1 mb-1 bg-teal-50 px-2 py-0.5 rounded-md inline-block">
-                                  <span>⚙️</span> Skills & Experience
-                                </h4>
-                                <p className="text-slate-700 text-xs leading-relaxed">
-                                  <strong className="text-slate-800 font-semibold">Knowledge or tools/code background:</strong> <br/>
-                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-200 block mt-1">{u.pathwayExperience || u.experience || 'Not answered'}</span>
-                                </p>
-                                <p className="text-slate-700 text-xs leading-relaxed mt-2">
-                                  <strong className="text-slate-800 font-semibold">Reason for choosing this pathway:</strong> <br/>
-                                  <span className="text-slate-600 italic bg-white p-2 rounded border border-slate-200 block mt-1">{u.pathwayReason || 'Not answered'}</span>
-                                </p>
-                              </div>
-
-                              <div className="space-y-1.5">
-                                <h4 className="font-extrabold uppercase text-[10px] text-pink-700 tracking-wider flex items-center gap-1 mb-1 bg-pink-50 px-2 py-0.5 rounded-md inline-block">
-                                  <span>📋</span> Extra Metadata
-                                </h4>
-                                <div className="bg-white p-3 rounded border border-slate-200 space-y-2 text-xs">
-                                  <div>
-                                    <span className="text-slate-400 block font-bold text-[9px] uppercase">Commitment Availability</span>
-                                    <span className="font-medium text-slate-800">{u.availability || 'Not answered'}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-slate-400 block font-bold text-[9px] uppercase">Joined Date & Time</span>
-                                    <span className="font-medium text-slate-800">
-                                      {formatFirestoreDateTime(u.createdAt)}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-slate-400 block font-bold text-[9px] uppercase">Path Routing & Details</span>
-                                    <span className="font-medium text-slate-800">
-                                      System suggested: <strong className="text-slate-900">{u.recommendedPath || '-'}</strong> <br/>
-                                      Choice selections: <strong className="text-slate-900">{u.courseType || ''} {u.pathwaySelection ? `(${u.pathwaySelection})` : ''}</strong>
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-slate-400 block font-bold text-[9px] uppercase">Cohort Placement</span>
-                                    <CustomDropdown
-                                      value={u.cohort || 'Cohort 1'}
-                                      onChange={async (val) => {
-                                        const targetCohort = val;
-                                        try {
-                                          await updateDoc(doc(db, 'users', u.id), {
-                                            cohort: targetCohort,
-                                            updatedAt: serverTimestamp()
-                                          });
-                                          await triggerSystemSignal('user_signals', u.id);
-                                          setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, cohort: targetCohort } : usr));
-                                          alert(`Moved student to ${targetCohort} successfully!`);
-                                        } catch (err) {
-                                          console.error("Error moving student cohort:", err);
-                                          alert("Failed to update cohort. Please try again.");
-                                        }
-                                      }}
-                                      options={allAvailableCohorts.map(cohort => ({
-                                        label: cohort,
-                                        value: cohort
-                                      }))}
-                                      className="w-full"
-                                      theme="light"
-                                    />
-                                  </div>
-
-                                  <div className="pt-2.5 border-t border-slate-150 mt-2.5">
-                                    <span className="text-slate-500 block font-bold text-[9px] uppercase tracking-wider">🏷️ Year Badge Ownership</span>
-                                    <div className="flex items-center justify-between mt-1.5 bg-slate-100/50 p-2 rounded-xl border border-slate-205">
-                                      <span className={`text-xs font-black ${u.hasYearBadge ? 'text-amber-700' : 'text-slate-450'}`}>
-                                        {u.hasYearBadge ? '🏷️ Badge Active (Paid/Granted)' : 'No Badge Active'}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          const nextVal = !u.hasYearBadge;
-                                          try {
-                                            const updateData: any = {
-                                              hasYearBadge: nextVal,
-                                              updatedAt: serverTimestamp()
-                                            };
-
-                                            if (nextVal) {
-                                              const year = new Date().getFullYear();
-                                              const randNum = Math.floor(1000 + Math.random() * 9000);
-                                              const membershipId = u.membershipId || `CIYA-PRO-${year}-${randNum}`;
-                                              const startDate = Date.now();
-                                              const expiryDate = startDate + 30 * 24 * 60 * 60 * 1000;
-
-                                              updateData.badgePaymentRequestStatus = 'Approved';
-                                              updateData.badgePurchaseDate = startDate;
-                                              updateData.badgeExpiryDate = expiryDate;
-                                              updateData.membershipId = membershipId;
-
-                                              // Send Notification
-                                              await addDoc(collection(db, 'notifications'), {
-                                                userId: u.id,
-                                                title: 'Upgraded to CIYA Student Pro! 🎖️🚀',
-                                                message: `Congratulations! Your payment has been approved and confirmed by the Academy Admin. You have been officially upgraded to "CIYA Student Pro" and are now a member of the elite CIYA ecosystem!
-
-Your exclusive benefits include:
-• 🏷️ Verified CIYA Badge: Displayed on your profile page.
-• 📁 Profile Photo Upload: Customize your badge with a professional photo before download.
-• 🚀 30-Day Ecosystem Membership: Valid from ${new Date(startDate).toLocaleDateString()} to ${new Date(expiryDate).toLocaleDateString()}.
-• 🎓 Advanced Syllabus Access: Access to specialized courses, assignments, and practical training templates.
-• 💻 Netlify Verified Link: Host and showcase your projects with premium support.
-
-Please go to your profile now to see your "CIYA badge" reflected, upload your photo, and download your high-resolution badge PNG to celebrate your status!`,
-                                                type: 'badge_upgrade',
-                                                isRead: false,
-                                                triggeredBy: 'Academy Admin Office',
-                                                createdAt: serverTimestamp()
-                                              });
-                                            }
-
-                                            await updateDoc(doc(db, 'users', u.id), updateData);
-                                            await triggerSystemSignal('user_signals', u.id);
-                                            setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, hasYearBadge: nextVal, membershipId: nextVal ? updateData.membershipId : usr.membershipId } : usr));
-                                            alert(`Year badge ${nextVal ? 'granted' : 'revoked'} successfully!`);
-                                          } catch (err) {
-                                            console.error(err);
-                                            alert("Failed to update Year Badge status.");
-                                          }
-                                        }}
-                                        className={`px-2.5 py-1 rounded text-[10px] font-black uppercase transition-all border-0 cursor-pointer ${
-                                          u.hasYearBadge 
-                                            ? 'bg-amber-150 text-amber-900 hover:bg-amber-200' 
-                                            : 'bg-slate-200 hover:bg-slate-300 text-slate-750'
-                                        }`}
-                                      >
-                                        {u.hasYearBadge ? 'Revoke Badge' : 'Grant Badge'}
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  <div className="col-span-full pt-3 border-t border-slate-100 mt-2">
-                                    <span className="text-slate-500 block font-bold text-[9px] uppercase tracking-wider mb-2">🎓 Special Override: Course Completion</span>
-                                    {allCourses.length === 0 ? (
-                                      <p className="text-slate-400 text-xs italic">No courses in the system yet.</p>
-                                    ) : (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                                        {allCourses.map(course => {
-                                          const isCompleted = (Array.isArray(u.completedCoursesOverride) && u.completedCoursesOverride.includes(course.id || '')) || false;
-                                          return (
-                                            <div key={course.id} className="flex items-center justify-between bg-slate-50/50 p-2 rounded-xl border border-slate-200 text-xs">
-                                              <span className="font-extrabold text-slate-800 truncate pr-2" title={course.title}>
-                                                {course.title}
-                                              </span>
-                                              <button
-                                                type="button"
-                                                onClick={async () => {
-                                                  try {
-                                                    const currentCompleted = Array.isArray(u.completedCoursesOverride) ? u.completedCoursesOverride : [];
-                                                    let nextCompleted: string[];
-                                                    if (isCompleted) {
-                                                      nextCompleted = currentCompleted.filter(id => id !== course.id);
-                                                    } else {
-                                                      nextCompleted = [...currentCompleted, course.id || ''];
-                                                    }
-                                                    await updateDoc(doc(db, 'users', u.id), {
-                                                      completedCoursesOverride: nextCompleted,
-                                                      updatedAt: serverTimestamp()
-                                                    });
-                                                    await triggerSystemSignal('user_signals', u.id);
-                                                    setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, completedCoursesOverride: nextCompleted } : usr));
-                                                  } catch (err) {
-                                                    console.error("Error overriding course complete:", err);
-                                                    alert("Failed to update course override complete. Please try again.");
-                                                  }
-                                                }}
-                                                className={`shrink-0 px-2 py-1 rounded text-[9px] font-black uppercase transition-all border-0 cursor-pointer ${
-                                                  isCompleted 
-                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
-                                                    : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
-                                                }`}
-                                              >
-                                                {isCompleted ? "✓ Completed" : "Mark Completed"}
-                                              </button>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="pt-2.5 border-t border-slate-100 mt-2.5 space-y-2">
-                                    <span className="text-slate-500 block font-bold text-[9px] uppercase tracking-wider">🔑 Training Activation Code</span>
-                                    <div className="flex gap-2 items-center text-xs">
-                                      <input 
-                                        type="text"
-                                        placeholder="No code set"
-                                        value={editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || '')}
-                                        onChange={(e) => setEditingCodes(prev => ({ ...prev, [u.id]: e.target.value.toUpperCase() }))}
-                                        className="bg-white border-2 border-slate-400 rounded px-2.5 py-1 text-xs font-mono font-bold text-slate-950 focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-550/20 w-36 shadow-sm transition-all"
-                                      />
-                                      <button 
-                                        onClick={() => handleUpdateAdminCode(u.id, editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || ''))}
-                                        className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-750 px-2.5 py-1.5 rounded transition-colors"
-                                      >
-                                        Save
-                                      </button>
-                                      
-                                      <button 
-                                        onClick={() => {
-                                          const code = editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || '');
-                                          if (code) {
-                                            navigator.clipboard.writeText(code);
-                                            alert(`Copied activation code: ${code}`);
-                                          }
-                                        }}
-                                        className="text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded transition-colors"
-                                        title="Copy code to send to student"
-                                        disabled={!(editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || ''))}
-                                      >
-                                        Copy
-                                      </button>
-                                    </div>
-                                    {codeSuccessId === u.id && (
-                                      <span className="text-[10px] font-bold text-emerald-600 block">✓ Code saved successfully!</span>
-                                    )}
-
-                                    <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/50 mt-1">
-                                      <span className="text-slate-500 font-semibold">User Role:</span>
-                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                        u.email?.toLowerCase() === 'developermike5@gmail.com'
-                                          ? 'bg-purple-101 text-purple-800'
-                                          : admins.includes(u.id)
-                                            ? 'bg-indigo-101 text-indigo-805 animate-pulse'
-                                            : 'bg-slate-101 text-slate-700'
-                                      }`}>
-                                        {u.email?.toLowerCase() === 'developermike5@gmail.com'
-                                          ? 'Super Admin 👑'
-                                          : admins.includes(u.id)
-                                            ? `${adminsData[u.id]?.role || 'CIYA Admin'} 💻`
-                                            : 'Student 🎓'}
-                                      </span>
-                                    </div>
-
-                                    {isSuperAdmin && u.email?.toLowerCase() !== 'developermike5@gmail.com' && (
-                                      <>
-                                        <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/50 mt-1">
-                                          <span className="text-slate-500 font-semibold">Admin Access:</span>
-                                          <button
-                                            onClick={() => handleToggleAdminStatus(u)}
-                                            className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                                              admins.includes(u.id)
-                                                ? 'bg-rose-100 text-rose-800 hover:bg-rose-200' 
-                                                : 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'
-                                            }`}
-                                          >
-                                            {admins.includes(u.id) ? '🔒 Revoke Admin Power' : '🔑 Upgrade to Admin'}
-                                          </button>
-                                        </div>
-
-                                        {admins.includes(u.id) && (
-                                          <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 mt-2 space-y-2.5 text-left">
-                                            <div className="flex flex-col gap-1">
-                                              <div className="flex justify-between items-center bg-transparent border-0 select-none">
-                                                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Custom Admin Role/Title</label>
-                                                {adminDrafts[u.id] !== undefined && (
-                                                  <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 animate-pulse">
-                                                    UNSAVED EDITS ⚠️
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <input
-                                                type="text"
-                                                className="bg-white border border-slate-300 rounded-md px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-teal-500 w-full"
-                                                placeholder="e.g. CIYA Admin, Content Editor"
-                                                value={getAdminRoleValue(u.id)}
-                                                onChange={(e) => handleDraftRoleChange(u.id, e.target.value)}
-                                              />
-                                            </div>
-                                            <div className="space-y-1">
-                                              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Grant Specific Powers</span>
-                                              <div className="space-y-1 text-xs text-slate-700">
-                                                <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none">
-                                                  <input 
-                                                    type="checkbox"
-                                                    checked={getAdminPermissionsValue(u.id).includes('manage_courses')}
-                                                    onChange={() => handleDraftTogglePermission(u.id, 'manage_courses')}
-                                                    className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
-                                                  />
-                                                  Course Management
-                                                </label>
-                                                <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none">
-                                                  <input 
-                                                    type="checkbox"
-                                                    checked={getAdminPermissionsValue(u.id).includes('manage_students')}
-                                                    onChange={() => handleDraftTogglePermission(u.id, 'manage_students')}
-                                                    className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
-                                                  />
-                                                  Student & Stats Management
-                                                </label>
-                                                <label className="flex items-center gap-1.5 cursor-pointer hover:text-slate-900 select-none">
-                                                  <input 
-                                                    type="checkbox"
-                                                    checked={getAdminPermissionsValue(u.id).includes('manage_branding')}
-                                                    onChange={() => handleDraftTogglePermission(u.id, 'manage_branding')}
-                                                    className="accent-indigo-600 rounded bg-white w-3.5 h-3.5"
-                                                  />
-                                                  Branding & Logo Management
-                                                </label>
-                                              </div>
-                                            </div>
-
-                                            <div className="pt-2 border-t border-slate-250 flex justify-end">
-                                              <button
-                                                type="button"
-                                                disabled={savingAdminId === u.id}
-                                                onClick={() => handleSaveAdminPrivileges(u.id, u.email)}
-                                                className={`px-3 py-1.5 rounded-md text-xs font-black transition-all border-none flex items-center gap-1 cursor-pointer outline-none ${
-                                                  adminDrafts[u.id] !== undefined
-                                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow shadow-emerald-600/25 ring-2 ring-emerald-450/15'
-                                                    : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
-                                                }`}
-                                              >
-                                                {savingAdminId === u.id ? (
-                                                  <>
-                                                    <span className="animate-spin inline-block w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full mr-1 animate-ping" />
-                                                    Saving...
-                                                  </>
-                                                ) : adminDrafts[u.id] !== undefined ? (
-                                                  "💾 Save Privileges"
-                                                ) : (
-                                                  "✓ Privileges Synced"
-                                                )}
-                                              </button>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </>
-                                    )}
-
-                                    <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100/50 mt-1">
-                                      <span className="text-slate-500 font-semibold">Dashboard Access:</span>
-                                      <button
-                                        onClick={() => handleToggleDashboardUnlock(u.id, u.isDashboardUnlocked === true)}
-                                        className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                                          u.isDashboardUnlocked 
-                                            ? 'bg-emerald-100 text-emerald-805' 
-                                            : 'bg-amber-100 text-amber-800'
-                                        }`}
-                                      >
-                                        {u.isDashboardUnlocked ? '🔓 Access Active (Lock)' : '🔒 Locked (Unlock)'}
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Course Switcher Section */}
-                            <div className="mt-6 pt-6 border-t border-slate-200">
-                              <h4 className="font-extrabold uppercase text-[10px] text-indigo-700 tracking-wider flex items-center gap-1.5 mb-3 bg-indigo-50 px-2.5 py-1 rounded-md inline-flex select-none">
-                                <span>🎓</span> Administrative Course Switcher (Change Active Pathway)
-                              </h4>
-                              <p className="text-xs text-slate-500 mb-4 font-semibold leading-relaxed">
-                                Use this panel to immediately re-route the student's assigned learning curriculum. This will update the student's homepage, milestones, and active lessons instantly.
-                              </p>
-
-                              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center gap-4">
-                                <div className="flex-1">
-                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Select New Target Course Path</label>
-                                  <CustomDropdown
-                                    value={selectedCourses[u.id] !== undefined ? selectedCourses[u.id] : (getUserRegisteredCourses(u)[0]?.id || "")}
-                                    options={[
-                                      { label: '-- Choose a course pathway --', value: '', disabled: true },
-                                      ...allCourses.filter(c => !c.isCloned).map(course => ({
-                                        label: course.title,
-                                        value: course.id
-                                      }))
-                                    ]}
-                                    onChange={(val) => {
-                                      setSelectedCourses(prev => ({ ...prev, [u.id]: val }));
-                                      if (courseSwitchConfirmId === u.id) {
-                                        setCourseSwitchConfirmId(null);
-                                      }
-                                    }}
-                                    className="w-full"
-                                    theme="indigo"
-                                  />
-                                </div>
-
-                                <div className="flex flex-col gap-2 shrink-0 md:pt-4">
-                                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700 font-semibold">
-                                    <input
-                                      type="checkbox"
-                                      id={`clear-progress-chk-${u.id}`}
-                                      checked={clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : false}
-                                      onChange={(e) => {
-                                        setClearProgressMap(prev => ({ ...prev, [u.id]: e.target.checked }));
-                                      }}
-                                      className="accent-indigo-600 rounded bg-white w-4 h-4"
-                                    />
-                                    <span>Reset progress of this target course only (Warning: Wipes progress for this specific course)</span>
-                                  </label>
-                                  <button
-                                    type="button"
-                                    id={`btn-course-switch-${u.id}`}
-                                    onClick={() => {
-                                      const selectedId = selectedCourses[u.id] !== undefined ? selectedCourses[u.id] : (getUserRegisteredCourses(u)[0]?.id || "");
-                                      const clearProgress = clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : false;
-
-                                      if (!selectedId) {
-                                        alert("Please select a target course first.");
-                                        return;
-                                      }
-
-                                      if (courseSwitchConfirmId !== u.id) {
-                                        setCourseSwitchConfirmId(u.id);
-                                        return;
-                                      }
-
-                                      setCourseSwitchConfirmId(null);
-                                      handleSwitchCourse(u.id, selectedId, clearProgress);
-                                    }}
-                                    className={`px-4 py-2 font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-md transition-all duration-200 border-0 cursor-pointer text-center ${
-                                      courseSwitchConfirmId === u.id
-                                        ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
-                                        : 'bg-indigo-600 hover:bg-indigo-750 text-white'
-                                    }`}
-                                  >
-                                    {courseSwitchConfirmId === u.id ? '⚠️ Click again to CONFIRM! ⚠️' : 'Change Course Path Now'}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Registered Courses & Manual Lesson Unlock Override Section */}
-                            <div className="mt-6 pt-6 border-t border-slate-200">
-                              <h4 className="font-extrabold uppercase text-[10px] text-indigo-700 tracking-wider flex items-center gap-1.5 mb-3 bg-indigo-50 px-2.5 py-1 rounded-md inline-flex select-none">
-                                <span>📚</span> Registered Courses & Manual Lesson Unlock Override
-                              </h4>
-                              <p className="text-xs text-slate-500 mb-4 font-semibold leading-relaxed">
-                                Click on any Day (D1 - D5) to manually approve and unlock that day's lessons and assignments for this student, bypassing quiz checks and prerequisite watch requirements.
-                              </p>
-                              
-                              {getUserRegisteredCourses(u).length === 0 ? (
-                                <div className="bg-white border rounded-xl p-4 text-center text-xs text-slate-400 font-bold uppercase tracking-wider">
-                                  No registered courses found matching student's onboarding pathway.
-                                </div>
-                              ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {getUserRegisteredCourses(u).map(course => {
-                                    const days = course.days || [];
-                                    return (
-                                      <div key={course.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 transition-colors">
-                                        <div className="space-y-0.5">
-                                          <span className="text-[9px] font-black uppercase text-indigo-600 tracking-wider">Course Pathway</span>
-                                          <h5 className="font-extrabold text-slate-900 text-xs truncate max-w-[200px]" title={course.title}>{course.title}</h5>
-                                          <p className="text-[10px] text-slate-400 font-semibold">ID: {course.id} • {days.length} days total</p>
-                                        </div>
-                                        
-                                        <div className="flex flex-wrap gap-1.5 items-center">
-                                          {[0, 1, 2, 3, 4].map((dayIdx) => {
-                                            const dayNumber = dayIdx + 1;
-                                            const isUnlocked = u.manualDayUnlock?.[course.id || '']?.[dayIdx] === true;
-                                            
-                                            return (
-                                              <button
-                                                key={dayIdx}
-                                                type="button"
-                                                onClick={() => handleToggleDayUnlock(u.id, course.id || '', dayIdx, isUnlocked)}
-                                                className={`h-8 px-2.5 text-xs font-black rounded-lg border flex items-center gap-1 transition-all shadow-sm cursor-pointer select-none ${
-                                                  isUnlocked
-                                                    ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
-                                                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
-                                                }`}
-                                                title={`Toggle Day ${dayNumber} Manual Unlock Override`}
-                                              >
-                                                <span>D{dayNumber}</span>
-                                                {isUnlocked ? (
-                                                  <span className="text-[9px] font-bold">✓</span>
-                                                ) : (
-                                                  <span className="text-slate-400 text-[9px] font-bold">🔒</span>
-                                                )}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
                     </React.Fragment>
                   );
                 })}
@@ -2141,6 +2121,21 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
           </div>
         </div>
       )}
+
+      {detailUserId && (() => {
+        const du: any = users.find((x: any) => x.id === detailUserId);
+        return (
+          <SlideOver
+            open={!!du}
+            onClose={() => setDetailUserId(null)}
+            title={du ? (du.fullName || du.displayName || 'Student') : ''}
+            subtitle={du?.email || ''}
+            maxWidth="max-w-lg"
+          >
+            {du && renderUserDetailsBody(du)}
+          </SlideOver>
+        );
+      })()}
     </div>
   );
 }

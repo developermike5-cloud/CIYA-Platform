@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router';
 import CustomDropdown from '../../components/CustomDropdown';
+import RowActionsDropdown, { actionIcons } from '../../components/admin/RowActionsDropdown';
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Download, Upload, ArrowRight, CheckCircle, Copy, Info, RefreshCw, AlertCircle, EyeOff, ShieldCheck } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
@@ -499,60 +500,49 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
                                                   >
                                                     👥 Students
                                                   </Link>
-                                                      <button
-                            type="button"
-                            onClick={() => handleToggleLock(c.id!, !!c.isLocked)}
-                            className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] cursor-pointer transition-all ${
-                              c.isLocked
-                                ? 'border-teal-200 bg-teal-50 text-teal-800 font-extrabold'
-                                : 'border-orange-200 bg-orange-50 text-orange-850 font-extrabold'
-                            }`}
-                            title={c.isLocked ? "Click to Unlock this Course" : "Click to Lock this Course"}
-                          >
-                            {c.isLocked ? '🔓 Unlock' : '🔒 Lock'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleTogglePublish(c.id!, isPublished)}
-                            className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] cursor-pointer transition-all ${
-                              isPublished
-                                ? 'border-amber-200 bg-amber-55 text-amber-700'
-                                : 'border-emerald-200 bg-emerald-50 text-emerald-700 font-extrabold'
-                            }`}
-                          >
-                            {isPublished ? 'Unpublish' : 'Publish'}
-                          </button>
                           <Link
                             to={`/admin/courses/${c.id}`}
                             title="Edit syllabus curriculum"
-                            className="p-1.5 hover:bg-indigo-50 text-indigo-600 hover:text-indigo-700 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-indigo-100 inline-block"
+                            className="px-3 py-1.5 bg-white border-2 border-slate-300 rounded-lg text-slate-800 font-extrabold hover:bg-slate-50 transition-all shadow-sm text-xs"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            Edit
                           </Link>
-                          <button
-                            onClick={() => {
-                              setCloneDialogCourse(c);
-                              setCloneDialogName(`${c.title} (Copy)`);
-                            }}
-                            title="Clone syllabus module"
-                            className="p-1.5 hover:bg-teal-50 text-teal-600 hover:text-teal-700 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-teal-100"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleExportSingle(c)}
-                            title="Download/Export this course individually"
-                            className="p-1.5 hover:bg-amber-50 text-amber-600 hover:text-amber-700 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-amber-100"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteDialogCourse(c)}
-                            title="Delete syllabus"
-                            className="p-1.5 hover:bg-rose-50 text-rose-500 hover:text-rose-600 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-100"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <RowActionsDropdown
+                            label="Actions"
+                            actions={[
+                              {
+                                label: c.isLocked ? 'Unlock course' : 'Lock course',
+                                icon: c.isLocked ? actionIcons.unlock : actionIcons.lock,
+                                onClick: () => handleToggleLock(c.id!, !!c.isLocked),
+                                title: c.isLocked ? 'Unlock this course' : 'Lock this course',
+                              },
+                              {
+                                label: isPublished ? 'Unpublish' : 'Publish',
+                                icon: isPublished ? actionIcons.unpublish : actionIcons.publish,
+                                onClick: () => handleTogglePublish(c.id!, isPublished),
+                              },
+                              {
+                                label: 'Clone course',
+                                icon: actionIcons.clone,
+                                onClick: () => {
+                                  setCloneDialogCourse(c);
+                                  setCloneDialogName(`${c.title} (Copy)`);
+                                },
+                              },
+                              {
+                                label: 'Export JSON',
+                                icon: actionIcons.export,
+                                onClick: () => handleExportSingle(c),
+                              },
+                              {
+                                label: 'Delete course',
+                                icon: actionIcons.delete,
+                                danger: true,
+                                onClick: () => setDeleteDialogCourse(c),
+                                title: 'Delete this course permanently',
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>
