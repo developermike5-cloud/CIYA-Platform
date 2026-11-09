@@ -318,7 +318,7 @@ export async function uploadToCloudinary(
   const cloudName =
     (typeof process !== 'undefined' && process.env?.CLOUDINARY_CLOUD_NAME) ||
     (import.meta.env && import.meta.env.VITE_CLOUDINARY_CLOUD_NAME) ||
-    'di4dlnd5x';
+    'qgvszym1';
 
   if (preset && cloudName) {
     try {
