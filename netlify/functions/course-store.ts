@@ -236,6 +236,15 @@ export async function handler(event: any) {
           const existing = await fetchStoredCourse(publicId, cloudName, apiKey, apiSecret);
           if (existing && Array.isArray(existing.days) && existing.days.length > 0) {
             c = { ...c, days: existing.days };
+          } else {
+            // A course with no lesson content and nothing stored must never reach the
+            // store: it would serve students an empty course and blank the editor.
+            results.push({
+              id: String(c.id),
+              ok: false,
+              error: `"${c.title || c.id}" has no lesson content loaded. Open it in the course editor, confirm the lessons are visible, then publish again.`,
+            });
+            continue;
           }
         }
         const payload = JSON.stringify(c);
