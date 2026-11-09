@@ -1,0 +1,76 @@
+/* Landing page behaviours that plain Tailwind can't express cleanly.
+   Ported from design/landing/ciya-landing.html (prototype look + behaviour). */
+
+/* student results: sticky stack. Each card sits lower than the one before. */
+.stack { margin: 40px auto 0; max-width: 980px; text-align: left; }
+.stk { position: sticky; top: calc(var(--navh, 104px) + var(--i, 0) * 14px); margin-bottom: 64px; }
+.stk:last-child { margin-bottom: 0; }
+@media (max-width: 980px) {
+  .stk { top: calc(var(--navh, 88px) + var(--i, 0) * 10px); margin-bottom: 48px; }
+}
+
+/* flip card */
+.scale { transform-origin: 50% 0; perspective: 1800px; will-change: transform; }
+.flip { display: grid; transform-style: preserve-3d; transition: transform .85s cubic-bezier(.4,.1,.2,1); }
+.stk.flipped .flip { transform: rotateY(180deg); }
+.face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.face.back { transform: rotateY(180deg); }
+
+/* media placeholder stripes */
+.ph-slot {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; text-align: center; padding: 16px; overflow: hidden; color: #99f6e4;
+  background: repeating-linear-gradient(135deg, rgba(19,78,74,.55) 0 14px, rgba(4,47,46,.55) 14px 28px);
+  border: 2px dashed rgba(251,191,36,.55); border-radius: 16px; width: 100%;
+}
+.ph-slot.no-border { border: 0; border-radius: 0; }
+.ph-slot video, .ph-slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* mission typing */
+.tv { white-space: pre-wrap; }
+.th { visibility: hidden; white-space: pre-wrap; }
+.tcur::after {
+  content: ""; display: inline-block; width: 3px; height: .9em; background: #fbbf24;
+  margin-left: 3px; vertical-align: -.08em; animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* courses track entrance + light sweep */
+.track-enter .trk-in { animation: trkIn .55s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes trkIn { from { opacity: 0; transform: translateY(22px) scale(.985); } to { opacity: 1; transform: none; } }
+.csw { animation: csw .8s ease-out; }
+@keyframes csw { 0% { transform: translateX(-120%); opacity: 1; } 100% { transform: translateX(420%); opacity: 0; } }
+
+/* faq open animation */
+.faq-in { animation: faqIn .35s ease both; }
+@keyframes faqIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* earnings calculator range inputs */
+input[type="range"].ciya-range {
+  width: 100%; height: 10px; appearance: none; -webkit-appearance: none;
+  background: #115e59; border-radius: 999px; accent-color: #f59e0b; cursor: pointer;
+}
+input[type="range"].ciya-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%;
+  background: #fbbf24; border: 3px solid #042f2e; box-shadow: 0 0 0 3px #fbbf24;
+}
+input[type="range"].ciya-range::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%; background: #fbbf24; border: 3px solid #042f2e;
+}
+
+/* courses background skeleton (shown until a real screenshot is wired in) */
+.sk-window { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.sk-window .sk-bar { position: absolute; top: 0; left: 0; right: 0; height: 9%; background: rgba(19,78,74,.9); border-bottom: 1px solid rgba(94,234,212,.25); }
+.sk-window .sk-side { position: absolute; top: 9%; bottom: 0; left: 0; width: 17%; background: rgba(19,78,74,.55); border-right: 1px solid rgba(94,234,212,.18); }
+.sk-window .sk-hero { position: absolute; top: 12%; left: 20%; right: 4%; height: 26%; background: rgba(94,234,212,.08); border-radius: 10px; }
+.sk-window .sk-row { position: absolute; left: 20%; right: 4%; height: 12%; background: rgba(94,234,212,.05); border-radius: 8px; }
+.sk-window .sk-row:nth-of-type(2) { top: 42%; }
+.sk-window .sk-row:nth-of-type(3) { top: 58%; }
+.sk-window .sk-row:nth-of-type(4) { top: 74%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .flip { transition: none; }
+  .track-enter .trk-in, .csw, .faq-in { animation: none !important; }
+  .tcur::after { animation: none; }
+  .marrow-nudge { animation: none !important; }
+}
