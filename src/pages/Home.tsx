@@ -491,22 +491,22 @@ const COURSES_DATA = {
 
 const MEDIA_URLS = {
   landing: [
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/704f7970e09360476c34e5b8dd6a1239_720w_hkdauz.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4'
+    'https://res.cloudinary.com/qgvszym1/video/upload/a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp.mp4',
+    'https://res.cloudinary.com/qgvszym1/video/upload/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4',
+    'https://res.cloudinary.com/qgvszym1/video/upload/704f7970e09360476c34e5b8dd6a1239_720w_hkdauz.mp4',
+    'https://res.cloudinary.com/qgvszym1/video/upload/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4'
   ],
   ecommerce: [
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4'
+    'https://res.cloudinary.com/qgvszym1/video/upload/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
+    'https://res.cloudinary.com/qgvszym1/video/upload/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
+    'https://res.cloudinary.com/qgvszym1/video/upload/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4',
+    'https://res.cloudinary.com/qgvszym1/video/upload/5b233e180530fcf94134bfed78e2c49d_720w_gqclim.mp4'
   ],
   portfolio: [
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/704f7970e09360476c34e5b8dd6a1239_720w_hkdauz.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/704f7970e09360476c34e5b8dd6a1239_720w_hkdauz.mp4',
-    'https://res.cloudinary.com/di4dlnd5x/video/upload/v1/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4'
+    'https://res.cloudinary.com/qgvszym1/video/upload/704f7970e09360476c34e5b8dd6a1239_720w_hkdauz.mp4',
+    'https://res.cloudinary.com/qgvszym1/video/upload/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4',
+    'https://res.cloudinary.com/qgvszym1/video/upload/704f7970e09360476c34e5b8dd6a1239_720w_hkdauz.mp4',
+    'https://res.cloudinary.com/qgvszym1/video/upload/e354a38f14d9cf824f2b4a73a11ad45c_t4_qvqj5r.mp4'
   ]
 };
 
