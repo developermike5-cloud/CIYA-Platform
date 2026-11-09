@@ -30,6 +30,7 @@ import CustomDropdown from '../components/CustomDropdown';
 import { verifyTimeBasedCode, getPasscodeSecondsLeft } from '../utils/passcode';
 import { FRONTEND_YEAR_BADGE_SETTINGS } from '../constants/badgeSettings';
 import { staticLeaderboardData } from '../utils/leaderboardData';
+import { subscribeCohortLeaderboard, upsertLeaderboardEntry, cacheLiveLeaderboard, LiveLeaderboardEntry } from '../services/leaderboardRtdbService';
 import staticAnnouncements from '../data/announcements.json';
 import PWAInstallModal from '../components/PWAInstallModal';
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -4635,6 +4636,8 @@ export default function StudentDashboard() {
     }
   });
   const [selectedLeaderboardCohort, setSelectedLeaderboardCohort] = useState<string>('');
+  // Live leaderboard: RTDB board entries for the cohort currently shown
+  const [liveLeaderboardEntries, setLiveLeaderboardEntries] = useState<LiveLeaderboardEntry[] | null>(null);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -5207,6 +5210,41 @@ export default function StudentDashboard() {
       if (unsubLeaderboard) unsubLeaderboard();
     };
   }, [currentUser]);
+
+  // Live leaderboard: native RTDB listener on the cohort board shown to this student.
+  useEffect(() => {
+    if (coursesViewTab !== 'leaderboard') return;
+    if (!currentUser?.uid) return;
+    const studentCohort = (userProfile as any)?.cohort || 'Cohort 4';
+    const isLegacy = studentCohort === 'Cohort 1' || studentCohort === 'Cohort 2';
+    const active = selectedLeaderboardCohort || (!isLegacy ? studentCohort : 'Cohort 4');
+    const unsubBoard = subscribeCohortLeaderboard(
+      active,
+      (entries) => {
+        setLiveLeaderboardEntries(entries);
+        if (entries.length > 0) cacheLiveLeaderboard(active, entries);
+      },
+      () => setLiveLeaderboardEntries(null)
+    );
+    return () => unsubBoard();
+  }, [coursesViewTab, selectedLeaderboardCohort, (userProfile as any)?.cohort, currentUser?.uid]);
+
+  // Mirror this student's own progress onto the live board whenever it changes
+  // (watched lessons, passed checks, quiz scores, completions).
+  const leaderboardProgressSignature = JSON.stringify((userProfile as any)?.progress || {});
+  useEffect(() => {
+    if (!currentUser?.uid || !(userProfile as any)?.progress) return;
+    const profEmail = String((currentUser as any)?.email || (userProfile as any)?.email || '').toLowerCase();
+    if ((userProfile as any)?.role === 'admin' || profEmail === 'developermike5@gmail.com') return;
+    const mirrorTimer = setTimeout(() => {
+      upsertLeaderboardEntry({
+        ...(userProfile as any),
+        uid: currentUser.uid,
+        email: (currentUser as any)?.email || (userProfile as any)?.email
+      } as any).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(mirrorTimer);
+  }, [leaderboardProgressSignature, currentUser?.uid]);
 
   const [timeLeft, setTimeLeft] = useState('');
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
@@ -8222,6 +8260,8 @@ export default function StudentDashboard() {
 
                           const activeCohort = selectedLeaderboardCohort || (studentCohort !== 'Cohort 1' && studentCohort !== 'Cohort 2' ? studentCohort : 'Cohort 4');
                           const staticCohortEntries = staticLeaderboardData[activeCohort] || staticLeaderboardData['Cohort 4'] || [];
+                          const isLiveBoard = Array.isArray(liveLeaderboardEntries) && liveLeaderboardEntries.length > 0;
+                          const cohortEntries = isLiveBoard ? liveLeaderboardEntries! : staticCohortEntries;
 
                           return (
                             <div className="mt-2 bg-white border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-sm max-w-5xl mx-auto space-y-6 text-left font-sans">
@@ -8229,15 +8269,22 @@ export default function StudentDashboard() {
                                 <div className="space-y-1">
                                   <h4 className="text-base font-black uppercase text-slate-900 flex items-center gap-2">
                                     <Award className="w-5 h-5 text-amber-500" />
-                                    🏆 {activeCohort} Official Leaderboard Standings
+                                    🏆 {activeCohort} Official Leaderboard Standings {isLiveBoard && (
+                                      <span className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                                        Live
+                                      </span>
+                                    )}
                                   </h4>
                                   <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-                                    Official student standings updated periodically by CIYA academy admin.
+                                    {isLiveBoard
+                                      ? 'Live standings: every lesson watched, check passed, and quiz score lands on this board instantly.'
+                                      : 'Official student standings updated periodically by CIYA academy admin.'}
                                   </p>
                                 </div>
                               </div>
 
-                              {staticCohortEntries.length === 0 ? (
+                              {cohortEntries.length === 0 ? (
                                 <div className="text-center py-10 bg-slate-50 border border-slate-200/60 rounded-2xl p-6">
                                   <span className="text-3xl block mb-2 select-none">📊</span>
                                   <h5 className="text-xs font-black text-slate-700 uppercase tracking-wide">No Rankings Available for {activeCohort}</h5>
@@ -8256,7 +8303,7 @@ export default function StudentDashboard() {
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                      {staticCohortEntries.map((entry, idx) => {
+                                      {cohortEntries.map((entry, idx) => {
                                         const isMe = entry.email?.toLowerCase() === currentUser?.email?.toLowerCase();
                                         const rankNum = entry.rank || idx + 1;
                                         const isTop1 = rankNum === 1;

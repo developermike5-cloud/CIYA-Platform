@@ -26,6 +26,7 @@ import {
   Save
 } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
+import { seedLeaderboardCohort } from '../../services/leaderboardRtdbService';
 
 interface LeaderboardEntry {
   uid: string;
@@ -45,6 +46,7 @@ export default function LeaderboardAdmin() {
   const [selectedCohort, setSelectedCohort] = useState<string>('Cohort 3');
   const [allowedCohorts, setAllowedCohorts] = useState<string[]>(['Cohort 3']);
   const [savingConfig, setSavingConfig] = useState(false);
+  const [publishingBoard, setPublishingBoard] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Available cohorts list (aligned with standard course cohorts)
@@ -140,7 +142,8 @@ export default function LeaderboardAdmin() {
         // Sum quiz scores
         if (courseData.quizScores && typeof courseData.quizScores === 'object') {
           Object.values(courseData.quizScores).forEach((val: any) => {
-            const scoreNum = Number(val) || 0;
+            // quizScores values are score records like { score, passed, ... }
+            const scoreNum = val && typeof val === 'object' ? Number(val.score) || 0 : Number(val) || 0;
             aggregateQuizScore += scoreNum;
           });
         }
@@ -207,6 +210,24 @@ export default function LeaderboardAdmin() {
     }
   };
 
+  // Publish the computed cohort standings to the live RTDB board students see
+  const handlePublishLiveBoard = async () => {
+    setPublishingBoard(true);
+    try {
+      const count = await seedLeaderboardCohort(selectedCohort, users);
+      if (count === 0) {
+        showToast(`No student entries to publish for ${selectedCohort}.`, "error");
+      } else {
+        showToast(`Live board published for ${selectedCohort}: ${count} student${count === 1 ? '' : 's'} ranked. Dashboards now update instantly.`, "success");
+      }
+    } catch (err: any) {
+      console.error("Error publishing live board:", err);
+      showToast("Failed to publish the live board. Check Realtime Database rules.", "error");
+    } finally {
+      setPublishingBoard(false);
+    }
+  };
+
   // Triggers manual recount/fetch of all user records in firestore
   const handleRefreshLiveRecords = async () => {
     showToast("Scanning student database and calculating ranks...", "success");
@@ -267,6 +288,16 @@ export default function LeaderboardAdmin() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Recount Live Ranks
+          </button>
+
+          <button
+            type="button"
+            disabled={publishingBoard}
+            onClick={handlePublishLiveBoard}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer border-0 shadow-md flex items-center gap-1.5 transition-all disabled:opacity-50"
+          >
+            <Trophy className={`w-4 h-4 ${publishingBoard ? 'animate-pulse' : ''}`} />
+            Publish Live Board
           </button>
           
           <button
