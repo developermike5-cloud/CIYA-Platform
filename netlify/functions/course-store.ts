@@ -254,10 +254,13 @@ export async function handler(event: any) {
       }
       const publicId = PUBLIC_ID_PREFIX + courseId;
       const ts = String(Math.floor(Date.now() / 1000));
-      // Authenticated assets need a signed delivery URL. The signature covers
-      // the query params; retry once with public_id included in case the
-      // account-level signing mode expects it.
-      const attempts = [crypto.createHash("sha1").update(`timestamp=${ts}${apiSecret}`).digest("hex")];
+      // Authenticated assets need a signed delivery URL. Cloudinary signs the
+      // sorted query params; the strictest signing mode also expects
+      // public_id inside the signature, so try that variant too.
+      const attempts = [
+        crypto.createHash("sha1").update(`timestamp=${ts}${apiSecret}`).digest("hex"),
+        crypto.createHash("sha1").update(`public_id=${publicId}&timestamp=${ts}${apiSecret}`).digest("hex"),
+      ];
       let res: Response | null = null;
       let lastStatus = 0;
       for (const sig of attempts) {
