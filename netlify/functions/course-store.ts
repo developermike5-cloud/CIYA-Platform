@@ -250,7 +250,22 @@ export async function handler(event: any) {
         registered = ids.includes(courseId);
       }
       if (!admin && !registered) {
-        return json(403, { error: "not registered for this course" });
+        // Temporary diagnostics for the registration read; remove after verifying.
+        const userRead = await googleFetch(
+          `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/users/${caller.uid}`
+        );
+        const adminRead = await googleFetch(
+          `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/admins/${caller.uid}`
+        );
+        return json(403, {
+          error: "not registered for this course",
+          dbg: {
+            db: databaseId,
+            userReadStatus: userRead.status,
+            adminReadStatus: adminRead.status,
+            userReadBody: (await userRead.text()).slice(0, 400),
+          },
+        });
       }
       const publicId = PUBLIC_ID_PREFIX + courseId;
       const ts = String(Math.floor(Date.now() / 1000));
