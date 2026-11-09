@@ -36,6 +36,13 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 import { PullToRefresh } from '../components/PullToRefresh';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
+// Module-level refresh hooks for the once-per-session Firestore reads in the
+// student dashboard. Submitting an assignment re-reads the assignments list;
+// marking notifications read updates the local copy immediately.
+let assignmentsRefreshRef: (() => Promise<void>) | null = null;
+let notificationsRefreshRef: (() => Promise<void>) | null = null;
+
+
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Development", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
   film: { label: "AI Film Studio", icon: "🎬", color: "#7c3aed", bg: "#ede9fe" },
@@ -92,7 +99,9 @@ function AnnouncementCarouselCard({ onNavigateTab }: { onNavigateTab?: (tab: str
   const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'announcements'), (snapshot) => {
+    // One-shot read per session: announcements rarely change, so we no longer keep
+    // a paid real-time listener open on this doc.
+    getDoc(doc(db, 'settings', 'announcements')).then((snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         if (Array.isArray(data.items) && data.items.length > 0) {
@@ -100,8 +109,7 @@ function AnnouncementCarouselCard({ onNavigateTab }: { onNavigateTab?: (tab: str
           safeStorage.setItem('ciya_cached_announcements', JSON.stringify(data.items));
         }
       }
-    }, () => {});
-    return () => unsub();
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -2721,6 +2729,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
           autoApproveAt: autoApproveAt,
           createdAt: serverTimestamp()
         });
+        assignmentsRefreshRef?.();
       }
 
       const cleanReason = (evalRes.adminReason || '').replace(/^Automated Compliance:\s*/i, '');
@@ -4629,47 +4638,66 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (!currentUser) return;
+    // One-shot read per session instead of a paid live listener. We re-read after
+    // a new submission (assignmentsRefreshRef) and when the tab comes back into
+    // view after 5+ minutes, so graded work still shows up without constant reads.
+    let cancelled = false;
+    let lastFetched = 0;
 
-    const q = query(
-      collection(db, 'assignments'),
-      where('userId', '==', currentUser.uid)
-    );
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const list = snap.docs.map(doc => {
-        const data = doc.data();
-        let submittedText = data.submittedText || '';
-        let images = data.images || [];
-
-        if (submittedText.includes("---IMAGES_JSON---")) {
-          const parts = submittedText.split("---IMAGES_JSON---");
-          submittedText = parts[0].trim();
-          try {
-            images = JSON.parse(parts[1].trim());
-          } catch (e) {
-            console.error("Error parsing images JSON", e);
-          }
-        }
-
-        return { id: doc.id, ...data, submittedText, images } as any;
-      });
-
-      // Sort list by createdAt descending so that the most recent submission is always first
-      list.sort((a, b) => {
-        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
-        return timeB - timeA;
-      });
-
-      setAllMySubmissions(list);
+    const load = async () => {
+      lastFetched = Date.now();
       try {
-        safeStorage.setItem('ciya_cached_student_assignments', JSON.stringify(list));
-      } catch (e) {}
-    }, (error) => {
-      console.error("Error loading student assignments:", error);
-    });
+        const q = query(
+          collection(db, 'assignments'),
+          where('userId', '==', currentUser.uid)
+        );
+        const snap = await getDocs(q);
+        if (cancelled) return;
+        const list = snap.docs.map(doc => {
+          const data = doc.data();
+          let submittedText = data.submittedText || '';
+          let images = data.images || [];
+
+          if (submittedText.includes("---IMAGES_JSON---")) {
+            const parts = submittedText.split("---IMAGES_JSON---");
+            submittedText = parts[0].trim();
+            try {
+              images = JSON.parse(parts[1].trim());
+            } catch (e) {
+              console.error("Error parsing images JSON", e);
+            }
+          }
+
+          return { id: doc.id, ...data, submittedText, images } as any;
+        });
+
+        // Sort list by createdAt descending so that the most recent submission is always first
+        list.sort((a, b) => {
+          const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+          const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+          return timeB - timeA;
+        });
+
+        setAllMySubmissions(list);
+        try {
+          safeStorage.setItem('ciya_cached_student_assignments', JSON.stringify(list));
+        } catch (e) {}
+      } catch (error) {
+        console.error("Error loading student assignments:", error);
+      }
+    };
+
+    assignmentsRefreshRef = load;
+    load();
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastFetched > 5 * 60 * 1000) load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
     return () => {
-      unsubscribe();
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [currentUser]);
 
@@ -4912,6 +4940,7 @@ export default function StudentDashboard() {
           autoApproveAt: autoApproveAt,
           createdAt: serverTimestamp()
         });
+        assignmentsRefreshRef?.();
       }
 
       const cleanReason = (evalRes.adminReason || '').replace(/^Automated Compliance:\s*/i, '');
@@ -4992,8 +5021,9 @@ export default function StudentDashboard() {
 
     const startSettingsListener = () => {
       if (unsubSettings) return;
-      // Always use high-performance real-time Firestore listener to ensure absolute reliability
-      unsubSettings = onSnapshot(doc(db, 'settings', 'app'), (snapshot) => {
+      // One-shot read per session: portal-lock settings rarely change mid-session.
+      unsubSettings = () => {};
+      getDoc(doc(db, 'settings', 'app')).then((snapshot) => {
         if (!isSubscribed) return;
         if (snapshot.exists()) {
           const data = snapshot.data();
@@ -5001,22 +5031,24 @@ export default function StudentDashboard() {
           safeStorage.setItem('ciya_cached_app_settings', JSON.stringify(data));
           safeStorage.setItem('ciya_auto_approval_enabled', data.autoApprovalEnabled !== false ? 'true' : 'false');
         }
-      }, (error) => {
-        console.warn("Soft handling direct real-time settings app listener error:", error);
+      }).catch((error) => {
+        console.warn("Soft handling settings app fetch error:", error);
       });
     };
 
     const startLeaderboardConfigListener = () => {
       if (unsubLeaderboard) return;
-      unsubLeaderboard = onSnapshot(doc(db, 'settings', 'leaderboard_config'), (snapshot) => {
+      // One-shot read per session.
+      unsubLeaderboard = () => {};
+      getDoc(doc(db, 'settings', 'leaderboard_config')).then((snapshot) => {
         if (!isSubscribed) return;
         if (snapshot.exists()) {
           const data = snapshot.data();
           setLeaderboardConfig(data);
           safeStorage.setItem('ciya_cached_leaderboard_config', JSON.stringify(data));
         }
-      }, (error) => {
-        console.warn("Error in real-time leaderboard config listener:", error);
+      }).catch((error) => {
+        console.warn("Error loading leaderboard config:", error);
       });
     };
 
@@ -5199,32 +5231,53 @@ export default function StudentDashboard() {
     if (isAdmin) {
       targets.push('admins_group');
     }
+    // One-shot read per session instead of a paid live listener, re-read when the
+    // tab becomes visible after 5+ minutes so new notifications still land.
+    let cancelled = false;
+    let lastFetched = 0;
 
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', 'in', targets),
-      limit(50)
-    );
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      list.sort((a: any, b: any) => {
-        const timeA = a.createdAt?.seconds || 0;
-        const timeB = b.createdAt?.seconds || 0;
-        return timeB - timeA;
-      });
-      setDbNotifications(list);
-    }, (error) => {
-      console.warn("Soft handling error loading db notifications:", error);
-    });
+    const load = async () => {
+      lastFetched = Date.now();
+      try {
+        const q = query(
+          collection(db, 'notifications'),
+          where('userId', 'in', targets),
+          limit(50)
+        );
+        const snap = await getDocs(q);
+        if (cancelled) return;
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        list.sort((a: any, b: any) => {
+          const timeA = a.createdAt?.seconds || 0;
+          const timeB = b.createdAt?.seconds || 0;
+          return timeB - timeA;
+        });
+        setDbNotifications(list);
+      } catch (error) {
+        console.warn("Soft handling error loading db notifications:", error);
+      }
+    };
+
+    notificationsRefreshRef = load;
+    load();
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastFetched > 5 * 60 * 1000) load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
     return () => {
-      unsubscribe();
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [currentUser, isAdmin]);
 
   const unreadNotificationsCount = dbNotifications.filter(x => !x.isRead).length;
 
+
+
   const handleMarkAsRead = async (id: string) => {
+    setDbNotifications((prev) => prev.map((n: any) => (n.id === id ? { ...n, isRead: true } : n)));
     try {
       await updateDoc(doc(db, 'notifications', id), { isRead: true });
     } catch (e) {
@@ -5233,6 +5286,7 @@ export default function StudentDashboard() {
   };
 
   const handleMarkAllAsRead = async () => {
+    setDbNotifications((prev) => prev.map((n: any) => ({ ...n, isRead: true })));
     try {
       const unreadList = dbNotifications.filter(x => !x.isRead);
       for (const item of unreadList) {
@@ -5539,6 +5593,7 @@ export default function StudentDashboard() {
           autoApproveAt: autoApproveAt,
           createdAt: serverTimestamp()
         });
+        assignmentsRefreshRef?.();
       }
 
       const submissionData = {

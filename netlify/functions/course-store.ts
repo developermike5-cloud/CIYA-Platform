@@ -9,7 +9,7 @@ import crypto from "crypto";
  * function, which verifies their identity and registration before returning
  * anything. Cloudinary keys and the Firebase service account stay server-side.
  *
- * Ops (POST JSON): publish (admin) | get (registered student or admin) | delete (admin)
+ * Ops (POST JSON): publish (admin) | get courseId (registered student or admin) | get "all" (admin) | delete (admin)
  */
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -116,6 +116,28 @@ function signParams(params: Record<string, string>, apiSecret: string): string {
   return crypto.createHash("sha1").update(`${toSign}${apiSecret}`).digest("hex");
 }
 
+
+// Signed delivery URL for an authenticated asset: Cloudinary's s-- signature
+// is base64url(sha1(public_id + api_secret)) truncated to 8 characters, and
+// the URL must include a version segment (v1) when the public_id has folders.
+function storedCourseUrl(publicId: string, cloudName: string, apiSecret: string): string {
+  const sig = b64url(crypto.createHash("sha1").update(`${publicId}${apiSecret}`).digest()).slice(0, 8);
+  const versionSeg = publicId.includes("/") ? "v1/" : "";
+  return `https://res.cloudinary.com/${cloudName}/raw/authenticated/s--${sig}--/${versionSeg}${publicId}`;
+}
+
+async function fetchStoredCourse(publicId: string, cloudName: string, apiKey: string, apiSecret: string): Promise<any | null> {
+  try {
+    const res = await fetch(storedCourseUrl(publicId, cloudName, apiSecret));
+    if (!res.ok) return null;
+    const text = await res.text();
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 async function verifyIdToken(idToken: string): Promise<{ uid: string; email: string }> {
   const webKey = process.env.VITE_FIREBASE_API_KEY;
   if (!webKey) throw new Error("VITE_FIREBASE_API_KEY is not configured");
@@ -201,12 +223,21 @@ export async function handler(event: any) {
       const courses = Array.isArray(body.courses) ? body.courses : [];
       if (!courses.length) return json(400, { error: "no courses to publish" });
       const results: any[] = [];
-      for (const c of courses) {
+      for (let c of courses) {
         if (!c || !c.id) {
           results.push({ id: c?.id || "(missing id)", ok: false, error: "course has no id" });
           continue;
         }
         const publicId = PUBLIC_ID_PREFIX + String(c.id);
+        // Safety guard: a copy with no lesson content (a catalog-only edit) must never
+        // wipe the stored days. Re-attach the stored days unless the admin explicitly
+        // saved a course with days present.
+        if (!Array.isArray(c.days) || c.days.length === 0) {
+          const existing = await fetchStoredCourse(publicId, cloudName, apiKey, apiSecret);
+          if (existing && Array.isArray(existing.days) && existing.days.length > 0) {
+            c = { ...c, days: existing.days };
+          }
+        }
         const payload = JSON.stringify(c);
         const timestamp = String(Math.floor(Date.now() / 1000));
         const params: Record<string, string> = {
@@ -244,6 +275,25 @@ export async function handler(event: any) {
       const courseId = String(body.courseId || "").trim();
       if (!courseId) return json(400, { error: "missing courseId" });
       const admin = await isAdminUid(projectId, databaseId, caller.uid);
+      if (courseId === "all") {
+        if (!admin) return json(403, { error: "caller is not an admin" });
+        // List every stored course under the store prefix, then signed-fetch each JSON.
+        const authHeader = "Basic " + Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
+        const listRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/resources/raw?type=authenticated&prefix=${encodeURIComponent(PUBLIC_ID_PREFIX)}&max_results=500`,
+          { headers: { Authorization: authHeader } },
+        );
+        if (!listRes.ok) return json(500, { error: `could not list the course store (HTTP ${listRes.status})` });
+        const listData: any = await listRes.json().catch(() => ({}));
+        const resources: any[] = Array.isArray(listData?.resources) ? listData.resources : [];
+        const courses: any[] = [];
+        for (const r of resources) {
+          if (!r?.public_id) continue;
+          const stored = await fetchStoredCourse(String(r.public_id), cloudName, apiKey, apiSecret);
+          if (stored && stored.id) courses.push(stored);
+        }
+        return json(200, { ok: true, courses });
+      }
       let registered = false;
       if (!admin) {
         const ids = await getRegisteredCourseIds(projectId, databaseId, caller.uid);
@@ -253,14 +303,7 @@ export async function handler(event: any) {
         return json(403, { error: "not registered for this course" });
       }
       const publicId = PUBLIC_ID_PREFIX + courseId;
-      // Signed delivery URL for an authenticated asset: Cloudinary's s-- signature
-      // is base64url(sha1(public_id + api_secret)) truncated to 8 characters, and
-      // the URL must include a version segment (v1) when the public_id has folders.
-      const sig = b64url(crypto.createHash("sha1").update(`${publicId}${apiSecret}`).digest()).slice(0, 8);
-      const versionSeg = publicId.includes("/") ? "v1/" : "";
-      const res = await fetch(
-        `https://res.cloudinary.com/${cloudName}/raw/authenticated/s--${sig}--/${versionSeg}${publicId}`,
-      );
+      const res = await fetch(storedCourseUrl(publicId, cloudName, apiSecret));
       if (!res.ok) {
         return json(404, { error: "course not published to the store yet", cloudinaryStatus: res.status });
       }

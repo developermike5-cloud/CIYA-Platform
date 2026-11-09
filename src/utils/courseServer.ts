@@ -60,6 +60,41 @@ export async function fetchServerCourse(courseId: string): Promise<Course | null
   return p;
 }
 
+
+// Resolve once Firebase Auth has finished restoring the session (or immediately
+// when signed out), so callers that run before hydration are not silently no-ops.
+function authReady(timeoutMs = 8000): Promise<void> {
+  return new Promise((resolve) => {
+    const anyAuth = auth as any;
+    if (anyAuth.currentUser) return resolve();
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    const timer = setTimeout(finish, timeoutMs);
+    const unsub = anyAuth.onAuthStateChanged(() => { clearTimeout(timer); unsub(); finish(); });
+  });
+}
+
+export async function fetchAllServerCourses(): Promise<Course[]> {
+  try {
+    await authReady();
+    const token = await currentIdToken();
+    if (!token) return [];
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      body: JSON.stringify({ op: 'get', courseId: 'all' }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const courses: any[] = Array.isArray(data?.courses) ? data.courses : [];
+    courses.forEach((c) => { if (c?.id) hydratedThisSession.add(String(c.id)); });
+    return courses as Course[];
+  } catch (e) {
+    console.warn('[course-store] admin fetch-all failed:', e);
+    return [];
+  }
+}
+
 export async function publishCoursesToServer(
   courses: Course[]
 ): Promise<{ ok: boolean; published?: number; failed?: number; error?: string }> {

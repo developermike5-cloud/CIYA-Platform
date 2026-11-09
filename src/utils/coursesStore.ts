@@ -1,6 +1,6 @@
 import { Course } from '../types';
 import { safeStorage } from './safeStorage';
-import { publishCoursesToServer, deleteServerCourse } from './courseServer';
+import { publishCoursesToServer, deleteServerCourse, fetchAllServerCourses } from './courseServer';
 import staticCourses from '../data/courses.json';
 import staticAdvancedCourses from '../data/advanced_courses.json';
 
@@ -538,6 +538,18 @@ if (typeof window !== 'undefined') {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ courses: finalAdvanced })
       }).catch(() => {});
+
+
+      // Admins: pull the full course content (days, lessons, assignments) from the
+      // protected Cloudinary store so editing never depends on bundled copies.
+      // Students get their own copies hydrated per course in the dashboard.
+      try {
+        const adminCourses = await fetchAllServerCourses();
+        if (adminCourses.length > 0) {
+          coursesStore.upsertFromServer(adminCourses);
+          console.log(`[course-store] hydrated ${adminCourses.length} course(s) from the store (admin).`);
+        }
+      } catch (e) {}
 
     } catch (err) {
       console.error("Critical error during courses synchronization startup:", err);
