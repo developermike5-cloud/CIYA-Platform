@@ -192,7 +192,7 @@ export async function handler(event: any) {
     const caller = await verifyIdToken(idToken);
     const sa = loadServiceAccount();
     const projectId = sa.project_id;
-    const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "(default)";
+    const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-1aaee609-a922-43e7-9568-0b675490ff78";
     const { cloudName, apiKey, apiSecret } = cloudinaryCreds();
 
     if (op === "publish") {
