@@ -148,7 +148,7 @@ async function getRegisteredCourseIds(projectId: string, databaseId: string, uid
   );
   if (res.ok) {
     const doc: any = await res.json().catch(() => null);
-    const data = fieldsToValues(doc?.fields) || {};
+    const data = fieldsToValues({ mapValue: { fields: doc?.fields || {} } }) || {};
     if (Array.isArray(data.registeredCourses)) {
       data.registeredCourses.forEach((x: any) => {
         if (typeof x === "string") ids.push(x);
@@ -250,33 +250,7 @@ export async function handler(event: any) {
         registered = ids.includes(courseId);
       }
       if (!admin && !registered) {
-        // Temporary diagnostics for the registration read; remove after verifying.
-        const userRead = await googleFetch(
-          `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/users/${caller.uid}`
-        );
-        const adminRead = await googleFetch(
-          `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/admins/${caller.uid}`
-        );
-        const rawText = await userRead.text();
-        let parsed: any = null;
-        let parseErr = "";
-        try { parsed = JSON.parse(rawText); } catch (e: any) { parseErr = String(e?.message || e); }
-        const manual = parsed ? fieldsToValues(parsed.fields) : null;
-        const ids2 = await getRegisteredCourseIds(projectId, databaseId, caller.uid);
-        return json(403, {
-          error: "not registered for this course",
-          dbg: {
-            db: databaseId,
-            userReadStatus: userRead.status,
-            adminReadStatus: adminRead.status,
-            rawLen: rawText.length,
-            parseErr,
-            hasFields: !!(parsed && parsed.fields),
-            progressKeys: manual ? Object.keys(manual.progress || {}) : null,
-            registeredCourses: manual && Array.isArray(manual.registeredCourses) ? manual.registeredCourses.length : "absent",
-            ids2,
-          },
-        });
+        return json(403, { error: "not registered for this course" });
       }
       const publicId = PUBLIC_ID_PREFIX + courseId;
       const ts = String(Math.floor(Date.now() / 1000));
