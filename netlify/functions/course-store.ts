@@ -9,11 +9,14 @@ import crypto from "crypto";
  * function, which verifies their identity and registration before returning
  * anything. Cloudinary keys and the Firebase service account stay server-side.
  *
- * Ops (POST JSON): publish (admin) | get courseId (registered student or admin) | get "all" (admin) | delete (admin)
+ * Ops (POST JSON): publish (admin) | get courseId (registered student or admin) | get "all" (admin) | draft-save (admin) | draft-get (admin) | delete (admin)
  */
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const PUBLIC_ID_PREFIX = "ciya-course-store/";
+// Admin-only working copies. Edits auto-save here; students only ever read the
+// published store, and Publish promotes a draft to it.
+const DRAFT_PUBLIC_ID_PREFIX = "ciya-course-drafts/";
 
 type ServiceAccount = { project_id: string; client_email: string; private_key: string };
 
@@ -138,6 +141,51 @@ async function fetchStoredCourse(publicId: string, cloudName: string, apiKey: st
   }
 }
 
+// Upload a course JSON payload to an authenticated raw asset (store or drafts).
+async function uploadCourseJson(publicId: string, payload: string, cloudName: string, apiKey: string, apiSecret: string): Promise<{ ok: boolean; error?: string }> {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const params: Record<string, string> = {
+    public_id: publicId,
+    timestamp,
+    type: "authenticated",
+    overwrite: "true",
+    invalidate: "true",
+  };
+  const signature = signParams(params, apiSecret);
+  const form = new URLSearchParams({
+    file: `data:application/json;base64,${Buffer.from(payload).toString("base64")}`,
+    api_key: apiKey,
+    ...params,
+    signature,
+  });
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: !!res.ok, error: res.ok ? undefined : (data?.error?.message || `HTTP ${res.status}`) };
+}
+
+// Delete an authenticated raw asset (store or drafts copy).
+async function destroyStoredCourse(publicId: string, cloudName: string, apiKey: string, apiSecret: string): Promise<{ ok: boolean; result?: string; error?: string }> {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const params: Record<string, string> = { public_id: publicId, timestamp, type: "authenticated", invalidate: "true" };
+  const signature = signParams(params, apiSecret);
+  const form = new URLSearchParams({ api_key: apiKey, ...params, signature });
+  try {
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/destroy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: !!res.ok, result: data?.result || undefined, error: res.ok ? undefined : (data?.error?.message || `HTTP ${res.status}`) };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
 async function verifyIdToken(idToken: string): Promise<{ uid: string; email: string }> {
   const webKey = process.env.VITE_FIREBASE_API_KEY;
   if (!webKey) throw new Error("VITE_FIREBASE_API_KEY is not configured");
@@ -248,33 +296,18 @@ export async function handler(event: any) {
           }
         }
         const payload = JSON.stringify(c);
-        const timestamp = String(Math.floor(Date.now() / 1000));
-        const params: Record<string, string> = {
-          public_id: publicId,
-          timestamp,
-          type: "authenticated",
-          overwrite: "true",
-          invalidate: "true",
-        };
-        const signature = signParams(params, apiSecret);
-        const form = new URLSearchParams({
-          file: `data:application/json;base64,${Buffer.from(payload).toString("base64")}`,
-          api_key: apiKey,
-          ...params,
-          signature,
-        });
-        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: form.toString(),
-        });
-        const data = await res.json().catch(() => ({}));
+        const up = await uploadCourseJson(publicId, payload, cloudName, apiKey, apiSecret);
         results.push({
           id: String(c.id),
-          ok: !!res.ok,
-          error: res.ok ? undefined : (data?.error?.message || `HTTP ${res.status}`),
+          ok: up.ok,
+          error: up.error,
           bytes: payload.length,
         });
+        // The published copy is now live: drop any pending draft so the next
+        // editor session starts clean from the published content.
+        if (up.ok) {
+          await destroyStoredCourse(DRAFT_PUBLIC_ID_PREFIX + String(c.id), cloudName, apiKey, apiSecret).catch(() => null);
+        }
       }
       const failed = results.filter((r) => !r.ok);
       return json(200, { ok: failed.length === 0, results });
@@ -331,21 +364,70 @@ export async function handler(event: any) {
       if (!admin) return json(403, { error: "caller is not an admin" });
       const courseId = String(body.courseId || "").trim();
       if (!courseId) return json(400, { error: "missing courseId" });
-      const publicId = PUBLIC_ID_PREFIX + courseId;
-      const timestamp = String(Math.floor(Date.now() / 1000));
-      const params: Record<string, string> = { public_id: publicId, timestamp, type: "authenticated", invalidate: "true" };
-      const signature = signParams(params, apiSecret);
-      const form = new URLSearchParams({ api_key: apiKey, ...params, signature });
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/destroy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: form.toString(),
-      });
-      const data = await res.json().catch(() => ({}));
-      return json(200, { ok: !!res.ok, result: data?.result || null, error: res.ok ? undefined : (data?.error?.message || `HTTP ${res.status}`) });
+      const live = await destroyStoredCourse(PUBLIC_ID_PREFIX + courseId, cloudName, apiKey, apiSecret);
+      // Remove any pending draft of the same course so the deletion is complete.
+      const draft = await destroyStoredCourse(DRAFT_PUBLIC_ID_PREFIX + courseId, cloudName, apiKey, apiSecret);
+      return json(200, { ok: !!live.ok, result: live.result || null, error: live.ok ? undefined : live.error, draft: draft.result || null });
     }
 
-    return json(400, { error: "unknown op", ops: ["publish", "get", "delete"] });
+    if (op === "draft-save") {
+      const admin = await isAdminUid(projectId, databaseId, caller.uid);
+      if (!admin) return json(403, { error: "caller is not an admin" });
+      const courses = Array.isArray(body.courses) ? body.courses : [];
+      if (!courses.length) return json(400, { error: "no courses to save" });
+      const results: any[] = [];
+      for (let c of courses) {
+        if (!c || !c.id) {
+          results.push({ id: c?.id || "(missing id)", ok: false, error: "course has no id" });
+          continue;
+        }
+        const draftId = DRAFT_PUBLIC_ID_PREFIX + String(c.id);
+        // Guard: never let a content-less working copy blank out lesson days that
+        // already exist as a draft or a published copy. (Mirrors the publish guard.)
+        if (!Array.isArray(c.days) || c.days.length === 0) {
+          const draft = await fetchStoredCourse(draftId, cloudName, apiKey, apiSecret);
+          const live = draft && Array.isArray(draft.days) && draft.days.length > 0
+            ? draft
+            : await fetchStoredCourse(PUBLIC_ID_PREFIX + String(c.id), cloudName, apiKey, apiSecret);
+          if (live && Array.isArray(live.days) && live.days.length > 0) {
+            results.push({
+              id: String(c.id),
+              ok: false,
+              skipped: true,
+              error: `"${c.title || c.id}" has no lesson content loaded, so the draft was not saved. Open it in the course editor, confirm the lessons are visible, then save again.`,
+            });
+            continue;
+          }
+        }
+        const payload = JSON.stringify(c);
+        const up = await uploadCourseJson(draftId, payload, cloudName, apiKey, apiSecret);
+        results.push({ id: String(c.id), ok: up.ok, error: up.error, bytes: payload.length });
+      }
+      const failed = results.filter((r) => !r.ok);
+      return json(200, { ok: failed.length === 0, results });
+    }
+
+    if (op === "draft-get") {
+      const admin = await isAdminUid(projectId, databaseId, caller.uid);
+      if (!admin) return json(403, { error: "caller is not an admin" });
+      const authHeader = "Basic " + Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
+      const listRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/resources/raw?type=authenticated&prefix=${encodeURIComponent(DRAFT_PUBLIC_ID_PREFIX)}&max_results=500`,
+        { headers: { Authorization: authHeader } },
+      );
+      if (!listRes.ok) return json(500, { error: `could not list the drafts store (HTTP ${listRes.status})` });
+      const listData: any = await listRes.json().catch(() => ({}));
+      const resources: any[] = Array.isArray(listData?.resources) ? listData.resources : [];
+      const courses: any[] = [];
+      for (const r of resources) {
+        if (!r?.public_id) continue;
+        const stored = await fetchStoredCourse(String(r.public_id), cloudName, apiKey, apiSecret);
+        if (stored && stored.id) courses.push(stored);
+      }
+      return json(200, { ok: true, courses });
+    }
+
+    return json(400, { error: "unknown op", ops: ["publish", "get", "delete", "draft-save", "draft-get"] });
   } catch (err: any) {
     return json(500, { error: err.message || String(err) });
   }

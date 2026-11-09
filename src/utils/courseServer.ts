@@ -150,3 +150,62 @@ export async function hydrateRegisteredCourses(
     })
   );
 }
+
+
+// Drafts: admin-only working copies of courses, auto-saved on every edit.
+// Students only ever read the published store; Publish promotes the draft.
+export async function saveCourseDrafts(
+  courses: Course[]
+): Promise<{ ok: boolean; saved?: number; skipped?: number; error?: string }> {
+  try {
+    const token = await currentIdToken();
+    if (!token) return { ok: false, error: 'not signed in' };
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      body: JSON.stringify({ op: 'draft-save', courses }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: data?.error || `HTTP ${res.status}` };
+    const results: any[] = Array.isArray(data?.results) ? data.results : [];
+    const skipped = results.filter((r) => !r.ok && r.skipped);
+    const failed = results.filter((r) => !r.ok && !r.skipped);
+    return {
+      ok: data.ok !== false && failed.length === 0,
+      saved: results.filter((r) => r.ok).length,
+      skipped: skipped.length,
+      error: failed.length ? failed.map((f) => `${f.id}: ${f.error}`).join('; ') : undefined,
+    };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
+export async function fetchAllDraftsCourses(): Promise<Course[]> {
+  try {
+    await authReady();
+    const token = await currentIdToken();
+    if (!token) return [];
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      body: JSON.stringify({ op: 'draft-get' }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.courses) ? (data.courses as Course[]) : [];
+  } catch (e) {
+    console.warn('[course-store] admin draft fetch failed:', e);
+    return [];
+  }
+}
+
+// Admin working copies: unpublished drafts override the published copy of the
+// same course, so the editor always opens with the latest saved edits.
+export async function fetchAdminWorkingCopies(): Promise<Course[]> {
+  const [published, drafts] = await Promise.all([fetchAllServerCourses(), fetchAllDraftsCourses()]);
+  const map = new Map<string, Course>();
+  published.forEach((c) => { if (c?.id) map.set(String(c.id), c); });
+  drafts.forEach((c) => { if (c?.id) map.set(String(c.id), c); });
+  return Array.from(map.values());
+}

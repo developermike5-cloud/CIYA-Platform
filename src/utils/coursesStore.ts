@@ -1,6 +1,6 @@
 import { Course } from '../types';
 import { safeStorage } from './safeStorage';
-import { publishCoursesToServer, deleteServerCourse, fetchAllServerCourses } from './courseServer';
+import { saveCourseDrafts, deleteServerCourse, fetchAdminWorkingCopies } from './courseServer';
 import staticCourses from '../data/courses.json';
 import staticAdvancedCourses from '../data/advanced_courses.json';
 
@@ -8,16 +8,29 @@ import staticAdvancedCourses from '../data/advanced_courses.json';
 const BROADCAST_EVENT = 'ciya_courses_updated';
 
 
-// Fire-and-forget publish of the live course copy to the protected Cloudinary store.
-// Save UX never depends on it: failures are logged, not thrown.
-function publishQuietly(courses: Course[]): void {
+// Fire-and-forget auto-save of working copies to the protected drafts store.
+// Admin edits survive cache clears and follow them across devices; the
+// student-facing published copy only moves when an admin presses Publish.
+// Failures are logged, never thrown: saving locally always succeeds first.
+let draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingDrafts: Course[] = [];
+function draftQuietly(courses: Course[]): void {
   if (!Array.isArray(courses) || courses.length === 0) return;
-  publishCoursesToServer(courses)
-    .then((r) => {
-      if (r.ok) console.log(`[course-store] published ${r.published} course(s) to Cloudinary.`);
-      else console.warn('[course-store] publish failed:', r.error || 'unknown error');
-    })
-    .catch((e) => console.warn('[course-store] publish error:', e));
+  const byId = new Map(pendingDrafts.map((c) => [c.id!, c]));
+  courses.forEach((c) => { if (c?.id) byId.set(c.id!, c); });
+  pendingDrafts = Array.from(byId.values());
+  if (draftSaveTimer) clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(() => {
+    const batch = pendingDrafts;
+    pendingDrafts = [];
+    draftSaveTimer = null;
+    saveCourseDrafts(batch)
+      .then((r) => {
+        if (r.ok) console.log(`[course-store] auto-saved ${r.saved} draft(s) to Cloudinary${r.skipped ? ` (${r.skipped} skipped, no lesson content)` : ''}.`);
+        else console.warn('[course-store] draft save failed:', r.error || 'unknown error');
+      })
+      .catch((e) => console.warn('[course-store] draft save error:', e));
+  }, 2000);
 }
 
 // Helper to safely parse dates / Firestore timestamps to ISO string
@@ -156,7 +169,7 @@ export const coursesStore = {
           console.warn("Unable to save advanced_courses.json on disk:", err);
         });
 
-        publishQuietly(courses);
+        draftQuietly(courses);
       }
       return Promise.resolve();
     } catch (e) {
@@ -212,7 +225,7 @@ export const coursesStore = {
           console.warn("Unable to save advanced_courses.json on disk:", err);
         });
 
-        publishQuietly([...standard, ...advanced]);
+        draftQuietly([...standard, ...advanced]);
       }
       return Promise.resolve();
     } catch (e) {
@@ -544,7 +557,7 @@ if (typeof window !== 'undefined') {
       // protected Cloudinary store so editing never depends on bundled copies.
       // Students get their own copies hydrated per course in the dashboard.
       try {
-        const adminCourses = await fetchAllServerCourses();
+        const adminCourses = await fetchAdminWorkingCopies();
         if (adminCourses.length > 0) {
           coursesStore.upsertFromServer(adminCourses);
           console.log(`[course-store] hydrated ${adminCourses.length} course(s) from the store (admin).`);
