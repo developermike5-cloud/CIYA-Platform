@@ -6,6 +6,7 @@ import CourseRosterSlideover from '../../components/admin/CourseRosterSlideover'
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy, Download, Upload } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
+import { publishCoursesToServer } from '../../utils/courseServer';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Class", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -44,6 +45,7 @@ function TierBadge({ tier, price }: { tier: string, price?: number }) {
 
 export default function CoursesAdmin() {
   const [courses, setCourses] = useState<Course[]>(() => coursesStore.getStandardCoursesOnly());
+  const [cloudPublishStatus, setCloudPublishStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
   // Filters state
@@ -336,6 +338,24 @@ export default function CoursesAdmin() {
           >
             <Download className="w-3.5 h-3.5 text-slate-600" />
             Download JSON
+          </button>
+
+          {/* Publish live copy to the protected Cloudinary store */}
+          <button
+            onClick={async () => {
+              setCloudPublishStatus('Publishing…');
+              const res = await publishCoursesToServer(coursesStore.getStandardCoursesOnly());
+              setCloudPublishStatus(
+                res.ok
+                  ? `Live on Cloudinary: ${res.published} course(s)`
+                  : `Publish failed: ${res.error || 'unknown error'}`
+              );
+              setTimeout(() => setCloudPublishStatus(null), 8000);
+            }}
+            disabled={cloudPublishStatus === 'Publishing…'}
+            className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg transition-all cursor-pointer text-xs flex items-center gap-1.5 border border-indigo-200 disabled:opacity-60"
+          >
+            {cloudPublishStatus || '☁️ Publish to Cloudinary'}
           </button>
 
           {/* Import JSON Button */}

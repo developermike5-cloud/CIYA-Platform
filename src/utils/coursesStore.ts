@@ -1,10 +1,24 @@
 import { Course } from '../types';
 import { safeStorage } from './safeStorage';
+import { publishCoursesToServer, deleteServerCourse } from './courseServer';
 import staticCourses from '../data/courses.json';
 import staticAdvancedCourses from '../data/advanced_courses.json';
 
 // Broadcast channel/event for synchronizing across component mounts or active sessions
 const BROADCAST_EVENT = 'ciya_courses_updated';
+
+
+// Fire-and-forget publish of the live course copy to the protected Cloudinary store.
+// Save UX never depends on it: failures are logged, not thrown.
+function publishQuietly(courses: Course[]): void {
+  if (!Array.isArray(courses) || courses.length === 0) return;
+  publishCoursesToServer(courses)
+    .then((r) => {
+      if (r.ok) console.log(`[course-store] published ${r.published} course(s) to Cloudinary.`);
+      else console.warn('[course-store] publish failed:', r.error || 'unknown error');
+    })
+    .catch((e) => console.warn('[course-store] publish error:', e));
+}
 
 // Helper to safely parse dates / Firestore timestamps to ISO string
 function parseDate(val: any): string {
@@ -141,6 +155,8 @@ export const coursesStore = {
         .catch(err => {
           console.warn("Unable to save advanced_courses.json on disk:", err);
         });
+
+        publishQuietly(courses);
       }
       return Promise.resolve();
     } catch (e) {
@@ -195,6 +211,8 @@ export const coursesStore = {
         .catch(err => {
           console.warn("Unable to save advanced_courses.json on disk:", err);
         });
+
+        publishQuietly([...standard, ...advanced]);
       }
       return Promise.resolve();
     } catch (e) {
@@ -268,7 +286,7 @@ export const coursesStore = {
       console.warn("Error caching deleted course ID:", e);
     }
 
-    return this.saveAll([...filteredStandard, ...filteredAdvanced]);
+    return this.saveAll([...filteredStandard, ...filteredAdvanced]).then(() => deleteServerCourse(courseId).catch(() => false));
   },
 
   cloneCourse(course: Course, newTitle: string): Promise<Course> {
@@ -315,6 +333,30 @@ export const coursesStore = {
       const current = this.getStandardCoursesOnly();
       current.push(cloned);
       return this.saveAll([...current, ...this.getAdvancedCourses()]).then(() => cloned);
+    }
+  },
+
+  // Merge the latest published copy of course(s) fetched from the protected
+  // Cloudinary store into the local caches and broadcast the update.
+  upsertFromServer(courses: Course[]): void {
+    if (!Array.isArray(courses) || courses.length === 0) return;
+    const standard = this.getStandardCoursesOnly();
+    const advanced = this.getAdvancedCourses();
+    courses.forEach((c) => {
+      const norm = normalizeCourse(c);
+      const isAdvanced = norm.tier === 'advanced' || norm.tier === 'masterclass' || norm.level === 'Advanced' || norm.level === 'Masterclass';
+      if (isAdvanced) {
+        const i = advanced.findIndex((x) => x.id === norm.id);
+        if (i >= 0) advanced[i] = norm; else advanced.push(norm);
+      } else {
+        const i = standard.findIndex((x) => x.id === norm.id);
+        if (i >= 0) standard[i] = norm; else standard.push(norm);
+      }
+    });
+    safeStorage.setItem('ciya_frontend_courses', JSON.stringify(standard));
+    safeStorage.setItem('ciya_frontend_advanced_courses', JSON.stringify(advanced));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(BROADCAST_EVENT, { detail: [...standard, ...advanced] }));
     }
   },
 

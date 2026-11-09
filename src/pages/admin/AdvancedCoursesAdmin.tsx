@@ -6,6 +6,7 @@ import CourseRosterSlideover from '../../components/admin/CourseRosterSlideover'
 import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Download, Upload, ArrowRight, CheckCircle, Copy, Info, RefreshCw, AlertCircle, EyeOff, ShieldCheck } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
+import { publishCoursesToServer } from '../../utils/courseServer';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Class", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -42,6 +43,7 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
   const [studentsPanelCourse, setStudentsPanelCourse] = useState<Course | null>(null);
   const [cloneDialogName, setCloneDialogName] = useState<string>('');
   const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+  const [cloudPublishStatus, setCloudPublishStatus] = useState<string | null>(null);
   const [isPerformingAction, setIsPerformingAction] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
@@ -386,6 +388,22 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
       {/* Action Filters and Creator */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              setCloudPublishStatus('Publishing…');
+              const res = await publishCoursesToServer(coursesStore.getAdvancedCourses());
+              setCloudPublishStatus(
+                res.ok
+                  ? `Live on Cloudinary: ${res.published} course(s)`
+                  : `Publish failed: ${res.error || 'unknown error'}`
+              );
+              setTimeout(() => setCloudPublishStatus(null), 8000);
+            }}
+            disabled={cloudPublishStatus === 'Publishing…'}
+            className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg transition-all cursor-pointer text-xs flex items-center gap-1.5 border border-indigo-200 disabled:opacity-60"
+          >
+            {cloudPublishStatus || '☁️ Publish to Cloudinary'}
+          </button>
           <div>
             <label className="block text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Filter by Skill</label>
             <CustomDropdown

@@ -2,6 +2,11 @@
 # This file is automatically read by Netlify when you deploy.
 
 [[redirects]]
+  from = "/api/course-store"
+  to = "/.netlify/functions/course-store"
+  status = 200
+
+[[redirects]]
   from = "/api/cloudinary-signature"
   to = "/.netlify/functions/cloudinary-signature"
   status = 200

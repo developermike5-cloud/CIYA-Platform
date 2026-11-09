@@ -23,6 +23,7 @@ import { safeStorage } from '../utils/safeStorage';
 import { supabase, getStoragePublicUrl } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { coursesStore } from '../utils/coursesStore';
+import { hydrateRegisteredCourses } from '../utils/courseServer';
 import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
 import CIYAMembershipBadge from '../components/CIYAMembershipBadge';
 import CustomDropdown from '../components/CustomDropdown';
@@ -6008,6 +6009,34 @@ export default function StudentDashboard() {
       return firstTitleIndexMap.get(cTitle) === idx;
     });
   }, [courses, userProfile, isAdmin]);
+
+  // Pull the latest published copy of every course this student is registered
+  // for from the protected Cloudinary course store, so admin edits and new
+  // courses show up live without a new deploy. Falls back to the bundled copy
+  // if the store is unreachable. Runs once per course per session.
+  useEffect(() => {
+    if (!currentUser || isAdmin) return;
+    const ids = new Set<string>();
+    const rc = userProfile?.registeredCourses;
+    if (Array.isArray(rc)) {
+      rc.forEach((x: any) => {
+        if (typeof x === 'string') ids.add(x);
+        else if (x && typeof x === 'object' && x.id) ids.add(String(x.id));
+      });
+    }
+    const prog = userProfile?.progress;
+    if (prog && typeof prog === 'object') {
+      Object.keys(prog).forEach((k) => {
+        if (prog[k]?.accessStatus !== 'revoked') ids.add(k);
+      });
+    }
+    if (ids.size === 0) return;
+    let cancelled = false;
+    hydrateRegisteredCourses(Array.from(ids), (c) => {
+      if (!cancelled) coursesStore.upsertFromServer([c]);
+    });
+    return () => { cancelled = true; };
+  }, [currentUser?.uid, isAdmin, userProfile?.registeredCourses]);
 
   // Helper to check if student has completed their first course path (at least one registered course is 100% completed)
   const hasCompletedFirstCourse = useMemo((): boolean => {
