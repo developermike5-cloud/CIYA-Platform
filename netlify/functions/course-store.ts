@@ -257,13 +257,17 @@ export async function handler(event: any) {
         const adminRead = await googleFetch(
           `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/admins/${caller.uid}`
         );
+        const udata = fieldsToValues(((await userRead.json().catch(() => null)) || {})?.fields) || {};
+        const ids2 = await getRegisteredCourseIds(projectId, databaseId, caller.uid);
         return json(403, {
           error: "not registered for this course",
           dbg: {
             db: databaseId,
             userReadStatus: userRead.status,
             adminReadStatus: adminRead.status,
-            userReadBody: (await userRead.text()).slice(0, 400),
+            progressKeys: Object.keys(udata.progress || {}),
+            registeredCourses: Array.isArray(udata.registeredCourses) ? udata.registeredCourses.length : "absent",
+            ids2,
           },
         });
       }
