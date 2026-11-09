@@ -97,9 +97,9 @@ function fieldsToValues(f: any): any {
 }
 
 function cloudinaryCreds() {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || "qgvszym1";
-  const apiKey = process.env.CLOUDINARY_API_KEY || process.env.VITE_CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET || process.env.VITE_CLOUDINARY_API_SECRET;
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "qgvszym1";
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
   if (!apiKey || !apiSecret) {
     throw new Error("Cloudinary credentials not configured on serverless environment.");
   }
@@ -253,24 +253,16 @@ export async function handler(event: any) {
         return json(403, { error: "not registered for this course" });
       }
       const publicId = PUBLIC_ID_PREFIX + courseId;
-      const ts = String(Math.floor(Date.now() / 1000));
-      // Authenticated assets need a signed delivery URL. Cloudinary signs the
-      // sorted query params; the strictest signing mode also expects
-      // public_id inside the signature, so try that variant too.
-      const attempts = [
-        crypto.createHash("sha1").update(`timestamp=${ts}${apiSecret}`).digest("hex"),
-        crypto.createHash("sha1").update(`public_id=${publicId}&timestamp=${ts}${apiSecret}`).digest("hex"),
-      ];
-      let res: Response | null = null;
-      let lastStatus = 0;
-      for (const sig of attempts) {
-        const url = `https://res.cloudinary.com/${cloudName}/raw/authenticated/${publicId}?api_key=${apiKey}&timestamp=${ts}&signature=${sig}`;
-        res = await fetch(url);
-        lastStatus = res.status;
-        if (res.ok) break;
-      }
-      if (!res || !res.ok) {
-        return json(404, { error: "course not published to the store yet", cloudinaryStatus: lastStatus });
+      // Signed delivery URL for an authenticated asset: Cloudinary's s-- signature
+      // is base64url(sha1(public_id + api_secret)) truncated to 8 characters, and
+      // the URL must include a version segment (v1) when the public_id has folders.
+      const sig = b64url(crypto.createHash("sha1").update(`${publicId}${apiSecret}`).digest()).slice(0, 8);
+      const versionSeg = publicId.includes("/") ? "v1/" : "";
+      const res = await fetch(
+        `https://res.cloudinary.com/${cloudName}/raw/authenticated/s--${sig}--/${versionSeg}${publicId}`,
+      );
+      if (!res.ok) {
+        return json(404, { error: "course not published to the store yet", cloudinaryStatus: res.status });
       }
       const text = await res.text();
       let course: any;
