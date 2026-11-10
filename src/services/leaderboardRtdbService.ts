@@ -1,5 +1,6 @@
 import {
   ref,
+  get,
   set,
   update,
   remove,
@@ -140,19 +141,33 @@ export async function seedLeaderboardCohort(
 ): Promise<number> {
   if (isLegacyCohort(cohort)) return 0;
 
-  const updates: Record<string, LiveLeaderboardEntry> = {};
-  let count = 0;
+  const entries: LiveLeaderboardEntry[] = [];
 
   users.forEach((user) => {
     if (isLeaderboardExcluded(user)) return;
     const entry = buildLeaderboardEntry(user);
-    if (!entry) return;
-    updates[entry.uid] = entry;
-    count += 1;
+    // Only students whose actual cohort matches the board being published.
+    if (!entry || entry.cohort !== cohort) return;
+    entries.push(entry);
   });
 
-  await update(ref(rtdb, `${LEADERBOARD_RTDB_ROOT}/${cohort}`), updates);
-  return count;
+  // Rank 1..n before writing so the stored board reads correctly too.
+  const ranked = sortLeaderboardEntries(entries);
+  const updates: Record<string, LiveLeaderboardEntry | null> = {};
+  ranked.forEach((entry) => {
+    updates[entry.uid] = entry;
+  });
+
+  // Drop stale rows (students who moved cohort or left) so a re-publish
+  // always leaves the node exactly matching the Firestore source.
+  const boardRef = ref(rtdb, `${LEADERBOARD_RTDB_ROOT}/${cohort}`);
+  const existing = await get(boardRef);
+  Object.keys(existing.val() || {}).forEach((key) => {
+    if (!updates[key]) updates[key] = null;
+  });
+
+  await update(boardRef, updates);
+  return ranked.length;
 }
 
 /** Score desc, then lessons, then alphabetical. Same order the admin uses. */
