@@ -95,6 +95,21 @@ interface UserProfile {
   };
 }
 
+// Badge expiry in milliseconds, mirroring the student dashboard's expiry logic:
+// badgeExpiryDate if set, else badgePurchaseDate + 30 days, else 0 (unknown).
+const badgeExpiryMs = (u: any): number => {
+  let exp: any = u?.badgeExpiryDate;
+  if (exp && typeof exp === 'object' && typeof exp.seconds === 'number') exp = exp.seconds * 1000;
+  if (typeof exp === 'string') { const p = Date.parse(exp); exp = isNaN(p) ? 0 : p; }
+  if (typeof exp !== 'number') exp = 0;
+  if (!exp && u?.badgePurchaseDate) {
+    let p: any = u.badgePurchaseDate;
+    if (p && typeof p === 'object' && typeof p.seconds === 'number') p = p.seconds * 1000;
+    exp = typeof p === 'number' ? p + 30 * 24 * 60 * 60 * 1000 : 0;
+  }
+  return typeof exp === 'number' ? exp : 0;
+};
+
 export default function UsersAdmin() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>([]);
@@ -1316,9 +1331,20 @@ export default function UsersAdmin() {
             <div className="py-2 border-t border-slate-100">
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">🏷️ Year badge</div>
               <div className="flex items-center justify-between gap-2 text-xs">
-                <span className={`text-xs font-black ${u.hasYearBadge ? 'text-amber-700' : 'text-slate-400'}`}>
-                  {u.hasYearBadge ? 'Badge Active (Paid/Granted)' : 'No Badge Active'}
-                </span>
+                {(() => {
+                  const expMs = badgeExpiryMs(u);
+                  const badgeActive = u.hasYearBadge && expMs > 0 && Date.now() <= expMs;
+                  const badgeExpired = u.hasYearBadge && (expMs === 0 || Date.now() > expMs);
+                  return (
+                    <span className={`text-xs font-black ${badgeActive ? 'text-amber-700' : badgeExpired ? 'text-rose-600' : 'text-slate-400'}`}>
+                      {badgeActive
+                        ? `Badge Active (until ${new Date(expMs).toLocaleDateString()})`
+                        : badgeExpired
+                          ? `Badge Expired${expMs > 0 ? ` (on ${new Date(expMs).toLocaleDateString()})` : ''}`
+                          : 'No Badge Active'}
+                    </span>
+                  );
+                })()}
                 <button
                                         type="button"
                                         onClick={async () => {
@@ -1988,13 +2014,23 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                           <div className="font-bold text-slate-900 leading-tight mb-1">{u.fullName || '-'}</div>
                           <div className="text-slate-500 text-xs">{u.gender ? `${u.gender} • ` : ''}{u.state || '-'}</div>
                           
-                          {u.hasYearBadge && (
-                            <div className="mt-1">
-                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[9px] font-black tracking-wider uppercase rounded bg-amber-100 text-amber-800 border border-amber-200">
-                                🏷️ Year Badge
-                              </span>
-                            </div>
-                          )}
+                          {u.hasYearBadge && (() => {
+                            const expMs = badgeExpiryMs(u);
+                            const badgeActive = expMs > 0 && Date.now() <= expMs;
+                            return (
+                              <div className="mt-1">
+                                {badgeActive ? (
+                                  <span className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[9px] font-black tracking-wider uppercase rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                    🏷️ Year Badge
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[9px] font-black tracking-wider uppercase rounded bg-rose-100 text-rose-700 border border-rose-200">
+                                    🏷️ Badge Expired
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                           
                           {u.adminCode && (
                             <div className="mt-2 flex items-center gap-1.5 flex-wrap">

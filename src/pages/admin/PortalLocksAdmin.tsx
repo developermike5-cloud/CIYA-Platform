@@ -133,6 +133,21 @@ const INITIAL_ASSIGNMENT_SETTING: AssignmentDaySetting = {
   disapproveComment: "Submission failed compliance checks. Please ensure you have met the minimum word counts and screenshot counts."
 };
 
+// Badge expiry in milliseconds, mirroring the student dashboard's expiry logic:
+// badgeExpiryDate if set, else badgePurchaseDate + 30 days, else 0 (unknown).
+const badgeExpiryMs = (u: any): number => {
+  let exp: any = u?.badgeExpiryDate;
+  if (exp && typeof exp === 'object' && typeof exp.seconds === 'number') exp = exp.seconds * 1000;
+  if (typeof exp === 'string') { const p = Date.parse(exp); exp = isNaN(p) ? 0 : p; }
+  if (typeof exp !== 'number') exp = 0;
+  if (!exp && u?.badgePurchaseDate) {
+    let p: any = u.badgePurchaseDate;
+    if (p && typeof p === 'object' && typeof p.seconds === 'number') p = p.seconds * 1000;
+    exp = typeof p === 'number' ? p + 30 * 24 * 60 * 60 * 1000 : 0;
+  }
+  return typeof exp === 'number' ? exp : 0;
+};
+
 export default function PortalLocksAdmin() {
   const [activeTab, setActiveTab] = useState<'locks' | 'beginners' | 'advanced' | 'approvals'>('locks');
   
@@ -202,9 +217,14 @@ export default function PortalLocksAdmin() {
     return list;
   }, [allUsers]);
 
-  // Derived active badge owners (Approved and granted badge holders)
+  // Derived active badge owners (Approved badge holders still inside their 30-day
+  // window; expired badges drop off, matching what the student dashboard shows)
   const activeBadgeOwners = React.useMemo(() => {
-    const list = allUsers.filter(u => u.hasYearBadge === true);
+    const list = allUsers.filter(u => {
+      if (u.hasYearBadge !== true) return false;
+      const expMs = badgeExpiryMs(u);
+      return expMs > 0 && Date.now() <= expMs;
+    });
     list.sort((a, b) => {
       const nameA = (a.fullName || '').toLowerCase();
       const nameB = (b.fullName || '').toLowerCase();
@@ -257,14 +277,40 @@ export default function PortalLocksAdmin() {
     }
   }, []);
 
-  // Fetch users only when switching to Advanced or Approvals tabs
+  // Fetch users (with caching) when switching to the Advanced tab
   useEffect(() => {
-    if (activeTab === 'advanced' || activeTab === 'approvals') {
-      if (allUsers.length === 0) {
-        fetchAdminUsers(false);
-      }
+    if (activeTab === 'advanced' && allUsers.length === 0) {
+      fetchAdminUsers(false);
     }
   }, [activeTab, allUsers.length, fetchAdminUsers]);
+
+  // LIVE badge-approvals feed: while the Badge Portal & Members tab is open,
+  // subscribe to the users collection in real time so a student who pays shows
+  // up in the queue instantly, never from a stale localStorage snapshot.
+  useEffect(() => {
+    if (activeTab !== 'approvals') return;
+    setLoadingPending(true);
+    const unsub = onSnapshot(collection(db, 'users'), (snap) => {
+      const list: any[] = [];
+      snap.forEach((docSnap) => list.push({ id: docSnap.id, ...docSnap.data() }));
+      if (list.length > 0) {
+        setAllUsers(list);
+        try {
+          safeStorage.setItem('ciya_admin_cached_portallocks_users', JSON.stringify(list));
+        } catch {
+          // Cache write is best-effort only
+        }
+      }
+      setLoadingPending(false);
+    }, (err) => {
+      console.error("Badge approvals live listener error:", err);
+      setLoadingPending(false);
+    });
+    return () => {
+      unsub();
+      setLoadingPending(false);
+    };
+  }, [activeTab]);
 
   // Helper function to extract numerical millisecond timestamp from various Firestore / ISO date formats
   const getFirestoreTime = (timestamp: any): number => {
@@ -3355,6 +3401,10 @@ export function YearBadgePaymentFlow({
   const [confirmingTime, setConfirmingTime] = useState(10);
   const [confirmingProgress, setConfirmingProgress] = useState(100);
 
+  // Firestore write state for the payment request: the write fires the moment the
+  // student confirms payment, and its outcome decides what the confirming screen ends on.
+  const [badgeWriteState, setBadgeWriteState] = useState<'idle' | 'writing' | 'ok' | 'error'>('idle');
+
   // Countdown timer ticking effect
   useEffect(() => {
     let interval: any = null;
@@ -3380,40 +3430,15 @@ export function YearBadgePaymentFlow({
         });
       }, 1000);
     } else if (step === 'confirming' && confirmingTime === 0) {
-      // Transition immediately to Success to avoid any asynchronous blocking / infinite loop triggers!
-      setStep('success');
-
-      // Execute Firestore sync in the background
-      const completeVerification = async () => {
-        if (!isAdminSimulation && currentUser?.uid) {
-          try {
-            // Update the user profile document with PendingApproval status
-            const userRef = doc(db, 'users', currentUser.uid);
-            await updateDoc(userRef, {
-              badgePaymentRequestStatus: 'PendingApproval',
-              hasYearBadge: false, // Wait for admin approval
-              updatedAt: serverTimestamp()
-            });
-
-            // Update local state so it reflects immediately
-            if (setUserProfile && userProfile) {
-              const updated = {
-                ...userProfile,
-                badgePaymentRequestStatus: 'PendingApproval',
-                hasYearBadge: false
-              };
-              setUserProfile(updated);
-              safeStorage.setItem('ciya_cached_profile', JSON.stringify(updated));
-            }
-          } catch (err) {
-            console.error("Failed to write payment request status to Firestore:", err);
-          }
-        }
-      };
-      completeVerification();
+      // Only land on Success once the request is actually saved in Firestore.
+      // A failed write keeps the student here with a visible retry instead of
+      // faking a success and silently losing the request.
+      if (isAdminSimulation || badgeWriteState === 'ok') {
+        setStep('success');
+      }
     }
     return () => clearInterval(interval);
-  }, [step, confirmingTime, isAdminSimulation, currentUser, userProfile, setUserProfile]);
+  }, [step, confirmingTime, isAdminSimulation, currentUser, userProfile, setUserProfile, badgeWriteState]);
 
   // Formatter for countdown timer (MM:SS)
   const formatTime = (seconds: number) => {
@@ -3442,10 +3467,46 @@ export function YearBadgePaymentFlow({
     setStep('countdown');
   };
 
+  // Saves the payment request to Firestore IMMEDIATELY when the student confirms
+  // payment, not after the cosmetic 10-second animation, so closing the modal or
+  // the app early can never lose the request. Failures surface with a retry.
+  const submitBadgeRequest = async () => {
+    if (isAdminSimulation || !currentUser?.uid) {
+      setBadgeWriteState('ok');
+      return;
+    }
+    setBadgeWriteState('writing');
+    try {
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, {
+        badgePaymentRequestStatus: 'PendingApproval',
+        hasYearBadge: false, // Wait for admin approval
+        badgePaymentRequestDate: Date.now(),
+        updatedAt: serverTimestamp()
+      });
+      if (setUserProfile && userProfile) {
+        const updated = {
+          ...userProfile,
+          badgePaymentRequestStatus: 'PendingApproval',
+          hasYearBadge: false,
+          badgePaymentRequestDate: Date.now()
+        };
+        setUserProfile(updated);
+        safeStorage.setItem('ciya_cached_profile', JSON.stringify(updated));
+      }
+      setBadgeWriteState('ok');
+    } catch (err) {
+      console.error("Failed to write payment request status to Firestore:", err);
+      setBadgeWriteState('error');
+    }
+  };
+
   const handleIHavePaid = () => {
     setConfirmingTime(10);
     setConfirmingProgress(100);
+    setBadgeWriteState('idle');
     setStep('confirming');
+    submitBadgeRequest();
   };
 
   const handleTryAgain = () => {
@@ -3690,7 +3751,6 @@ export function YearBadgePaymentFlow({
           <div 
             onClick={() => {
               setConfirmingTime(0);
-              setStep('success');
             }}
             className="relative w-24 h-24 mx-auto flex flex-col items-center justify-center bg-indigo-50 hover:bg-indigo-100 active:scale-95 transition-all rounded-full border-2 border-indigo-200 shadow-inner cursor-pointer"
             title="Click to force skip"
@@ -3711,12 +3771,30 @@ export function YearBadgePaymentFlow({
               />
             </div>
 
+            {badgeWriteState === 'error' && (
+              <div className="pt-5 space-y-3">
+                <p className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                  ⚠️ We couldn't save your payment request. Check your internet connection and try again.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => submitBadgeRequest()}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase rounded-xl border-0 cursor-pointer transition-all duration-150 active:scale-95"
+                >
+                  Retry Save
+                </button>
+              </div>
+            )}
+
+            {badgeWriteState === 'writing' && (
+              <p className="text-[11px] text-slate-500 font-semibold">💾 Saving your request...</p>
+            )}
+
             <div className="pt-4">
               <button
                 type="button"
                 onClick={() => {
                   setConfirmingTime(0);
-                  setStep('success');
                 }}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-black uppercase rounded-xl border-0 cursor-pointer transition-all duration-150 active:scale-95"
               >
