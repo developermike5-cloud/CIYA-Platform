@@ -126,9 +126,10 @@ export default function UsersAdmin() {
   const [filterLearningTool, setFilterLearningTool] = useState('');
 
   // Cohorts State
-  const [cohortsConfig, setCohortsConfig] = useState<{ activeCohort: string; cohortsList: string[] }>({
+  const [cohortsConfig, setCohortsConfig] = useState<{ activeCohort: string; cohortsList: string[]; onboardingActive: boolean }>({
     activeCohort: 'Cohort 1',
-    cohortsList: ['Cohort 1']
+    cohortsList: ['Cohort 1'],
+    onboardingActive: false,
   });
   const [newCohortName, setNewCohortName] = useState('');
   const [isCreatingCohort, setIsCreatingCohort] = useState(false);
@@ -180,9 +181,10 @@ export default function UsersAdmin() {
       
       await setDoc(doc(db, 'settings', 'cohorts'), {
         activeCohort: newActive,
-        cohortsList: updatedList
-      });
-      setCohortsConfig({ activeCohort: newActive, cohortsList: updatedList });
+        cohortsList: updatedList,
+        onboardingActive: cohortsConfig.onboardingActive
+      }, { merge: true });
+      setCohortsConfig({ activeCohort: newActive, cohortsList: updatedList, onboardingActive: cohortsConfig.onboardingActive });
       setNewCohortName('');
       alert(`Cohort "${sanitized}" created successfully! It is now the ACTIVE cohort for new registrations.`);
     } catch (err) {
@@ -197,13 +199,32 @@ export default function UsersAdmin() {
     try {
       await setDoc(doc(db, 'settings', 'cohorts'), {
         activeCohort: newActive,
-        cohortsList: cohortsConfig.cohortsList
-      });
+        cohortsList: cohortsConfig.cohortsList,
+        onboardingActive: cohortsConfig.onboardingActive
+      }, { merge: true });
       setCohortsConfig(prev => ({ ...prev, activeCohort: newActive }));
       alert(`Active cohort updated to: ${newActive}`);
     } catch (err) {
       console.error("Error updating active cohort:", err);
       alert("Failed to update active cohort.");
+    }
+  };
+
+  const handleToggleOnboardingActive = async () => {
+    const next = !cohortsConfig.onboardingActive;
+    try {
+      await setDoc(doc(db, 'settings', 'cohorts'), {
+        activeCohort: cohortsConfig.activeCohort,
+        cohortsList: cohortsConfig.cohortsList,
+        onboardingActive: next
+      }, { merge: true });
+      setCohortsConfig(prev => ({ ...prev, onboardingActive: next }));
+      alert(next
+        ? `Registration intake is now OPEN for ${cohortsConfig.activeCohort}. "Start for Free" buttons send new students straight into the onboarding signup form.`
+        : `Registration intake is now CLOSED. "Start for Free" buttons send new students to the waiting list.`);
+    } catch (err) {
+      console.error("Error updating registration intake toggle:", err);
+      alert("Failed to update registration status.");
     }
   };
 
@@ -543,12 +564,14 @@ export default function UsersAdmin() {
     const initCohorts = async () => {
       let active = 'Cohort 1';
       let list = ['Cohort 1'];
+      let intakeOpen = false;
       try {
         const cohortsSnap = await getDoc(doc(db, 'settings', 'cohorts'));
         if (cohortsSnap.exists()) {
           const cData = cohortsSnap.data();
           active = cData.activeCohort || 'Cohort 1';
           list = cData.cohortsList || ['Cohort 1'];
+          intakeOpen = cData.onboardingActive === true;
         } else {
           // Initialize cohorts setting
           await setDoc(doc(db, 'settings', 'cohorts'), {
@@ -559,7 +582,7 @@ export default function UsersAdmin() {
       } catch (cohortErr) {
         console.warn("Could not fetch settings/cohorts document:", cohortErr);
       }
-      setCohortsConfig({ activeCohort: active, cohortsList: list });
+      setCohortsConfig({ activeCohort: active, cohortsList: list, onboardingActive: intakeOpen });
       setFilterCohort(active); // Set default selected cohort in UI
 
       // Fetch auto-approval setting
@@ -1623,6 +1646,17 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                 className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-750 text-white font-extrabold text-xs uppercase tracking-wide rounded-xl shadow transition-all duration-150 disabled:opacity-50 shrink-0 border-0 cursor-pointer"
               >
                 {isCreatingCohort ? "Creating..." : "Create"}
+              </button>
+            </div>
+
+            {/* Registration Intake Toggle */}
+            <div className="flex items-center gap-2 border-t sm:border-t-0 sm:border-l border-slate-200 pt-3 sm:pt-0 sm:pl-4" title="When OPEN, the landing page's Start for Free buttons send new students into the onboarding signup form. When CLOSED, they go to the waiting list instead.">
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Registrations:</span>
+              <button
+                onClick={handleToggleOnboardingActive}
+                className={`px-4 py-2 rounded-xl font-extrabold text-xs uppercase tracking-wide shadow transition-all duration-150 border-0 cursor-pointer ${cohortsConfig.onboardingActive ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
+              >
+                {cohortsConfig.onboardingActive ? 'OPEN' : 'CLOSED'}
               </button>
             </div>
 

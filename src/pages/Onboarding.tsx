@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { auth, db } from '../firebase';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import LoginModal from '../components/LoginModal';
 import BrandingLogo from '../components/BrandingLogo';
@@ -108,7 +108,7 @@ export default function Onboarding() {
 
   // Onboarding Auth Choice Modal States
   const [showAuthChoiceModal, setShowAuthChoiceModal] = useState(false);
-  const [authChoiceTab, setAuthChoiceTab] = useState<'email' | 'google'>('google');
+  
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [showAuthPassword, setShowAuthPassword] = useState(false);
@@ -150,35 +150,6 @@ export default function Onboarding() {
 
   const handleDirectLogin = () => {
     setIsLoginOpen(true);
-  };
-
-  const handleGoogleOnboarding = async () => {
-    setLoading(true);
-    setFormError('');
-    try {
-      const provider = new GoogleAuthProvider();
-      if (provider && typeof (provider as any).setCustomParameters === 'function') {
-        (provider as any).setCustomParameters({ prompt: 'select_account' });
-      }
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      if (user) {
-        setData(d => ({
-          ...d,
-          email: user.email || '',
-          fullName: d.fullName || user.displayName || ''
-        }));
-      }
-    } catch (e: any) {
-      console.error("Google Onboarding Sign Up error:", e);
-      if (e.code === 'auth/popup-blocked' || e.message?.toLowerCase().includes('popup-blocked')) {
-        setShowPopupBlocked(true);
-      } else {
-        setFormError(e.message || 'Google authentication failed.');
-      }
-    } finally {
-      setLoading(false);
-    }
   };
 
   const selectData = (key: keyof typeof data, value: string | boolean) => {
@@ -434,35 +405,6 @@ export default function Onboarding() {
     setShowAuthChoiceModal(true);
     setAuthModalError('');
     if (data.email) setAuthEmail(data.email);
-  };
-
-  const handleOnboardingGoogleAuth = async () => {
-    if (globalOnboardingSignInActive) return;
-    setLoading(true);
-    setAuthModalError('');
-    try {
-      globalOnboardingSignInActive = true;
-      const provider = new GoogleAuthProvider();
-      if (provider && typeof (provider as any).setCustomParameters === 'function') {
-        (provider as any).setCustomParameters({ prompt: 'select_account' });
-      }
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      if (!user) throw new Error('Google authentication failed.');
-      setShowAuthChoiceModal(false);
-      await handleRegisterSuccess(user);
-    } catch (e: any) {
-      console.error(e);
-      if (e.code === 'auth/popup-blocked' || e.message?.toLowerCase().includes('popup-blocked')) {
-        setShowPopupBlocked(true);
-        setAuthModalError('Popups blocked. Please allow popups or use Email & Password below.');
-      } else {
-        setAuthModalError(e.message || 'Google authentication failed.');
-      }
-    } finally {
-      globalOnboardingSignInActive = false;
-      setLoading(false);
-    }
   };
 
   const handleOnboardingEmailAuth = async (e: React.FormEvent) => {
@@ -1061,34 +1003,8 @@ export default function Onboarding() {
             {/* Header */}
             <div className="text-center mb-5 space-y-1 flex flex-col items-center">
               <BrandingLogo size="sm" className="mb-2" />
-              <h3 className="text-2xl font-black text-white tracking-tight">Select Sign-Up Method</h3>
-              <p className="text-xs text-slate-400 font-semibold">Choose how you would like to authenticate and complete your student registration.</p>
-            </div>
-
-            {/* Method Tabs */}
-            <div className="flex bg-slate-950/80 p-1 rounded-2xl border border-slate-800 mb-5">
-              <button
-                type="button"
-                onClick={() => { setAuthChoiceTab('google'); setAuthModalError(''); }}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer ${
-                  authChoiceTab === 'google'
-                    ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
-                }`}
-              >
-                Google Auth (Fast)
-              </button>
-              <button
-                type="button"
-                onClick={() => { setAuthChoiceTab('email'); setAuthModalError(''); }}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase transition-all cursor-pointer ${
-                  authChoiceTab === 'email'
-                    ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
-                }`}
-              >
-                Email & Password
-              </button>
+              <h3 className="text-2xl font-black text-white tracking-tight">Create Your Login</h3>
+              <p className="text-xs text-slate-400 font-semibold">Set up the email and password you will use to sign in to your CIYA dashboard and mobile app.</p>
             </div>
 
             {authModalError && (
@@ -1097,32 +1013,7 @@ export default function Onboarding() {
               </div>
             )}
 
-            {/* TAB: GOOGLE AUTH (FIRST) */}
-            {authChoiceTab === 'google' && (
-              <div className="space-y-4 py-2">
-                <p className="text-xs text-slate-300 leading-relaxed text-center font-medium">
-                  Use your Google account for instant 1-click authentication and student dashboard activation.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={handleOnboardingGoogleAuth}
-                  disabled={loading}
-                  className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-lg flex items-center justify-center gap-3 cursor-pointer border-0 uppercase tracking-wider disabled:opacity-60 hover:scale-[1.01] active:scale-[0.99]"
-                >
-                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5.04c1.64 0 3.11.56 4.27 1.67l3.19-3.19C17.51 1.7 14.99 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.79 2.94C6.18 7.37 8.86 5.04 12 5.04z" />
-                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.44c-.28 1.48-1.12 2.73-2.38 3.58l3.71 2.88c2.17-2 3.42-4.94 3.42-8.61z" />
-                    <path fill="#FBBC05" d="M5.29 14.83a7.19 7.19 0 0 1 0-4.57L1.5 7.32a11.95 11.95 0 0 0 0 10.37l3.79-2.86z" />
-                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.14 0-5.82-2.33-6.71-5.46L1.5 16.29C3.4 20.15 7.35 23 12 23z" />
-                  </svg>
-                  <span>{loading ? 'Connecting Google...' : 'Sign Up with Google (Recommended)'}</span>
-                </button>
-              </div>
-            )}
-
             {/* TAB: EMAIL & PASSWORD (SECOND) */}
-            {authChoiceTab === 'email' && (
               <form onSubmit={handleOnboardingEmailAuth} className="space-y-4">
                 {/* STERN WARNING NOTICE */}
                 <div className="p-3.5 bg-amber-500/10 border border-amber-500/40 rounded-2xl text-amber-300 text-xs leading-relaxed font-bold flex items-start gap-2.5">
@@ -1183,7 +1074,7 @@ export default function Onboarding() {
                   )}
                 </button>
               </form>
-            )}
+
           </motion.div>
         </div>
       )}

@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router';
 import { WHATSAPP_URL } from './data';
+import { useIntakeRoute } from '../../hooks/useIntakeRoute';
 
 /** Closing CTA with the WhatsApp community block. */
 export default function ClosingCta() {
+  const intakeRoute = useIntakeRoute();
   return (
     <section id="join" className="bg-teal-900/30 border-t border-teal-900 text-center overflow-hidden px-6 md:px-12 lg:px-24 py-[clamp(72px,10vw,128px)] relative">
       <div className="absolute top-1/2 left-1/2 -ml-[400px] -mt-[400px] w-[800px] h-[800px] rounded-full bg-amber-500/[0.05] blur-[110px] pointer-events-none" aria-hidden="true" />
@@ -21,7 +23,7 @@ export default function ClosingCta() {
         </p>
         <div className="flex flex-wrap gap-4 justify-center mt-10">
           <Link
-            to="/get-started"
+            to={intakeRoute}
             className="inline-flex items-center justify-center px-8 py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 text-teal-950 text-base font-bold shadow-[0_10px_24px_-8px_rgba(245,158,11,.45)] transition-all hover:-translate-y-0.5"
           >
             Start for Free

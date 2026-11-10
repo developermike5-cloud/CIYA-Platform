@@ -8,7 +8,7 @@ import InteractiveTemplatesSphere from '../components/InteractiveTemplatesSphere
 import { Star, Menu, X } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import './home/landing.css';
 import HeroSection from './home/HeroSection';
 import MissionSection from './home/MissionSection';
@@ -41,6 +41,8 @@ const useLogin = () => {
           if (docSnap.exists()) {
             navigate('/dashboard');
           } else {
+            // New students no longer sign up with Google: sign out and use the email & password onboarding form.
+            await signOut(auth);
             navigate('/onboarding');
           }
         }
@@ -60,6 +62,8 @@ const useLogin = () => {
         if (docSnap.exists()) {
           navigate('/dashboard');
         } else {
+          // New students no longer sign up with Google: sign out and use the email & password onboarding form.
+          await signOut(auth);
           navigate('/onboarding');
         }
       }

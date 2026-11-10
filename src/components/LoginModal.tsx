@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { Mail, Lock, X, Sparkles, ArrowRight, User, Phone, MapPin, ChevronDown, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { auth, db, safeGetItem, safeSetItem } from '../firebase';
 import BrandingLogo from './BrandingLogo';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
 interface LoginModalProps {
@@ -299,7 +299,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           if (docSnap.exists()) {
             navigate('/dashboard');
           } else {
-            // New Google account gets redirected to onboarding to fill detailed profile
+            // New students no longer sign up with Google: sign the fresh account out and
+            // route them to the email & password onboarding form instead.
+            await signOut(auth);
             navigate('/onboarding');
           }
         }
