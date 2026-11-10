@@ -5,6 +5,7 @@ import { Mail, Lock, X, Sparkles, ArrowRight, User, Phone, MapPin, ChevronDown, 
 import { auth, db, safeGetItem, safeSetItem } from '../firebase';
 import BrandingLogo from './BrandingLogo';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, signOut } from 'firebase/auth';
+import { useIntakeRoute } from '../hooks/useIntakeRoute';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
 interface LoginModalProps {
@@ -21,6 +22,7 @@ const NIGERIAN_STATES = [
 
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const navigate = useNavigate();
+  const intakeRoute = useIntakeRoute();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -302,7 +304,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             // New students no longer sign up with Google: sign the fresh account out and
             // route them to the email & password onboarding form instead.
             await signOut(auth);
-            navigate('/onboarding');
+            navigate(intakeRoute);
           }
         }
         onClose();
@@ -522,7 +524,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                         type="button"
                         onClick={() => {
                           onClose();
-                          navigate('/waitingonboarding');
+                          navigate(intakeRoute);
                         }}
                         className="text-amber-400 hover:text-amber-300 font-black underline bg-transparent border-0 cursor-pointer p-0 ml-1 inline-flex items-center gap-1"
                         id="login_signup_redirect_btn"

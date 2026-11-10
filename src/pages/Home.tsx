@@ -22,11 +22,13 @@ import WhyCiya from './home/WhyCiya';
 import FaqSection from './home/FaqSection';
 import ClosingCta from './home/ClosingCta';
 import { WHATSAPP_URL } from './home/data';
+import { useIntakeRoute } from '../hooks/useIntakeRoute';
 
 let globalLoginActive = false;
 
 const useLogin = () => {
   const navigate = useNavigate();
+  const intakeRoute = useIntakeRoute();
   return async () => {
     if (globalLoginActive) {
       console.warn("Sign-in already in progress, ignoring duplicate action.");
@@ -43,7 +45,7 @@ const useLogin = () => {
           } else {
             // New students no longer sign up with Google: sign out and use the email & password onboarding form.
             await signOut(auth);
-            navigate('/onboarding');
+            navigate(intakeRoute);
           }
         }
         return;
@@ -64,7 +66,7 @@ const useLogin = () => {
         } else {
           // New students no longer sign up with Google: sign out and use the email & password onboarding form.
           await signOut(auth);
-          navigate('/onboarding');
+          navigate(intakeRoute);
         }
       }
     } catch (e: any) {
