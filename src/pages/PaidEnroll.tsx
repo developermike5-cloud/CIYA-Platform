@@ -75,7 +75,7 @@ export default function PaidEnroll() {
       const res = await fetch('/.netlify/functions/onboarding-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, paid: true })
+        body: JSON.stringify({ ...form, paid: true, courseTitle: course?.title || "" })
       });
       const data = await res.json().catch(() => ({} as any));
       if (!res.ok || !data?.ok) {

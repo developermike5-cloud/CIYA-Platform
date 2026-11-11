@@ -186,9 +186,11 @@ async function sendLoginEmail(opts: {
   ciyaCode: string;
   cohort: string;
   appUrl: string;
+  paid?: boolean;
+  courseTitle?: string;
 }): Promise<{ queued: boolean; reason?: string }> {
   const apiKey = process.env.ZEPTO_API_KEY;
-  const templateKey = process.env.ZEPTO_TEMPLATE_KEY;
+  const templateKey = (opts.paid && process.env.ZEPTO_TEMPLATE_KEY_PAID) || process.env.ZEPTO_TEMPLATE_KEY;
   const fromAddress = process.env.ZEPTO_FROM_ADDRESS;
   const fromName = process.env.ZEPTO_FROM_NAME || "CIYA Academy";
   if (!apiKey || !templateKey || !fromAddress) {
@@ -208,6 +210,7 @@ async function sendLoginEmail(opts: {
         ciya_code: opts.ciyaCode,
         cohort: opts.cohort,
         app_link: opts.appUrl,
+        course_title: opts.courseTitle || "",
       },
     }),
   });
@@ -352,6 +355,8 @@ export const handler = async (event: any) => {
         ciyaCode,
         cohort: activeCohort,
         appUrl,
+        paid: body?.paid === true,
+        courseTitle: String(body?.courseTitle || ""),
       });
       emailQueued = sendResult.queued;
       if (emailQueued) {
