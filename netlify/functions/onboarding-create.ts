@@ -406,7 +406,11 @@ export const handler = async (event: any) => {
       }
     }
 
-    return json(200, { ok: true, uid, cohort: activeCohort, emailQueued });
+    return json(200, { ok: true, uid, cohort: activeCohort, emailQueued,
+      // Email-fallback: when the welcome email could not be sent (mail keys
+      // missing or provider rejected), hand the login details back to the
+      // registration screen so the student is never stranded without them.
+      ...(emailQueued ? {} : { tempPassword, ciyaCode, emailFallback: true }) });
   } catch (err: any) {
     console.error("onboarding-create failed:", err);
     return json(500, { error: "server-error", detail: String(err?.message || err) });
