@@ -193,12 +193,22 @@ export const handler = async (event: any) => {
     const databaseId =
       process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-1aaee609-a922-43e7-9568-0b675490ff78";
 
-    // 2. The caller must be an admin.
+    // 2. The caller must be an admin. Same check as the Firestore rules:
+    // bootstrap uid/email, a users-doc admin role, or membership in the
+    // admins collection.
     const callerDoc = await getDocFields(projectId, databaseId, `users/${callerUid}`);
     const role = str(callerDoc, "role");
     const baseAdmin =
       callerUid === BOOTSTRAP_UID || String(caller?.email || "").toLowerCase() === BOOTSTRAP_EMAIL;
-    if (!(baseAdmin || ["admin", "super_admin", "superadmin"].includes(role))) {
+    let adminsDoc: Record<string, any> = {};
+    if (!baseAdmin && !["admin", "super_admin", "superadmin"].includes(role)) {
+      try {
+        adminsDoc = await getDocFields(projectId, databaseId, `admins/${callerUid}`);
+      } catch {
+        adminsDoc = {};
+      }
+    }
+    if (!(baseAdmin || ["admin", "super_admin", "superadmin"].includes(role) || Object.keys(adminsDoc).length > 0)) {
       return json(403, { error: "not-admin" });
     }
 
