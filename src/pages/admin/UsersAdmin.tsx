@@ -5,6 +5,7 @@ import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
 import CustomDropdown from '../../components/CustomDropdown';
+import { getStudentAccessCode } from '../../utils/courseServer';
 import RowActionsDropdown, { actionIcons } from '../../components/admin/RowActionsDropdown';
 import SlideOver from '../../components/admin/SlideOver';
 import { Course } from '../../types';
@@ -245,6 +246,16 @@ export default function UsersAdmin() {
 
   // Actions Toggle & States
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const [detailAccessCode, setDetailAccessCode] = useState<{ uid: string; ciyaCode?: string; usedForCourseId?: string } | null>(null);
+
+  useEffect(() => {
+    if (!detailUserId) { setDetailAccessCode(null); return; }
+    let cancelled = false;
+    getStudentAccessCode(detailUserId).then((res) => {
+      if (!cancelled && res) setDetailAccessCode({ uid: detailUserId, ...res });
+    });
+    return () => { cancelled = true; };
+  }, [detailUserId]);
   const [actionLoading, setActionLoading] = useState<Record<string, 'approve' | 'disapprove' | 'delete' | null>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -1120,6 +1131,12 @@ export default function UsersAdmin() {
               {row('Experience level', u.experience)}
               {row('Commitment availability', u.availability)}
               {row('Joined', u.createdAt ? formatFirestoreDateTime(u.createdAt) : null)}
+              {row('CIYA access code', (() => {
+                const codeInfo = detailAccessCode && detailAccessCode.uid === u.id ? detailAccessCode : null;
+                return codeInfo?.ciyaCode
+                  ? <span className="font-mono">{codeInfo.ciyaCode}{codeInfo.usedForCourseId ? ' · used for first course' : ' · not used yet'}</span>
+                  : 'Not issued yet';
+              })())}
             </div>
             <div className="mt-3">
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cohort placement</div>

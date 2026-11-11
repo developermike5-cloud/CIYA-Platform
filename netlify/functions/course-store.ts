@@ -99,6 +99,189 @@ function fieldsToValues(f: any): any {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Rotating classroom passcodes (stateless 15-minute codes).
+// Mirrors src/utils/passcode.ts so the server is the authority for course
+// unlocks: the same secret + current time window must produce the code.
+// ---------------------------------------------------------------------------
+const DEFAULT_ADVANCED_PASSCODE_SECRET = "CIYA_ADVANCED_PASSCODE_SECRET_2026";
+const DEFAULT_BEGINNER_PASSCODE_SECRET = "CIYA_BEGINNER_PASSCODE_SECRET_2026";
+const ROTATING_OFFSETS = [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -8, 8];
+
+function generateTimeBasedCode(secret: string, intervalMs = 900000, offset = 0): string {
+  const cleanSecret = (secret || "").trim();
+  if (!cleanSecret) return "";
+  const timeFactor = Math.floor(Date.now() / intervalMs) + offset;
+  const input = `${cleanSecret}_${timeFactor}`;
+
+  // FNV-1a 32-bit hash, then MurmurHash3 32-bit finalizer mix (matches the client).
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x85ebca6b);
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 0xc2b2ae35);
+  hash ^= hash >>> 16;
+  return (Math.abs(hash | 0) % 900000 + 100000).toString();
+}
+
+function verifyRotatingCode(
+  inputCode: string,
+  secret: string,
+  opts?: { defaultSecret?: string; legacyMasterCodes?: boolean }
+): boolean {
+  const clean = (inputCode || "").trim();
+  if (!clean) return false;
+  const target = (secret || "").trim();
+  if (!target) return false;
+  if (clean.toLowerCase() === target.toLowerCase()) return true;
+  const defaultSecret = (opts?.defaultSecret || "").trim();
+  if (defaultSecret && clean.toLowerCase() === defaultSecret.toLowerCase()) return true;
+  if (opts?.legacyMasterCodes && ["ciya2026", "advanced2026"].includes(clean.toLowerCase())) return true;
+  const digits = clean.replace(/\s+/g, "");
+  if (/^\d{6}$/.test(digits)) {
+    for (const offset of ROTATING_OFFSETS) {
+      if (generateTimeBasedCode(target, 900000, offset) === digits) return true;
+      if (defaultSecret && defaultSecret !== target && generateTimeBasedCode(defaultSecret, 900000, offset) === digits) return true;
+    }
+  }
+  return false;
+}
+
+async function getDocFields(projectId: string, databaseId: string, path: string): Promise<any | null> {
+  const res = await googleFetch(
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/${path}`
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`firestore get ${path} failed (${res.status})`);
+  const data: any = await res.json();
+  return fieldsToValues({ mapValue: { fields: data.fields || {} } });
+}
+
+async function patchDocFields(
+  projectId: string,
+  databaseId: string,
+  path: string,
+  fields: Record<string, any>,
+  updateMask: string[]
+): Promise<void> {
+  let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/${path}`;
+  if (updateMask.length) {
+    url += "?" + updateMask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join("&");
+  }
+  const res = await googleFetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) throw new Error(`firestore write ${path} failed (${res.status})`);
+}
+
+type AccessGateResult = { ok: boolean; error?: string; codeType?: "ciya" | "beginner" | "advanced" };
+
+function isAdvancedTierCourse(course: any): boolean {
+  const tier = String(course?.tier || "").toLowerCase();
+  const level = String(course?.level || "").toLowerCase();
+  return tier === "advanced" || tier === "masterclass" || level === "advanced" || level === "masterclass";
+}
+
+// Server-side access gate for the CIYA access-code flow. Applies only to
+// students registered through the new onboarding (they have an accessCodes
+// document). Legacy students (no accessCodes document) keep the old behavior.
+// Rules, in order:
+//   1. The course the student already unlocked with their CIYA code is open.
+//   2. The CIYA code from their welcome email unlocks their FIRST registered
+//      course, paid or free (recorded as usedForCourseId).
+//   3. Advanced/Masterclass courses open with the rotating advanced passcode;
+//      once verified it serves ALL advanced courses for that student.
+//   4. Any other beginner course opens with the rotating beginner passcode;
+//      once verified it serves all beginner courses for that student.
+async function checkCourseAccessGate(
+  projectId: string,
+  databaseId: string,
+  uid: string,
+  courseId: string,
+  course: any,
+  accessCode: string
+): Promise<AccessGateResult> {
+  const [user, codeDoc] = await Promise.all([
+    getDocFields(projectId, databaseId, `users/${uid}`),
+    getDocFields(projectId, databaseId, `accessCodes/${uid}`),
+  ]);
+  const profile = user || {};
+  if (!codeDoc || !codeDoc.ciyaCode) {
+    // Legacy student: registered before the CIYA access-code flow existed.
+    return { ok: true };
+  }
+  const ciyaCode = String(codeDoc.ciyaCode || "");
+  const firstCourseId = String(codeDoc.usedForCourseId || "");
+  const cleanInput = (accessCode || "").trim();
+  const isAdv = isAdvancedTierCourse(course);
+
+  // 1. Already unlocked as the student's first registered course.
+  if (firstCourseId === courseId) return { ok: true };
+
+  // 2. The CIYA code from the welcome email unlocks the first course (paid or free).
+  if (cleanInput && cleanInput.toUpperCase() === ciyaCode.toUpperCase()) {
+    await patchDocFields(
+      projectId,
+      databaseId,
+      `accessCodes/${uid}`,
+      { usedForCourseId: { stringValue: courseId }, updatedAt: { timestampValue: new Date().toISOString() } },
+      ["usedForCourseId", "updatedAt"]
+    );
+    return { ok: true };
+  }
+
+  if (isAdv) {
+    // 3. One rotating advanced passcode serves all advanced courses.
+    if (profile.advancedAllAccess === true) return { ok: true };
+    const settings = (await getDocFields(projectId, databaseId, "settings/app")) || {};
+    const advSettings = settings.advancedCourseSettings || {};
+    const advSecret = String(advSettings.secretPasscode || DEFAULT_ADVANCED_PASSCODE_SECRET);
+    if (cleanInput && verifyRotatingCode(cleanInput, advSecret, { defaultSecret: DEFAULT_ADVANCED_PASSCODE_SECRET, legacyMasterCodes: true })) {
+      await patchDocFields(
+        projectId,
+        databaseId,
+        `users/${uid}`,
+        { advancedAllAccess: { booleanValue: true }, updatedAt: { timestampValue: new Date().toISOString() } },
+        ["advancedAllAccess", "updatedAt"]
+      );
+      return { ok: true };
+    }
+    return {
+      ok: false,
+      error: cleanInput ? "invalid-access-code" : "access-code-required",
+      codeType: firstCourseId ? "advanced" : "ciya",
+    };
+  }
+
+  // 4. Returning students unlock additional beginner courses with the
+  //    rotating beginner passcode (modeled on the advanced passcode).
+  if (profile.beginnerAllAccess === true) return { ok: true };
+  const settings = (await getDocFields(projectId, databaseId, "settings/app")) || {};
+  const begSettings = settings.beginnerCourseSettings || {};
+  const begSecret = String(begSettings.secretPasscode || DEFAULT_BEGINNER_PASSCODE_SECRET);
+  if (cleanInput && verifyRotatingCode(cleanInput, begSecret, { defaultSecret: DEFAULT_BEGINNER_PASSCODE_SECRET })) {
+    await patchDocFields(
+      projectId,
+      databaseId,
+      `users/${uid}`,
+      { beginnerAllAccess: { booleanValue: true }, updatedAt: { timestampValue: new Date().toISOString() } },
+      ["beginnerAllAccess", "updatedAt"]
+    );
+    return { ok: true };
+  }
+  return {
+    ok: false,
+    error: cleanInput ? "invalid-access-code" : "access-code-required",
+    codeType: firstCourseId ? "beginner" : "ciya",
+  };
+}
+
 function cloudinaryCreds() {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "qgvszym1";
   const apiKey = process.env.CLOUDINARY_API_KEY;
@@ -356,7 +539,39 @@ export async function handler(event: any) {
       } catch {
         return json(500, { error: "stored course file is not valid JSON" });
       }
+      // Server-side access gate for the CIYA access-code flow (students only).
+      if (!admin) {
+        const gate = await checkCourseAccessGate(
+          projectId,
+          databaseId,
+          caller.uid,
+          courseId,
+          course,
+          String(body.accessCode || "")
+        );
+        if (!gate.ok) {
+          return json(403, { error: gate.error || "access-code-required", codeType: gate.codeType });
+        }
+      }
       return json(200, { ok: true, course });
+    }
+
+    if (op === "student-code") {
+      // Admin-only: read a student's unique CIYA access code (students can never
+      // read this document; Firestore rules deny all client access to accessCodes).
+      const admin = await isAdminUid(projectId, databaseId, caller.uid);
+      if (!admin) return json(403, { error: "caller is not an admin" });
+      const uid = String(body.uid || "").trim();
+      if (!uid) return json(400, { error: "missing uid" });
+      const codeDoc = await getDocFields(projectId, databaseId, `accessCodes/${uid}`);
+      if (!codeDoc || !codeDoc.ciyaCode) {
+        return json(404, { error: "no access code on file for this student" });
+      }
+      return json(200, {
+        ok: true,
+        ciyaCode: String(codeDoc.ciyaCode || ""),
+        usedForCourseId: String(codeDoc.usedForCourseId || ""),
+      });
     }
 
     if (op === "delete") {
@@ -427,7 +642,7 @@ export async function handler(event: any) {
       return json(200, { ok: true, courses });
     }
 
-    return json(400, { error: "unknown op", ops: ["publish", "get", "delete", "draft-save", "draft-get"] });
+    return json(400, { error: "unknown op", ops: ["publish", "get", "student-code", "delete", "draft-save", "draft-get"] });
   } catch (err: any) {
     return json(500, { error: err.message || String(err) });
   }

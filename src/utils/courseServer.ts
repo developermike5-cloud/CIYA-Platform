@@ -74,6 +74,68 @@ function authReady(timeoutMs = 8000): Promise<void> {
   });
 }
 
+export type CourseGateResult =
+  | { status: 'ok'; course: Course }
+  | { status: 'needs-code'; codeType: 'ciya' | 'beginner' | 'advanced' }
+  | { status: 'invalid-code'; codeType?: 'ciya' | 'beginner' | 'advanced' }
+  | { status: 'error' };
+
+// Fetch a course through the server-side access gate. When the course needs an
+// access code (the student's CIYA code from their welcome email, or a rotating
+// classroom passcode), the server answers with which kind, so the UI can ask
+// for the right one. Passing accessCode submits it; a match unlocks the course
+// server-side and returns the full content.
+export async function fetchServerCourseGated(courseId: string, accessCode?: string): Promise<CourseGateResult> {
+  if (!courseId) return { status: 'error' };
+  try {
+    const token = await currentIdToken();
+    if (!token) return { status: 'error' };
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      body: JSON.stringify({ op: 'get', courseId, ...(accessCode ? { accessCode } : {}) }),
+    });
+    const data = await res.json().catch(() => ({} as any));
+    if (res.ok && data?.ok && data?.course?.id) {
+      hydratedThisSession.add(courseId);
+      return { status: 'ok', course: data.course as Course };
+    }
+    if (res.status === 403) {
+      const err = String(data?.error || '');
+      const codeType = data?.codeType;
+      if (err === 'access-code-required') return { status: 'needs-code', codeType };
+      if (err === 'invalid-access-code') return { status: 'invalid-code', codeType };
+    }
+    return { status: 'error' };
+  } catch (e) {
+    console.warn('[course-store] gated fetch failed for', courseId, e);
+    return { status: 'error' };
+  }
+}
+
+// Admin-only: a student's unique CIYA access code (held server-side; students
+// can never read it). Used by the admin student-details panel.
+export async function getStudentAccessCode(
+  uid: string
+): Promise<{ ciyaCode?: string; usedForCourseId?: string } | null> {
+  if (!uid) return null;
+  try {
+    const token = await currentIdToken();
+    if (!token) return null;
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      body: JSON.stringify({ op: 'student-code', uid }),
+    });
+    const data = await res.json().catch(() => ({} as any));
+    if (!res.ok || !data?.ok) return null;
+    return { ciyaCode: data.ciyaCode, usedForCourseId: data.usedForCourseId };
+  } catch (e) {
+    console.warn('[course-store] student-code fetch failed:', e);
+    return null;
+  }
+}
+
 export async function fetchAllServerCourses(): Promise<Course[]> {
   try {
     await authReady();

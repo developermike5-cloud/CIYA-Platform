@@ -111,6 +111,10 @@ interface BeginnersSettings {
     whatsappNumber: string;
     secretPasscode: string;
   };
+    beginnerCourseSettings?: {
+      enabled?: boolean;
+      secretPasscode?: string;
+    };
   assignmentSettings: Record<string, AssignmentDaySetting>;
   unlockSettings?: Record<string, UnlockDaySetting>;
 }
@@ -775,6 +779,10 @@ export default function PortalLocksAdmin() {
       whatsappNumber: '+2349042544355',
       secretPasscode: 'CIYA_ADVANCED_PASSCODE_SECRET_2026',
     },
+    beginnerCourseSettings: {
+      enabled: true,
+      secretPasscode: 'CIYA_BEGINNER_PASSCODE_SECRET_2026',
+    },
     assignmentSettings: {
       'day-0': { ...INITIAL_ASSIGNMENT_SETTING, minChars: 50 },
       'day-1': { ...INITIAL_ASSIGNMENT_SETTING, minChars: 100 },
@@ -1035,6 +1043,10 @@ export default function PortalLocksAdmin() {
           bankName: 'United Bank for Africa (UBA)',
           whatsappNumber: '+2349042544355',
           secretPasscode: 'CIYA_ADVANCED_PASSCODE_SECRET_2026',
+        },
+        beginnerCourseSettings: beginnersSettings.beginnerCourseSettings || {
+          enabled: true,
+          secretPasscode: 'CIYA_BEGINNER_PASSCODE_SECRET_2026',
         },
         assignmentSettings: beginnersSettings.assignmentSettings,
         unlockSettings: beginnersSettings.unlockSettings || {},
@@ -1343,6 +1355,22 @@ export default function PortalLocksAdmin() {
           bankName: 'United Bank for Africa (UBA)',
           whatsappNumber: '+2349042544355',
           secretPasscode: 'CIYA_ADVANCED_PASSCODE_SECRET_2026',
+        }),
+        [field]: value
+      }
+    };
+    setBeginnersSettings(updated);
+    setHasUnsavedChanges(true);
+    hasUnsavedChangesRef.current = true;
+  };
+
+  const handleUpdateBeginnerCourseSetting = (field: string, value: any) => {
+    const updated = {
+      ...beginnersSettings,
+      beginnerCourseSettings: {
+        ...(beginnersSettings.beginnerCourseSettings || {
+          enabled: true,
+          secretPasscode: 'CIYA_BEGINNER_PASSCODE_SECRET_2026',
         }),
         [field]: value
       }
@@ -2672,6 +2700,36 @@ export default function PortalLocksAdmin() {
                   <AdminPasscodeConsole secret={beginnersSettings.advancedCourseSettings?.secretPasscode ?? 'CIYA_ADVANCED_PASSCODE_SECRET_2026'} />
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Beginner returning-student rotating passcode */}
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6 text-left">
+            <div className="border-b pb-3 border-slate-100 space-y-2">
+              <h2 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <Settings className="w-4 h-4 text-purple-600" />
+                1b. Beginner Returning-Student Passcode
+              </h2>
+              <p className="text-[11px] text-slate-500 font-semibold leading-relaxed max-w-3xl">
+                Returning students unlocking another beginner course enter a rotating 6-digit passcode (same 15-minute rotation). The secret key below produces those passcodes.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">🔑 Shared Secret Key</label>
+              <p className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                Changing this instantly invalidates old beginner passcodes.
+              </p>
+              <input
+                type="text"
+                value={beginnersSettings.beginnerCourseSettings?.secretPasscode ?? 'CIYA_BEGINNER_PASSCODE_SECRET_2026'}
+                onChange={(e) => handleUpdateBeginnerCourseSetting('secretPasscode', e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-xs rounded-xl p-3 outline-none focus:ring-1 focus:ring-purple-500"
+                placeholder="Shared secret key"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">🕒 Real-Time Synchronized Passcodes Console</label>
+              <AdminPasscodeConsole secret={beginnersSettings.beginnerCourseSettings?.secretPasscode ?? 'CIYA_BEGINNER_PASSCODE_SECRET_2026'} />
             </div>
           </div>
 

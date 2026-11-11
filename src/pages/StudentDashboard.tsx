@@ -23,7 +23,7 @@ import { safeStorage } from '../utils/safeStorage';
 import { supabase, getStoragePublicUrl } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { coursesStore } from '../utils/coursesStore';
-import { hydrateRegisteredCourses } from '../utils/courseServer';
+import { fetchServerCourseGated, isCourseHydrated } from '../utils/courseServer';
 import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
 import CIYAMembershipBadge from '../components/CIYAMembershipBadge';
 import CustomDropdown from '../components/CustomDropdown';
@@ -300,6 +300,71 @@ function CategoryBannerCarousel({
 // ==========================================
 // OPTION A ADVANCED CLASS PASSCODE VALIDATOR
 // ==========================================
+// ==========================================
+// COURSE ACCESS CODE UNLOCK MODAL
+// ==========================================
+function CourseAccessCodeModal({
+  codeType,
+  courseTitle,
+  busy,
+  error,
+  onCancel,
+  onSubmit
+}: {
+  codeType: 'ciya' | 'beginner' | 'advanced';
+  courseTitle: string;
+  busy: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onSubmit: (code: string) => void;
+}) {
+  const [codeVal, setCodeVal] = useState('');
+  const heading = codeType === 'ciya'
+    ? 'Enter your CIYA access code'
+    : codeType === 'beginner'
+      ? 'Enter the beginner class passcode'
+      : 'Enter the advanced class passcode';
+  const hint = codeType === 'ciya'
+    ? 'Check your welcome email for the CIYA access code that unlocks your first registered course.'
+    : 'Ask CIYA admin support for the current 6-digit classroom passcode (it rotates every 15 minutes).';
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 text-slate-800">
+        <h3 className="text-sm font-black uppercase tracking-wider">
+          {codeType === 'ciya' ? '🔐' : '🔑'} {heading}
+        </h3>
+        <p className="text-xs font-semibold text-slate-500 leading-relaxed">
+          {courseTitle ? `Course: ${courseTitle}. ` : ''}{hint}
+        </p>
+        <input
+          type="text"
+          value={codeVal}
+          onChange={(e) => setCodeVal(e.target.value)}
+          placeholder={codeType === 'ciya' ? 'e.g. CIYA-XXXXXX' : '6-digit code'}
+          className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-sm rounded-xl p-3 outline-none focus:ring-1 focus:ring-purple-500"
+          autoFocus
+        />
+        {error && <p className="text-xs font-bold text-red-600">{error}</p>}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => onSubmit(codeVal.trim())}
+            disabled={busy || !codeVal.trim()}
+            className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider rounded-xl py-3 cursor-pointer"
+          >
+            {busy ? 'Verifying...' : 'Unlock course'}
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-3 text-xs font-black uppercase tracking-wider text-slate-500 cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdvancedCoursePasscodeSection({
   secret,
   onVerifySuccess,
@@ -309,7 +374,7 @@ function AdvancedCoursePasscodeSection({
   userEmail
 }: {
   secret: string;
-  onVerifySuccess: () => void;
+  onVerifySuccess: (code?: string) => void;
   whatsappNumber: string;
   courseTitle: string;
   price: number;
@@ -328,7 +393,7 @@ function AdvancedCoursePasscodeSection({
 
     const isValid = verifyTimeBasedCode(cleanInput, secret);
     if (isValid) {
-      onVerifySuccess();
+      onVerifySuccess(cleanInput);
     } else {
       setErrorMsg("Invalid access code or passcode. Please verify or check with admin support.");
     }
@@ -5395,6 +5460,28 @@ export default function StudentDashboard() {
     }
   };
 
+  const handleGatedSelectCourseId = (cId: string | null) => {
+    if (!cId || isAdmin || isCourseHydrated(cId)) { handleSelectCourseId(cId); return; }
+    setUnlockGate({ courseId: cId, codeType: courseCodeGates[cId] || 'ciya', busy: false, error: null });
+  };
+
+  const handleUnlockSubmit = async (code: string) => {
+    if (!unlockGate || !code) return;
+    const { courseId } = unlockGate;
+    setUnlockGate((g) => (g ? { ...g, busy: true, error: null } : g));
+    const res = await fetchServerCourseGated(courseId, code);
+    if (res.status === 'ok') {
+      coursesStore.upsertFromServer([res.course]);
+      setUnlockGate(null);
+      handleSelectCourseId(courseId);
+      navigate(`/dashboard?view=courses&courseId=${courseId}&syllabus=false`);
+    } else if (res.status === 'invalid-code') {
+      setUnlockGate((g) => (g ? { ...g, busy: false, error: 'That code is not valid. Check your email or ask admin support.' } : g));
+    } else {
+      setUnlockGate((g) => (g ? { ...g, busy: false, error: 'Could not verify the code right now. Please try again.' } : g));
+    }
+  };
+
   const handleSelectCourseId = (cId: string | null) => {
     if (cId && !isAdmin) {
       const targetCourse = courses.find(c => c.id === cId);
@@ -6111,6 +6198,9 @@ export default function StudentDashboard() {
     });
   }, [courses, userProfile, isAdmin]);
 
+  const [courseCodeGates, setCourseCodeGates] = useState<Record<string, 'ciya' | 'beginner' | 'advanced'>>({});
+  const [unlockGate, setUnlockGate] = useState<{ courseId: string; codeType: 'ciya' | 'beginner' | 'advanced'; busy: boolean; error: string | null } | null>(null);
+
   // Pull the latest published copy of every course this student is registered
   // for from the protected Cloudinary course store, so admin edits and new
   // courses show up live without a new deploy. Falls back to the bundled copy
@@ -6133,9 +6223,15 @@ export default function StudentDashboard() {
     }
     if (ids.size === 0) return;
     let cancelled = false;
-    hydrateRegisteredCourses(Array.from(ids), (c) => {
-      if (!cancelled) coursesStore.upsertFromServer([c]);
-    });
+    (async () => {
+      for (const id of Array.from(ids)) {
+        if (cancelled) return;
+        const res = await fetchServerCourseGated(id);
+        if (cancelled) return;
+        if (res.status === 'ok') coursesStore.upsertFromServer([res.course]);
+        else if (res.status === 'needs-code') setCourseCodeGates((prev) => ({ ...prev, [id]: res.codeType }));
+      }
+    })();
     return () => { cancelled = true; };
   }, [currentUser?.uid, isAdmin, userProfile?.registeredCourses]);
 
@@ -8864,7 +8960,7 @@ export default function StudentDashboard() {
         onClose={() => setIsCourseCardSplashOpen(false)}
         onViewDescription={(courseId) => {
           setIsCourseCardSplashOpen(false);
-          handleSelectCourseId(courseId);
+          handleGatedSelectCourseId(courseId);
         }}
       />
 
@@ -8878,7 +8974,7 @@ export default function StudentDashboard() {
         onViewAssignments={() => handleViewChange('assignments')}
         onSelectCourse={(courseId) => {
           setIsRegisteredCoursesSplashOpen(false);
-          handleSelectCourseId(courseId);
+          handleGatedSelectCourseId(courseId);
           navigate(`/dashboard?view=courses&courseId=${courseId}&syllabus=false`);
         }}
         onBrowseCatalog={() => {
@@ -8887,6 +8983,17 @@ export default function StudentDashboard() {
           setCurrentView('courses');
         }}
       />
+
+      {unlockGate && (
+        <CourseAccessCodeModal
+          codeType={unlockGate.codeType}
+          courseTitle={courses.find((c) => c.id === unlockGate.courseId)?.title || ''}
+          busy={unlockGate.busy}
+          error={unlockGate.error}
+          onCancel={() => setUnlockGate(null)}
+          onSubmit={handleUnlockSubmit}
+        />
+      )}
 
       {/* 3. Buzz Bottom Splash Modal (Live Chat & Academy Blog in standalone views) */}
       <BuzzSplashModal
@@ -9173,8 +9280,12 @@ export default function StudentDashboard() {
             {/* Countdown / Rotating code sync status block */}
             <AdvancedCoursePasscodeSection
               secret={appSettings?.advancedCourseSettings?.secretPasscode ?? 'CIYA_ADVANCED_PASSCODE_SECRET_2026'}
-              onVerifySuccess={async () => {
+              onVerifySuccess={async (passcode?: string) => {
                 try {
+                  if (passcode) {
+                    const gated = await fetchServerCourseGated(advancedPaymentCourse.id, passcode);
+                    if (gated.status === 'ok') coursesStore.upsertFromServer([gated.course]);
+                  }
                   const courseId = advancedPaymentCourse.id;
                   const allAvailableCourses = coursesStore.getCourses();
                   
