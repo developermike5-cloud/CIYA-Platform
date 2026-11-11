@@ -163,7 +163,7 @@ export default function PaidEnroll() {
             <p className="text-teal-100 text-sm md:text-base leading-relaxed font-semibold">{course.description}</p>
             <ul className="list-none m-0 p-0 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {(course.days || []).slice(0, 6).map((d, i) => (
-                <li key={i} className="flex gap-2 items-start text-sm font-medium text-teal-50">✅ {d.title || d.day_title || `Day ${i + 1}`}</li>
+                <li key={i} className="flex gap-2 items-start text-sm font-medium text-teal-50">✅ {d.title || `Day ${i + 1}`}</li>
               ))}
             </ul>
             <div className="flex items-center justify-between border-t border-teal-800 pt-4">
