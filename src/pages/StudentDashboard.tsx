@@ -4338,6 +4338,14 @@ export default function StudentDashboard() {
     }
     return null;
   });
+  // First-login lock: students logging in with the temporary password from
+  // their welcome email must set their own password before the dashboard opens.
+  useEffect(() => {
+    if (userProfile?.passwordChangeRequired === true) {
+      window.location.assign('/change-password');
+    }
+  }, [userProfile?.passwordChangeRequired]);
+
 
   const [unlockedCourseIds, setUnlockedCourseIds] = useState<string[]>(() => {
     try {

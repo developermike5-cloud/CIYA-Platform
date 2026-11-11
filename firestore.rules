@@ -373,6 +373,13 @@ service cloud.firestore {
       allow delete: if isBaseAdmin() || adminPerm('manage_admins');
     }
 
+    // CIYA access codes: written and read only by server functions (admin SDK).
+    // Students unlock their first course by typing the code from their email;
+    // the database itself is never readable by clients.
+    match /accessCodes/{codeId} {
+      allow read, write: if false;
+    }
+
     match /users/{userId} {
       allow read: if true;
       allow list: if true;

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { auth, db } from '../firebase';
-import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import LoginModal from '../components/LoginModal';
 import BrandingLogo from '../components/BrandingLogo';
@@ -102,6 +102,8 @@ export default function Onboarding() {
 
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
+  // Post-registration screens: congratulations -> login-details-sent -> app download
+  const [postInfo, setPostRegistration] = useState<{ cohort: string; emailQueued: boolean } | null>(null);
   const [timeLeft, setTimeLeft] = useState('');
   const [creationTime, setCreationTime] = useState<number | null>(null);
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
@@ -388,23 +390,69 @@ export default function Onboarding() {
     if (!validateForm()) return;
     if (globalOnboardingSignInActive) return;
 
-    // If already logged in, directly save profile!
-    if (auth.currentUser) {
-      setLoading(true);
-      try {
-        await handleRegisterSuccess(auth.currentUser);
-      } catch (e: any) {
-        setFormError(e.message || 'Error saving student profile.');
-      } finally {
-        setLoading(false);
+    setLoading(true);
+    setFormError('');
+    try {
+      // A fresh registration always creates a brand-new account, so an existing
+      // session is signed out first.
+      if (auth.currentUser) {
+        try { await signOut(auth); } catch (sErr) { console.warn("Sign out before registration failed:", sErr); }
       }
-      return;
-    }
 
-    // Otherwise, open the Auth Choice Modal so student chooses Google or Email/Password!
-    setShowAuthChoiceModal(true);
-    setAuthModalError('');
-    if (data.email) setAuthEmail(data.email);
+      // Recommended path uses the same client-side rules as before
+      let recommendedPath = '';
+      if (pathway === 'A') {
+        if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
+          recommendedPath = 'Professional Conversion Page Builder';
+        } else if (data.experience.includes('expert')) {
+          recommendedPath = 'Conversion Funnel Agency Masterclass';
+        } else {
+          recommendedPath = 'Landing Page Foundations';
+        }
+      } else if (pathway === 'C') {
+        if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
+          recommendedPath = 'Professional Portfolio Builder';
+        } else if (data.experience.includes('expert')) {
+          recommendedPath = 'Portfolio Agency Masterclass';
+        } else {
+          recommendedPath = 'Portfolio Website Foundations';
+        }
+      } else {
+        if (data.experience.includes('Intermediate') || data.experience.includes('tried')) {
+          recommendedPath = 'Professional Store Builder';
+        } else if (data.experience.includes('expert')) {
+          recommendedPath = 'E-Commerce Agency Growth Masterclass';
+        } else {
+          recommendedPath = 'E-commerce Essentials';
+        }
+      }
+      setData(d => ({ ...d, recommendedPath }));
+
+      // The account is created server-side: email + a temporary password that
+      // only arrives by email, plus the student's unique CIYA access code.
+      const res = await fetch('/.netlify/functions/onboarding-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, pathway, recommendedPath })
+      });
+      const payload: any = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 403) {
+          setFormError('Registration is closed right now. Please check back when the next cohort opens.');
+        } else if (res.status === 409) {
+          setFormError('An account already exists with this email address. Please log in instead.');
+        } else {
+          setFormError(payload?.detail || 'Registration failed. Please check your internet connection and try again.');
+        }
+        return;
+      }
+      setPostRegistration({ cohort: payload?.cohort || '', emailQueued: !!payload?.emailQueued });
+    } catch (e: any) {
+      console.error("Onboarding registration failed:", e);
+      setFormError(e.message || 'Registration failed. Please check your internet connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOnboardingEmailAuth = async (e: React.FormEvent) => {
@@ -486,6 +534,16 @@ export default function Onboarding() {
       return () => clearInterval(interval);
     }
   }, [step, data.isActivated, creationTime]);
+
+  if (postInfo) {
+    return (
+      <OnboardingComplete
+        cohort={postInfo.cohort}
+        emailQueued={postInfo.emailQueued}
+        studentEmail={data.email}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col items-center relative overflow-x-hidden selection:bg-teal-500/30 selection:text-teal-200">
@@ -1080,6 +1138,84 @@ export default function Onboarding() {
       )}
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+    </div>
+  );
+}
+
+function OnboardingComplete({ cohort, emailQueued, studentEmail }: { cohort: string; emailQueued: boolean; studentEmail: string }) {
+  const [stage, setStage] = useState<'congrats' | 'check-email' | 'download'>('congrats');
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 p-8 text-center space-y-6">
+        {stage === 'congrats' && (
+          <>
+            <div className="mx-auto w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-4xl shadow-md border border-emerald-200">🎉</div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-black text-slate-900">Congratulations!</h1>
+              <p className="text-slate-600 text-sm leading-relaxed">
+                Your registration was successful. You are officially registered for{' '}
+                <span className="font-black text-indigo-700">{cohort || 'the upcoming cohort'}</span>.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStage('check-email')}
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl transition-all active:scale-95 cursor-pointer"
+            >
+              Continue
+            </button>
+          </>
+        )}
+
+        {stage === 'check-email' && (
+          <>
+            <div className="mx-auto w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-4xl shadow-md border border-amber-200">📧</div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-black text-slate-900">Check Your Email</h1>
+              <p className="text-slate-600 text-sm leading-relaxed">
+                Your login details have been sent to <span className="font-bold text-slate-900">{studentEmail || 'your email address'}</span>.
+              </p>
+              <p className="text-slate-500 text-xs leading-relaxed">
+                The email contains your login email, a temporary password, and your unique CIYA access code. Your dashboard stays locked until you change your password on first login.
+              </p>
+              {!emailQueued && (
+                <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs font-semibold">
+                  Your login email is being prepared and will arrive shortly. If it doesn't reach you within a few minutes, contact support.
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setStage('download')}
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl transition-all active:scale-95 cursor-pointer"
+            >
+              Next
+            </button>
+          </>
+        )}
+
+        {stage === 'download' && (
+          <>
+            <div className="mx-auto w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-4xl shadow-md border border-indigo-200">📱</div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-black text-slate-900">Get the CIYA App</h1>
+              <p className="text-slate-600 text-sm leading-relaxed">
+                Install the CIYA app on your phone, then log in with the details we emailed you.
+              </p>
+              <p className="text-slate-500 text-xs leading-relaxed">
+                Open the CIYA site in your phone browser and choose "Add to Home Screen" to install the app. All your learning happens inside the app.
+              </p>
+            </div>
+            <a
+              href="/?login=true"
+              className="block w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl transition-all active:scale-95"
+            >
+              Log in to the App
+            </a>
+          </>
+        )}
+      </div>
     </div>
   );
 }

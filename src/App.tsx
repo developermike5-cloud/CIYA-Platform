@@ -22,6 +22,7 @@ import BlogAdmin from './pages/admin/BlogAdmin';
 import LeaderboardAdmin from './pages/admin/LeaderboardAdmin';
 import BuzzGroupsAdmin from './pages/admin/BuzzGroupsAdmin';
 import Onboarding from './pages/Onboarding';
+import ChangePassword from './pages/ChangePassword';
 import WaitingOnboarding from './pages/WaitingOnboarding';
 import GetStarted from './pages/GetStarted';
 import PastCohortProjects from './pages/PastCohortProjects';
@@ -190,6 +191,7 @@ function AppContent() {
         <Route path="/get-started" element={<GetStarted />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/waitingonboarding" element={<WaitingOnboarding />} />
+        <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/projects" element={<PastCohortProjects />} />
         <Route path="/past-cohort-projects" element={<PastCohortProjects />} />
         <Route path="/kycb" element={<ClientKycbForm />} />

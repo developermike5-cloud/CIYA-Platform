@@ -93,7 +93,13 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           if (!routed) {
             const docSnap = await getDoc(doc(db, 'users', user.uid));
             if (docSnap.exists()) {
-              navigate('/dashboard');
+              if (docSnap.data()?.passwordChangeRequired === true) {
+                // Temporary password from the welcome email: unlock only after
+                // the student sets their own password.
+                navigate('/change-password');
+              } else {
+                navigate('/dashboard');
+              }
             } else {
               navigate('/onboarding');
             }
