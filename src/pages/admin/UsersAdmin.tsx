@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp, where, addDoc } from 'firebase/firestore';
+import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp, where, addDoc, arrayUnion } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, getActiveDatabaseId, setActiveDatabaseId, triggerSystemSignal } from '../../firebase';
 import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
@@ -1120,6 +1120,59 @@ export default function UsersAdmin() {
           </div>
           {statusChip}
         </div>
+
+        {u.paidCourseRequest && section('Paid course payment', (
+          <div className="space-y-3">
+            <div className="divide-y divide-slate-100">
+              {row('Course', u.paidCourseRequest.courseTitle || u.paidCourseRequestedCourseId)}
+              {row('Amount', u.paidCourseRequest.amount ? `\u20a6${Number(u.paidCourseRequest.amount).toLocaleString()}` : null)}
+              {row('Submitted', u.paidCourseRequestDate ? formatFirestoreDateTime(u.paidCourseRequestDate) : null)}
+              {row('Status', (() => {
+                const st = u.paidCourseRequestStatus || u.paidCourseRequest.status;
+                return <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${st === 'Approved' ? 'bg-emerald-100 text-emerald-800' : st === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>{st || 'Pending'}</span>;
+              })())}
+            </div>
+            {u.paidCourseRequest.screenshotUrl && (
+              <a href={u.paidCourseRequest.screenshotUrl} target="_blank" rel="noreferrer" className="block group">
+                <img src={u.paidCourseRequest.screenshotUrl} alt="Payment screenshot" className="w-full max-h-64 object-contain rounded-lg border border-slate-200 bg-slate-50" />
+                <span className="text-[10px] text-indigo-600 font-black underline mt-1 inline-block">Open full screenshot</span>
+              </a>
+            )}
+            {(u.paidCourseRequestStatus || u.paidCourseRequest.status) === 'PendingApproval' ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const courseId = u.paidCourseRequestedCourseId || u.paidCourseRequest.courseId;
+                    const patch = { 'paidCourseRequest.status': 'Approved', paidCourseRequestStatus: 'Approved', paidCourseRequestApprovedAt: serverTimestamp(), registeredCourses: arrayUnion(courseId), advancedAllAccess: true };
+                    try {
+                      await updateDoc(doc(db, 'users', u.id), patch);
+      try { fetchUsers(); } catch {}
+                    } catch (e) { console.error('approve paid course failed:', e); }
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black cursor-pointer"
+                >
+                  Approve &amp; Unlock Course
+                </button>
+                <button
+                  onClick={async () => {
+                    const patch = { 'paidCourseRequest.status': 'Rejected', paidCourseRequestStatus: 'Rejected', paidCourseRequestReviewedAt: serverTimestamp() };
+                    try {
+                      await updateDoc(doc(db, 'users', u.id), patch);
+      try { fetchUsers(); } catch {}
+                    } catch (e) { console.error('reject paid course failed:', e); }
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-black cursor-pointer"
+                >
+                  Reject
+                </button>
+              </div>
+            ) : (
+              <p className={`text-xs font-bold ${(u.paidCourseRequestStatus || u.paidCourseRequest.status) === 'Approved' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {(u.paidCourseRequestStatus || u.paidCourseRequest.status) === 'Approved' ? 'Approved. The course is unlocked for this student.' : 'Rejected. The student was not unlocked.'}
+              </p>
+            )}
+          </div>
+        ))}
 
         {section('Profile & Account', (
           <>
