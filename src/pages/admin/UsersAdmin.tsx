@@ -1146,7 +1146,7 @@ export default function UsersAdmin() {
                     const patch = { 'paidCourseRequest.status': 'Approved', paidCourseRequestStatus: 'Approved', paidCourseRequestApprovedAt: serverTimestamp(), registeredCourses: arrayUnion(courseId), advancedAllAccess: true };
                     try {
                       await updateDoc(doc(db, 'users', u.id), patch);
-      try { fetchUsers(); } catch {}
+      try { fetchUsers('All', true); } catch {}
                     } catch (e) { console.error('approve paid course failed:', e); }
                   }}
                   className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black cursor-pointer"
@@ -1158,7 +1158,7 @@ export default function UsersAdmin() {
                     const patch = { 'paidCourseRequest.status': 'Rejected', paidCourseRequestStatus: 'Rejected', paidCourseRequestReviewedAt: serverTimestamp() };
                     try {
                       await updateDoc(doc(db, 'users', u.id), patch);
-      try { fetchUsers(); } catch {}
+      try { fetchUsers('All', true); } catch {}
                     } catch (e) { console.error('reject paid course failed:', e); }
                   }}
                   className="flex-1 py-2.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-black cursor-pointer"
