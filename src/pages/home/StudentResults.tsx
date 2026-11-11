@@ -12,7 +12,7 @@ const BADGE: Record<TrackId, string> = {
 
 /** Student results: sticky stacked cards that flip in 3D to the story. */
 export default function StudentResults({ reduced }: { reduced: boolean }) {
-  const [filter, setFilter] = useState<'all' | TrackId>('all');
+  const [filter] = useState<'all' | TrackId>('all');
   const [flipped, setFlipped] = useState<Set<number>>(new Set());
   const stackRef = useRef<HTMLDivElement>(null);
   const ticking = useRef(false);
@@ -76,23 +76,6 @@ export default function StudentResults({ reduced }: { reduced: boolean }) {
           Scroll through four projects students delivered. Tap "Tap for the story" on a card to flip it and see the website and how it was built.
         </p>
 
-        <div className="flex flex-wrap gap-2 justify-center mt-[30px]" role="group" aria-label="Filter by track">
-          {RESULT_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              aria-pressed={filter === f.id}
-              onClick={() => setFilter(f.id)}
-              className={`rounded-full px-5 py-2.5 text-sm font-bold transition-colors border ${
-                filter === f.id
-                  ? 'bg-amber-500 border-amber-400 text-teal-950'
-                  : 'bg-teal-900/60 border-teal-700/50 text-teal-200 hover:bg-teal-800/80 hover:text-teal-50'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
 
         <div className="stack" ref={stackRef}>
           {wins.map((w, i) => {

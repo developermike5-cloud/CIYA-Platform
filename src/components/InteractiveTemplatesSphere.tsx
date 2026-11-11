@@ -26,6 +26,7 @@ interface TemplateItem {
   link1?: string;
   link2?: string;
   description?: string;
+  designer?: string;
 }
 
 // 3D Point on Sphere
@@ -432,30 +433,33 @@ export default function InteractiveTemplatesSphere() {
                       )}
                     </div>
 
-                    <h3 className="text-xl md:text-2xl font-black text-white tracking-tight leading-snug">
+                    <h3 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-snug">
                       {selectedTemplate.name}
                     </h3>
 
-                    <p className="text-slate-400 text-xs md:text-sm leading-relaxed font-medium">
-                      This custom template demonstrates production-ready styling, responsive layout composition, elegant typographic scales, and optimized performance guidelines modeled from modern high-converting websites.
-                    </p>
+                    {selectedTemplate.designer && (
+                      <p className="text-teal-300 text-xs md:text-sm font-black uppercase tracking-wider">
+                        Designed by {selectedTemplate.designer}
+                      </p>
+                    )}
+
                   </div>
 
                   <div className="flex flex-col justify-between h-full space-y-4">
                     {/* Additional details list */}
                     <div className="border-t border-b border-slate-800/80 py-3 space-y-2">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-extrabold text-slate-500">Responsive Ready</span>
+                        <span className="font-black text-white">Responsive Ready</span>
                         <span className="font-black text-teal-400 flex items-center gap-1">
                           <Smartphone size={13} /> Mobile & Desktop
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-extrabold text-slate-500">Interactive Animations</span>
+                        <span className="font-black text-white">Interactive Animations</span>
                         <span className="font-black text-amber-400">Yes (Framer Motion)</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-extrabold text-slate-500">Design Framework</span>
+                        <span className="font-black text-white">Design Framework</span>
                         <span className="font-black text-white">Tailwind CSS</span>
                       </div>
                     </div>

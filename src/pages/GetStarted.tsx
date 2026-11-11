@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Link } from 'react-router';
+import { useIntakeRoute } from '../hooks/useIntakeRoute';
 import { ChevronLeft, Globe, Sparkles, Check, Info, ArrowRight } from 'lucide-react';
 import BrandingLogo from '../components/BrandingLogo';
 
 export default function GetStarted() {
   const navigate = useNavigate();
+  const intakeRoute = useIntakeRoute();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   const webTypes = [
@@ -142,6 +144,18 @@ export default function GetStarted() {
               )}
             </AnimatePresence>
           </div>
+        </div>
+        {/* Continue to sign up */}
+        <div className="text-center mt-8">
+          <button
+            onClick={() => navigate(intakeRoute)}
+            className="inline-flex items-center justify-center px-10 py-4 rounded-full bg-amber-500 hover:bg-amber-400 text-teal-950 text-base font-black shadow-[0_10px_24px_-8px_rgba(245,158,11,.5)] transition-all hover:-translate-y-0.5 cursor-pointer"
+          >
+            Continue to sign up
+          </button>
+          <p className="text-teal-300/80 text-xs font-semibold mt-3">
+            Happy with your pick? Continue to create your student account.
+          </p>
         </div>
 
         {/* Global WhatsApp Community Section */}

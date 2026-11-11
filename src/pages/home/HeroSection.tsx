@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import MediaSlot from './MediaSlot';
-import { useIntakeRoute } from '../../hooks/useIntakeRoute';
 
 const HERO_TYPE_TEXTS = ['Create It Yourself', 'Elevate your skills', 'Build Your Freedom'];
 
@@ -62,7 +61,6 @@ function StatCounter({ to, suffix = '' }: { to: number; suffix?: string }) {
 }
 
 export default function HeroSection({ reduced }: { reduced: boolean }) {
-  const intakeRoute = useIntakeRoute();
   return (
     <section
       id="home"
@@ -95,7 +93,7 @@ export default function HeroSection({ reduced }: { reduced: boolean }) {
 
         <div className="flex flex-wrap gap-4 justify-center mt-9">
           <Link
-            to={intakeRoute}
+            to="/get-started"
             className="inline-flex items-center justify-center px-8 py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 text-teal-950 text-sm font-bold shadow-[0_10px_24px_-8px_rgba(245,158,11,.45)] transition-all hover:-translate-y-0.5"
           >
             Start for Free

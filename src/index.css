@@ -55,6 +55,12 @@ body.template-modal-open nav {
   pointer-events: none !important;
 }
 
+body.template-modal-open header {
+  transform: translateY(-100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* Fo: slide-over panel + overlay animations */
 @keyframes fo-slide-in-right {
   from { transform: translateX(100%); }
