@@ -25,6 +25,7 @@ import Onboarding from './pages/Onboarding';
 import ChangePassword from './pages/ChangePassword';
 import WaitingOnboarding from './pages/WaitingOnboarding';
 import GetStarted from './pages/GetStarted';
+import PaidEnroll from './pages/PaidEnroll';
 import PastCohortProjects from './pages/PastCohortProjects';
 import { BrandedAlertContainer } from './components/BrandedAlert';
 import { safeStorage } from './utils/safeStorage';
@@ -189,6 +190,7 @@ function AppContent() {
         <Route path="/" element={<Home />} />
         <Route path="/dashboard" element={<StudentDashboard />} />
         <Route path="/get-started" element={<GetStarted />} />
+        <Route path="/paid-enroll" element={<PaidEnroll />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/waitingonboarding" element={<WaitingOnboarding />} />
         <Route path="/change-password" element={<ChangePassword />} />

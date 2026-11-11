@@ -362,7 +362,7 @@ export default function CoursesSection({ reduced }: { reduced: boolean }) {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      window.location.href = '/get-started';
+                      window.location.href = t.price.includes('Free') ? '/get-started' : '/paid-enroll';
                     }}
                     className={`w-full text-center rounded-full py-3.5 text-sm font-bold transition-all ${
                       t.price.includes('Free')

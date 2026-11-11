@@ -243,7 +243,7 @@ export const handler = async (event: any) => {
     // 1. Intake gate: only register students while a cohort is active.
     const cohortsFields = await getDocFields(projectId, databaseId, "settings/cohorts");
     const onboardingActive = bool(cohortsFields, "onboardingActive") === true;
-    if (!onboardingActive) {
+    if (body?.paid !== true && !onboardingActive) {
       return json(403, { error: "intake-closed" });
     }
     const activeCohort = str(cohortsFields, "activeCohort", "Cohort 1");

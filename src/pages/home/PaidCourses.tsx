@@ -103,7 +103,7 @@ export default function PaidCourses() {
                 <div className="flex items-center justify-between gap-3 mt-1.5">
                   <span className="text-2xl font-black text-amber-400">{naira(Number(c.price))}</span>
                   <Link
-                    to={`/get-started?course=${encodeURIComponent(c.title)}`}
+                    to={`/paid-enroll?course=${encodeURIComponent(c.title)}`}
                     className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-teal-950 text-xs font-extrabold shadow-[0_10px_24px_-8px_rgba(245,158,11,.45)] transition-all"
                   >
                     Enrol now
