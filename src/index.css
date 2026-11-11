@@ -72,3 +72,23 @@ body.template-modal-open header {
 }
 .fo-sl-panel { animation: fo-slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
 .fo-sl-overlay { animation: fo-fade-in 0.2s ease; }
+
+/* CIYA paid enrollment stepper: animated connecting line */
+.ciya-step-fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  transition: width 0.8s ease;
+}
+.ciya-step-fill.ciya-step-done { width: 100%; }
+.ciya-step-fill.ciya-step-active {
+  width: 45%;
+  animation: ciyaLineFlow 1.6s ease-in-out infinite;
+}
+@keyframes ciyaLineFlow {
+  0% { width: 8%; opacity: 0.55; }
+  50% { width: 65%; opacity: 1; }
+  100% { width: 8%; opacity: 0.55; }
+}

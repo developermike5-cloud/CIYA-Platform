@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { coursesStore } from '../utils/coursesStore';
 import { Course } from '../types';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { db } from '../firebase';
 import { useIntakeRoute } from '../hooks/useIntakeRoute';
+import { NIGERIAN_STATES } from '../utils/nigerianStates';
+import { safeStorage } from '../utils/safeStorage';
 
 /** Bank details come from the admin's Settings & Portal Locks page. */
 const BANK_DEFAULTS = {
@@ -15,12 +17,40 @@ const BANK_DEFAULTS = {
 };
 
 type Stage = 'pick' | 'preview' | 'details' | 'payment' | 'done';
+const STAGE_ORDER: Stage[] = ['preview', 'details', 'payment', 'done'];
+const STAGE_LABELS: Partial<Record<Stage, string>> = { preview: 'Preview', details: 'Details', payment: 'Payment', done: 'Done' };
+const DRAFT_KEY = 'ciya_paid_enroll_draft';
 
 const isPaidLevel = (c: Course) => {
   const level = (c.level || (c as any).tier || '').toString();
   const published = c.publish_status ? c.publish_status === 'Published' : (c as any).status !== 'draft';
   return /advanced|masterclass/i.test(level) && published && Number(c.price) > 0;
 };
+
+/** Steps with a connecting line that animates as the student moves through the flow. */
+function Stepper({ stage }: { stage: Stage }) {
+  if (stage === 'pick') return null;
+  const current = STAGE_ORDER.indexOf(stage);
+  return (
+    <div className="flex items-center w-full max-w-xl mx-auto pt-2 pb-4" aria-label="Enrollment progress">
+      {STAGE_ORDER.map((s, i) => (
+        <React.Fragment key={s}>
+          <div className="flex flex-col items-center gap-1.5 shrink-0">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all duration-500 ${i < current ? 'bg-amber-500 border-amber-500 text-teal-950' : i === current ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-[0_0_14px_rgba(245,158,11,0.45)]' : 'border-teal-800 text-teal-500 bg-teal-950/60'}`}>
+              {i < current ? '✓' : i + 1}
+            </div>
+            <span className={`text-[10px] font-black uppercase tracking-wider ${i <= current ? 'text-amber-300' : 'text-teal-500'}`}>{STAGE_LABELS[s]}</span>
+          </div>
+          {i < STAGE_ORDER.length - 1 && (
+            <div className="flex-1 h-0.5 mx-2 rounded-full bg-teal-900 relative overflow-hidden mb-4 min-w-[24px]">
+              <div className={`ciya-step-fill ${i < current ? 'ciya-step-done' : i === current ? 'ciya-step-active' : ''}`} />
+            </div>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
 
 export default function PaidEnroll() {
   const navigate = useNavigate();
@@ -31,16 +61,43 @@ export default function PaidEnroll() {
   const [paidCourses, setPaidCourses] = useState<Course[]>([]);
   const [course, setCourse] = useState<Course | null>(null);
   const [bank, setBank] = useState(BANK_DEFAULTS);
-  const [form, setForm] = useState({ fullName: '', email: '', whatsapp: '', state: '', ageRange: '', gender: '' });
+  const [form, setForm] = useState({ email: '', whatsapp: '', state: '', gender: '' });
   const [account, setAccount] = useState<{ uid: string; tempPassword?: string; ciyaCode?: string; emailQueued: boolean } | null>(null);
   const [proof, setProof] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const draftLoadedRef = useRef(false);
+  const finishedRef = useRef(false);
 
   useEffect(() => {
     try {
       const all = coursesStore.getCourses().filter(isPaidLevel);
       setPaidCourses(all);
+      // Restore saved progress so a refresh or network drop never restarts the flow.
+      try {
+        const raw = safeStorage.getItem(DRAFT_KEY);
+        if (raw) {
+          const d = JSON.parse(raw);
+          const savedStage: Stage = d?.stage;
+          const savedCourse = d?.courseTitle
+            ? all.find((c) => (c.title || '').trim().toLowerCase() === String(d.courseTitle).trim().toLowerCase())
+            : null;
+          if (savedCourse) setCourse(savedCourse);
+          if (d?.form && typeof d.form === 'object') {
+            setForm({ email: String(d.form.email || ''), whatsapp: String(d.form.whatsapp || ''), state: String(d.form.state || ''), gender: String(d.form.gender || '') });
+          }
+          if (d?.account && d.account.uid) {
+            setAccount({ uid: String(d.account.uid), tempPassword: d.account.tempPassword ? String(d.account.tempPassword) : undefined, ciyaCode: d.account.ciyaCode ? String(d.account.ciyaCode) : undefined, emailQueued: !!d.account.emailQueued });
+          }
+          if (savedStage && ['preview', 'details', 'payment'].includes(savedStage) && (savedCourse || courseParam)) {
+            setStage(savedCourse ? savedStage : (savedStage === 'details' || savedStage === 'payment' ? 'details' : 'preview'));
+          } else if (savedCourse && !courseParam) {
+            setStage('preview');
+          }
+        }
+      } catch (e) {
+        console.warn('paid enroll draft restore failed:', e);
+      }
       if (courseParam) {
         const hit = all.find((c) => (c.title || '').trim().toLowerCase() === decodeURIComponent(courseParam).trim().toLowerCase());
         if (hit) setCourse(hit);
@@ -48,7 +105,15 @@ export default function PaidEnroll() {
     } catch (e) {
       console.warn('paid course load failed:', e);
     }
+    draftLoadedRef.current = true;
   }, [courseParam]);
+
+  useEffect(() => {
+    if (!draftLoadedRef.current || finishedRef.current || stage === 'done') return;
+    try {
+      safeStorage.setItem(DRAFT_KEY, JSON.stringify({ stage, courseTitle: course?.title || '', form, account, savedAt: Date.now() }));
+    } catch (e) { /* storage unavailable */ }
+  }, [stage, course, form]);
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'app')).then((snap) => {
@@ -61,21 +126,29 @@ export default function PaidEnroll() {
     }).catch(() => {});
   }, []);
 
+  // Leave the flow done: drop the saved draft.
+  useEffect(() => {
+    if (stage === 'done') {
+      finishedRef.current = true;
+      try { safeStorage.removeItem(DRAFT_KEY); } catch (e) { /* noop */ }
+    }
+  }, [stage]);
+
   const price = useMemo(() => (course ? `₦${Number(course.price).toLocaleString()}` : ''), [course]);
 
   const submitDetails = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!form.fullName || !form.email || !form.whatsapp || !form.state || !form.ageRange) {
-      setError('Please fill every field marked required.');
-      return;
-    }
+    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) { setError('Enter a valid email address.'); return; }
+    if (!/^\d{11}$/.test(form.whatsapp.trim())) { setError('WhatsApp number must be exactly 11 digits.'); return; }
+    if (!form.state) { setError('Select your state.'); return; }
     setBusy(true);
     try {
+      const derivedName = form.email.trim().split('@')[0] || 'CIYA Student';
       const res = await fetch('/.netlify/functions/onboarding-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, paid: true, courseTitle: course?.title || "" })
+        body: JSON.stringify({ ...form, fullName: derivedName, paid: true, courseTitle: course?.title || "" })
       });
       const data = await res.json().catch(() => ({} as any));
       if (!res.ok || !data?.ok) {
@@ -103,6 +176,7 @@ export default function PaidEnroll() {
     setBusy(true);
     try {
       const up = await uploadToCloudinary(proof, 'ciya-payments', undefined, account.uid);
+      if (!up?.url) throw new Error('upload returned no url');
       // Sign the fresh account in so its own profile can be updated.
       const key = (import.meta as any).env?.VITE_FIREBASE_API_KEY;
       const si = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${key}`, {
@@ -123,7 +197,7 @@ export default function PaidEnroll() {
       setStage('done');
     } catch (err) {
       console.error(err);
-      setError('Could not submit your payment proof. Please try again.');
+      setError('Could not submit your payment proof. Check your connection and try again.');
     } finally {
       setBusy(false);
     }
@@ -136,6 +210,8 @@ export default function PaidEnroll() {
     <div className="min-h-screen bg-teal-950 text-teal-50 flex flex-col">
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-10 space-y-6">
         <Link to="/" className="inline-flex items-center gap-2 text-teal-300 hover:text-teal-50 transition-colors text-sm font-semibold">← Back to CIYA</Link>
+
+        <Stepper stage={stage} />
 
         {stage === 'pick' && (
           <div className={card + ' space-y-4'}>
@@ -177,9 +253,18 @@ export default function PaidEnroll() {
           <form onSubmit={submitDetails} className={card + ' space-y-4'}>
             <h1 className="text-xl md:text-2xl font-extrabold text-white tracking-tight">Your Details</h1>
             <p className="text-teal-300 text-xs font-semibold">We use these to create your student account and email your login details.</p>
-            {([['fullName', 'Full name *'], ['email', 'Email address *'], ['whatsapp', 'WhatsApp number *'], ['state', 'State *'], ['ageRange', 'Age range *'], ['gender', 'Gender']] as const).map(([k, label]) => (
-              <input key={k} type="text" placeholder={label} value={(form as any)[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} className={input} />
-            ))}
+            <input type="email" placeholder="Email address *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
+            <input type="tel" inputMode="numeric" maxLength={11} placeholder="WhatsApp number * (11 digits)" value={form.whatsapp}
+              onChange={(e) => setForm({ ...form, whatsapp: e.target.value.replace(/\D/g, '').slice(0, 11) })} className={input} />
+            <select value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className={input + ' cursor-pointer'}>
+              <option value="">Select State *</option>
+              {NIGERIAN_STATES.map((s) => <option key={s} value={s} className="bg-teal-950 text-teal-50">{s}</option>)}
+            </select>
+            <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className={input + ' cursor-pointer'}>
+              <option value="">Gender</option>
+              <option value="Male" className="bg-teal-950 text-teal-50">Male</option>
+              <option value="Female" className="bg-teal-950 text-teal-50">Female</option>
+            </select>
             {error && <p className="text-xs font-bold text-rose-400">{error}</p>}
             <button type="submit" disabled={busy} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-teal-950 text-sm font-black transition-all cursor-pointer">
               {busy ? 'Creating your account...' : 'Create Account & Continue to Payment'}
@@ -204,6 +289,7 @@ export default function PaidEnroll() {
             <label className="block text-xs font-black text-teal-300 uppercase tracking-wide">Payment confirmation screenshot *</label>
             <input type="file" accept="image/*" onChange={(e) => setProof(e.target.files?.[0] || null)}
               className="w-full bg-teal-950/60 border border-teal-800 text-teal-50 rounded-xl py-3 px-4 text-sm font-semibold file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-amber-500 file:text-teal-950 file:font-black cursor-pointer" />
+            {proof && <p className="text-teal-300 text-xs font-semibold">Attached: {proof.name}</p>}
             {error && <p className="text-xs font-bold text-rose-400">{error}</p>}
             <button onClick={submitProof} disabled={busy} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-teal-950 text-sm font-black transition-all cursor-pointer">
               {busy ? 'Submitting...' : 'Submit Payment Proof'}

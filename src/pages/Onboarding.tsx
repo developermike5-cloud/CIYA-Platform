@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef} from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag, Mail, Lock, Eye, EyeOff } from 'lucide-react';
@@ -9,6 +9,7 @@ import LoginModal from '../components/LoginModal';
 import BrandingLogo from '../components/BrandingLogo';
 import CustomDropdown from '../components/CustomDropdown';
 import { safeStorage } from '../utils/safeStorage';
+import { NIGERIAN_STATES } from '../utils/nigerianStates';
 import { ALL_COUNTRIES } from '../utils/countries';
 
 type Pathway = 'A' | 'B' | 'C' | null;
@@ -108,6 +109,34 @@ export default function Onboarding() {
   const [creationTime, setCreationTime] = useState<number | null>(null);
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
 
+  // Draft persistence: students never lose progress on refresh or network loss.
+  const draftLoadedRef = useRef(false);
+  const registeredRef = useRef(false);
+  useEffect(() => {
+    try {
+      const raw = safeStorage.getItem('ciya_onboarding_draft');
+      if (raw) {
+        const d = JSON.parse(raw);
+        const restored = (d && d.data) || {};
+        delete restored.email;
+        delete restored.password;
+        restored.isActivated = false;
+        setData((prev: typeof data) => ({ ...prev, ...restored }));
+        const s = Number(d && d.step);
+        if (Number.isFinite(s) && s >= 1 && s <= 10) setStep(s);
+      }
+    } catch (e) {
+      console.warn('onboarding draft restore failed:', e);
+    }
+    draftLoadedRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (!draftLoadedRef.current || registeredRef.current || step >= 11) return;
+    try {
+      safeStorage.setItem('ciya_onboarding_draft', JSON.stringify({ step, data: { ...data, email: '', password: '' }, savedAt: Date.now() }));
+    } catch (e) { /* storage unavailable */ }
+  }, [step, data]);
+
   // Onboarding Auth Choice Modal States
   const [showAuthChoiceModal, setShowAuthChoiceModal] = useState(false);
   
@@ -197,10 +226,8 @@ export default function Onboarding() {
 
   const validateForm = () => {
     setFormError('');
-    if (!data.fullName.trim()) { setFormError('Full Name is required.'); return false; }
     if (!data.gender) { setFormError('Gender is required.'); return false; }
-    if (!data.ageRange) { setFormError('Age Range is required.'); return false; }
-    if (!data.whatsapp.trim()) { setFormError('WhatsApp Number is required.'); return false; }
+    if (!/^\d{11}$/.test(data.whatsapp.trim())) { setFormError('WhatsApp Number must be exactly 11 digits.'); return false; }
     if (!data.country) { setFormError('Country is required.'); return false; }
     if (!data.state.trim()) { setFormError('State/Region is required.'); return false; }
     return true;
@@ -304,8 +331,8 @@ export default function Onboarding() {
       availability: data.availability,
       learningTool: data.learningTool || '',
       educationLevel: data.educationLevel || '',
-      ageRange: data.ageRange || '',
-      fullName: data.fullName,
+      ageRange: '',
+      fullName: (user.email || '').split('@')[0] || 'CIYA Student',
       gender: data.gender,
       whatsapp: data.whatsapp,
       country: data.country || 'Nigeria',
@@ -337,8 +364,8 @@ export default function Onboarding() {
         availability: data.availability,
         learningTool: data.learningTool || '',
         educationLevel: data.educationLevel || '',
-        ageRange: data.ageRange || '',
-        fullName: data.fullName,
+        ageRange: '',
+        fullName: (user.email || '').split('@')[0] || 'CIYA Student',
         gender: data.gender,
         whatsapp: data.whatsapp,
         country: data.country || 'Nigeria',
@@ -360,6 +387,8 @@ export default function Onboarding() {
       }));
       safeStorage.setItem('ciya_cached_profile', JSON.stringify(freshProfile));
       safeStorage.setItem('ciya_cached_profile_time', Date.now().toString());
+      safeStorage.removeItem('ciya_onboarding_draft');
+      registeredRef.current = true;
     } catch (cacheErr) {
       console.warn("Could not seed safeStorage on onboarding completion:", cacheErr);
     }
@@ -485,9 +514,10 @@ export default function Onboarding() {
       }
 
       if (user) {
-        if (data.fullName && (!user.displayName || user.displayName !== data.fullName)) {
+        const derivedName = (user.email || '').split('@')[0] || 'CIYA Student';
+        if (!user.displayName || user.displayName !== derivedName) {
           try {
-            await updateProfile(user, { displayName: data.fullName });
+            await updateProfile(user, { displayName: derivedName });
           } catch (pErr) {
             console.warn("Could not update display name:", pErr);
           }
@@ -865,13 +895,6 @@ export default function Onboarding() {
                 )}
 
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Full Name *</label>
-                  <div className="relative">
-                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input type="text" value={data.fullName} onChange={e => selectData('fullName', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold" placeholder="John Doe" />
-                  </div>
-                </div>
-                <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Gender *</label>
                   <CustomDropdown
                     value={data.gender}
@@ -886,26 +909,10 @@ export default function Onboarding() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Age Range *</label>
-                  <CustomDropdown
-                    value={data.ageRange}
-                    onChange={val => selectData('ageRange', val)}
-                    options={[
-                      { label: 'Select Age Range', value: '' },
-                      { label: 'Below 18', value: 'Below 18' },
-                      { label: 'Between 18-25', value: 'Between 18-25' },
-                      { label: 'Between 25-36', value: 'Between 25-36' },
-                      { label: 'Above 36', value: 'Above 36' }
-                    ]}
-                    theme="dark"
-                    className="w-full"
-                  />
-                </div>
-                <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">WhatsApp Number *</label>
                   <div className="relative">
                     <MessageCircle className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input type="tel" value={data.whatsapp} onChange={e => selectData('whatsapp', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold" placeholder="+234..." />
+                    <input type="tel" inputMode="numeric" maxLength={11} value={data.whatsapp} onChange={e => selectData('whatsapp', e.target.value.replace(/\D/g, '').slice(0, 11))} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold" placeholder="08012345678" />
                   </div>
                 </div>
                 <div>
@@ -923,29 +930,16 @@ export default function Onboarding() {
                 </div>
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">State / Region *</label>
-                  {data.country && COUNTRY_STATES[data.country] ? (
-                    <CustomDropdown
-                      value={data.state}
-                      onChange={val => selectData('state', val)}
-                      options={[
-                        { label: 'Select State', value: '' },
-                        ...COUNTRY_STATES[data.country].map(s => ({ label: s, value: s }))
-                      ]}
-                      theme="dark"
-                      className="w-full"
-                    />
-                  ) : (
-                    <div className="relative">
-                      <MapPin className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                      <input 
-                        type="text" 
-                        value={data.state} 
-                        onChange={e => selectData('state', e.target.value)} 
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold" 
-                        placeholder="Type State/Region..." 
-                      />
-                    </div>
-                  )}
+                  <CustomDropdown
+                    value={data.state}
+                    onChange={val => selectData('state', val)}
+                    options={[
+                      { label: 'Select State', value: '' },
+                      ...NIGERIAN_STATES.map(s => ({ label: s, value: s }))
+                    ]}
+                    theme="dark"
+                    className="w-full"
+                  />
                 </div>
               </div>
 
@@ -986,7 +980,7 @@ export default function Onboarding() {
                 
                 <div className="text-slate-300 text-lg md:text-xl font-semibold mb-8 leading-relaxed max-w-xl mx-auto">
                   <p>
-                    Congratulations, <strong className="text-teal-400 font-extrabold">{data.fullName ? data.fullName.split(' ')[0] : 'Student'}</strong>! Your student profile has been successfully registered.
+                    Congratulations, <strong className="text-teal-400 font-extrabold">{(auth.currentUser?.email || 'Student').split('@')[0]}</strong>! Your student profile has been successfully registered.
                   </p>
                   <p className="text-base text-slate-400 mt-4 font-normal">
                     You can now proceed to your student dashboard to view your profile status and access learning modules.
@@ -1229,16 +1223,8 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
       <div className="space-y-4 text-xs md:text-sm">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <span className="text-slate-450 block text-[10px] uppercase font-bold">Full Name</span>
-            <span className="text-slate-100 font-semibold">{data.fullName || '-'}</span>
-          </div>
-          <div>
             <span className="text-slate-450 block text-[10px] uppercase font-bold">Gender</span>
             <span className="text-slate-100 font-semibold">{data.gender || '-'}</span>
-          </div>
-          <div>
-            <span className="text-slate-450 block text-[10px] uppercase font-bold">Age Range</span>
-            <span className="text-slate-100 font-semibold">{data.ageRange || '-'}</span>
           </div>
           <div>
             <span className="text-slate-450 block text-[10px] uppercase font-bold">Education Level</span>

@@ -43,12 +43,18 @@ export async function handler(event: any) {
       };
     }
 
+    // Cloudinary validates the signature over EVERY param sent with the upload,
+    // so tags (e.g. student ids on payment proofs) must be signed too.
+    const tags = typeof body.tags === "string" && body.tags ? body.tags : "";
     const timestamp = Math.floor(Date.now() / 1000);
     const params: Record<string, string> = {
       timestamp: String(timestamp),
     };
     if (folder) {
       params.folder = folder;
+    }
+    if (tags) {
+      params.tags = tags;
     }
 
     const sortedKeys = Object.keys(params).sort();
@@ -71,6 +77,7 @@ export async function handler(event: any) {
         apiKey,
         cloudName,
         folder,
+        tags,
       }),
     };
   } catch (err: any) {

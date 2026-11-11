@@ -223,7 +223,7 @@ export async function uploadToCloudinary(
     const sigResponse = await fetch('/api/cloudinary-signature', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folder, resourceType }),
+      body: JSON.stringify({ folder, resourceType, tags: tagsString || undefined }),
     });
 
     if (sigResponse.ok) {

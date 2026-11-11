@@ -253,17 +253,15 @@ export const handler = async (event: any) => {
 
     // 2. Validate the registration payload.
     const email = String(body.email || "").trim().toLowerCase();
-    const fullName = String(body.fullName || "").trim();
+    const fullName = String(body.fullName || "").trim() || (String(body.email || "").split("@")[0] || "CIYA Student");
     const gender = String(body.gender || "").trim();
     const ageRange = String(body.ageRange || "").trim();
     const whatsapp = String(body.whatsapp || "").trim();
     const country = String(body.country || "Nigeria").trim();
     const state = String(body.state || "").trim();
     if (!email || !email.includes("@")) return json(400, { error: "invalid-email" });
-    if (!fullName) return json(400, { error: "missing-fullName" });
     if (!whatsapp) return json(400, { error: "missing-whatsapp" });
     if (!state) return json(400, { error: "missing-state" });
-    if (!ageRange) return json(400, { error: "missing-ageRange" });
 
     // 3. Auto-approval follows the same settings the client flow used.
     let autoApprovalEnabled = true;
