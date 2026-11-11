@@ -80,7 +80,7 @@ export default function PaidEnroll() {
   const [course, setCourse] = useState<Course | null>(null);
   const [bank, setBank] = useState(BANK_DEFAULTS);
   const [form, setForm] = useState({ email: '', whatsapp: '', state: '', gender: '' });
-  const [account, setAccount] = useState<{ uid: string; tempPassword?: string; ciyaCode?: string; emailQueued: boolean } | null>(null);
+  const [account, setAccount] = useState<{ uid: string; email?: string; tempPassword?: string; ciyaCode?: string; emailQueued: boolean } | null>(null);
   const [proof, setProof] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +106,7 @@ export default function PaidEnroll() {
             setForm({ email: String(d.form.email || ''), whatsapp: String(d.form.whatsapp || ''), state: String(d.form.state || ''), gender: String(d.form.gender || '') });
           }
           if (d?.account && d.account.uid) {
-            setAccount({ uid: String(d.account.uid), tempPassword: d.account.tempPassword ? String(d.account.tempPassword) : undefined, ciyaCode: d.account.ciyaCode ? String(d.account.ciyaCode) : undefined, emailQueued: !!d.account.emailQueued });
+            setAccount({ uid: String(d.account.uid), email: d.account.email ? String(d.account.email).toLowerCase() : (d.form?.email ? String(d.form.email).toLowerCase() : undefined), tempPassword: d.account.tempPassword ? String(d.account.tempPassword) : undefined, ciyaCode: d.account.ciyaCode ? String(d.account.ciyaCode) : undefined, emailQueued: !!d.account.emailQueued });
           }
           if (savedStage && ['preview', 'details', 'payment'].includes(savedStage) && (savedCourse || courseParam)) {
             setStage(savedCourse ? savedStage : (savedStage === 'details' || savedStage === 'payment' ? 'details' : 'preview'));
@@ -174,7 +174,7 @@ export default function PaidEnroll() {
 
   const submitDetails = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (account) { setStage('payment'); return; }
+    if (account && (!account.email || account.email === form.email.trim().toLowerCase())) { setStage('payment'); return; }
     setError(null);
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) { setError('Enter a valid email address.'); return; }
     if (!/^\d{11}$/.test(form.whatsapp.trim())) { setError('WhatsApp number must be exactly 11 digits.'); return; }
@@ -196,7 +196,7 @@ export default function PaidEnroll() {
             : 'Could not create your account. Please try again.');
         return;
       }
-      setAccount({ uid: data.uid, tempPassword: data.tempPassword, ciyaCode: data.ciyaCode, emailQueued: !!data.emailQueued });
+      setAccount({ uid: data.uid, email: form.email.trim().toLowerCase(), tempPassword: data.tempPassword, ciyaCode: data.ciyaCode, emailQueued: !!data.emailQueued });
       setStage('payment');
     } catch (err) {
       console.error(err);
@@ -217,7 +217,7 @@ export default function PaidEnroll() {
       if (!up?.url) throw new Error('upload returned no url');
       // Sign the fresh account in (SDK session) so Firestore rules accept its own profile update.
       step = 'sign-in';
-      const si = await signInWithEmailAndPassword(auth, form.email.trim().toLowerCase(), account.tempPassword);
+      const si = await signInWithEmailAndPassword(auth, (account.email || form.email).trim().toLowerCase(), account.tempPassword);
       if (!si?.user?.uid) throw new Error('sign-in failed');
       step = 'save';
       const userDoc = doc(db, 'users', account.uid);
@@ -297,7 +297,7 @@ export default function PaidEnroll() {
             <button type="button" onClick={() => setStage('preview')} className="self-start w-fit text-teal-400 hover:text-amber-300 text-xs font-black uppercase tracking-wider cursor-pointer transition-colors">← Back</button>
             <h1 className="text-xl md:text-2xl font-extrabold text-white tracking-tight">Your Details</h1>
             <p className="text-teal-300 text-xs font-semibold">We use these to create your student account and email your login details.</p>
-            {account && <p className="text-amber-300/90 text-xs font-semibold">Your account is already created. Continue to payment.</p>}
+            {account && (!account.email || account.email === form.email.trim().toLowerCase()) && <p className="text-amber-300/90 text-xs font-semibold">Your account is already created for {account.email || form.email}. Continue to payment.</p>}
             <input type="email" placeholder="Email address *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
             <input type="tel" inputMode="numeric" maxLength={11} placeholder="WhatsApp number * (11 digits)" value={form.whatsapp}
               onChange={(e) => setForm({ ...form, whatsapp: e.target.value.replace(/\D/g, '').slice(0, 11) })} className={input} />
@@ -312,7 +312,7 @@ export default function PaidEnroll() {
             </select>
             {error && <p className="text-xs font-bold text-rose-400">{error}</p>}
             <button type="submit" disabled={busy} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-teal-950 text-sm font-black transition-all cursor-pointer">
-              {busy ? 'Creating your account...' : account ? 'Continue to Payment' : 'Create Account & Continue to Payment'}
+              {busy ? 'Creating your account...' : account && (!account.email || account.email === form.email.trim().toLowerCase()) ? 'Continue to Payment' : 'Create Account & Continue to Payment'}
             </button>
           </form>
         )}
@@ -324,6 +324,7 @@ export default function PaidEnroll() {
             <p className="text-teal-100 text-sm font-semibold leading-relaxed">
               Transfer <span className="text-amber-400 font-black">{price}</span> to the account below, then upload the payment confirmation screenshot. Your course unlocks as soon as the admin confirms it.
             </p>
+            {account?.email && <p className="text-teal-300 text-xs font-semibold">Paying as {account.email}.</p>}
             <div className="bg-teal-950/60 border border-teal-800 rounded-2xl p-5 space-y-2">
               {[['Bank', bank.bankName], ['Account name', bank.accountName], ['Account number', bank.accountNumber], ['Amount', price]].map(([k, v]) => (
                 <div key={k} className="flex justify-between items-center gap-2 text-sm">
@@ -356,7 +357,7 @@ export default function PaidEnroll() {
             <div className="mx-auto w-20 h-20 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center text-4xl shadow-md border border-amber-500/20">📱</div>
             <h1 className="text-2xl font-black text-white">Payment Proof Received</h1>
             <p className="text-teal-100 text-sm font-semibold leading-relaxed">
-              The admin will confirm your <span className="font-black text-white">{course.title}</span> payment shortly. Your login details are on their way to <span className="font-black text-white">{form.email}</span>.
+              The admin will confirm your <span className="font-black text-white">{course.title}</span> payment shortly. Your login details are on their way to <span className="font-black text-white">{account?.email || form.email}</span>.
             </p>
             <div className="bg-teal-950/60 border border-teal-800 rounded-2xl p-5 text-left space-y-2">
               <p className="text-xs font-black uppercase tracking-wider text-amber-400">How to log in through the app</p>
@@ -366,7 +367,7 @@ export default function PaidEnroll() {
             {account && !account.emailQueued && account.tempPassword && (
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 text-left space-y-2">
                 <p className="text-xs font-black uppercase tracking-wider text-amber-400">Email delivery is temporarily unavailable, so here are your details</p>
-                <p className="text-teal-50 text-sm font-bold">Email: {form.email}</p>
+                <p className="text-teal-50 text-sm font-bold">Email: {account?.email || form.email}</p>
                 <p className="text-teal-50 text-sm font-bold">Temporary password: <span className="font-mono">{account.tempPassword}</span></p>
                 <p className="text-teal-50 text-sm font-bold">CIYA access code: <span className="font-mono">{account.ciyaCode}</span></p>
               </div>
