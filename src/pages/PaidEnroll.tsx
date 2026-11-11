@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { coursesStore } from '../utils/coursesStore';
 import { Course } from '../types';
 import { uploadToCloudinary } from '../utils/cloudinary';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
 import { useIntakeRoute } from '../hooks/useIntakeRoute';
 import { NIGERIAN_STATES } from '../utils/nigerianStates';
 import { safeStorage } from '../utils/safeStorage';
@@ -27,27 +28,44 @@ const isPaidLevel = (c: Course) => {
   return /advanced|masterclass/i.test(level) && published && Number(c.price) > 0;
 };
 
-/** Steps with a connecting line that animates as the student moves through the flow. */
-function Stepper({ stage }: { stage: Stage }) {
+/** Steps with a connecting line that animates as the student moves through the flow. Completed steps are clickable to go back. */
+function Stepper({ stage, onBack }: { stage: Stage; onBack?: (s: Stage) => void }) {
   if (stage === 'pick') return null;
   const current = STAGE_ORDER.indexOf(stage);
   return (
     <div className="flex items-center w-full max-w-xl mx-auto pt-2 pb-4" aria-label="Enrollment progress">
-      {STAGE_ORDER.map((s, i) => (
-        <React.Fragment key={s}>
-          <div className="flex flex-col items-center gap-1.5 shrink-0">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all duration-500 ${i < current ? 'bg-amber-500 border-amber-500 text-teal-950' : i === current ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-[0_0_14px_rgba(245,158,11,0.45)]' : 'border-teal-800 text-teal-500 bg-teal-950/60'}`}>
-              {i < current ? '✓' : i + 1}
-            </div>
-            <span className={`text-[10px] font-black uppercase tracking-wider ${i <= current ? 'text-amber-300' : 'text-teal-500'}`}>{STAGE_LABELS[s]}</span>
+      {STAGE_ORDER.map((s, i) => {
+        const canGoBack = !!onBack && i < current;
+        const circle = (
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all duration-500 ${i < current ? 'bg-amber-500 border-amber-500 text-teal-950' : i === current ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-[0_0_14px_rgba(245,158,11,0.45)]' : 'border-teal-800 text-teal-500 bg-teal-950/60'}`}>
+            {i < current ? '✓' : i + 1}
           </div>
-          {i < STAGE_ORDER.length - 1 && (
-            <div className="flex-1 h-0.5 mx-2 rounded-full bg-teal-900 relative overflow-hidden mb-4 min-w-[24px]">
-              <div className={`ciya-step-fill ${i < current ? 'ciya-step-done' : i === current ? 'ciya-step-active' : ''}`} />
+        );
+        const label = <span className={`text-[10px] font-black uppercase tracking-wider ${i <= current ? 'text-amber-300' : 'text-teal-500'}`}>{STAGE_LABELS[s]}</span>;
+        return (
+          <React.Fragment key={s}>
+            <div className="flex flex-col items-center gap-1.5 shrink-0">
+              {canGoBack ? (
+                <button type="button" title={`Back to ${STAGE_LABELS[s]}`} onClick={() => onBack!(s)}
+                  className="flex flex-col items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity">
+                  {circle}
+                  {label}
+                </button>
+              ) : (
+                <>
+                  {circle}
+                  {label}
+                </>
+              )}
             </div>
-          )}
-        </React.Fragment>
-      ))}
+            {i < STAGE_ORDER.length - 1 && (
+              <div className="flex-1 h-0.5 mx-2 rounded-full bg-teal-900 relative overflow-hidden mb-4 min-w-[24px]">
+                <div className={`ciya-step-fill ${i < current ? 'ciya-step-done' : i === current ? 'ciya-step-active' : ''}`} />
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }
@@ -66,6 +84,7 @@ export default function PaidEnroll() {
   const [proof, setProof] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const draftLoadedRef = useRef(false);
   const finishedRef = useRef(false);
 
@@ -136,8 +155,26 @@ export default function PaidEnroll() {
 
   const price = useMemo(() => (course ? `₦${Number(course.price).toLocaleString()}` : ''), [course]);
 
+  const copyAccountNumber = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(bank.accountNumber || '');
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = bank.accountNumber || '';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch (e) { /* clipboard unavailable */ }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
+  };
+
   const submitDetails = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (account) { setStage('payment'); return; }
     setError(null);
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) { setError('Enter a valid email address.'); return; }
     if (!/^\d{11}$/.test(form.whatsapp.trim())) { setError('WhatsApp number must be exactly 11 digits.'); return; }
@@ -178,14 +215,10 @@ export default function PaidEnroll() {
     try {
       const up = await uploadToCloudinary(proof, 'ciya-payments', undefined, account.uid);
       if (!up?.url) throw new Error('upload returned no url');
-      // Sign the fresh account in so its own profile can be updated.
+      // Sign the fresh account in (SDK session) so Firestore rules accept its own profile update.
       step = 'sign-in';
-      const key = (import.meta as any).env?.VITE_FIREBASE_API_KEY;
-      const si = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${key}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email.trim().toLowerCase(), password: account.tempPassword, returnSecureToken: true })
-      }).then((r) => r.json());
-      if (!si?.idToken) throw new Error('sign-in failed');
+      const si = await signInWithEmailAndPassword(auth, form.email.trim().toLowerCase(), account.tempPassword);
+      if (!si?.user?.uid) throw new Error('sign-in failed');
       step = 'save';
       const userDoc = doc(db, 'users', account.uid);
       await setDoc(userDoc, {
@@ -221,7 +254,7 @@ export default function PaidEnroll() {
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-10 space-y-6">
         <Link to="/" className="inline-flex items-center gap-2 text-teal-300 hover:text-teal-50 transition-colors text-sm font-semibold">← Back to CIYA</Link>
 
-        <Stepper stage={stage} />
+        <Stepper stage={stage} onBack={stage === 'done' ? undefined : (s) => setStage(s)} />
 
         {stage === 'pick' && (
           <div className={card + ' space-y-4'}>
@@ -261,8 +294,10 @@ export default function PaidEnroll() {
 
         {stage === 'details' && (
           <form onSubmit={submitDetails} className={card + ' space-y-4'}>
+            <button type="button" onClick={() => setStage('preview')} className="self-start w-fit text-teal-400 hover:text-amber-300 text-xs font-black uppercase tracking-wider cursor-pointer transition-colors">← Back</button>
             <h1 className="text-xl md:text-2xl font-extrabold text-white tracking-tight">Your Details</h1>
             <p className="text-teal-300 text-xs font-semibold">We use these to create your student account and email your login details.</p>
+            {account && <p className="text-amber-300/90 text-xs font-semibold">Your account is already created. Continue to payment.</p>}
             <input type="email" placeholder="Email address *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
             <input type="tel" inputMode="numeric" maxLength={11} placeholder="WhatsApp number * (11 digits)" value={form.whatsapp}
               onChange={(e) => setForm({ ...form, whatsapp: e.target.value.replace(/\D/g, '').slice(0, 11) })} className={input} />
@@ -277,22 +312,31 @@ export default function PaidEnroll() {
             </select>
             {error && <p className="text-xs font-bold text-rose-400">{error}</p>}
             <button type="submit" disabled={busy} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-teal-950 text-sm font-black transition-all cursor-pointer">
-              {busy ? 'Creating your account...' : 'Create Account & Continue to Payment'}
+              {busy ? 'Creating your account...' : account ? 'Continue to Payment' : 'Create Account & Continue to Payment'}
             </button>
           </form>
         )}
 
         {stage === 'payment' && course && (
           <div className={card + ' space-y-5'}>
+            <button type="button" onClick={() => setStage('details')} className="self-start w-fit text-teal-400 hover:text-amber-300 text-xs font-black uppercase tracking-wider cursor-pointer transition-colors">← Back</button>
             <h1 className="text-xl md:text-2xl font-extrabold text-white tracking-tight">Make Your Payment</h1>
             <p className="text-teal-100 text-sm font-semibold leading-relaxed">
               Transfer <span className="text-amber-400 font-black">{price}</span> to the account below, then upload the payment confirmation screenshot. Your course unlocks as soon as the admin confirms it.
             </p>
             <div className="bg-teal-950/60 border border-teal-800 rounded-2xl p-5 space-y-2">
               {[['Bank', bank.bankName], ['Account name', bank.accountName], ['Account number', bank.accountNumber], ['Amount', price]].map(([k, v]) => (
-                <div key={k} className="flex justify-between items-center text-sm">
+                <div key={k} className="flex justify-between items-center gap-2 text-sm">
                   <span className="font-extrabold text-teal-400">{k}</span>
-                  <span className="font-black text-white">{v}</span>
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="font-black text-white">{v}</span>
+                    {k === 'Account number' && (
+                      <button type="button" onClick={copyAccountNumber} aria-label="Copy account number"
+                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-teal-950 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shrink-0">
+                        {copied ? 'Copied ✓' : 'Copy'}
+                      </button>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>
