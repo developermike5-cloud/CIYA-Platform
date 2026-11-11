@@ -174,16 +174,19 @@ export default function PaidEnroll() {
     if (!proof) { setError('Attach the payment confirmation screenshot first.'); return; }
     setError(null);
     setBusy(true);
+    let step: 'upload' | 'sign-in' | 'save' = 'upload';
     try {
       const up = await uploadToCloudinary(proof, 'ciya-payments', undefined, account.uid);
       if (!up?.url) throw new Error('upload returned no url');
       // Sign the fresh account in so its own profile can be updated.
+      step = 'sign-in';
       const key = (import.meta as any).env?.VITE_FIREBASE_API_KEY;
       const si = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${key}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: form.email.trim().toLowerCase(), password: account.tempPassword, returnSecureToken: true })
       }).then((r) => r.json());
       if (!si?.idToken) throw new Error('sign-in failed');
+      step = 'save';
       const userDoc = doc(db, 'users', account.uid);
       await setDoc(userDoc, {
         paidCourseRequest: {
@@ -196,8 +199,15 @@ export default function PaidEnroll() {
       }, { merge: true });
       setStage('done');
     } catch (err) {
-      console.error(err);
-      setError('Could not submit your payment proof. Check your connection and try again.');
+      console.error('submitProof failed at', step, err);
+      const detail = err instanceof Error ? err.message : '';
+      if (step === 'upload') {
+        setError(`Could not upload your payment screenshot${detail ? ` (${detail})` : ''}. Check your connection and try again.`);
+      } else if (step === 'sign-in') {
+        setError(`Your screenshot uploaded, but we couldn't sign the account in${detail ? ` (${detail})` : ''}. Try again in a minute.`);
+      } else {
+        setError(`Your screenshot uploaded, but the request didn't save${detail ? ` (${detail})` : ''}. Try again in a minute.`);
+      }
     } finally {
       setBusy(false);
     }
