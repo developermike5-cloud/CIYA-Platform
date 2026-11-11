@@ -6,9 +6,9 @@ import { coursesStore } from '../utils/coursesStore';
 import { Course } from '../types';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { auth, db } from '../firebase';
-import { useIntakeRoute } from '../hooks/useIntakeRoute';
 import { NIGERIAN_STATES } from '../utils/nigerianStates';
 import { safeStorage } from '../utils/safeStorage';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 /** Bank details come from the admin's Settings & Portal Locks page. */
 const BANK_DEFAULTS = {
@@ -21,6 +21,9 @@ type Stage = 'pick' | 'preview' | 'details' | 'payment' | 'done';
 const STAGE_ORDER: Stage[] = ['preview', 'details', 'payment', 'done'];
 const STAGE_LABELS: Partial<Record<Stage, string>> = { preview: 'Preview', details: 'Details', payment: 'Payment', done: 'Done' };
 const DRAFT_KEY = 'ciya_paid_enroll_draft';
+
+/** Admin WhatsApp number students message for payment confirmation. */
+const ADMIN_WHATSAPP = '2349042544355';
 
 const isPaidLevel = (c: Course) => {
   const level = (c.level || (c as any).tier || '').toString();
@@ -72,7 +75,6 @@ function Stepper({ stage, onBack }: { stage: Stage; onBack?: (s: Stage) => void 
 
 export default function PaidEnroll() {
   const navigate = useNavigate();
-  const intakeRoute = useIntakeRoute();
   const [params] = useSearchParams();
   const courseParam = params.get('course') || '';
   const [stage, setStage] = useState<Stage>(courseParam ? 'preview' : 'pick');
@@ -85,6 +87,7 @@ export default function PaidEnroll() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const { isInstallable, isInstalled, isIOS, installApp } = usePWAInstall();
   const draftLoadedRef = useRef(false);
   const finishedRef = useRef(false);
 
@@ -154,6 +157,7 @@ export default function PaidEnroll() {
   }, [stage]);
 
   const price = useMemo(() => (course ? `₦${Number(course.price).toLocaleString()}` : ''), [course]);
+  const waMsg = encodeURIComponent(`Hello CIYA Admin, I just enrolled for ${course?.title || 'a paid course'} (${price}) and uploaded my payment proof. Please confirm my payment. My email: ${account?.email || form.email}`);
 
   const copyAccountNumber = async () => {
     try {
@@ -354,26 +358,34 @@ export default function PaidEnroll() {
 
         {stage === 'done' && course && (
           <div className={card + ' space-y-5 text-center'}>
-            <div className="mx-auto w-20 h-20 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center text-4xl shadow-md border border-amber-500/20">📱</div>
+            <div className="mx-auto w-20 h-20 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center text-4xl shadow-md border border-amber-500/20">⏳</div>
+            <div className="mx-auto inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-amber-300 text-xs font-black uppercase tracking-widest">Pending approval</span>
+            </div>
             <h1 className="text-2xl font-black text-white">Payment Proof Received</h1>
             <p className="text-teal-100 text-sm font-semibold leading-relaxed">
-              The admin will confirm your <span className="font-black text-white">{course.title}</span> payment shortly. Your login details are on their way to <span className="font-black text-white">{account?.email || form.email}</span>.
+              We have your <span className="font-black text-white">{course.title}</span> payment proof. Once the admin confirms it, your login details and CIYA access code arrive by email at <span className="font-black text-white">{account?.email || form.email}</span>.
             </p>
-            <div className="bg-teal-950/60 border border-teal-800 rounded-2xl p-5 text-left space-y-2">
-              <p className="text-xs font-black uppercase tracking-wider text-amber-400">How to log in through the app</p>
-              <p className="text-teal-100 text-sm font-semibold leading-relaxed">Install the CIYA app: open the CIYA site in your phone browser and choose "Add to Home Screen". All your learning happens inside the app.</p>
-              <p className="text-teal-100 text-sm font-semibold leading-relaxed">Log in with your email and the temporary password we emailed you, then set your own password. Your unique CIYA access code unlocks your registered course.</p>
+
+            <div className="bg-teal-950/60 border border-teal-800 rounded-2xl p-5 text-left space-y-3">
+              <p className="text-xs font-black uppercase tracking-wider text-amber-400">Step 1 · Download the app</p>
+              {isInstallable && !isInstalled && (
+                <button onClick={installApp} className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl transition-all active:scale-95">Download the CIYA App</button>
+              )}
+              <p className="text-teal-100 text-sm font-semibold leading-relaxed">
+                {isIOS ? 'On iPhone: open this site in Safari, tap the Share icon and choose "Add to Home Screen".' : 'Open the CIYA site in your phone browser, open the browser menu and choose "Add to Home Screen" or "Install app". All your learning happens inside the app.'}
+              </p>
+              {isInstalled && <p className="text-teal-300 text-xs font-bold">The CIYA app is installed on this device.</p>}
             </div>
-            {account && !account.emailQueued && account.tempPassword && (
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 text-left space-y-2">
-                <p className="text-xs font-black uppercase tracking-wider text-amber-400">Email delivery is temporarily unavailable, so here are your details</p>
-                <p className="text-teal-50 text-sm font-bold">Email: {account?.email || form.email}</p>
-                <p className="text-teal-50 text-sm font-bold">Temporary password: <span className="font-mono">{account.tempPassword}</span></p>
-                <p className="text-teal-50 text-sm font-bold">CIYA access code: <span className="font-mono">{account.ciyaCode}</span></p>
-              </div>
-            )}
-            <a href="/?login=true" className="block w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl transition-all active:scale-95">Log in to the App</a>
-            <p className="text-teal-400 text-xs font-semibold">Not now? <button onClick={() => navigate('/')} className="underline cursor-pointer">You can come back anytime</button> — or continue to the free beginner track at <button onClick={() => navigate(intakeRoute)} className="underline cursor-pointer">sign up</button>.</p>
+
+            <div className="bg-teal-950/60 border border-teal-800 rounded-2xl p-5 text-left space-y-3">
+              <p className="text-xs font-black uppercase tracking-wider text-amber-400">Step 2 · Contact the admin</p>
+              <p className="text-teal-100 text-sm font-semibold leading-relaxed">Message the admin on WhatsApp to request confirmation of your payment. Attach your transfer receipt in the chat to make approval faster.</p>
+              <a href={`https://wa.me/${ADMIN_WHATSAPP}?text=${waMsg}`} target="_blank" rel="noreferrer" className="block w-full py-3.5 bg-[#25D366] hover:brightness-110 text-white font-black rounded-2xl transition-all active:scale-95">💬 Message the Admin on WhatsApp</a>
+            </div>
+
+            <p className="text-teal-400 text-xs font-semibold"><button onClick={() => navigate('/')} className="underline cursor-pointer">Back to CIYA</button></p>
           </div>
         )}
       </main>

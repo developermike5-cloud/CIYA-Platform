@@ -337,15 +337,22 @@ export const handler = async (event: any) => {
     //    this document (Firestore rules deny client access).
     await patchDoc(projectId, databaseId, `accessCodes/${uid}`, {
       ciyaCode: S(ciyaCode),
+      tempPassword: S(tempPassword),
       usedForCourseId: { nullValue: null },
       createdAt: TS(now),
       updatedAt: TS(now),
     });
 
     // 7. Email the login details through ZeptoMail when configured.
+    //    Paid enrollments send NOTHING now: the temp password lives in the
+    //    server-only accessCodes doc and the email fires when the admin
+    //    approves the payment proof (netlify/functions/paid-approve-email.ts).
     const appUrl = (process.env.PUBLIC_APP_URL || "https://ciyacademy.netlify.app").replace(/\/+$/, "");
     let emailQueued = false;
-    try {
+    if (body?.paid === true) {
+      // Approval-gated: login details reach the student only after the admin confirms payment.
+    } else {
+      try {
       const sendResult = await sendLoginEmail({
         toEmail: email,
         fullName,
@@ -370,6 +377,7 @@ export const handler = async (event: any) => {
       console.error("login-details email failed:", e);
       // The account exists and the code is stored; the email stays "pending"
       // so the admin can resend rather than the student losing their details.
+    }
     }
 
     // 8. Activate the referrer, best effort (same rules as the client flow).

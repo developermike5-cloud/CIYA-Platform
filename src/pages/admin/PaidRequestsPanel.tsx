@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { collection, doc, getDocs, query, serverTimestamp, updateDoc, where, arrayUnion } from 'firebase/firestore';
 import { coursesStore } from '../../utils/coursesStore';
-import { db } from '../../firebase';
+import { auth, db } from '../../firebase';
 
 /** Pending paid-course payment requests, filtered to one course tier. */
 export default function PaidRequestsPanel({ tier = 'all' as 'all' | 'advanced' | 'masterclass' }) {
@@ -37,6 +37,21 @@ export default function PaidRequestsPanel({ tier = 'all' as 'all' | 'advanced' |
     try {
       await updateDoc(doc(db, 'users', r.id), patch);
       setRows((prev) => prev.filter((x) => x.id !== r.id));
+      if (status === 'Approved') {
+        // Approval fires the login-details email (server-side, ZeptoMail).
+        try {
+          const idToken = await auth.currentUser?.getIdToken();
+          const res = await fetch('/.netlify/functions/paid-approve-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ studentUid: r.id, idToken }),
+          });
+          const data = await res.json().catch(() => ({} as any));
+          if (!data?.queued) setError(`Approved, but the login email did not send${data?.reason ? ` (${data.reason})` : ''}.`);
+        } catch {
+          setError('Approved, but the login email did not send.');
+        }
+      }
     } catch (e) {
       console.error('paid request action failed:', e);
       setError('Could not save that. Please try again.');
