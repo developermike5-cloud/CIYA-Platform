@@ -189,7 +189,7 @@ async function sendLoginEmail(opts: {
   paid?: boolean;
   courseTitle?: string;
 }): Promise<{ queued: boolean; reason?: string }> {
-  const apiKey = process.env.ZEPTO_API_KEY;
+  const apiKey = process.env.ZEPTOMAIL_API_KEY || process.env.ZEPTO_API_KEY;
   const templateKey = (opts.paid && process.env.ZEPTO_TEMPLATE_KEY_PAID) || process.env.ZEPTO_TEMPLATE_KEY;
   const fromAddress = process.env.ZEPTO_FROM_ADDRESS;
   const fromName = process.env.ZEPTO_FROM_NAME || "CIYA Academy";
