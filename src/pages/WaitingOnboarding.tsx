@@ -475,7 +475,7 @@ _Action: Please review my CIY Academy application. Thank you!_`;
                   <label className="block text-sm font-semibold text-slate-700 mb-1">WhatsApp Number *</label>
                   <div className="relative">
                     <MessageCircle className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input type="tel" value={data.whatsapp} onChange={e => selectData('whatsapp', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all text-slate-800 placeholder:text-slate-400" placeholder="+234..." />
+                    <input type="tel" inputMode="numeric" maxLength={11} value={data.whatsapp} onChange={e => selectData('whatsapp', e.target.value.replace(/\D/g, '').slice(0, 11))} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 outline-none transition-all text-slate-800 placeholder:text-slate-400" placeholder="08012345678" />
                   </div>
                 </div>
                 <div>
@@ -548,23 +548,16 @@ _Action: Please review my CIY Academy application. Thank you!_`;
                   </p>
                 </div>
 
-                <div className="bg-amber-500 text-amber-950 rounded-3xl p-6 md:p-8 mb-8 text-center space-y-4 shadow-xl border border-amber-400 relative overflow-hidden">
-                  <div className="flex items-center justify-center gap-2.5">
-                    <span className="flex h-3.5 w-3.5 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-200 opacity-80"></span>
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-950"></span>
-                    </span>
-                    <h3 className="font-black text-amber-950 text-base md:text-lg uppercase tracking-widest">
-                      WhatsApp Dispatch Ready
-                    </h3>
-                  </div>
-
-                  <p className="text-sm md:text-base text-amber-900 leading-relaxed font-bold max-w-lg mx-auto">
+                <div className="mb-8 text-center space-y-3">
+                  <h3 className="font-black text-slate-700 text-base md:text-lg uppercase tracking-widest">
+                    WhatsApp Dispatch Ready
+                  </h3>
+                  <p className="text-sm md:text-base text-slate-600 leading-relaxed font-semibold max-w-lg mx-auto">
                     Click the button below to submit your details directly. Once verified, we will contact you directly via WhatsApp!
                   </p>
                 </div>
 
-                <div className="w-full mb-8 max-h-[250px] overflow-y-auto rounded-2xl border border-slate-100">
+                <div className="w-full mb-8 max-h-[560px] overflow-y-auto rounded-2xl border border-slate-100">
                   <OnboardingSubmissionDetails data={data} />
                 </div>
 
@@ -594,11 +587,11 @@ _Action: Please review my CIY Academy application. Thank you!_`;
 
 function OnboardingSubmissionDetails({ data }: { data: any }) {
   return (
-    <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left max-w-xl mx-auto my-6 text-sm">
+    <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left max-w-2xl mx-auto my-6 text-sm md:text-base">
       <h3 className="font-extrabold text-slate-800 mb-4 text-xs tracking-tight border-b border-slate-200 pb-2 uppercase text-[11px] tracking-wider text-indigo-700 flex items-center gap-2">
         <span>📋</span> Prepared Registration Details
       </h3>
-      <div className="space-y-4 text-xs md:text-sm">
+      <div className="space-y-4 text-sm md:text-base">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <span className="text-slate-600 block text-[10px] uppercase font-bold">Full Name</span>

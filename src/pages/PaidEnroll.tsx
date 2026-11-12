@@ -303,7 +303,7 @@ export default function PaidEnroll() {
             <p className="text-teal-300 text-xs font-semibold">We use these to create your student account and email your login details.</p>
             {account && (!account.email || account.email === form.email.trim().toLowerCase()) && <p className="text-amber-300/90 text-xs font-semibold">Your account is already created for {account.email || form.email}. Continue to payment.</p>}
             <input type="email" placeholder="Email address *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
-            <input type="tel" inputMode="numeric" maxLength={11} placeholder="WhatsApp number * (11 digits)" value={form.whatsapp}
+            <input type="tel" inputMode="numeric" maxLength={11} placeholder="WhatsApp number *" value={form.whatsapp}
               onChange={(e) => setForm({ ...form, whatsapp: e.target.value.replace(/\D/g, '').slice(0, 11) })} className={input} />
             <select value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className={input + ' cursor-pointer'}>
               <option value="">Select State *</option>

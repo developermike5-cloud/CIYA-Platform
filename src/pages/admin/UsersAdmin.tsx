@@ -1726,39 +1726,47 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
-            {/* Create cohort input */}
-            <div className="flex items-center gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 w-full min-w-0">
+            {/* Create cohort: field with the Create button under it */}
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">New Cohort</span>
               <input
                 type="text"
                 placeholder="New Cohort (e.g. Cohort 2)"
                 value={newCohortName}
                 onChange={(e) => setNewCohortName(e.target.value)}
-                className="px-3 py-1.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-xs text-slate-800 font-semibold w-full sm:w-48 bg-white"
+                className="px-3 py-1.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-xs text-slate-800 font-semibold w-full bg-white"
               />
               <button
                 onClick={handleCreateCohort}
                 disabled={isCreatingCohort}
-                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-750 text-white font-extrabold text-xs uppercase tracking-wide rounded-xl shadow transition-all duration-150 disabled:opacity-50 shrink-0 border-0 cursor-pointer"
+                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-750 text-white font-extrabold text-xs uppercase tracking-wide rounded-xl shadow transition-all duration-150 disabled:opacity-50 border-0 cursor-pointer w-full"
               >
                 {isCreatingCohort ? "Creating..." : "Create"}
               </button>
             </div>
 
-            {/* Registration Intake Toggle */}
-            <div className="flex items-center gap-2 border-t sm:border-t-0 sm:border-l border-slate-200 pt-3 sm:pt-0 sm:pl-4" title="When OPEN, the landing page's Start for Free buttons send new students into the onboarding signup form. When CLOSED, they go to the waiting list instead.">
-              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Registrations:</span>
-              <button
-                onClick={handleToggleOnboardingActive}
-                className={`px-4 py-2 rounded-xl font-extrabold text-xs uppercase tracking-wide shadow transition-all duration-150 border-0 cursor-pointer ${cohortsConfig.onboardingActive ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}
-              >
-                {cohortsConfig.onboardingActive ? 'OPEN' : 'CLOSED'}
-              </button>
+            {/* Registration Intake: open/close toggle under the label */}
+            <div className="flex flex-col gap-1.5 min-w-0" title="When OPEN, the landing page's Start for Free buttons send new students into the onboarding signup form. When CLOSED, they go to the waiting list instead.">
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Registrations</span>
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={handleToggleOnboardingActive}
+                  role="switch"
+                  aria-checked={cohortsConfig.onboardingActive}
+                  className={`relative inline-flex h-7 w-14 shrink-0 items-center rounded-full shadow transition-colors duration-200 border-0 cursor-pointer ${cohortsConfig.onboardingActive ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${cohortsConfig.onboardingActive ? 'translate-x-8' : 'translate-x-1'}`} />
+                </button>
+                <span className={`text-xs font-extrabold uppercase tracking-wide ${cohortsConfig.onboardingActive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {cohortsConfig.onboardingActive ? 'Open' : 'Closed'}
+                </span>
+              </div>
             </div>
 
-            {/* Change Active Cohort */}
-            <div className="flex items-center gap-2 border-t sm:border-t-0 sm:border-l border-slate-200 pt-3 sm:pt-0 sm:pl-4">
-              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider whitespace-nowrap">Active Cohort:</span>
+            {/* Active cohort dropdown under the label */}
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Active Cohort</span>
               <CustomDropdown
                 value={cohortsConfig.activeCohort}
                 onChange={(val) => handleChangeActiveCohort(val)}
@@ -1766,7 +1774,7 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                   label: cohort,
                   value: cohort
                 }))}
-                className="min-w-[140px]"
+                className="w-full"
                 theme="indigo"
               />
             </div>

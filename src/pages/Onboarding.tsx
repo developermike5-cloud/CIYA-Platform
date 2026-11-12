@@ -226,10 +226,13 @@ export default function Onboarding() {
 
   const validateForm = () => {
     setFormError('');
+    if (!data.fullName.trim()) { setFormError('Full name is required.'); return false; }
     if (!data.gender) { setFormError('Gender is required.'); return false; }
+    if (!data.ageRange) { setFormError('Age range is required.'); return false; }
     if (!/^\d{11}$/.test(data.whatsapp.trim())) { setFormError('WhatsApp Number must be exactly 11 digits.'); return false; }
     if (!data.country) { setFormError('Country is required.'); return false; }
     if (!data.state.trim()) { setFormError('State/Region is required.'); return false; }
+    if (!data.email.trim() || !/^\S+@\S+\.\S+$/.test(data.email.trim())) { setFormError('Please enter a valid email address.'); return false; }
     return true;
   };
 
@@ -895,6 +898,29 @@ export default function Onboarding() {
                 )}
 
                 <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Full Name *</label>
+                  <div className="relative">
+                    <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input type="text" value={data.fullName} onChange={e => selectData('fullName', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold" placeholder="Your full name" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Age Range *</label>
+                  <CustomDropdown
+                    value={data.ageRange}
+                    onChange={val => selectData('ageRange', val)}
+                    options={[
+                      { label: 'Select Age Range', value: '' },
+                      { label: 'Below 18', value: 'Below 18' },
+                      { label: 'Between 18-25', value: 'Between 18-25' },
+                      { label: 'Between 25-36', value: 'Between 25-36' },
+                      { label: 'Above 36', value: 'Above 36' }
+                    ]}
+                    theme="dark"
+                    className="w-full"
+                  />
+                </div>
+                <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Gender *</label>
                   <CustomDropdown
                     value={data.gender}
@@ -943,6 +969,13 @@ export default function Onboarding() {
                 </div>
               </div>
 
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Email Address *</label>
+                  <div className="relative">
+                    <Mail className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input type="email" value={data.email || auth.currentUser?.email || ''} onChange={e => selectData('email', e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-800 bg-slate-950 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all text-slate-100 placeholder:text-slate-600 font-bold" placeholder="you@example.com" />
+                  </div>
+                </div>
               <div className="mt-6 space-y-4">
                 <button 
                   onClick={doAuthAndSave} 
