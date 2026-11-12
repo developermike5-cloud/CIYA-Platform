@@ -67,7 +67,7 @@ function TierBadge({ tier, price }: { tier: string, price?: number }) {
 export default function CoursesAdmin() {
   const [courses, setCourses] = useState<Course[]>(() => coursesStore.getStandardCoursesOnly());
   // Current-cohort students per beginner course, shown inline under each course row.
-  const [cohortStudents, setCohortStudents] = useState<{ activeCohort: string; byCourse: Record<string, any[]> } | null>(null);
+  const [cohortStudents, setCohortStudents] = useState<{ activeCohort: string; regOpen: boolean; byCourse: Record<string, any[]> } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -80,6 +80,7 @@ export default function CoursesAdmin() {
         if (!alive) return;
         const users = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
         const activeCohort = cohortsSnap.exists() ? String((cohortsSnap.data() as any).activeCohort || 'Cohort 1') : 'Cohort 1';
+        const regOpen = cohortsSnap.exists() ? (cohortsSnap.data() as any).onboardingActive === true : false;
         const all = coursesStore.getCourses();
         const byCourse: Record<string, any[]> = {};
         for (const c of courses) {
@@ -104,7 +105,7 @@ export default function CoursesAdmin() {
               || matchesPath(u);
           });
         }
-        setCohortStudents({ activeCohort, byCourse });
+        setCohortStudents({ activeCohort, regOpen, byCourse });
       } catch (e) {
         console.error('cohort roster load failed:', e);
       }
@@ -475,7 +476,10 @@ export default function CoursesAdmin() {
                 const checks = c.days?.reduce((sum, d) => sum + (d.videos?.filter(v => v.checkType && v.checkType !== 'none').length || 0), 0) || 0;
                 const isPublished = c.status === 'published' || c.publish_status === 'Published';
                 
-                const roster = cohortStudents ? (cohortStudents.byCourse[c.id!] || []) : null;
+                // Inline roster shows live registrations only while the registration toggle is OPEN;
+                // once it is closed the list disappears here and stays reachable via Students & Stats
+                // and each course's Students button.
+                const roster = cohortStudents && cohortStudents.regOpen ? (cohortStudents.byCourse[c.id!] || []) : null;
 
                 return (
                   <React.Fragment key={c.id}>

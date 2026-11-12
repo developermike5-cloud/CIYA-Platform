@@ -81,6 +81,12 @@ const CSS = `
 .ig-openapp{animation:ig-open .55s cubic-bezier(.2,.8,.2,1) both}
 .ig-bar{animation:ig-fill var(--ig-dur) linear forwards}
 .ig-paused .ig-bar{animation-play-state:paused}
+@keyframes ig-cta-ring{0%{transform:scale(.92);opacity:.85}70%{transform:scale(1.2);opacity:0}100%{transform:scale(1.2);opacity:0}}
+@keyframes ig-cta-shine{0%{left:-70%}55%{left:140%}100%{left:140%}}
+@keyframes ig-cta-lift{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+.ig-cta-wrap::before{content:"";position:absolute;inset:-5px;border-radius:999px;border:3px solid rgba(251,191,36,.55);animation:ig-cta-ring 1.7s ease-out infinite;pointer-events:none}
+.ig-cta::after{content:"";position:absolute;top:0;bottom:0;width:38%;left:-70%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.85),transparent);transform:skewX(-18deg);animation:ig-cta-shine 2.8s ease-in-out infinite;pointer-events:none}
+.ig-cta{animation:ig-cta-lift 2.2s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.ig *,.ig *::after,.ig *::before{animation:none!important;transition:none!important}}
 `;
 
@@ -181,20 +187,7 @@ export default function InstallGuide() {
           You sign in through the app, not the website. Add it to your phone in a few taps, then use the login details we emailed you.
         </p>
 
-        {guide === 'android' && isInstallable && (
-          <div className="mb-6">
-            <button
-              type="button"
-              onClick={handleRealInstall}
-              disabled={installing}
-              className="px-8 py-3.5 rounded-full bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-teal-950 font-black text-base shadow-lg transition-all active:scale-95 cursor-pointer"
-            >
-              {installing ? 'Installing…' : 'Install app'}
-            </button>
-          </div>
-        )}
-
-        <div className="flex gap-1.5 p-1.5 rounded-full bg-teal-900/60 border border-teal-800 mb-8 w-fit" role="tablist" aria-label="Phone type">
+        <div className="flex gap-1.5 p-1.5 rounded-full bg-teal-900/60 border border-teal-800 mb-8 md:mb-10 mx-auto w-fit" role="tablist" aria-label="Phone type">
           <button type="button" role="tab" aria-selected={guide === 'ios'} onClick={() => switchGuide('ios')}
             className={`px-5 md:px-6 py-2.5 rounded-full font-extrabold text-sm md:text-[15px] transition-all cursor-pointer border-0 ${guide === 'ios' ? 'bg-amber-400 text-teal-950' : 'bg-transparent text-teal-200'}`}>
             iPhone
@@ -409,6 +402,23 @@ export default function InstallGuide() {
         </div>
 
         <p className="mt-[18px] px-4 py-3.5 rounded-[18px] border border-dashed border-teal-700 text-teal-200 text-[0.92rem]">{GUIDES[guide].note}</p>
+
+        {guide === 'android' && isInstallable && (
+          <div className="mt-8 flex justify-center">
+            <span className="ig-cta-wrap relative inline-flex">
+              <button
+                type="button"
+                onClick={handleRealInstall}
+                disabled={installing}
+                aria-label="Install the CIYA app now"
+                className="ig-cta relative overflow-hidden inline-flex items-center gap-3 px-10 md:px-14 py-4 md:py-5 rounded-full bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-teal-950 font-black text-lg md:text-xl shadow-[0_14px_44px_-10px_rgba(251,191,36,.6)] transition-all active:scale-95 cursor-pointer border-0"
+              >
+                <svg viewBox="0 0 24 24" className="w-6 h-6 stroke-teal-950 fill-none" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 19h16" /></svg>
+                {installing ? 'Installing…' : 'Install the CIYA app'}
+              </button>
+            </span>
+          </div>
+        )}
       </div>
     </section>
   );
