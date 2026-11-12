@@ -86,6 +86,13 @@ export default function CoursesAdmin() {
           if (!c.id) continue;
           // An express clone of this course holds the student's progress instead
           const expressClone = all.find((x) => x.clonedFromId === c.id && x.isCloned && x.durationMode === 'express');
+          // Freshly registered students haven't unlocked yet: match them on the
+          // pathway they picked at registration until they have progress.
+          const title = (c.title || '').toLowerCase().trim();
+          const matchesPath = (u: any) => {
+            const hay = `${String(u.recommendedPath || '')} ${String(u.courseType || '')} ${String(u.pathwaySelection || '')}`.toLowerCase();
+            return !!title && hay.includes(title);
+          };
           byCourse[c.id] = users.filter((u: any) => {
             if (String(u.cohort || '') !== activeCohort) return false;
             const p: any = u.progress || {};
@@ -93,7 +100,8 @@ export default function CoursesAdmin() {
             return !!p[c.id]
               || !!(expressClone && p[expressClone.id])
               || reg.includes(c.id)
-              || !!(expressClone && reg.includes(expressClone.id));
+              || !!(expressClone && reg.includes(expressClone.id))
+              || matchesPath(u);
           });
         }
         setCohortStudents({ activeCohort, byCourse });
