@@ -189,7 +189,12 @@ async function sendLoginEmail(opts: {
   paid?: boolean;
   courseTitle?: string;
 }): Promise<{ queued: boolean; reason?: string }> {
-  const apiKey = process.env.ZEPTOMAIL_API_KEY || process.env.ZEPTO_API_KEY;
+  // Some Netlify env values are pasted with the "Zoho-enczapikey" prefix already
+  // included; the header adds its own, so strip any duplicate prefix first.
+  const apiKey = (process.env.ZEPTOMAIL_API_KEY || process.env.ZEPTO_API_KEY || "")
+    .trim()
+    .replace(/^Zoho-enczapikey\s*/i, "")
+    .trim();
   const templateKey = (opts.paid && process.env.ZEPTO_TEMPLATE_KEY_PAID) || process.env.ZEPTO_TEMPLATE_KEY;
   const fromAddress = process.env.ZEPTO_FROM_ADDRESS;
   const fromName = process.env.ZEPTO_FROM_NAME || "CIYA Academy";
