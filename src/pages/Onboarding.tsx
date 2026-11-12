@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef} from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import InstallGuide from '../components/InstallGuide';
 import { useNavigate } from 'react-router';
 import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { auth, db } from '../firebase';
@@ -1172,6 +1173,23 @@ export default function Onboarding() {
 function OnboardingComplete({ cohort, emailQueued, studentEmail }: { cohort: string; emailQueued: boolean; studentEmail: string }) {
   const [stage, setStage] = useState<'congrats' | 'check-email' | 'download'>('congrats');
 
+  if (stage === 'download') {
+    return (
+      <div className="min-h-screen bg-teal-950 px-4 py-8">
+        <div className="max-w-5xl mx-auto">
+          <button
+            type="button"
+            onClick={() => setStage('check-email')}
+            className="mb-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-teal-900/60 hover:bg-teal-800 border border-teal-700 text-teal-100 text-sm font-black cursor-pointer transition-all"
+          >
+            &larr; Back
+          </button>
+          <InstallGuide />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 p-8 text-center space-y-6">
@@ -1197,6 +1215,15 @@ function OnboardingComplete({ cohort, emailQueued, studentEmail }: { cohort: str
 
         {stage === 'check-email' && (
           <>
+            <div className="text-left -mt-2 -mb-4">
+              <button
+                type="button"
+                onClick={() => setStage('congrats')}
+                className="text-slate-400 hover:text-slate-700 text-xs font-black inline-flex items-center gap-1 cursor-pointer border-0 bg-transparent"
+              >
+                &larr; Back
+              </button>
+            </div>
             <div className="mx-auto w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-4xl shadow-md border border-amber-200">📧</div>
             <div className="space-y-2">
               <h1 className="text-2xl font-black text-slate-900">Check Your Email</h1>
@@ -1222,26 +1249,6 @@ function OnboardingComplete({ cohort, emailQueued, studentEmail }: { cohort: str
           </>
         )}
 
-        {stage === 'download' && (
-          <>
-            <div className="mx-auto w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-4xl shadow-md border border-indigo-200">📱</div>
-            <div className="space-y-2">
-              <h1 className="text-2xl font-black text-slate-900">Get the CIYA App</h1>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                Install the CIYA app on your phone, then log in with the details we emailed you.
-              </p>
-              <p className="text-slate-500 text-xs leading-relaxed">
-                Open the CIYA site in your phone browser and choose "Add to Home Screen" to install the app. All your learning happens inside the app.
-              </p>
-            </div>
-            <a
-              href="/?login=true"
-              className="block w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl transition-all active:scale-95"
-            >
-              Log in to the App
-            </a>
-          </>
-        )}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import InstallGuide from '../components/InstallGuide';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -368,16 +369,6 @@ export default function PaidEnroll() {
               We have your <span className="font-black text-white">{course.title}</span> payment proof. Once the admin confirms it, your login details and CIYA access code arrive by email at <span className="font-black text-white">{account?.email || form.email}</span>.
             </p>
 
-            <div className="bg-teal-950/60 border border-teal-800 rounded-2xl p-5 text-left space-y-3">
-              <p className="text-xs font-black uppercase tracking-wider text-amber-400">Step 1 · Download the app</p>
-              {isInstallable && !isInstalled && (
-                <button onClick={installApp} className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl transition-all active:scale-95">Download the CIYA App</button>
-              )}
-              <p className="text-teal-100 text-sm font-semibold leading-relaxed">
-                {isIOS ? 'On iPhone: open this site in Safari, tap the Share icon and choose "Add to Home Screen".' : 'Open the CIYA site in your phone browser, open the browser menu and choose "Add to Home Screen" or "Install app". All your learning happens inside the app.'}
-              </p>
-              {isInstalled && <p className="text-teal-300 text-xs font-bold">The CIYA app is installed on this device.</p>}
-            </div>
 
             <div className="bg-teal-950/60 border border-teal-800 rounded-2xl p-5 text-left space-y-3">
               <p className="text-xs font-black uppercase tracking-wider text-amber-400">Step 2 · Contact the admin</p>
@@ -387,6 +378,10 @@ export default function PaidEnroll() {
 
             <p className="text-teal-400 text-xs font-semibold"><button onClick={() => navigate('/')} className="underline cursor-pointer">Back to CIYA</button></p>
           </div>
+        )}
+
+        {stage === 'done' && course && (
+          <InstallGuide />
         )}
       </main>
       <footer className="border-t border-teal-900 py-6 text-center text-teal-400 text-xs shrink-0">© 2026 Create It Yourself Academy (CIYA). All rights reserved.</footer>
