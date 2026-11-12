@@ -7,12 +7,33 @@ import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Film, ArrowRight, Play, CheckCircle, Copy, Download, Upload } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
 import { publishCoursesToServer } from '../../utils/courseServer';
+import { collection, doc, getDocs, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Class", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
   film: { label: "AI Film Studio Class", icon: "🎬", color: "#7c3aed", bg: "#ede9fe" },
   image: { label: "AI Graphics & Image Class", icon: "🎨", color: "#d97706", bg: "#fef3c7" },
 };
+
+function relDate(v: any): string {
+  if (!v) return '-';
+  try {
+    const d = typeof v.toDate === 'function' ? v.toDate() : new Date(v);
+    if (isNaN(d.getTime())) return '-';
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 30) return `${days}d ago`;
+    return d.toLocaleDateString();
+  } catch {
+    return '-';
+  }
+}
 
 function formatFirestoreDate(timestamp: any): string {
   if (!timestamp) return '-';
@@ -45,6 +66,43 @@ function TierBadge({ tier, price }: { tier: string, price?: number }) {
 
 export default function CoursesAdmin() {
   const [courses, setCourses] = useState<Course[]>(() => coursesStore.getStandardCoursesOnly());
+  // Current-cohort students per beginner course, shown inline under each course row.
+  const [cohortStudents, setCohortStudents] = useState<{ activeCohort: string; byCourse: Record<string, any[]> } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [usersSnap, cohortsSnap] = await Promise.all([
+          getDocs(collection(db, 'users')),
+          getDoc(doc(db, 'settings', 'cohorts')),
+        ]);
+        if (!alive) return;
+        const users = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const activeCohort = cohortsSnap.exists() ? String((cohortsSnap.data() as any).activeCohort || 'Cohort 1') : 'Cohort 1';
+        const all = coursesStore.getCourses();
+        const byCourse: Record<string, any[]> = {};
+        for (const c of courses) {
+          if (!c.id) continue;
+          // An express clone of this course holds the student's progress instead
+          const expressClone = all.find((x) => x.clonedFromId === c.id && x.isCloned && x.durationMode === 'express');
+          byCourse[c.id] = users.filter((u: any) => {
+            if (String(u.cohort || '') !== activeCohort) return false;
+            const p: any = u.progress || {};
+            const reg: string[] = Array.isArray(u.registeredCourses) ? u.registeredCourses : [];
+            return !!p[c.id]
+              || !!(expressClone && p[expressClone.id])
+              || reg.includes(c.id)
+              || !!(expressClone && reg.includes(expressClone.id));
+          });
+        }
+        setCohortStudents({ activeCohort, byCourse });
+      } catch (e) {
+        console.error('cohort roster load failed:', e);
+      }
+    })();
+    return () => { alive = false; };
+  }, [courses]);
   const [cloudPublishStatus, setCloudPublishStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
@@ -409,8 +467,11 @@ export default function CoursesAdmin() {
                 const checks = c.days?.reduce((sum, d) => sum + (d.videos?.filter(v => v.checkType && v.checkType !== 'none').length || 0), 0) || 0;
                 const isPublished = c.status === 'published' || c.publish_status === 'Published';
                 
+                const roster = cohortStudents ? (cohortStudents.byCourse[c.id!] || []) : null;
+
                 return (
-                  <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
+                  <React.Fragment key={c.id}>
+                  <tr className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex gap-3.5 items-center">
                         <div className="w-10 h-10 rounded-xl bg-slate-50 border flex items-center justify-center text-xl shrink-0 shadow-inner">
@@ -517,6 +578,34 @@ export default function CoursesAdmin() {
                       </div>
                     </td>
                   </tr>
+                  {roster !== null && (
+                    <tr className="bg-slate-50/50">
+                      <td colSpan={5} className="px-5 py-3">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                          {cohortStudents.activeCohort} students &middot; {roster.length} enrolled
+                        </div>
+                        {roster.length === 0 ? (
+                          <div className="text-xs font-semibold text-slate-400 py-1">
+                            No {cohortStudents.activeCohort} students enrolled in this course yet.
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-1.5">
+                            {roster.map((u: any) => (
+                              <div key={u.id} className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs font-semibold text-slate-600 bg-white border border-slate-100 rounded-lg px-3 py-2">
+                                <span className="font-black text-slate-800">{u.fullName || u.displayName || 'Student'}</span>
+                                <span className="text-slate-500">{u.email || u.id}</span>
+                                {u.whatsapp ? <span className="text-slate-500">WhatsApp: {u.whatsapp}</span> : null}
+                                {u.gender ? <span className="text-slate-500">{u.gender}</span> : null}
+                                {u.ageRange ? <span className="text-slate-500">{u.ageRange}</span> : null}
+                                <span className="text-slate-400 text-[10px] font-bold ml-auto shrink-0">{relDate(u.createdAt)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
                 );
               })}
             </tbody>

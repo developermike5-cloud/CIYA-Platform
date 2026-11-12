@@ -752,11 +752,22 @@ export default function UsersAdmin() {
       if (userToDelete) {
         await rejectSubmissionMedia(userToDelete);
       }
+      // Server-side cleanup: assignments, notifications, access codes,
+      // leaderboard/presence records and the auth account itself.
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch('/.netlify/functions/student-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: userId, idToken }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(data?.error || `cleanup failed (${res.status})`);
       await deleteDoc(doc(db, 'users', userId));
       setUsers(prev => prev.filter(u => u.id !== userId));
       if (detailUserId === userId) setDetailUserId(null);
     } catch (error) {
       console.error("Error deleting user application:", error);
+      alert(`Could not fully delete this student. Nothing was removed.\n\n${(error as any)?.message || 'Unknown error'}`);
     } finally {
       setActionLoading(prev => ({ ...prev, [userId]: null }));
     }

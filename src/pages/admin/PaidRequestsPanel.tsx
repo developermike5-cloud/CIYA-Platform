@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { collection, doc, getDocs, query, serverTimestamp, updateDoc, where, arrayUnion } from 'firebase/firestore';
 import { coursesStore } from '../../utils/coursesStore';
 import { auth, db } from '../../firebase';
+import SlideOver from '../../components/admin/SlideOver';
 
 /** Pending paid-course payment requests, filtered to one course tier. */
 export default function PaidRequestsPanel({ tier = 'all' as 'all' | 'advanced' | 'masterclass' }) {
   const [rows, setRows] = useState<any[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [detail, setDetail] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const matchesTier = (r: any) => {
@@ -72,7 +74,9 @@ export default function PaidRequestsPanel({ tier = 'all' as 'all' | 'advanced' |
         {error && <p className="text-xs font-bold text-rose-600 mb-3">{error}</p>}
         <div className="space-y-3">
           {rows.map((r) => (
-            <div key={r.id} className="border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center gap-4">
+            <div key={r.id} className="border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center gap-4 cursor-pointer hover:border-amber-300 hover:bg-amber-50/40 transition-all"
+              onClick={() => setDetail(r)}
+              title="View full registration details">
               <div className="min-w-0 flex-1">
                 <div className="font-black text-slate-900 text-sm truncate">{r.fullName || r.displayName || 'Student'}</div>
                 <div className="text-xs text-slate-500 font-semibold truncate">{r.email || r.id}</div>
@@ -87,7 +91,7 @@ export default function PaidRequestsPanel({ tier = 'all' as 'all' | 'advanced' |
                   <img src={r.paidCourseRequest.screenshotUrl} alt="Payment screenshot" className="h-20 w-28 object-cover rounded-lg border border-slate-200" />
                 </a>
               )}
-              <div className="flex gap-2 shrink-0">
+              <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                 <button disabled={busy === r.id} onClick={() => act(r, 'Approved')}
                   className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-black cursor-pointer">
                   Approve &amp; Unlock
@@ -101,6 +105,80 @@ export default function PaidRequestsPanel({ tier = 'all' as 'all' | 'advanced' |
           ))}
         </div>
       </div>
+
+      <SlideOver
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail ? (detail.fullName || detail.displayName || 'Student') : ''}
+        subtitle={detail ? (detail.email || detail.id) : ''}
+        maxWidth="max-w-xl"
+      >
+        {detail && (
+          <div className="space-y-4 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ['Full name', detail.fullName || detail.displayName],
+                ['Email', detail.email],
+                ['WhatsApp', detail.whatsapp],
+                ['Cohort', detail.cohort],
+                ['Gender', detail.gender],
+                ['Age range', detail.ageRange],
+                ['Education level', detail.educationLevel || detail.education],
+                ['Learning tool', detail.learningTool],
+                ['State', detail.state],
+                ['Country', detail.country],
+                ['CIYA code', detail.ciyaCode || detail.accessCode],
+                ['Registered', detail.createdAt ? new Date((detail.createdAt as any).seconds ? (detail.createdAt as any).seconds * 1000 : (detail.createdAt as any)).toLocaleDateString() : null],
+              ].filter(([, v]) => v != null && v !== '').map(([label, value]) => (
+                <div key={label as string} className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                  <div className="text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</div>
+                  <div className="text-xs font-bold text-slate-800 break-words">{String(value)}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-1">
+              <div className="text-[9px] font-black uppercase tracking-widest text-amber-700">Payment request</div>
+              <div className="text-xs font-bold text-slate-800">
+                {detail.paidCourseRequest?.courseTitle || detail.paidCourseRequestedCourseId}
+                {detail.paidCourseRequest?.amount ? <span> &middot; ₦{Number(detail.paidCourseRequest.amount).toLocaleString()}</span> : null}
+              </div>
+              <div className="text-[11px] font-semibold text-slate-600">
+                Status: {detail.paidCourseRequestStatus || detail.paidCourseRequest?.status || 'PendingApproval'}
+                {detail.paidCourseRequestDate ? ` · Submitted ${new Date((detail.paidCourseRequestDate as any).seconds ? (detail.paidCourseRequestDate as any).seconds * 1000 : Date.now()).toLocaleDateString()}` : ''}
+              </div>
+            </div>
+
+            {detail.paidCourseRequest?.screenshotUrl && (
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Payment screenshot</div>
+                <a href={detail.paidCourseRequest.screenshotUrl} target="_blank" rel="noreferrer">
+                  <img src={detail.paidCourseRequest.screenshotUrl} alt="Payment proof" className="w-full rounded-xl border border-slate-200" />
+                </a>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                disabled={busy === detail.id}
+                onClick={() => { act(detail, 'Approved'); setDetail(null); }}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-black cursor-pointer"
+              >
+                Approve &amp; Unlock
+              </button>
+              <button
+                type="button"
+                disabled={busy === detail.id}
+                onClick={() => { act(detail, 'Rejected'); setDetail(null); }}
+                className="flex-1 py-2.5 rounded-xl bg-rose-100 hover:bg-rose-200 disabled:opacity-50 text-rose-700 text-xs font-black cursor-pointer"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        )}
+      </SlideOver>
     </div>
   );
 }
