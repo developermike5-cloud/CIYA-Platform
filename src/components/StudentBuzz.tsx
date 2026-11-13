@@ -390,7 +390,7 @@ export default function StudentBuzz({
   };
 
   const handleDeleteMessage = async (messageId: string) => {
-    if (!activeGroupId || !window.confirm('Delete this message?')) return;
+    if (!activeGroupId) return;
     try {
       await deleteBuzzMessage(activeGroupId, messageId);
     } catch (e) {

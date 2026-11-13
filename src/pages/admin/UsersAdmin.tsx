@@ -7,6 +7,7 @@ import BrandingLogo from '../../components/BrandingLogo';
 import CustomDropdown from '../../components/CustomDropdown';
 import { getStudentAccessCode } from '../../utils/courseServer';
 import RowActionsDropdown, { actionIcons } from '../../components/admin/RowActionsDropdown';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import SlideOver from '../../components/admin/SlideOver';
 import { Course } from '../../types';
 import { supabase, getStoragePublicUrl } from '../../lib/supabase';
@@ -139,6 +140,7 @@ export default function UsersAdmin() {
   const [filterCohort, setFilterCohort] = useState('All');
   // Beginner / Advanced / Masterclass view switch for the Students & Stats section.
   const [tierFilter, setTierFilter] = useState<'beginner' | 'advanced' | 'masterclass'>('beginner');
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<{ id: string; name: string } | null>(null);
   const [filterAgeRange, setFilterAgeRange] = useState('');
   const [filterEducationLevel, setFilterEducationLevel] = useState('');
   const [filterLearningTool, setFilterLearningTool] = useState('');
@@ -1010,23 +1012,35 @@ export default function UsersAdmin() {
   const courseTierMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const c of coursesStore.getCourses() as any[]) {
-      const id = c?.id;
-      if (!id) continue;
       const t = String(c.tier || c.level || '').toLowerCase();
-      map[id] = /masterclass/.test(t) ? 'masterclass' : /advanced/.test(t) ? 'advanced' : 'beginner';
+      const tier = /masterclass/.test(t) ? 'masterclass' : /advanced/.test(t) ? 'advanced' : 'beginner';
+      if (c?.id) map[String(c.id)] = tier;
+      if (c?.title) map[String(c.title).trim().toLowerCase()] = tier;
     }
     return map;
   }, [users]);
 
+  const tierOfKey = (key: any) => courseTierMap[String(key ?? '')] || courseTierMap[String(key ?? '').trim().toLowerCase()];
+
   const tieredUsers = useMemo(() => {
     return users.filter((u: any) => {
       const paidReqId = u.paidCourseRequestedCourseId || u.paidCourseRequest?.courseId;
-      if (paidReqId && courseTierMap[paidReqId] && courseTierMap[paidReqId] !== 'beginner') return courseTierMap[paidReqId] === tierFilter;
+      if (paidReqId) {
+        const t = tierOfKey(paidReqId);
+        if (t && t !== 'beginner') return t === tierFilter;
+      }
       const regs: string[] = Array.isArray(u.registeredCourses) ? u.registeredCourses : [];
       let tier = '';
       for (const id of regs) {
-        const t = courseTierMap[id];
+        const t = tierOfKey(id);
         if (t === 'advanced' || t === 'masterclass') { tier = t; break; }
+      }
+      // Students who entered a paid course with a passcode carry it in progress.
+      if (!tier && u.progress && typeof u.progress === 'object') {
+        for (const k of Object.keys(u.progress)) {
+          const t = tierOfKey(k);
+          if (t === 'advanced' || t === 'masterclass') { tier = t; break; }
+        }
       }
       if (!tier && u.advancedAllAccess) tier = 'advanced';
       return (tier || 'beginner') === tierFilter;
@@ -1136,12 +1150,26 @@ export default function UsersAdmin() {
   }, [cohortFilteredUsers, searchTerm, filterState, filterCourse, filterStatus, filterApproval, filterGender, sortDate, filterStartDate, filterEndDate, filterAgeRange, filterEducationLevel, filterLearningTool]);
 
   const renderUserDetailsBody = (u: any) => {
-    const row = (label: string, value: React.ReactNode) => (
-      <div key={label} className="flex items-start justify-between gap-3 py-1.5">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide shrink-0">{label}</span>
-        <span className="text-xs font-bold text-slate-800 text-right break-words">{value || '-'}</span>
-      </div>
-    );
+    // A student who never took a beginner course sees strictly their signup
+    // answers and paid-course details: no beginner sections, no dash rows.
+    const hasBeginnerHistory = (() => {
+      const regs: string[] = Array.isArray(u.registeredCourses) ? u.registeredCourses : [];
+      for (const id of regs) { const t = tierOfKey(id); if (t === 'beginner') return true; }
+      if (u.progress && typeof u.progress === 'object') {
+        for (const k of Object.keys(u.progress)) { const t = tierOfKey(k); if (t === 'beginner') return true; }
+      }
+      return false;
+    })();
+    const paidOnly = !hasBeginnerHistory;
+    const row = (label: string, value: React.ReactNode) => {
+      if (paidOnly && (value === null || value === undefined || value === '')) return null;
+      return (
+        <div key={label} className="flex items-start justify-between gap-3 py-1.5">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide shrink-0">{label}</span>
+          <span className="text-xs font-bold text-slate-800 text-right break-words">{value || '-'}</span>
+        </div>
+      );
+    };
     const section = (title: string, children: React.ReactNode) => (
       <div key={title} className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">{title}</div>
@@ -1235,7 +1263,7 @@ export default function UsersAdmin() {
                   : 'Not issued yet';
               })())}
             </div>
-            <div className="mt-3">
+            {!paidOnly && (<div className="mt-3">
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cohort placement</div>
               <CustomDropdown
                                       value={u.cohort || 'Cohort 1'}
@@ -1261,7 +1289,7 @@ export default function UsersAdmin() {
                                       className="w-full"
                                       theme="light"
                                     />
-            </div>
+            </div>)}
             <div className="mt-3 flex items-center justify-between text-xs pt-2 border-t border-slate-100">
               <span className="text-slate-500 font-semibold">Role:</span>
               <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -2297,11 +2325,7 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                   danger: true,
                                   title: 'Delete student record',
                                   disabled: actionLoading[u.id] !== undefined && actionLoading[u.id] !== null,
-                                  onClick: () => {
-                                    if (window.confirm(`Delete ${(u.fullName || u.email || 'this student')}\'s record permanently? This cannot be undone.`)) {
-                                      performDelete(u.id);
-                                    }
-                                  },
+                                  onClick: () => setPendingDeleteUser({ id: u.id, name: u.fullName || u.email || 'this student' }),
                                 },
                               ]}
                             />
@@ -2349,6 +2373,19 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
           </SlideOver>
         );
       })()}
+
+      <ConfirmDialog
+        open={!!pendingDeleteUser}
+        title="Delete student record"
+        message={`Delete ${pendingDeleteUser?.name || 'this student'}'s record permanently? This cannot be undone.`}
+        confirmLabel="Yes, Delete Permanently"
+        onConfirm={() => {
+          const t = pendingDeleteUser;
+          setPendingDeleteUser(null);
+          if (t) performDelete(t.id);
+        }}
+        onCancel={() => setPendingDeleteUser(null)}
+      />
     </div>
   );
 }

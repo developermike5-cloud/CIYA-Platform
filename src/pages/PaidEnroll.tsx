@@ -8,6 +8,7 @@ import { Course } from '../types';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { auth, db } from '../firebase';
 import { NIGERIAN_STATES } from '../utils/nigerianStates';
+import CustomDropdown from '../components/CustomDropdown';
 import { safeStorage } from '../utils/safeStorage';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
@@ -97,7 +98,6 @@ export default function PaidEnroll() {
   const [copied, setCopied] = useState(false);
   const { isInstallable, isInstalled, isIOS, installApp } = usePWAInstall();
   const draftLoadedRef = useRef(false);
-  const finishedRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -108,6 +108,11 @@ export default function PaidEnroll() {
         const raw = safeStorage.getItem(DRAFT_KEY);
         if (raw) {
           const d = JSON.parse(raw);
+          if (d?.savedAt && Date.now() - Number(d.savedAt) > 7 * 24 * 60 * 60 * 1000) {
+            safeStorage.removeItem(DRAFT_KEY);
+            draftLoadedRef.current = true;
+            return;
+          }
           const savedStage: Stage = d?.stage;
           const savedCourse = d?.courseTitle
             ? all.find((c) => (c.title || '').trim().toLowerCase() === String(d.courseTitle).trim().toLowerCase())
@@ -119,7 +124,7 @@ export default function PaidEnroll() {
           if (d?.account && d.account.uid) {
             setAccount({ uid: String(d.account.uid), email: d.account.email ? String(d.account.email).toLowerCase() : (d.form?.email ? String(d.form.email).toLowerCase() : undefined), tempPassword: d.account.tempPassword ? String(d.account.tempPassword) : undefined, ciyaCode: d.account.ciyaCode ? String(d.account.ciyaCode) : undefined, emailQueued: !!d.account.emailQueued });
           }
-          if (savedStage && ['preview', 'details', 'payment'].includes(savedStage) && (savedCourse || courseParam)) {
+          if (savedStage && ['preview', 'details', 'payment', 'install'].includes(savedStage) && (savedCourse || courseParam)) {
             setStage(savedCourse ? savedStage : (savedStage === 'details' || savedStage === 'payment' ? 'details' : 'preview'));
           } else if (savedCourse && !courseParam) {
             setStage('preview');
@@ -139,7 +144,7 @@ export default function PaidEnroll() {
   }, [courseParam]);
 
   useEffect(() => {
-    if (!draftLoadedRef.current || finishedRef.current || stage === 'install') return;
+    if (!draftLoadedRef.current) return;
     try {
       safeStorage.setItem(DRAFT_KEY, JSON.stringify({ stage, courseTitle: course?.title || '', form, account, savedAt: Date.now() }));
     } catch (e) { /* storage unavailable */ }
@@ -156,13 +161,9 @@ export default function PaidEnroll() {
     }).catch(() => {});
   }, []);
 
-  // Leave the flow done: drop the saved draft.
-  useEffect(() => {
-    if (stage === 'install') {
-      finishedRef.current = true;
-      try { safeStorage.removeItem(DRAFT_KEY); } catch (e) { /* noop */ }
-    }
-  }, [stage]);
+  // The install stage is a resting point: the draft stays so a refresh
+  // (or a lost student) lands right back on the install guide. Stale
+  // drafts expire after 7 days on the next visit.
 
   const price = useMemo(() => (course ? `₦${Number(course.price).toLocaleString()}` : ''), [course]);
   const waMsg = encodeURIComponent(`Hello CIYA Admin, I just enrolled for ${course?.title || 'a paid course'} (${price}) and uploaded my payment proof. Please confirm my payment. My email: ${account?.email || form.email}`);
@@ -314,15 +315,20 @@ export default function PaidEnroll() {
             <input type="email" placeholder="Email address *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
             <input type="tel" inputMode="numeric" maxLength={11} placeholder="WhatsApp number *" value={form.whatsapp}
               onChange={(e) => setForm({ ...form, whatsapp: e.target.value.replace(/\D/g, '').slice(0, 11) })} className={input} />
-            <select value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className={input + ' cursor-pointer'}>
-              <option value="">Select State *</option>
-              {NIGERIAN_STATES.map((s) => <option key={s} value={s} className="bg-teal-950 text-teal-50">{s}</option>)}
-            </select>
-            <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className={input + ' cursor-pointer'}>
-              <option value="">Gender</option>
-              <option value="Male" className="bg-teal-950 text-teal-50">Male</option>
-              <option value="Female" className="bg-teal-950 text-teal-50">Female</option>
-            </select>
+            <CustomDropdown
+              value={form.state}
+              onChange={(val) => setForm({ ...form, state: val })}
+              options={[{ label: 'Select State *', value: '' }, ...NIGERIAN_STATES.map((s) => ({ label: s, value: s }))]}
+              className="w-full"
+              theme="dark"
+            />
+            <CustomDropdown
+              value={form.gender}
+              onChange={(val) => setForm({ ...form, gender: val })}
+              options={[{ label: 'Gender', value: '' }, { label: 'Male', value: 'Male' }, { label: 'Female', value: 'Female' }]}
+              className="w-full"
+              theme="dark"
+            />
             {error && <p className="text-xs font-bold text-rose-400">{error}</p>}
             <button type="submit" disabled={busy} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-teal-950 text-sm font-black transition-all cursor-pointer">
               {busy ? 'Creating your account...' : account && (!account.email || account.email === form.email.trim().toLowerCase()) ? 'Continue to Payment' : 'Create Account & Continue to Payment'}
