@@ -227,7 +227,7 @@ export const handler = async (event: any) => {
     if (!userDoc) return json(404, { error: "student-not-found" });
     const toEmail = str(userDoc, "email");
     const fullName = str(userDoc, "fullName") || (toEmail.split("@")[0] || "CIYA Student");
-    const cohort = str(userDoc, "cohort") || "Cohort 1";
+    const cohort = str(userDoc, "cohort");
     const pr = userDoc?.paidCourseRequest?.mapValue?.fields || {};
     const courseTitle = str(pr, "courseTitle");
 

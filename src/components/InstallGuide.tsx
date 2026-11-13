@@ -99,7 +99,7 @@ function SheetRow({ label, icon, hl }: { label: string; icon: React.ReactNode; h
   );
 }
 
-export default function InstallGuide() {
+export default function InstallGuide({ paid, whatsappHref }: { paid?: boolean; whatsappHref?: string } = {}) {
   const { isInstallable, isInstalled, isIOS, installApp } = usePWAInstall();
   const [guide, setGuide] = useState<GuideKey>(() =>
     typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(window.navigator.userAgent || '') ? 'ios' : 'android'
@@ -110,6 +110,32 @@ export default function InstallGuide() {
   const [reduce] = useState(() => typeof window !== 'undefined' && !!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [playing, setPlaying] = useState(!reduce);
   const [installing, setInstalling] = useState(false);
+  // The Android install button becomes a Login button once the app is on the phone.
+  const [appOnPhone, setAppOnPhone] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('ciya_pwa_installed') === '1') setAppOnPhone(true);
+    } catch { /* storage unavailable */ }
+    const standalone = typeof window !== 'undefined' && (
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      (window.navigator as any).standalone === true
+    );
+    if (standalone) setAppOnPhone(true);
+    const nav: any = typeof navigator !== 'undefined' ? navigator : {};
+    if (typeof nav.getInstalledRelatedApps === 'function') {
+      nav.getInstalledRelatedApps().then((apps: any[]) => {
+        if (alive && Array.isArray(apps) && apps.length > 0) setAppOnPhone(true);
+      }).catch(() => { /* detection unsupported */ });
+    }
+    const onInstalled = () => {
+      try { localStorage.setItem('ciya_pwa_installed', '1'); } catch { /* ignore */ }
+      setAppOnPhone(true);
+    };
+    window.addEventListener('appinstalled', onInstalled);
+    return () => { alive = false; window.removeEventListener('appinstalled', onInstalled); };
+  }, []);
+
 
   const steps = GUIDES[guide].steps;
   const step = steps[idx];
@@ -145,7 +171,10 @@ export default function InstallGuide() {
     setInstalling(true);
     try {
       const ok = await installApp();
-      if (ok) show(3); // jump to "Tap the CIYA icon / sign in"
+      if (ok) {
+        try { localStorage.setItem('ciya_pwa_installed', '1'); } catch { /* ignore */ }
+        show(3); // jump to "Tap the CIYA icon / sign in"
+      }
     } finally {
       setInstalling(false);
     }
@@ -403,7 +432,19 @@ export default function InstallGuide() {
 
         <p className="mt-[18px] px-4 py-3.5 rounded-[18px] border border-dashed border-teal-700 text-teal-200 text-[0.92rem]">{GUIDES[guide].note}</p>
 
-        {guide === 'android' && isInstallable && (
+        {guide === 'android' && appOnPhone && (
+          <div className="mt-8 flex justify-center">
+            <a
+              href="/?login=true"
+              aria-label="Log in to the CIYA app"
+              className="inline-flex items-center gap-3 px-10 md:px-14 py-4 md:py-5 rounded-full bg-amber-400 hover:bg-amber-300 text-teal-950 font-black text-lg md:text-xl shadow-[0_14px_44px_-10px_rgba(251,191,36,.6)] transition-all active:scale-95"
+            >
+              Log in to the App
+            </a>
+          </div>
+        )}
+
+        {guide === 'android' && !appOnPhone && isInstallable && (
           <div className="mt-8 flex justify-center">
             <span className="ig-cta-wrap relative inline-flex">
               <button
@@ -417,6 +458,28 @@ export default function InstallGuide() {
                 {installing ? 'Installing…' : 'Install the CIYA app'}
               </button>
             </span>
+          </div>
+        )}
+
+        {paid && (
+          <div className="mt-7 mx-auto max-w-xl text-center space-y-4">
+            <p className="text-teal-200 text-sm md:text-base font-semibold leading-relaxed">
+              {guide === 'android' && appOnPhone
+                ? 'Log in with your login details, which you will receive within 10 minutes after your payment is confirmed. If you do not receive them, contact the admin below.'
+                : guide === 'android'
+                  ? 'After installing the app, you will receive your login details within 10 minutes after your payment is confirmed. If you do not receive them, contact the admin below.'
+                  : 'After installing the app, log in with your login details, which you will receive within 10 minutes after your payment is confirmed. If you do not receive them, contact the admin below.'}
+            </p>
+            {whatsappHref && (
+              <a
+                href={whatsappHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#25D366] hover:brightness-110 text-white text-sm font-black transition-all active:scale-95"
+              >
+                💬 Contact the Admin on WhatsApp
+              </a>
+            )}
           </div>
         )}
       </div>

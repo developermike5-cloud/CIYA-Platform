@@ -298,6 +298,7 @@ export const handler = async (event: any) => {
     const userCode = String(uid).slice(0, 6).toUpperCase();
     const ciyaCode = `CIYA-${randomFrom(CODE_ALPHABET, 4)}-${randomFrom(CODE_ALPHABET, 4)}`;
     const recommendedPath = String(body.recommendedPath || "").trim();
+    const paidCourseTitle = String(body?.courseTitle || "").trim();
     const referralCode = String(body.referralCode || "").trim().toUpperCase();
 
     // 5. Save the registration profile (login email marked pending until the
@@ -310,7 +311,7 @@ export const handler = async (event: any) => {
       pathwaySelection: S(body.pathwaySelection),
       pathwayReason: S(body.pathwayReason),
       pathwayExperience: S(body.pathwayExperience),
-      recommendedPath: S(recommendedPath),
+      recommendedPath: S(body?.paid === true ? paidCourseTitle : recommendedPath),
       goal: S(body.goal),
       availability: S(body.availability),
       learningTool: S(body.learningTool),
@@ -328,7 +329,7 @@ export const handler = async (event: any) => {
       approvalStatus: S(finalApprovalStatus),
       adminCode: S(generatedAdminCode),
       isDashboardUnlocked: B(finalDashboardUnlocked),
-      cohort: S(activeCohort),
+      cohort: S(body?.paid === true ? "" : activeCohort),
       onboardingStatus: S("registered"),
       passwordChangeRequired: B(true),
       tempPasswordActive: B(true),

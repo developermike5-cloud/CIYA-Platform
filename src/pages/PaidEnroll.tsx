@@ -18,9 +18,9 @@ const BANK_DEFAULTS = {
   bankName: 'United Bank for Africa (UBA)',
 };
 
-type Stage = 'pick' | 'preview' | 'details' | 'payment' | 'done';
-const STAGE_ORDER: Stage[] = ['preview', 'details', 'payment', 'done'];
-const STAGE_LABELS: Partial<Record<Stage, string>> = { preview: 'Preview', details: 'Details', payment: 'Payment', done: 'Done' };
+type Stage = 'pick' | 'preview' | 'details' | 'payment' | 'install';
+const STAGE_ORDER: Stage[] = ['preview', 'details', 'payment', 'install'];
+const STAGE_LABELS: Partial<Record<Stage, string>> = { preview: 'Preview', details: 'Details', payment: 'Payment', install: 'Install App' };
 const DRAFT_KEY = 'ciya_paid_enroll_draft';
 
 /** Admin WhatsApp number students message for payment confirmation. */
@@ -79,6 +79,13 @@ export default function PaidEnroll() {
   const [params] = useSearchParams();
   const courseParam = params.get('course') || '';
   const [stage, setStage] = useState<Stage>(courseParam ? 'preview' : 'pick');
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 6000);
+  };
   const [paidCourses, setPaidCourses] = useState<Course[]>([]);
   const [course, setCourse] = useState<Course | null>(null);
   const [bank, setBank] = useState(BANK_DEFAULTS);
@@ -132,7 +139,7 @@ export default function PaidEnroll() {
   }, [courseParam]);
 
   useEffect(() => {
-    if (!draftLoadedRef.current || finishedRef.current || stage === 'done') return;
+    if (!draftLoadedRef.current || finishedRef.current || stage === 'install') return;
     try {
       safeStorage.setItem(DRAFT_KEY, JSON.stringify({ stage, courseTitle: course?.title || '', form, account, savedAt: Date.now() }));
     } catch (e) { /* storage unavailable */ }
@@ -151,7 +158,7 @@ export default function PaidEnroll() {
 
   // Leave the flow done: drop the saved draft.
   useEffect(() => {
-    if (stage === 'done') {
+    if (stage === 'install') {
       finishedRef.current = true;
       try { safeStorage.removeItem(DRAFT_KEY); } catch (e) { /* noop */ }
     }
@@ -235,7 +242,8 @@ export default function PaidEnroll() {
         paidCourseRequestDate: serverTimestamp(),
         paidCourseRequestedCourseId: course.id,
       }, { merge: true });
-      setStage('done');
+      showToast('Payment proof received. It will be confirmed shortly.');
+      setStage('install');
     } catch (err) {
       console.error('submitProof failed at', step, err);
       const detail = err instanceof Error ? err.message : '';
@@ -259,7 +267,7 @@ export default function PaidEnroll() {
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-10 space-y-6">
         <Link to="/" className="inline-flex items-center gap-2 text-teal-300 hover:text-teal-50 transition-colors text-sm font-semibold">← Back to CIYA</Link>
 
-        <Stepper stage={stage} onBack={stage === 'done' ? undefined : (s) => setStage(s)} />
+        <Stepper stage={stage} onBack={stage === 'install' ? undefined : (s) => setStage(s)} />
 
         {stage === 'pick' && (
           <div className={card + ' space-y-4'}>
@@ -357,32 +365,26 @@ export default function PaidEnroll() {
           </div>
         )}
 
-        {stage === 'done' && course && (
-          <div className={card + ' space-y-5 text-center'}>
-            <div className="mx-auto w-20 h-20 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center text-4xl shadow-md border border-amber-500/20">⏳</div>
-            <div className="mx-auto inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="text-amber-300 text-xs font-black uppercase tracking-widest">Pending approval</span>
-            </div>
-            <h1 className="text-2xl font-black text-white">Payment Proof Received</h1>
-            <p className="text-teal-100 text-sm font-semibold leading-relaxed">
-              We have your <span className="font-black text-white">{course.title}</span> payment proof. Once the admin confirms it, your login details and CIYA access code arrive by email at <span className="font-black text-white">{account?.email || form.email}</span>.
-            </p>
+        {stage === 'install' && course && (
+          <InstallGuide
+            paid
+            whatsappHref={`https://wa.me/${ADMIN_WHATSAPP}?text=${waMsg}`}
+          />
+        )}
 
+        {stage === 'install' && (
+          <p className="text-teal-400 text-xs font-semibold text-center">
+            <button onClick={() => navigate('/')} className="underline cursor-pointer">Back to CIYA</button>
+          </p>
+        )}
 
-            <div className="bg-teal-950/60 border border-teal-800 rounded-2xl p-5 text-left space-y-3">
-              <p className="text-xs font-black uppercase tracking-wider text-amber-400">Step 2 · Contact the admin</p>
-              <p className="text-teal-100 text-sm font-semibold leading-relaxed">Message the admin on WhatsApp to request confirmation of your payment. Attach your transfer receipt in the chat to make approval faster.</p>
-              <a href={`https://wa.me/${ADMIN_WHATSAPP}?text=${waMsg}`} target="_blank" rel="noreferrer" className="block w-full py-3.5 bg-[#25D366] hover:brightness-110 text-white font-black rounded-2xl transition-all active:scale-95">💬 Message the Admin on WhatsApp</a>
-            </div>
-
-            <p className="text-teal-400 text-xs font-semibold"><button onClick={() => navigate('/')} className="underline cursor-pointer">Back to CIYA</button></p>
+        {toast && (
+          <div role="status" className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-fit max-w-[92vw] px-5 py-3.5 rounded-2xl bg-teal-900 border border-amber-500/50 shadow-2xl flex items-start gap-3">
+            <span aria-hidden="true" className="text-amber-400 leading-none mt-0.5">✓</span>
+            <p className="text-teal-50 text-sm font-bold">{toast}</p>
           </div>
         )}
 
-        {stage === 'done' && course && (
-          <InstallGuide />
-        )}
       </main>
       <footer className="border-t border-teal-900 py-6 text-center text-teal-400 text-xs shrink-0">© 2026 Create It Yourself Academy (CIYA). All rights reserved.</footer>
     </div>

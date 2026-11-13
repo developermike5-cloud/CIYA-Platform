@@ -137,6 +137,8 @@ export default function UsersAdmin() {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterCohort, setFilterCohort] = useState('All');
+  // Beginner / Advanced / Masterclass view switch for the Students & Stats section.
+  const [tierFilter, setTierFilter] = useState<'beginner' | 'advanced' | 'masterclass'>('beginner');
   const [filterAgeRange, setFilterAgeRange] = useState('');
   const [filterEducationLevel, setFilterEducationLevel] = useState('');
   const [filterLearningTool, setFilterLearningTool] = useState('');
@@ -1002,9 +1004,40 @@ export default function UsersAdmin() {
     return [...fromSettings].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   }, [cohortsConfig.cohortsList]);
 
+  // Which course tier a student belongs to: paid requests and registered paid
+  // courses place a student under Advanced or Masterclass; everyone else is a
+  // Beginner registration.
+  const courseTierMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of coursesStore.getCourses() as any[]) {
+      const id = c?.id;
+      if (!id) continue;
+      const t = String(c.tier || c.level || '').toLowerCase();
+      map[id] = /masterclass/.test(t) ? 'masterclass' : /advanced/.test(t) ? 'advanced' : 'beginner';
+    }
+    return map;
+  }, [users]);
+
+  const tieredUsers = useMemo(() => {
+    return users.filter((u: any) => {
+      const paidReqId = u.paidCourseRequestedCourseId || u.paidCourseRequest?.courseId;
+      if (paidReqId && courseTierMap[paidReqId] && courseTierMap[paidReqId] !== 'beginner') return courseTierMap[paidReqId] === tierFilter;
+      const regs: string[] = Array.isArray(u.registeredCourses) ? u.registeredCourses : [];
+      let tier = '';
+      for (const id of regs) {
+        const t = courseTierMap[id];
+        if (t === 'advanced' || t === 'masterclass') { tier = t; break; }
+      }
+      if (!tier && u.advancedAllAccess) tier = 'advanced';
+      return (tier || 'beginner') === tierFilter;
+    });
+  }, [users, tierFilter, courseTierMap]);
+
   const cohortFilteredUsers = useMemo(() => {
-    return users.filter(u => {
-      const uCohort = u.cohort || 'Cohort 1';
+    // Advanced / Masterclass views show their own students only, with no cohort machinery.
+    if (tierFilter !== 'beginner') return tieredUsers;
+    return tieredUsers.filter(u => {
+      const uCohort = u.cohort || '';
       
       let matchesCohort = false;
       if (filterCohort === 'All') {
@@ -1020,7 +1053,7 @@ export default function UsersAdmin() {
       
       return matchesCohort;
     });
-  }, [users, filterCohort]);
+  }, [tieredUsers, filterCohort, tierFilter]);
 
   const filteredUsers = useMemo(() => {
     let result = cohortFilteredUsers.filter(u => {
@@ -1725,6 +1758,8 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
         </div>
       )}
 
+      {tierFilter === 'beginner' && (
+      <>
       {/* Cohort Management Dashboard */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -1832,10 +1867,25 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
         </div>
       </div>
 
+      </>
+      )}
+
       <div className="flex flex-col mb-6 gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold text-slate-800">Students & Onboarding Stats</h1>
+            <div className="flex gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200" role="tablist" aria-label="Course tier">
+              {([['beginner', 'Beginner'], ['advanced', 'Advanced'], ['masterclass', 'Masterclass']] as const).map(([t, label]) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => { setTierFilter(t); if (t !== 'beginner') setFilterCohort('All'); }}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all duration-150 border-0 cursor-pointer ${tierFilter === t ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => fetchUsers(filterCohort, true)}
               disabled={isRefreshing}
@@ -1865,19 +1915,21 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
           </div>
           
           {/* Cohort filter */}
-          <CustomDropdown
-            value={filterCohort}
-            onChange={(val) => setFilterCohort(val)}
-            options={[
-              { label: "All Cohorts (Aggregated)", value: "All" },
-              ...allAvailableCohorts.map(cohort => ({
-                label: `${cohort} ${cohortsConfig.activeCohort === cohort ? "(Active)" : ""}`,
-                value: cohort
-              }))
-            ]}
-            className="min-w-[180px]"
-            theme="indigo"
-          />
+          {tierFilter === 'beginner' && (
+            <CustomDropdown
+              value={filterCohort}
+              onChange={(val) => setFilterCohort(val)}
+              options={[
+                { label: "All Cohorts (Aggregated)", value: "All" },
+                ...allAvailableCohorts.map(cohort => ({
+                  label: `${cohort} ${cohortsConfig.activeCohort === cohort ? "(Active)" : ""}`,
+                  value: cohort
+                }))
+              ]}
+              className="min-w-[180px]"
+              theme="indigo"
+            />
+          )}
 
           <CustomDropdown
             value={sortDate}
@@ -1960,19 +2012,21 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
             theme="light"
           />
 
-          <CustomDropdown
-            value={filterCourse}
-            onChange={(val) => setFilterCourse(val)}
-            options={[
-              { label: "All Path Options", value: "" },
-              ...uniqueCourses.map(c => ({
-                label: c,
-                value: c
-              }))
-            ]}
-            className="min-w-[180px]"
-            theme="light"
-          />
+          {tierFilter === 'beginner' && (
+                    <CustomDropdown
+              value={filterCourse}
+              onChange={(val) => setFilterCourse(val)}
+              options={[
+                { label: "All Path Options", value: "" },
+                ...uniqueCourses.map(c => ({
+                  label: c,
+                  value: c
+                }))
+              ]}
+              className="min-w-[180px]"
+              theme="light"
+            />
+          )}
 
           <CustomDropdown
             value={filterState}
