@@ -18,6 +18,7 @@ import CoursesSection from './home/CoursesSection';
 import PaidCourses from './home/PaidCourses';
 import EarningsCalculator from './home/EarningsCalculator';
 import HowItWorks from './home/HowItWorks';
+import EmailTestTrigger from './home/EmailTestTrigger';
 import WhyCiya from './home/WhyCiya';
 import FaqSection from './home/FaqSection';
 import ClosingCta from './home/ClosingCta';
@@ -312,6 +313,7 @@ export default function Home() {
         <WhyCiya />
         <FaqSection />
         <ClosingCta />
+        <EmailTestTrigger />
       </main>
       <Footer />
 
