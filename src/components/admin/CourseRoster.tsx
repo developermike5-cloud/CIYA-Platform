@@ -102,9 +102,33 @@ export default function CourseRoster({
           // course they registered for in recommendedPath instead, so count
           // them too and show them as not active until they change their
           // temporary password.
-          const recPath = String((u as any).recommendedPath || '').trim().toLowerCase();
-          const inRegPath = (!!courseTitleLower && recPath === courseTitleLower)
-            || (!!expressCloneTitleLower && recPath === expressCloneTitleLower);
+          // Pathway names from the questionnaire (e.g. "Professional Store
+          // Builder") are not course titles, so match the course category the
+          // same way the admin Students page does: portfolio / landing /
+          // e-commerce keywords on both sides.
+          const profilePath = [
+            (u as any).recommendedPath,
+            (u as any).courseType,
+            (u as any).pathwaySelection,
+          ].filter(Boolean).join(' ').toLowerCase();
+          const courseMeta = [
+            course?.title, course?.skillPath, course?.category,
+            expressClone?.title, expressClone?.skillPath, expressClone?.category,
+          ].filter(Boolean).join(' ').toLowerCase();
+          const isProfilePortfolio = profilePath.includes('portfolio');
+          const isProfileLanding = profilePath.includes('landing') || profilePath.includes('conversion') || profilePath.includes('funnel');
+          const isProfileEcommerce = profilePath.includes('e-commerce') || profilePath.includes('ecommerce') || profilePath.includes('store');
+          const isCoursePortfolio = courseMeta.includes('portfolio');
+          const isCourseLanding = courseMeta.includes('landing') || courseMeta.includes('conversion');
+          const isCourseEcommerce = courseMeta.includes('e-commerce') || courseMeta.includes('ecommerce') || courseMeta.includes('store');
+          const categoryMatch = (isProfilePortfolio && isCoursePortfolio)
+            || (isProfileLanding && isCourseLanding)
+            || (isProfileEcommerce && isCourseEcommerce);
+          const exactMatch = !!profilePath.trim() && !!courseTitleLower
+            && (profilePath.includes(courseTitleLower) || courseTitleLower.includes(profilePath.trim()));
+          const inRegPath = categoryMatch || exactMatch
+            || (!!profilePath.trim() && !!expressCloneTitleLower
+              && (profilePath.includes(expressCloneTitleLower) || expressCloneTitleLower.includes(profilePath.trim())));
           if (!inMain && !inClone && !inReg && !inRegPath) continue;
 
           const cid = inMain ? courseId : (expressClone ? expressClone.id : courseId);

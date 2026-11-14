@@ -6,7 +6,6 @@ import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, T
 import { auth, db } from '../firebase';
 import { onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
-import LoginModal from '../components/LoginModal';
 import BrandingLogo from '../components/BrandingLogo';
 import CustomDropdown from '../components/CustomDropdown';
 import { safeStorage } from '../utils/safeStorage';
@@ -20,7 +19,6 @@ let globalOnboardingSignInActive = false;
 export default function Onboarding() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [pathway, setPathway] = useState<Pathway>(null);
   const [showCareWarningModal, setShowCareWarningModal] = useState(() => {
     try {
@@ -180,9 +178,6 @@ export default function Onboarding() {
     setStep(s => Math.max(1, s - 1));
   };
 
-  const handleDirectLogin = () => {
-    setIsLoginOpen(true);
-  };
 
   const selectData = (key: keyof typeof data, value: string | boolean) => {
     setData(prev => ({ ...prev, [key]: value }));
@@ -718,9 +713,6 @@ export default function Onboarding() {
                 >
                   Start My Journey <ArrowRight className="w-5 h-5" />
                 </button>
-                <button onClick={handleDirectLogin} className="text-slate-400 hover:text-teal-400 transition-colors text-xs font-bold underline bg-transparent border-0 cursor-pointer">
-                  Already registered? Login directly here
-                </button>
               </div>
             </motion.div>
           )}
@@ -1165,7 +1157,6 @@ export default function Onboarding() {
         </div>
       )}
 
-      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
     </div>
   );
 }
