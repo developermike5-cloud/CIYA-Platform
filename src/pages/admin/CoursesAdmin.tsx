@@ -89,10 +89,29 @@ export default function CoursesAdmin() {
           const expressClone = all.find((x) => x.clonedFromId === c.id && x.isCloned && x.durationMode === 'express');
           // Freshly registered students haven't unlocked yet: match them on the
           // pathway they picked at registration until they have progress.
+          // Pathway names from the questionnaire (e.g. "Professional Store
+          // Builder") are not course titles, so match the course category the
+          // same way the admin Students page does: portfolio / landing /
+          // e-commerce keywords on both sides.
           const title = (c.title || '').toLowerCase().trim();
+          const courseMeta = [
+            c.title, (c as any).skillPath, (c as any).category,
+            expressClone?.title, expressClone?.skillPath, expressClone?.category,
+          ].filter(Boolean).join(' ').toLowerCase();
+          const isCoursePortfolio = courseMeta.includes('portfolio');
+          const isCourseLanding = courseMeta.includes('landing') || courseMeta.includes('conversion');
+          const isCourseEcommerce = courseMeta.includes('e-commerce') || courseMeta.includes('ecommerce') || courseMeta.includes('store');
           const matchesPath = (u: any) => {
             const hay = `${String(u.recommendedPath || '')} ${String(u.courseType || '')} ${String(u.pathwaySelection || '')}`.toLowerCase();
-            return !!title && hay.includes(title);
+            const isProfilePortfolio = hay.includes('portfolio');
+            const isProfileLanding = hay.includes('landing') || hay.includes('conversion') || hay.includes('funnel');
+            const isProfileEcommerce = hay.includes('e-commerce') || hay.includes('ecommerce') || hay.includes('store');
+            const categoryMatch = (isProfilePortfolio && isCoursePortfolio)
+              || (isProfileLanding && isCourseLanding)
+              || (isProfileEcommerce && isCourseEcommerce);
+            const exactMatch = !!title && !!hay.trim()
+              && (hay.includes(title) || title.includes(hay.trim()));
+            return categoryMatch || exactMatch;
           };
           byCourse[c.id] = users.filter((u: any) => {
             if (String(u.cohort || '') !== activeCohort) return false;
