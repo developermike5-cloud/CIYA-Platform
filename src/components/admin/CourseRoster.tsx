@@ -126,7 +126,18 @@ export default function CourseRoster({
             || (isProfileEcommerce && isCourseEcommerce);
           const exactMatch = !!profilePath.trim() && !!courseTitleLower
             && (profilePath.includes(courseTitleLower) || courseTitleLower.includes(profilePath.trim()));
-          const inRegPath = categoryMatch || exactMatch
+          const catOf = (sv: string) =>
+            sv.includes('portfolio') ? 'portfolio'
+            : (sv.includes('landing') || sv.includes('conversion') || sv.includes('funnel')) ? 'landing'
+            : (sv.includes('e-commerce') || sv.includes('ecommerce') || sv.includes('store')) ? 'ecommerce'
+            : '';
+          // Same rule as the inline roster: the recommended path decides the ONE
+          // beginner course a fresh registrant belongs to; interest strings in
+          // courseType/pathwaySelection are a fallback, never a second course.
+          const primary = catOf(String((u as any).recommendedPath || '').toLowerCase());
+          const courseCat = isCoursePortfolio ? 'portfolio' : isCourseLanding ? 'landing' : isCourseEcommerce ? 'ecommerce' : '';
+          const pathMatch = primary && courseCat ? primary === courseCat : categoryMatch;
+          const inRegPath = pathMatch || exactMatch
             || (!!profilePath.trim() && !!expressCloneTitleLower
               && (profilePath.includes(expressCloneTitleLower) || expressCloneTitleLower.includes(profilePath.trim())));
           if (!inMain && !inClone && !inReg && !inRegPath) continue;

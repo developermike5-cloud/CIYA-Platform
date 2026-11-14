@@ -68,6 +68,7 @@ export default function CoursesAdmin() {
   const [courses, setCourses] = useState<Course[]>(() => coursesStore.getStandardCoursesOnly());
   // Current-cohort students per beginner course, shown inline under each course row.
   const [cohortStudents, setCohortStudents] = useState<{ activeCohort: string; regOpen: boolean; byCourse: Record<string, any[]> } | null>(null);
+  const [openRosters, setOpenRosters] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let alive = true;
@@ -101,16 +102,29 @@ export default function CoursesAdmin() {
           const isCoursePortfolio = courseMeta.includes('portfolio');
           const isCourseLanding = courseMeta.includes('landing') || courseMeta.includes('conversion');
           const isCourseEcommerce = courseMeta.includes('e-commerce') || courseMeta.includes('ecommerce') || courseMeta.includes('store');
+          const catOf = (sv: string) =>
+            sv.includes('portfolio') ? 'portfolio'
+            : (sv.includes('landing') || sv.includes('conversion') || sv.includes('funnel')) ? 'landing'
+            : (sv.includes('e-commerce') || sv.includes('ecommerce') || sv.includes('store')) ? 'ecommerce'
+            : '';
           const matchesPath = (u: any) => {
             const hay = `${String(u.recommendedPath || '')} ${String(u.courseType || '')} ${String(u.pathwaySelection || '')}`.toLowerCase();
+            const exactMatch = !!title && !!hay.trim()
+              && (hay.includes(title) || title.includes(hay.trim()));
+            // The recommended path is the student's ONE assigned beginner pathway.
+            // Interest strings in courseType/pathwaySelection (e.g. "AI Landing Page
+            // Creation" on a Store Builder profile) must not pull the student into a
+            // second course; they are only consulted when the recommended path names
+            // no category at all.
+            const primary = catOf(String(u.recommendedPath || '').toLowerCase());
+            const courseCat = isCoursePortfolio ? 'portfolio' : isCourseLanding ? 'landing' : isCourseEcommerce ? 'ecommerce' : '';
+            if (primary && courseCat) return primary === courseCat || exactMatch;
             const isProfilePortfolio = hay.includes('portfolio');
             const isProfileLanding = hay.includes('landing') || hay.includes('conversion') || hay.includes('funnel');
             const isProfileEcommerce = hay.includes('e-commerce') || hay.includes('ecommerce') || hay.includes('store');
             const categoryMatch = (isProfilePortfolio && isCoursePortfolio)
               || (isProfileLanding && isCourseLanding)
               || (isProfileEcommerce && isCourseEcommerce);
-            const exactMatch = !!title && !!hay.trim()
-              && (hay.includes(title) || title.includes(hay.trim()));
             return categoryMatch || exactMatch;
           };
           byCourse[c.id] = users.filter((u: any) => {
@@ -499,6 +513,7 @@ export default function CoursesAdmin() {
                 // once it is closed the list disappears here and stays reachable via Students & Stats
                 // and each course's Students button.
                 const roster = cohortStudents && cohortStudents.regOpen ? (cohortStudents.byCourse[c.id!] || []) : null;
+                const isRosterOpen = openRosters[c.id!] !== false;
 
                 return (
                   <React.Fragment key={c.id}>
@@ -612,15 +627,22 @@ export default function CoursesAdmin() {
                   {roster !== null && (
                     <tr className="bg-slate-50/50">
                       <td colSpan={5} className="px-5 py-3">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                          {cohortStudents.activeCohort} students &middot; {roster.length} enrolled
-                        </div>
-                        {roster.length === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setOpenRosters((prev) => ({ ...prev, [c.id!]: prev[c.id!] === false ? true : false }))}
+                          className="w-full flex items-center gap-2 text-left group"
+                        >
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-slate-600 transition-colors">
+                            {cohortStudents.activeCohort} students &middot; {roster.length} enrolled
+                          </span>
+                          <span className={`ml-auto text-slate-400 text-sm leading-none transition-transform ${isRosterOpen ? 'rotate-180' : ''}`}>&#9662;</span>
+                        </button>
+                        {!isRosterOpen ? null : roster.length === 0 ? (
                           <div className="text-xs font-semibold text-slate-400 py-1">
                             No {cohortStudents.activeCohort} students enrolled in this course yet.
                           </div>
                         ) : (
-                          <div className="flex flex-col gap-1.5">
+                          <div className="flex flex-col gap-1.5 mt-2">
                             {roster.map((u: any) => (
                               <div key={u.id} className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs font-semibold text-slate-600 bg-white border border-slate-100 rounded-lg px-3 py-2">
                                 <span className="font-black text-slate-800">{u.fullName || u.displayName || 'Student'}</span>
@@ -628,6 +650,14 @@ export default function CoursesAdmin() {
                                 {u.whatsapp ? <span className="text-slate-500">WhatsApp: {u.whatsapp}</span> : null}
                                 {u.gender ? <span className="text-slate-500">{u.gender}</span> : null}
                                 {u.ageRange ? <span className="text-slate-500">{u.ageRange}</span> : null}
+                                {(() => {
+                                  const stuActive = (u as any).tempPasswordActive !== true && (u as any).passwordChangeRequired !== true;
+                                  return (
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${stuActive ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                      {stuActive ? 'Active' : 'Not active'}
+                                    </span>
+                                  );
+                                })()}
                                 <span className="text-slate-400 text-[10px] font-bold ml-auto shrink-0">{relDate(u.createdAt)}</span>
                               </div>
                             ))}
