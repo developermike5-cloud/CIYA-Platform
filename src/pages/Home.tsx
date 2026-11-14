@@ -147,8 +147,8 @@ function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
               My Dashboard
             </Link>
           ) : (
-            <button onClick={onOpenLogin} className="px-5 py-2.5 bg-teal-900 border border-teal-800 hover:bg-teal-800 text-teal-50 font-bold rounded-full text-xs transition-all cursor-pointer">
-              Student Login
+            <button onClick={onOpenLogin} title="way" aria-label="way" className="px-2.5 py-1 text-[11px] font-bold text-teal-500/50 hover:text-teal-500 rounded-full transition-all cursor-pointer opacity-70 hover:opacity-100">
+              way
             </button>
           )}
         </nav>
@@ -183,9 +183,9 @@ function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
                   setDrawerOpen(false);
                   onOpenLogin();
                 }}
-                className="py-3 border-b border-teal-900 text-left text-amber-400 font-bold"
+                className="py-3 border-b border-teal-900 text-left text-[11px] font-bold text-teal-500/50"
               >
-                Student Login
+                way
               </button>
             )}
           </motion.div>

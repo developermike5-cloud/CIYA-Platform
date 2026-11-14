@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import InstallGuide from '../components/InstallGuide';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { coursesStore } from '../utils/coursesStore';
 import { Course } from '../types';
 import { uploadToCloudinary } from '../utils/cloudinary';
@@ -245,6 +245,9 @@ export default function PaidEnroll() {
       }, { merge: true });
       showToast('Payment proof received. It will be confirmed shortly.');
       setStage('install');
+      // The student stays signed out until the admin confirms payment: login
+      // happens inside the CIYA app with the details emailed after approval.
+      try { await signOut(auth); } catch { /* ignore */ }
     } catch (err) {
       console.error('submitProof failed at', step, err);
       const detail = err instanceof Error ? err.message : '';
@@ -266,7 +269,11 @@ export default function PaidEnroll() {
   return (
     <div className="min-h-screen bg-teal-950 text-teal-50 flex flex-col">
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-10 space-y-6">
-        <Link to="/" className="inline-flex items-center gap-2 text-teal-300 hover:text-teal-50 transition-colors text-sm font-semibold">← Back to CIYA</Link>
+        {stage === 'install' ? (
+          <button type="button" onClick={() => setStage('payment')} className="self-start inline-flex items-center gap-2 text-teal-300 hover:text-teal-50 transition-colors text-sm font-semibold cursor-pointer">← Back to payment</button>
+        ) : (
+          <Link to="/" className="inline-flex items-center gap-2 text-teal-300 hover:text-teal-50 transition-colors text-sm font-semibold">← Back to CIYA</Link>
+        )}
 
         <Stepper stage={stage} onBack={stage === 'install' ? undefined : (s) => setStage(s)} />
 
@@ -376,12 +383,6 @@ export default function PaidEnroll() {
             paid
             whatsappHref={`https://wa.me/${ADMIN_WHATSAPP}?text=${waMsg}`}
           />
-        )}
-
-        {stage === 'install' && (
-          <p className="text-teal-400 text-xs font-semibold text-center">
-            <button onClick={() => navigate('/')} className="underline cursor-pointer">Back to CIYA</button>
-          </p>
         )}
 
         {toast && (

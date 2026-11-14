@@ -76,6 +76,18 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       const user = result.user;
 
       if (user) {
+        // The web app is admin-only: students sign in inside the installed CIYA app.
+        const inPwa = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+        if (!inPwa) {
+          const adminSnap = await getDoc(doc(db, 'admins', user.uid)).catch(() => null);
+          const isAdmin = !!adminSnap?.exists() || user.email?.toLowerCase() === 'developermike5@gmail.com';
+          if (!isAdmin) {
+            await signOut(auth);
+            setError('Students sign in through the CIYA app. Open the installed app on your phone to log in.');
+            return;
+          }
+        }
+
         if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
           navigate('/admin');
         } else {
@@ -300,6 +312,18 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       const user = result.user;
 
       if (user) {
+        // The web app is admin-only: students sign in inside the installed CIYA app.
+        const inPwa = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+        if (!inPwa) {
+          const adminSnap = await getDoc(doc(db, 'admins', user.uid)).catch(() => null);
+          const isAdmin = !!adminSnap?.exists() || user.email?.toLowerCase() === 'developermike5@gmail.com';
+          if (!isAdmin) {
+            await signOut(auth);
+            setError('Students sign in through the CIYA app. Open the installed app on your phone to log in.');
+            return;
+          }
+        }
+
         if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
           navigate('/admin');
         } else {
