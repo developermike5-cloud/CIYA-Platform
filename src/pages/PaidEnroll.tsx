@@ -95,6 +95,21 @@ export default function PaidEnroll() {
   const [proof, setProof] = useState<File | null>(null);
   /** Cloudinary URL once the proof is submitted: locks the whole flow read-only. */
   const [proofUrl, setProofUrl] = useState<string | null>(null);
+  /** Local object URL of the picked (not yet submitted) screenshot, for the preview + remove tile. */
+  const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
+
+  const onProofFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] || null;
+    if (proofPreviewUrl) URL.revokeObjectURL(proofPreviewUrl);
+    setProof(f);
+    setProofPreviewUrl(f ? URL.createObjectURL(f) : null);
+  };
+
+  const removeProof = () => {
+    if (proofPreviewUrl) URL.revokeObjectURL(proofPreviewUrl);
+    setProof(null);
+    setProofPreviewUrl(null);
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -232,6 +247,7 @@ export default function PaidEnroll() {
       const up = await uploadToCloudinary(proof, 'ciya-payments', undefined, account.uid);
       if (!up?.url) throw new Error('upload returned no url');
       setProofUrl(up.url);
+      if (proofPreviewUrl) { URL.revokeObjectURL(proofPreviewUrl); setProofPreviewUrl(null); }
       // Sign the fresh account in (SDK session) so Firestore rules accept its own profile update.
       step = 'sign-in';
       const si = await signInWithEmailAndPassword(auth, (account.email || form.email).trim().toLowerCase(), account.tempPassword);
@@ -391,9 +407,8 @@ export default function PaidEnroll() {
                 <span className="inline-flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-wider">
                   <span aria-hidden="true">✓</span> Payment proof submitted — read only
                 </span>
-                <div className="w-full bg-teal-950/60 border border-teal-800 rounded-2xl p-3 flex items-start gap-4">
-                  <img src={proofUrl} alt="Submitted payment confirmation screenshot" className="w-28 h-28 md:w-32 md:h-32 object-cover rounded-xl border border-teal-700 shrink-0" />
-                  <p className="text-teal-200 text-xs font-semibold leading-relaxed">This is the screenshot we received. It cannot be changed. If something is wrong, message the admin on WhatsApp before your payment is confirmed.</p>
+                <div className="w-full bg-teal-950/60 border border-teal-800 rounded-2xl p-3 flex justify-center">
+                  <img src={proofUrl} alt="Submitted payment confirmation screenshot" className="max-h-64 w-auto object-contain rounded-xl border border-teal-700" />
                 </div>
                 <button type="button" onClick={() => setStage('install')} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 text-teal-950 text-sm font-black transition-all cursor-pointer">
                   Continue to Install App
@@ -402,9 +417,24 @@ export default function PaidEnroll() {
             ) : (
               <>
                 <label className="block text-xs font-black text-teal-300 uppercase tracking-wide">Payment confirmation screenshot *</label>
-                <input type="file" accept="image/*" onChange={(e) => setProof(e.target.files?.[0] || null)}
-                  className="w-full bg-teal-950/60 border border-teal-800 text-teal-50 rounded-xl py-3 px-4 text-sm font-semibold file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-amber-500 file:text-teal-950 file:font-black cursor-pointer" />
-                {proof && <p className="text-teal-300 text-xs font-semibold">Attached: {proof.name}</p>}
+                {proof && proofPreviewUrl ? (
+                  <div className="flex items-start gap-4 bg-teal-950/60 border border-teal-800 rounded-2xl p-3">
+                    <img src={proofPreviewUrl} alt="Payment screenshot preview" className="w-24 h-24 object-cover rounded-xl border border-teal-700 shrink-0" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <p className="text-teal-100 text-xs font-semibold break-all">{proof.name}</p>
+                      <button type="button" onClick={removeProof} className="px-3 py-1.5 rounded-lg bg-rose-500/90 hover:bg-rose-500 text-white text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label htmlFor="ciya-proof-upload" className="flex flex-col items-center justify-center gap-2 w-full py-8 rounded-2xl border-2 border-dashed border-teal-700 bg-teal-950/60 hover:border-amber-400 hover:bg-teal-900/40 cursor-pointer transition-all">
+                    <svg viewBox="0 0 24 24" className="w-9 h-9 stroke-amber-400 fill-none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6" /><path d="M4 20h16" /></svg>
+                    <span className="text-teal-100 text-sm font-black">Upload payment screenshot</span>
+                    <span className="text-teal-400 text-xs font-semibold">Tap to choose an image</span>
+                  </label>
+                )}
+                <input id="ciya-proof-upload" type="file" accept="image/*" className="hidden" onChange={onProofFile} />
                 {error && <p className="text-xs font-bold text-rose-400">{error}</p>}
                 <button onClick={submitProof} disabled={busy} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-teal-950 text-sm font-black transition-all cursor-pointer">
                   {busy ? 'Submitting...' : 'Submit Payment Proof'}

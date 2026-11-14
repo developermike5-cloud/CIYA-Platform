@@ -1171,7 +1171,16 @@ export default function Onboarding() {
 }
 
 function OnboardingComplete({ cohort, emailQueued, studentEmail }: { cohort: string; emailQueued: boolean; studentEmail: string }) {
-  const [stage, setStage] = useState<'congrats' | 'check-email' | 'download'>('congrats');
+  const [stage, setStage] = useState<'congrats' | 'download'>('congrats');
+  const CONFETTI = ['#fbbf24', '#2dd4bf', '#818cf8', '#34d399', '#f472b6', '#facc15'];
+  const pieces = Array.from({ length: 14 }, (_, i) => ({
+    left: 4 + ((i * 37) % 93),
+    delay: (i * 0.45) % 3.2,
+    dur: 3.4 + ((i * 13) % 22) / 10,
+    size: 7 + ((i * 7) % 6),
+    color: CONFETTI[i % CONFETTI.length],
+    round: i % 3 === 0,
+  }));
 
   if (stage === 'download') {
     return (
@@ -1179,76 +1188,79 @@ function OnboardingComplete({ cohort, emailQueued, studentEmail }: { cohort: str
         <div className="max-w-5xl mx-auto">
           <button
             type="button"
-            onClick={() => setStage('check-email')}
+            onClick={() => setStage('congrats')}
             className="mb-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-teal-900/60 hover:bg-teal-800 border border-teal-700 text-teal-100 text-sm font-black cursor-pointer transition-all"
           >
             &larr; Back
           </button>
-          <InstallGuide />
+          <InstallGuide
+            footerNote={
+              <span>
+                <b className="text-amber-400">Your login details are ready.</b> We've sent them to{' '}
+                <span className="text-white font-bold">{studentEmail || 'your email address'}</span>.
+                {emailQueued
+                  ? ' Check your inbox (and your spam folder) for your login email, temporary password, and your unique CIYA access code. No waiting and no admin approval needed. After installing, open the app and log in with them.'
+                  : ' They are being delivered to your inbox right now — check your spam folder too if you do not see them in a moment. No waiting and no admin approval needed. After installing, open the app and log in with your email and temporary password.'}
+              </span>
+            }
+          />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 p-8 text-center space-y-6">
+    <div className="min-h-screen bg-teal-950 relative overflow-hidden flex items-center justify-center px-4 py-10">
+      <style>{`
+        @keyframes oc-fall { 0% { transform: translateY(-8vh) rotate(0deg); opacity: 0; } 8% { opacity: 1; } 100% { transform: translateY(108vh) rotate(540deg); opacity: .9; } }
+        @keyframes oc-pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+        @keyframes oc-ring { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(1.9); opacity: 0; } }
+        .oc-confetti { position: absolute; top: -5vh; animation-name: oc-fall; animation-timing-function: linear; animation-iteration-count: infinite; will-change: transform; }
+        .oc-pop { animation: oc-pop 1.6s ease-in-out infinite; }
+        .oc-ring { position: absolute; inset: 0; border-radius: 9999px; border: 3px solid rgba(251,191,36,.6); animation: oc-ring 2.2s ease-out infinite; }
+      `}</style>
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        {pieces.map((p, i) => (
+          <span
+            key={i}
+            className="oc-confetti"
+            style={{
+              left: `${p.left}%`,
+              width: `${p.size}px`,
+              height: `${p.round ? p.size : p.size * 2.2}px`,
+              background: p.color,
+              borderRadius: p.round ? '9999px' : '2px',
+              animationDelay: `${p.delay}s`,
+              animationDuration: `${p.dur}s`,
+              opacity: 0.85,
+            }}
+          />
+        ))}
+      </div>
+      <div className="relative w-full max-w-md bg-teal-900/50 backdrop-blur rounded-3xl shadow-2xl border border-teal-800 p-8 text-center space-y-6">
         {stage === 'congrats' && (
           <>
-            <div className="mx-auto w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-4xl shadow-md border border-emerald-200">🎉</div>
+            <div className="relative mx-auto w-24 h-24">
+              <span className="oc-ring" aria-hidden="true" />
+              <span className="oc-ring" style={{ animationDelay: '1.1s' }} aria-hidden="true" />
+              <div className="oc-pop relative mx-auto w-24 h-24 bg-amber-400 text-teal-950 rounded-full flex items-center justify-center text-5xl shadow-[0_0_0_10px_rgba(251,191,36,0.15),0_0_44px_rgba(251,191,36,0.45)]">🎉</div>
+            </div>
             <div className="space-y-2">
-              <h1 className="text-2xl font-black text-slate-900">Congratulations!</h1>
-              <p className="text-slate-600 text-sm leading-relaxed">
+              <h1 className="text-3xl font-black text-white tracking-tight">Congratulations!</h1>
+              <p className="text-teal-100 text-sm leading-relaxed font-semibold">
                 Your registration was successful. You are officially registered for{' '}
-                <span className="font-black text-indigo-700">{cohort || 'the upcoming cohort'}</span>.
+                <span className="font-black text-amber-400">{cohort || 'the upcoming cohort'}</span>.
               </p>
             </div>
             <button
               type="button"
-              onClick={() => setStage('check-email')}
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl transition-all active:scale-95 cursor-pointer"
+              onClick={() => setStage('download')}
+              className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-2xl transition-all active:scale-95 cursor-pointer"
             >
               Continue
             </button>
           </>
         )}
-
-        {stage === 'check-email' && (
-          <>
-            <div className="text-left -mt-2 -mb-4">
-              <button
-                type="button"
-                onClick={() => setStage('congrats')}
-                className="text-slate-400 hover:text-slate-700 text-xs font-black inline-flex items-center gap-1 cursor-pointer border-0 bg-transparent"
-              >
-                &larr; Back
-              </button>
-            </div>
-            <div className="mx-auto w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-4xl shadow-md border border-amber-200">📧</div>
-            <div className="space-y-2">
-              <h1 className="text-2xl font-black text-slate-900">Check Your Email</h1>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                Your login details have been sent to <span className="font-bold text-slate-900">{studentEmail || 'your email address'}</span>.
-              </p>
-              <p className="text-slate-500 text-xs leading-relaxed">
-                The email contains your login email, a temporary password, and your unique CIYA access code. Your dashboard stays locked until you change your password on first login.
-              </p>
-              {!emailQueued && (
-                <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs font-semibold">
-                  Your login email is being prepared and will arrive shortly. If it doesn't reach you within a few minutes, contact support.
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => setStage('download')}
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl transition-all active:scale-95 cursor-pointer"
-            >
-              Next
-            </button>
-          </>
-        )}
-
       </div>
     </div>
   );

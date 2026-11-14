@@ -95,7 +95,7 @@ function SheetRow({ label, icon, hl }: { label: string; icon: React.ReactNode; h
   );
 }
 
-export default function InstallGuide({ paid, whatsappHref }: { paid?: boolean; whatsappHref?: string } = {}) {
+export default function InstallGuide({ paid, whatsappHref, footerNote }: { paid?: boolean; whatsappHref?: string; footerNote?: React.ReactNode } = {}) {
   const { isInstallable, isInstalled, isIOS, installApp } = usePWAInstall();
   const [guide, setGuide] = useState<GuideKey>(() =>
     typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(window.navigator.userAgent || '') ? 'ios' : 'android'
@@ -478,6 +478,12 @@ export default function InstallGuide({ paid, whatsappHref }: { paid?: boolean; w
                 💬 Contact the Admin on WhatsApp
               </a>
             )}
+          </div>
+        )}
+
+        {footerNote && (
+          <div className="mt-8 mx-auto max-w-xl px-5 py-4 rounded-[22px] bg-teal-900/40 border border-teal-700 text-teal-100 text-sm md:text-[0.95rem] font-semibold leading-relaxed text-center">
+            {footerNote}
           </div>
         )}
       </div>
