@@ -93,6 +93,8 @@ export default function PaidEnroll() {
   const [form, setForm] = useState({ email: '', whatsapp: '', state: '', gender: '' });
   const [account, setAccount] = useState<{ uid: string; email?: string; tempPassword?: string; ciyaCode?: string; emailQueued: boolean } | null>(null);
   const [proof, setProof] = useState<File | null>(null);
+  /** Cloudinary URL once the proof is submitted: locks the whole flow read-only. */
+  const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -121,6 +123,7 @@ export default function PaidEnroll() {
           if (d?.form && typeof d.form === 'object') {
             setForm({ email: String(d.form.email || ''), whatsapp: String(d.form.whatsapp || ''), state: String(d.form.state || ''), gender: String(d.form.gender || '') });
           }
+          if (d?.proofUrl && typeof d.proofUrl === 'string') setProofUrl(String(d.proofUrl));
           if (d?.account && d.account.uid) {
             setAccount({ uid: String(d.account.uid), email: d.account.email ? String(d.account.email).toLowerCase() : (d.form?.email ? String(d.form.email).toLowerCase() : undefined), tempPassword: d.account.tempPassword ? String(d.account.tempPassword) : undefined, ciyaCode: d.account.ciyaCode ? String(d.account.ciyaCode) : undefined, emailQueued: !!d.account.emailQueued });
           }
@@ -146,7 +149,7 @@ export default function PaidEnroll() {
   useEffect(() => {
     if (!draftLoadedRef.current) return;
     try {
-      safeStorage.setItem(DRAFT_KEY, JSON.stringify({ stage, courseTitle: course?.title || '', form, account, savedAt: Date.now() }));
+      safeStorage.setItem(DRAFT_KEY, JSON.stringify({ stage, courseTitle: course?.title || '', form, account, proofUrl, savedAt: Date.now() }));
     } catch (e) { /* storage unavailable */ }
   }, [stage, course, form]);
 
@@ -228,6 +231,7 @@ export default function PaidEnroll() {
     try {
       const up = await uploadToCloudinary(proof, 'ciya-payments', undefined, account.uid);
       if (!up?.url) throw new Error('upload returned no url');
+      setProofUrl(up.url);
       // Sign the fresh account in (SDK session) so Firestore rules accept its own profile update.
       step = 'sign-in';
       const si = await signInWithEmailAndPassword(auth, (account.email || form.email).trim().toLowerCase(), account.tempPassword);
@@ -318,28 +322,43 @@ export default function PaidEnroll() {
             <button type="button" onClick={() => setStage('preview')} className="self-start w-fit text-teal-400 hover:text-amber-300 text-xs font-black uppercase tracking-wider cursor-pointer transition-colors">← Back</button>
             <h1 className="text-xl md:text-2xl font-extrabold text-white tracking-tight">Your Details</h1>
             <p className="text-teal-300 text-xs font-semibold">We use these to create your student account and email your login details.</p>
-            {account && (!account.email || account.email === form.email.trim().toLowerCase()) && <p className="text-amber-300/90 text-xs font-semibold">Your account is already created for {account.email || form.email}. Continue to payment.</p>}
-            <input type="email" placeholder="Email address *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
-            <input type="tel" inputMode="numeric" maxLength={11} placeholder="WhatsApp number *" value={form.whatsapp}
-              onChange={(e) => setForm({ ...form, whatsapp: e.target.value.replace(/\D/g, '').slice(0, 11) })} className={input} />
-            <CustomDropdown
-              value={form.state}
-              onChange={(val) => setForm({ ...form, state: val })}
-              options={[{ label: 'Select State *', value: '' }, ...NIGERIAN_STATES.map((s) => ({ label: s, value: s }))]}
-              className="w-full"
-              theme="dark"
-            />
-            <CustomDropdown
-              value={form.gender}
-              onChange={(val) => setForm({ ...form, gender: val })}
-              options={[{ label: 'Gender', value: '' }, { label: 'Male', value: 'Male' }, { label: 'Female', value: 'Female' }]}
-              className="w-full"
-              theme="dark"
-            />
+            {proofUrl && <p className="text-amber-300/90 text-xs font-semibold">Your details are locked. They were already submitted with your payment proof.</p>}
+            <input type="email" placeholder="Email address *" value={form.email} readOnly={!!proofUrl} disabled={!!proofUrl} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input + (proofUrl ? ' opacity-70 cursor-not-allowed' : '')} />
+            <input type="tel" inputMode="numeric" maxLength={11} placeholder="WhatsApp number *" value={form.whatsapp} readOnly={!!proofUrl} disabled={!!proofUrl}
+              onChange={(e) => setForm({ ...form, whatsapp: e.target.value.replace(/\D/g, '').slice(0, 11) })} className={input + (proofUrl ? ' opacity-70 cursor-not-allowed' : '')} />
+            {proofUrl ? (
+              <>
+                <input type="text" value={form.state || '—'} readOnly disabled className={input + ' opacity-70 cursor-not-allowed'} />
+                <input type="text" value={form.gender || '—'} readOnly disabled className={input + ' opacity-70 cursor-not-allowed'} />
+              </>
+            ) : (
+              <>
+                <CustomDropdown
+                  value={form.state}
+                  onChange={(val) => setForm({ ...form, state: val })}
+                  options={[{ label: 'Select State *', value: '' }, ...NIGERIAN_STATES.map((s) => ({ label: s, value: s }))]}
+                  className="w-full"
+                  theme="dark"
+                />
+                <CustomDropdown
+                  value={form.gender}
+                  onChange={(val) => setForm({ ...form, gender: val })}
+                  options={[{ label: 'Gender', value: '' }, { label: 'Male', value: 'Male' }, { label: 'Female', value: 'Female' }]}
+                  className="w-full"
+                  theme="dark"
+                />
+              </>
+            )}
             {error && <p className="text-xs font-bold text-rose-400">{error}</p>}
-            <button type="submit" disabled={busy} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-teal-950 text-sm font-black transition-all cursor-pointer">
-              {busy ? 'Creating your account...' : account && (!account.email || account.email === form.email.trim().toLowerCase()) ? 'Continue to Payment' : 'Create Account & Continue to Payment'}
-            </button>
+            {proofUrl ? (
+              <button type="button" onClick={() => setStage('payment')} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 text-teal-950 text-sm font-black transition-all cursor-pointer">
+                Continue to Payment
+              </button>
+            ) : (
+              <button type="submit" disabled={busy} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-teal-950 text-sm font-black transition-all cursor-pointer">
+                {busy ? 'Creating your account...' : account && (!account.email || account.email === form.email.trim().toLowerCase()) ? 'Continue to Payment' : 'Create Account & Continue to Payment'}
+              </button>
+            )}
           </form>
         )}
 
@@ -367,14 +386,31 @@ export default function PaidEnroll() {
                 </div>
               ))}
             </div>
-            <label className="block text-xs font-black text-teal-300 uppercase tracking-wide">Payment confirmation screenshot *</label>
-            <input type="file" accept="image/*" onChange={(e) => setProof(e.target.files?.[0] || null)}
-              className="w-full bg-teal-950/60 border border-teal-800 text-teal-50 rounded-xl py-3 px-4 text-sm font-semibold file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-amber-500 file:text-teal-950 file:font-black cursor-pointer" />
-            {proof && <p className="text-teal-300 text-xs font-semibold">Attached: {proof.name}</p>}
-            {error && <p className="text-xs font-bold text-rose-400">{error}</p>}
-            <button onClick={submitProof} disabled={busy} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-teal-950 text-sm font-black transition-all cursor-pointer">
-              {busy ? 'Submitting...' : 'Submit Payment Proof'}
-            </button>
+            {proofUrl ? (
+              <>
+                <span className="inline-flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-wider">
+                  <span aria-hidden="true">✓</span> Payment proof submitted — read only
+                </span>
+                <div className="w-full bg-teal-950/60 border border-teal-800 rounded-2xl p-3 flex items-start gap-4">
+                  <img src={proofUrl} alt="Submitted payment confirmation screenshot" className="w-28 h-28 md:w-32 md:h-32 object-cover rounded-xl border border-teal-700 shrink-0" />
+                  <p className="text-teal-200 text-xs font-semibold leading-relaxed">This is the screenshot we received. It cannot be changed. If something is wrong, message the admin on WhatsApp before your payment is confirmed.</p>
+                </div>
+                <button type="button" onClick={() => setStage('install')} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 text-teal-950 text-sm font-black transition-all cursor-pointer">
+                  Continue to Install App
+                </button>
+              </>
+            ) : (
+              <>
+                <label className="block text-xs font-black text-teal-300 uppercase tracking-wide">Payment confirmation screenshot *</label>
+                <input type="file" accept="image/*" onChange={(e) => setProof(e.target.files?.[0] || null)}
+                  className="w-full bg-teal-950/60 border border-teal-800 text-teal-50 rounded-xl py-3 px-4 text-sm font-semibold file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-amber-500 file:text-teal-950 file:font-black cursor-pointer" />
+                {proof && <p className="text-teal-300 text-xs font-semibold">Attached: {proof.name}</p>}
+                {error && <p className="text-xs font-bold text-rose-400">{error}</p>}
+                <button onClick={submitProof} disabled={busy} className="w-full py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-teal-950 text-sm font-black transition-all cursor-pointer">
+                  {busy ? 'Submitting...' : 'Submit Payment Proof'}
+                </button>
+              </>
+            )}
           </div>
         )}
 

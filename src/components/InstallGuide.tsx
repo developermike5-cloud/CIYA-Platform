@@ -31,11 +31,7 @@ interface Step {
 
 const GUIDES: Record<GuideKey, { note: React.ReactNode; steps: Step[] }> = {
   android: {
-    note: (
-      <>
-        <b className="text-amber-400">No Install button?</b> In Chrome, tap the menu (three dots), then tap Install app or Add to Home Screen.
-      </>
-    ),
+    note: null,
     steps: [
       { t: 'Open the page in Chrome', d: 'Open your CIYA link in Chrome. You will see the Install app button.', layer: 'web', pulse: 'pbtn' },
       { t: 'Tap Install app', d: 'Tap the amber Install app button.', layer: 'web', f: [50, 62] },
@@ -430,7 +426,9 @@ export default function InstallGuide({ paid, whatsappHref }: { paid?: boolean; w
           </ol>
         </div>
 
-        <p className="mt-[18px] px-4 py-3.5 rounded-[18px] border border-dashed border-teal-700 text-teal-200 text-[0.92rem]">{GUIDES[guide].note}</p>
+        {GUIDES[guide].note && (
+          <p className="mt-[18px] px-4 py-3.5 rounded-[18px] border border-dashed border-teal-700 text-teal-200 text-[0.92rem]">{GUIDES[guide].note}</p>
+        )}
 
         {guide === 'android' && appOnPhone && (
           <div className="mt-8 flex justify-center">
