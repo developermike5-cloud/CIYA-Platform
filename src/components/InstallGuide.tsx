@@ -104,7 +104,8 @@ export default function InstallGuide({ paid, whatsappHref, whatsappLabel, footer
   const [reduce] = useState(() => typeof window !== 'undefined' && !!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [playing, setPlaying] = useState(!reduce);
   const [installing, setInstalling] = useState(false);
-  // The Android install button becomes a Login button once the app is on the phone.
+  // Tracks whether the app is already on the phone: the install button then
+  // gives way to a short confirmation note (no login button).
   const [appOnPhone, setAppOnPhone] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -181,13 +182,7 @@ export default function InstallGuide({ paid, whatsappHref, whatsappLabel, footer
         <style>{CSS}</style>
         <img src={LOGO} alt="CIYA app icon" className="w-20 h-20 mx-auto rounded-2xl border-2 border-amber-400 shadow-lg" />
         <h2 className="text-2xl font-black text-teal-50">You already have the app</h2>
-        <p className="text-teal-200 text-sm font-semibold">Open the CIYA app and sign in with the login details we emailed you.</p>
-        <a
-          href="/?login=true"
-          className="inline-block px-10 py-3.5 bg-teal-900/60 hover:bg-teal-800 border border-teal-700 text-teal-50 font-black rounded-2xl transition-all active:scale-95"
-        >
-          Log in to the App
-        </a>
+        <p className="text-teal-200 text-sm font-semibold">The CIYA app is on this phone. Open it from your home screen and sign in with the login details we emailed you.</p>
       </section>
     );
   }
@@ -429,15 +424,9 @@ export default function InstallGuide({ paid, whatsappHref, whatsappLabel, footer
         )}
 
         {guide === 'android' && appOnPhone && (
-          <div className="mt-8 flex justify-center">
-            <a
-              href="/?login=true"
-              aria-label="Log in to the CIYA app"
-              className="inline-flex items-center gap-3 px-10 md:px-14 py-4 md:py-5 rounded-full bg-amber-400 hover:bg-amber-300 text-teal-950 font-black text-lg md:text-xl shadow-[0_14px_44px_-10px_rgba(251,191,36,.6)] transition-all active:scale-95"
-            >
-              Log in to the App
-            </a>
-          </div>
+          <p className="mt-8 mx-auto max-w-xl text-center text-teal-200 text-sm md:text-base font-semibold leading-relaxed">
+            App installed. The CIYA icon is now on your home screen. Minimize this page and open the app to sign in.
+          </p>
         )}
 
         {guide === 'android' && !appOnPhone && isInstallable && (
@@ -469,8 +458,14 @@ export default function InstallGuide({ paid, whatsappHref, whatsappLabel, footer
           </div>
         )}
 
+        {footerNote && (
+          <div className="mt-8 mx-auto max-w-xl px-5 py-4 rounded-[22px] bg-teal-900/40 border border-teal-700 text-teal-100 text-sm md:text-[0.95rem] font-semibold leading-relaxed text-center">
+            {footerNote}
+          </div>
+        )}
+
         {whatsappHref && (
-          <div className={`${paid ? 'mt-4' : 'mt-7'} mx-auto max-w-xl text-center`}>
+          <div className={`${paid ? 'mt-4' : 'mt-5'} mx-auto max-w-xl text-center`}>
             <a
               href={whatsappHref}
               target="_blank"
@@ -479,12 +474,6 @@ export default function InstallGuide({ paid, whatsappHref, whatsappLabel, footer
             >
               {whatsappLabel || '💬 Contact the Admin on WhatsApp'}
             </a>
-          </div>
-        )}
-
-        {footerNote && (
-          <div className="mt-8 mx-auto max-w-xl px-5 py-4 rounded-[22px] bg-teal-900/40 border border-teal-700 text-teal-100 text-sm md:text-[0.95rem] font-semibold leading-relaxed text-center">
-            {footerNote}
           </div>
         )}
       </div>

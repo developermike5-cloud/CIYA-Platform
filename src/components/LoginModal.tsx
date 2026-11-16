@@ -459,30 +459,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               ) : (
                 /* SIGN IN FORM & GOOGLE AUTH */
                 <div className="space-y-4">
-                  {/* Primary Google Auth Button (First Option) */}
-                  <button
-                    type="button"
-                    onClick={handleGoogleLogin}
-                    disabled={loading}
-                    className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-xl text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2.5 cursor-pointer border-0 uppercase tracking-wider hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
-                    id="login_google_btn"
-                  >
-                    <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                      <path fill="#EA4335" d="M12 5.04c1.64 0 3.11.56 4.27 1.67l3.19-3.19C17.51 1.7 14.99 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.79 2.94C6.18 7.37 8.86 5.04 12 5.04z" />
-                      <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.44c-.28 1.48-1.12 2.73-2.38 3.58l3.71 2.88c2.17-2 3.42-4.94 3.42-8.61z" />
-                      <path fill="#FBBC05" d="M5.29 14.83a7.19 7.19 0 0 1 0-4.57L1.5 7.32a11.95 11.95 0 0 0 0 10.37l3.79-2.86z" />
-                      <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.14 0-5.82-2.33-6.71-5.46L1.5 16.29C3.4 20.15 7.35 23 12 23z" />
-                    </svg>
-                    <span>{loading ? 'Connecting Google...' : 'Sign In with Google (Recommended)'}</span>
-                  </button>
-
-                  <div className="relative flex py-1 items-center">
-                    <div className="flex-grow border-t border-teal-900/60"></div>
-                    <span className="flex-shrink mx-3 text-[10px] uppercase font-black text-teal-500">Or sign in with Email</span>
-                    <div className="flex-grow border-t border-teal-900/60"></div>
-                  </div>
-
-                  <form onSubmit={handleEmailSignIn} className="space-y-3.5">
+                                    <form onSubmit={handleEmailSignIn} className="space-y-3.5">
                     <div>
                       <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300 mb-1">Email Address</label>
                       <div className="relative">
@@ -544,6 +521,29 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       <span>{loading ? 'Signing In...' : 'Sign In with Email & Password'}</span>
                     </button>
                   </form>
+
+                  <div className="relative flex py-1 items-center">
+                    <div className="flex-grow border-t border-teal-900/60"></div>
+                    <span className="flex-shrink mx-3 text-[10px] uppercase font-black text-teal-500">Or sign in with Google</span>
+                    <div className="flex-grow border-t border-teal-900/60"></div>
+                  </div>
+
+                  {/* Google Auth Button (below the email & password login) */}
+<button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={loading}
+                    className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-xl text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2.5 cursor-pointer border-0 uppercase tracking-wider hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
+                    id="login_google_btn"
+                  >
+                    <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                      <path fill="#EA4335" d="M12 5.04c1.64 0 3.11.56 4.27 1.67l3.19-3.19C17.51 1.7 14.99 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.79 2.94C6.18 7.37 8.86 5.04 12 5.04z" />
+                      <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.44c-.28 1.48-1.12 2.73-2.38 3.58l3.71 2.88c2.17-2 3.42-4.94 3.42-8.61z" />
+                      <path fill="#FBBC05" d="M5.29 14.83a7.19 7.19 0 0 1 0-4.57L1.5 7.32a11.95 11.95 0 0 0 0 10.37l3.79-2.86z" />
+                      <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.14 0-5.82-2.33-6.71-5.46L1.5 16.29C3.4 20.15 7.35 23 12 23z" />
+                    </svg>
+                    <span>{loading ? 'Connecting Google...' : 'Sign In with Google (Recommended)'}</span>
+                  </button>
 
                   <div className="text-center pt-3 border-t border-teal-900/40">
                     <p className="text-[11px] text-teal-400 font-semibold">
