@@ -103,8 +103,20 @@ export default function Onboarding() {
 
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState('');
-  // Post-registration screens: congratulations -> login-details-sent -> app download
-  const [postInfo, setPostRegistration] = useState<{ cohort: string; emailQueued: boolean } | null>(null);
+  // Post-registration screens: congratulations -> login-details-sent -> app download.
+  // Persisted per browser tab (sessionStorage) so a refresh keeps the student on the same
+  // screen instead of bouncing them back to the registration form.
+  const readRegisteredState = (): { postInfo: { cohort: string; emailQueued: boolean }; studentEmail: string } | null => {
+    try {
+      const raw = window.sessionStorage.getItem('ciya_onboarding_registered');
+      const d = raw ? JSON.parse(raw) : null;
+      return d && d.postInfo ? d : null;
+    } catch {
+      return null;
+    }
+  };
+  const [postInfo, setPostRegistration] = useState<{ cohort: string; emailQueued: boolean } | null>(() => readRegisteredState()?.postInfo || null);
+  const [registeredEmail, setRegisteredEmail] = useState<string>(() => readRegisteredState()?.studentEmail || '');
   const [timeLeft, setTimeLeft] = useState('');
   const [creationTime, setCreationTime] = useState<number | null>(null);
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
@@ -124,6 +136,8 @@ export default function Onboarding() {
         setData((prev: typeof data) => ({ ...prev, ...restored }));
         const s = Number(d && d.step);
         if (Number.isFinite(s) && s >= 1 && s <= 10) setStep(s);
+        const p = d && d.pathway;
+        if (p === 'A' || p === 'B' || p === 'C') setPathway(p as Pathway);
       }
     } catch (e) {
       console.warn('onboarding draft restore failed:', e);
@@ -133,7 +147,7 @@ export default function Onboarding() {
   useEffect(() => {
     if (!draftLoadedRef.current || registeredRef.current || step >= 11) return;
     try {
-      safeStorage.setItem('ciya_onboarding_draft', JSON.stringify({ step, data: { ...data, email: '', password: '' }, savedAt: Date.now() }));
+      safeStorage.setItem('ciya_onboarding_draft', JSON.stringify({ step, pathway, data: { ...data, email: '', password: '' }, savedAt: Date.now() }));
     } catch (e) { /* storage unavailable */ }
   }, [step, data]);
 
@@ -472,7 +486,13 @@ export default function Onboarding() {
         }
         return;
       }
-      setPostRegistration({ cohort: payload?.cohort || '', emailQueued: !!payload?.emailQueued });
+      const regInfo = { cohort: payload?.cohort || '', emailQueued: !!payload?.emailQueued };
+      setPostRegistration(regInfo);
+      setRegisteredEmail(data.email || '');
+      try {
+        window.sessionStorage.setItem('ciya_onboarding_registered', JSON.stringify({ postInfo: regInfo, studentEmail: data.email || '', savedAt: Date.now() }));
+        window.sessionStorage.setItem('ciya_onboarding_stage', 'congrats');
+      } catch (e) { /* storage unavailable */ }
     } catch (e: any) {
       console.error("Onboarding registration failed:", e);
       setFormError(e.message || 'Registration failed. Please check your internet connection and try again.');
@@ -567,7 +587,7 @@ export default function Onboarding() {
       <OnboardingComplete
         cohort={postInfo.cohort}
         emailQueued={postInfo.emailQueued}
-        studentEmail={data.email}
+        studentEmail={data.email || registeredEmail}
       />
     );
   }
@@ -1160,7 +1180,19 @@ export default function Onboarding() {
 }
 
 function OnboardingComplete({ cohort, emailQueued, studentEmail }: { cohort: string; emailQueued: boolean; studentEmail: string }) {
-  const [stage, setStage] = useState<'congrats' | 'download'>('congrats');
+  const [stage, setStage] = useState<'congrats' | 'download'>(() => {
+    try {
+      return window.sessionStorage.getItem('ciya_onboarding_stage') === 'download' ? 'download' : 'congrats';
+    } catch {
+      return 'congrats';
+    }
+  });
+  // Keep the current screen across refreshes within this tab
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem('ciya_onboarding_stage', stage);
+    } catch (e) { /* storage unavailable */ }
+  }, [stage]);
   const CONFETTI = ['#fbbf24', '#2dd4bf', '#818cf8', '#34d399', '#f472b6', '#facc15'];
   const pieces = Array.from({ length: 14 }, (_, i) => ({
     left: 4 + ((i * 37) % 93),
