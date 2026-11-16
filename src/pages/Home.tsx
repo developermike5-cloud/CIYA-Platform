@@ -29,7 +29,7 @@ let globalLoginActive = false;
 
 const useLogin = () => {
   const navigate = useNavigate();
-  const intakeRoute = useIntakeRoute();
+  const { route: intakeRoute, ready: intakeReady } = useIntakeRoute();
   return async () => {
     if (globalLoginActive) {
       console.warn("Sign-in already in progress, ignoring duplicate action.");
@@ -46,7 +46,7 @@ const useLogin = () => {
           } else {
             // New students no longer sign up with Google: sign out and use the email & password onboarding form.
             await signOut(auth);
-            navigate(intakeRoute);
+            if (intakeReady) navigate(intakeRoute);
           }
         }
         return;
@@ -67,7 +67,7 @@ const useLogin = () => {
         } else {
           // New students no longer sign up with Google: sign out and use the email & password onboarding form.
           await signOut(auth);
-          navigate(intakeRoute);
+          if (intakeReady) navigate(intakeRoute);
         }
       }
     } catch (e: any) {

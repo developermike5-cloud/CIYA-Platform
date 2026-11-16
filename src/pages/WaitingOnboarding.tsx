@@ -80,7 +80,24 @@ export default function WaitingOnboarding() {
   const [timeLeft, setTimeLeft] = useState('');
   const [creationTime, setCreationTime] = useState<number | null>(null);
 
-  const nextStep = () => setStep(s => s + 1);
+  const canProceed = (s: number, d: Record<string, any>): boolean => {
+    switch (s) {
+      case 2: return !!d.intent;
+      case 3: return !!d.courseType;
+      case 4: return !!d.experience;
+      case 5: return !!d.pathwayExperience;
+      case 6: return !!d.goal;
+      case 7: return !!d.availability;
+      case 8: return !!d.learningTool;
+      case 9: return !!d.educationLevel;
+      default: return true;
+    }
+  };
+  const nextStep = (override?: Record<string, any>) => {
+    const check = override ? { ...data, ...override } : data;
+    if (!canProceed(step, check)) return;
+    setStep(s => s + 1);
+  };
   const prevStep = () => setStep(s => Math.max(1, s - 1));
 
   const selectData = (key: keyof typeof data, value: string | boolean) => {
@@ -89,18 +106,18 @@ export default function WaitingOnboarding() {
 
   const handleIntent = (value: string) => {
     selectData('intent', value);
-    nextStep();
+    nextStep({ intent: value });
   };
 
   const handleExperience = (value: string) => {
     selectData('experience', value);
-    nextStep();
+    nextStep({ experience: value });
   };
 
   const handlePathwaySelect = (val: Pathway, label: string) => {
     setPathway(val);
     selectData('courseType', label);
-    nextStep();
+    nextStep({ courseType: label });
   };
 
   const intents = [
@@ -261,7 +278,11 @@ _Action: Please review my CIY Academy application. Thank you!_`;
         </div>
         <div className="w-24 flex justify-end">
           {step > 1 && step < 10 && (
-            <button onClick={nextStep} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-semibold">
+            <button
+              onClick={nextStep}
+              disabled={!canProceed(step, data)}
+              className="flex items-center gap-2 text-slate-500 hover:text-slate-900 disabled:text-slate-300 disabled:hover:text-slate-300 disabled:cursor-not-allowed transition-colors text-sm font-semibold"
+            >
               Next <ArrowRight className="w-4 h-4" />
             </button>
           )}
@@ -360,7 +381,7 @@ _Action: Please review my CIY Academy application. Thank you!_`;
                   'Build my own business tools',
                   'Learn a profitable skill',
                 ].map((opt, i) => (
-                  <button key={i} onClick={() => { selectData('goal', opt); nextStep(); }} className="w-full p-5 rounded-2xl border-2 border-slate-200 hover:border-amber-500 hover:bg-amber-50 bg-white text-slate-700 hover:text-amber-900 transition-all font-semibold text-lg shadow-sm">
+                  <button key={i} onClick={() => { selectData('goal', opt); nextStep({ goal: opt }); }} className="w-full p-5 rounded-2xl border-2 border-slate-200 hover:border-amber-500 hover:bg-amber-50 bg-white text-slate-700 hover:text-amber-900 transition-all font-semibold text-lg shadow-sm">
                     {opt}
                   </button>
                 ))}
@@ -378,7 +399,7 @@ _Action: Please review my CIY Academy application. Thank you!_`;
                   'I’ll need recordings',
                   'Not sure yet'
                 ].map((opt, i) => (
-                  <button key={i} onClick={() => { selectData('availability', opt); nextStep(); }} className="w-full p-5 rounded-2xl border-2 border-slate-200 hover:border-amber-500 hover:bg-amber-50 bg-white text-slate-700 hover:text-amber-900 transition-all font-semibold text-lg shadow-sm">
+                  <button key={i} onClick={() => { selectData('availability', opt); nextStep({ availability: opt }); }} className="w-full p-5 rounded-2xl border-2 border-slate-200 hover:border-amber-500 hover:bg-amber-50 bg-white text-slate-700 hover:text-amber-900 transition-all font-semibold text-lg shadow-sm">
                     {opt}
                   </button>
                 ))}
@@ -394,7 +415,7 @@ _Action: Please review my CIY Academy application. Thank you!_`;
                   { label: 'Mobile Phone', desc: 'I will learn and practice using my smartphone' },
                   { label: 'Laptop', desc: 'I will learn and practice using my personal computer/laptop' }
                 ].map((opt, i) => (
-                  <button key={i} onClick={() => { selectData('learningTool', opt.label); nextStep(); }} className={`w-full p-5 rounded-2xl border-2 text-left flex items-center justify-between transition-all font-semibold text-lg ${data.learningTool === opt.label ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-md' : 'border-slate-200 hover:border-amber-450 bg-white text-slate-700 hover:bg-amber-50/20'}`}>
+                  <button key={i} onClick={() => { selectData('learningTool', opt.label); nextStep({ learningTool: opt.label }); }} className={`w-full p-5 rounded-2xl border-2 text-left flex items-center justify-between transition-all font-semibold text-lg ${data.learningTool === opt.label ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-md' : 'border-slate-200 hover:border-amber-450 bg-white text-slate-700 hover:bg-amber-50/20'}`}>
                     <div>
                       <div className="font-bold text-slate-800">{opt.label}</div>
                       <div className="text-xs font-medium text-slate-500 mt-1">{opt.desc}</div>
@@ -417,7 +438,7 @@ _Action: Please review my CIY Academy application. Thank you!_`;
                   'Undergraduate',
                   'Graduate'
                 ].map((opt, i) => (
-                  <button key={i} onClick={() => { selectData('educationLevel', opt); nextStep(); }} className={`w-full p-5 rounded-2xl border-2 text-center transition-all font-semibold text-lg ${data.educationLevel === opt ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-md' : 'border-slate-200 hover:border-amber-500 hover:bg-amber-50/20 bg-white text-slate-700'}`}>
+                  <button key={i} onClick={() => { selectData('educationLevel', opt); nextStep({ educationLevel: opt }); }} className={`w-full p-5 rounded-2xl border-2 text-center transition-all font-semibold text-lg ${data.educationLevel === opt ? 'border-amber-500 bg-amber-50 text-amber-900 shadow-md' : 'border-slate-200 hover:border-amber-500 hover:bg-amber-50/20 bg-white text-slate-700'}`}>
                     {opt}
                   </button>
                 ))}
@@ -672,7 +693,7 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
   );
 }
 
-function PathwayA({ data, setData, onNext }: { data: any, setData: any, onNext: () => void }) {
+function PathwayA({ data, setData, onNext }: { data: any, setData: any, onNext: (override?: Record<string, any>) => void }) {
   const [subStep, setSubStep] = useState(1);
   const q1 = [
     { title: 'SaaS & Tech Landing Pages', meaning: 'Clean, high-tech landing pages built specifically to launch products, software, or mobile applications.', uses: 'Product walkthroughs, app feature showcases, waitlist registrations.', businesses: 'SaaS startups, software developers, technical founders.', src: 'https://player.cloudinary.com/embed/?cloud_name=qgvszym1&public_id=a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp' },
@@ -683,7 +704,7 @@ function PathwayA({ data, setData, onNext }: { data: any, setData: any, onNext: 
 
   const clickQ1 = (val: string) => { setData((p:any) => ({...p, pathwaySelection: val})); setSubStep(2); };
   const clickQ2 = (val: string) => { setData((p:any) => ({...p, pathwayReason: val})); setSubStep(3); };
-  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext(); };
+  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext({ pathwayExperience: val }); };
 
   return <PathwayFlow step={subStep} mediaType="video"
     title1="What type of landing page would you love to create?" opts1={q1} click1={clickQ1}
@@ -692,7 +713,7 @@ function PathwayA({ data, setData, onNext }: { data: any, setData: any, onNext: 
   />;
 }
 
-function PathwayB({ data, setData, onNext }: { data: any, setData: any, onNext: () => void }) {
+function PathwayB({ data, setData, onNext }: { data: any, setData: any, onNext: (override?: Record<string, any>) => void }) {
   const [subStep, setSubStep] = useState(1);
   const q1 = [
     { title: 'WhatsApp Automated Stores', meaning: 'Responsive digital storefronts integrated with instant WhatsApp order forwarding.', uses: 'Accepting local orders, listing standard item menus, instant buyer alerts.', businesses: 'Instagram clothing brands, local bakeries, dropshipping shops.', src: 'https://player.cloudinary.com/embed/?cloud_name=qgvszym1&public_id=5b233e180530fcf94134bfed78e2c49d_720w_gqclim' },
@@ -703,7 +724,7 @@ function PathwayB({ data, setData, onNext }: { data: any, setData: any, onNext: 
 
   const clickQ1 = (val: string) => { setData((p:any) => ({...p, pathwaySelection: val})); setSubStep(2); };
   const clickQ2 = (val: string) => { setData((p:any) => ({...p, pathwayReason: val})); setSubStep(3); };
-  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext(); };
+  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext({ pathwayExperience: val }); };
 
   return <PathwayFlow step={subStep} mediaType="video"
     title1="What type of e-commerce store would you love to create?" opts1={q1} click1={clickQ1}
@@ -712,7 +733,7 @@ function PathwayB({ data, setData, onNext }: { data: any, setData: any, onNext: 
   />;
 }
 
-function PathwayC({ data, setData, onNext }: { data: any, setData: any, onNext: () => void }) {
+function PathwayC({ data, setData, onNext }: { data: any, setData: any, onNext: (override?: Record<string, any>) => void }) {
   const [subStep, setSubStep] = useState(1);
   const q1 = [
     { title: 'Personal Developer Portfolio', meaning: 'Clean, professional portfolios designed to showcase developer projects, coding skills, and tech stacks.', uses: 'Tech job applications, engineering networking, code repository links.', businesses: 'Software engineers, frontend developers, tech job seekers.', src: 'https://player.cloudinary.com/embed/?cloud_name=qgvszym1&public_id=a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp' },
@@ -723,7 +744,7 @@ function PathwayC({ data, setData, onNext }: { data: any, setData: any, onNext: 
 
   const clickQ1 = (val: string) => { setData((p:any) => ({...p, pathwaySelection: val})); setSubStep(2); };
   const clickQ2 = (val: string) => { setData((p:any) => ({...p, pathwayReason: val})); setSubStep(3); };
-  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext(); };
+  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext({ pathwayExperience: val }); };
 
   return <PathwayFlow step={subStep} mediaType="video"
     title1="What type of portfolio website would you love to create?" opts1={q1} click1={clickQ1}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router';
+import { useIntakeRoute } from '../hooks/useIntakeRoute';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -65,6 +66,7 @@ const NIGERIAN_CREATORS = [
 
 export default function PastCohortProjects() {
   const navigate = useNavigate();
+  const { route: intakeRoute, ready: intakeReady } = useIntakeRoute();
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateItem | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -326,7 +328,9 @@ export default function PastCohortProjects() {
           {/* Strong Action Button */}
           <div className="pt-4">
             <Link
-              to="/waitingonboarding"
+              to={intakeRoute}
+              onClick={(e) => { if (!intakeReady) e.preventDefault(); }}
+              aria-disabled={!intakeReady}
               className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 text-sm font-black uppercase rounded-2xl shadow-lg shadow-amber-950/40 transition-all cursor-pointer border-0"
             >
               Start My 5-Day Journey Now
@@ -552,7 +556,7 @@ export default function PastCohortProjects() {
                     {/* Actions */}
                     <div className="flex flex-col sm:flex-row gap-3 items-center w-full">
                       <button
-                        onClick={() => navigate('/waitingonboarding')}
+                        onClick={() => { if (intakeReady) navigate(intakeRoute); }}
                         className="w-full sm:flex-1 py-3 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 rounded-xl text-xs font-black uppercase transition-all cursor-pointer border-0 shadow-lg shadow-amber-950/20"
                       >
                         I Want to Build Like This

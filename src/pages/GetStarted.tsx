@@ -7,7 +7,7 @@ import BrandingLogo from '../components/BrandingLogo';
 
 export default function GetStarted() {
   const navigate = useNavigate();
-  const intakeRoute = useIntakeRoute();
+  const { route: intakeRoute, ready: intakeReady } = useIntakeRoute();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   const webTypes = [
@@ -148,7 +148,8 @@ export default function GetStarted() {
         {/* Continue to sign up */}
         <div className="text-center mt-8">
           <button
-            onClick={() => navigate(intakeRoute)}
+            disabled={!intakeReady}
+            onClick={() => { if (intakeReady) navigate(intakeRoute); }}
             className="inline-flex items-center justify-center px-10 py-4 rounded-full bg-amber-500 hover:bg-amber-400 text-teal-950 text-base font-black shadow-[0_10px_24px_-8px_rgba(245,158,11,.5)] transition-all hover:-translate-y-0.5 cursor-pointer"
           >
             Continue to sign up

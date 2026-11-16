@@ -184,7 +184,22 @@ export default function Onboarding() {
     return () => unsub();
   }, [navigate]);
 
-  const nextStep = () => {
+  const canProceed = (s: number, d: Record<string, any>): boolean => {
+    switch (s) {
+      case 2: return !!d.intent;
+      case 3: return !!d.courseType;
+      case 4: return !!d.experience;
+      case 5: return !!d.pathwayExperience;
+      case 6: return !!d.goal;
+      case 7: return !!d.availability;
+      case 8: return !!d.learningTool;
+      case 9: return !!d.educationLevel;
+      default: return true;
+    }
+  };
+  const nextStep = (override?: Record<string, any>) => {
+    const check = override ? { ...data, ...override } : data;
+    if (!canProceed(step, check)) return;
     setFormError('');
     setStep(s => s + 1);
   };
@@ -200,18 +215,18 @@ export default function Onboarding() {
 
   const handleIntent = (value: string) => {
     selectData('intent', value);
-    nextStep();
+    nextStep({ intent: value });
   };
 
   const handleExperience = (value: string) => {
     selectData('experience', value);
-    nextStep();
+    nextStep({ experience: value });
   };
 
   const handlePathwaySelect = (val: Pathway, label: string) => {
     setPathway(val);
     selectData('courseType', label);
-    nextStep();
+    nextStep({ courseType: label });
   };
 
   const intents = [
@@ -671,7 +686,11 @@ export default function Onboarding() {
         </div>
         <div className="w-24 flex justify-end">
           {step > 1 && step < 10 && (
-            <button onClick={nextStep} className="flex items-center gap-2 text-slate-400 hover:text-slate-100 transition-colors text-sm font-semibold bg-transparent border-0 cursor-pointer">
+            <button
+              onClick={nextStep}
+              disabled={!canProceed(step, data)}
+              className="flex items-center gap-2 text-slate-400 hover:text-slate-100 disabled:text-slate-700 disabled:hover:text-slate-700 disabled:cursor-not-allowed transition-colors text-sm font-semibold bg-transparent border-0 cursor-pointer"
+            >
               Next <ArrowRight className="w-4 h-4" />
             </button>
           )}
@@ -809,7 +828,7 @@ export default function Onboarding() {
                 ].map((opt, i) => (
                   <button 
                     key={i} 
-                    onClick={() => { selectData('goal', opt); nextStep(); }} 
+                    onClick={() => { selectData('goal', opt); nextStep({ goal: opt }); }} 
                     className="w-full p-5 rounded-2xl border-2 border-slate-800 hover:border-teal-400 hover:bg-teal-950/20 bg-slate-900/60 text-slate-300 hover:text-teal-200 transition-all font-black text-lg cursor-pointer"
                   >
                     {opt}
@@ -831,7 +850,7 @@ export default function Onboarding() {
                 ].map((opt, i) => (
                   <button 
                     key={i} 
-                    onClick={() => { selectData('availability', opt); nextStep(); }} 
+                    onClick={() => { selectData('availability', opt); nextStep({ availability: opt }); }} 
                     className="w-full p-5 rounded-2xl border-2 border-slate-800 hover:border-teal-400 hover:bg-teal-950/20 bg-slate-900/60 text-slate-300 hover:text-teal-200 transition-all font-black text-lg cursor-pointer"
                   >
                     {opt}
@@ -851,7 +870,7 @@ export default function Onboarding() {
                 ].map((opt, i) => (
                   <button 
                     key={i} 
-                    onClick={() => { selectData('learningTool', opt.label); nextStep(); }} 
+                    onClick={() => { selectData('learningTool', opt.label); nextStep({ learningTool: opt.label }); }} 
                     className={`w-full p-5 rounded-2xl border-2 text-left flex items-center justify-between transition-all font-black text-lg cursor-pointer ${data.learningTool === opt.label ? 'border-teal-400 bg-teal-950/20 text-teal-300' : 'border-slate-800 hover:border-teal-400 bg-slate-900/60 text-slate-300'}`}
                   >
                     <div>
@@ -878,7 +897,7 @@ export default function Onboarding() {
                 ].map((opt, i) => (
                   <button 
                     key={i} 
-                    onClick={() => { selectData('educationLevel', opt); nextStep(); }} 
+                    onClick={() => { selectData('educationLevel', opt); nextStep({ educationLevel: opt }); }} 
                     className={`w-full p-5 rounded-2xl border-2 text-center transition-all font-black text-lg cursor-pointer ${data.educationLevel === opt ? 'border-teal-400 bg-teal-950/20 text-teal-300' : 'border-slate-800 hover:border-teal-400 bg-slate-900/60 text-slate-300'}`}
                   >
                     {opt}
@@ -1368,7 +1387,7 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
   );
 }
 
-function PathwayA({ data, setData, onNext }: { data: any, setData: any, onNext: () => void }) {
+function PathwayA({ data, setData, onNext }: { data: any, setData: any, onNext: (override?: Record<string, any>) => void }) {
   const [subStep, setSubStep] = useState(1);
   const q1 = [
     { title: 'SaaS & Tech Landing Pages', meaning: 'Clean, high-tech landing pages built specifically to launch products, software, or mobile applications.', uses: 'Product walkthroughs, app feature showcases, waitlist registrations.', businesses: 'SaaS startups, software developers, technical founders.', src: 'https://player.cloudinary.com/embed/?cloud_name=qgvszym1&public_id=a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp' },
@@ -1379,7 +1398,7 @@ function PathwayA({ data, setData, onNext }: { data: any, setData: any, onNext: 
 
   const clickQ1 = (val: string) => { setData((p:any) => ({...p, pathwaySelection: val})); setSubStep(2); };
   const clickQ2 = (val: string) => { setData((p:any) => ({...p, pathwayReason: val})); setSubStep(3); };
-  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext(); };
+  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext({ pathwayExperience: val }); };
 
   return <PathwayFlow step={subStep} mediaType="video"
     title1="What type of landing page would you love to create?" opts1={q1} click1={clickQ1}
@@ -1388,7 +1407,7 @@ function PathwayA({ data, setData, onNext }: { data: any, setData: any, onNext: 
   />;
 }
 
-function PathwayB({ data, setData, onNext }: { data: any, setData: any, onNext: () => void }) {
+function PathwayB({ data, setData, onNext }: { data: any, setData: any, onNext: (override?: Record<string, any>) => void }) {
   const [subStep, setSubStep] = useState(1);
   const q1 = [
     { title: 'WhatsApp Automated Stores', meaning: 'Responsive digital storefronts integrated with instant WhatsApp order forwarding.', uses: 'Accepting local orders, listing standard item menus, instant buyer alerts.', businesses: 'Instagram clothing brands, local bakeries, dropshipping shops.', src: 'https://player.cloudinary.com/embed/?cloud_name=qgvszym1&public_id=5b233e180530fcf94134bfed78e2c49d_720w_gqclim' },
@@ -1399,7 +1418,7 @@ function PathwayB({ data, setData, onNext }: { data: any, setData: any, onNext: 
 
   const clickQ1 = (val: string) => { setData((p:any) => ({...p, pathwaySelection: val})); setSubStep(2); };
   const clickQ2 = (val: string) => { setData((p:any) => ({...p, pathwayReason: val})); setSubStep(3); };
-  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext(); };
+  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext({ pathwayExperience: val }); };
 
   return <PathwayFlow step={subStep} mediaType="video"
     title1="What type of e-commerce store would you love to create?" opts1={q1} click1={clickQ1}
@@ -1408,7 +1427,7 @@ function PathwayB({ data, setData, onNext }: { data: any, setData: any, onNext: 
   />;
 }
 
-function PathwayC({ data, setData, onNext }: { data: any, setData: any, onNext: () => void }) {
+function PathwayC({ data, setData, onNext }: { data: any, setData: any, onNext: (override?: Record<string, any>) => void }) {
   const [subStep, setSubStep] = useState(1);
   const q1 = [
     { title: 'Personal Developer Portfolio', meaning: 'Clean, professional portfolios designed to showcase developer projects, coding skills, and tech stacks.', uses: 'Tech job applications, engineering networking, code repository links.', businesses: 'Software engineers, frontend developers, tech job seekers.', src: 'https://player.cloudinary.com/embed/?cloud_name=qgvszym1&public_id=a79c48c3e64b87dd05785e11a7bbfd24_xtpnvp' },
@@ -1419,7 +1438,7 @@ function PathwayC({ data, setData, onNext }: { data: any, setData: any, onNext: 
 
   const clickQ1 = (val: string) => { setData((p:any) => ({...p, pathwaySelection: val})); setSubStep(2); };
   const clickQ2 = (val: string) => { setData((p:any) => ({...p, pathwayReason: val})); setSubStep(3); };
-  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext(); };
+  const clickQ3 = (val: string) => { setData((p:any) => ({...p, pathwayExperience: val})); onNext({ pathwayExperience: val }); };
 
   return <PathwayFlow step={subStep} mediaType="video"
     title1="What type of portfolio website would you love to create?" opts1={q1} click1={clickQ1}
