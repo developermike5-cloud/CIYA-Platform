@@ -180,7 +180,7 @@ async function patchDocFields(
   if (!res.ok) throw new Error(`firestore write ${path} failed (${res.status})`);
 }
 
-type AccessGateResult = { ok: boolean; error?: string; codeType?: "ciya" | "beginner" | "advanced" };
+type AccessGateResult = { ok: boolean; error?: string; codeType?: "ciya" | "beginner" | "advanced"; boundCourseId?: string };
 
 function isAdvancedTierCourse(course: any): boolean {
   const tier = String(course?.tier || "").toLowerCase();
@@ -224,16 +224,32 @@ async function checkCourseAccessGate(
   // 1. Already unlocked as the student's first registered course.
   if (firstCourseId === courseId) return { ok: true };
 
-  // 2. The CIYA code from the welcome email unlocks the first course (paid or free).
-  if (cleanInput && cleanInput.toUpperCase() === ciyaCode.toUpperCase()) {
-    await patchDocFields(
-      projectId,
-      databaseId,
-      `accessCodes/${uid}`,
-      { usedForCourseId: { stringValue: courseId }, updatedAt: { timestampValue: new Date().toISOString() } },
-      ["usedForCourseId", "updatedAt"]
-    );
+  // 2. The CIYA code from the welcome email unlocks the ONE course it is bound
+  //    to (their first registered course: issuedCourseId when known, else the
+  //    course the code was first used on). Entering it for any other course is
+  //    refused with a clear wrong-course error, never a silent re-bind.
+  const boundCourseId = firstCourseId || String(codeDoc.issuedForCourseId || "");
+  const typedNorm = cleanInput.toUpperCase().replace(/-+$/, "");
+  if (cleanInput && typedNorm === ciyaCode.toUpperCase()) {
+    if (boundCourseId && boundCourseId !== courseId) {
+      return { ok: false, error: "wrong-course-code", boundCourseId, codeType: isAdv ? "advanced" : "beginner" };
+    }
+    if (!firstCourseId) {
+      await patchDocFields(
+        projectId,
+        databaseId,
+        `accessCodes/${uid}`,
+        { usedForCourseId: { stringValue: courseId }, updatedAt: { timestampValue: new Date().toISOString() } },
+        ["usedForCourseId", "updatedAt"]
+      );
+    }
     return { ok: true };
+  }
+  // A partial CIYA code (e.g. CIYA-YKEK or CIYA-YKEK-CHH) is reported as an
+  // incomplete entry instead of a wrong rotating passcode. A rotating passcode
+  // can never start with "CIYA-", so this can never mask one.
+  if (cleanInput && typedNorm.length >= 4 && typedNorm.length < ciyaCode.length && ciyaCode.toUpperCase().startsWith(typedNorm)) {
+    return { ok: false, error: "incomplete-access-code", codeType: isAdv ? "advanced" : "beginner" };
   }
 
   if (isAdv) {

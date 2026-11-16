@@ -204,7 +204,12 @@ export async function handler(event: any) {
       if (!res.ok) return json(200, { ok: false, reason: "no-code" });
       const doc: any = await res.json();
       const real = codeOf(doc?.fields).trim().toUpperCase();
-      return json(200, { ok: !!real && real === typed });
+      const typedNorm = typed.replace(/-+$/, "");
+      // A partial CIYA code reads as an incomplete entry, never as simply wrong.
+      if (real && typedNorm !== real && typedNorm.length >= 4 && typedNorm.length < real.length && real.startsWith(typedNorm)) {
+        return json(200, { ok: false, reason: "incomplete" });
+      }
+      return json(200, { ok: !!real && real === typedNorm });
     }
 
     return json(400, { error: "unknown op" });

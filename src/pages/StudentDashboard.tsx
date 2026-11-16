@@ -328,7 +328,7 @@ function CourseAccessCodeModal({
       ? 'Enter the beginner class passcode'
       : 'Enter the advanced class passcode';
   const hint = codeType === 'ciya'
-    ? 'Check your welcome email for the CIYA access code that unlocks your first registered course.'
+    ? 'Check your welcome email for the CIYA access code that unlocks your first registered course. Enter the whole code, including the CIYA- prefix.'
     : 'Ask CIYA admin support for the current 6-digit classroom passcode (it rotates every 15 minutes).';
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
@@ -343,7 +343,7 @@ function CourseAccessCodeModal({
           type="text"
           value={codeVal}
           onChange={(e) => setCodeVal(e.target.value)}
-          placeholder={codeType === 'ciya' ? 'e.g. CIYA-XXXXXX' : '6-digit code'}
+          placeholder={codeType === 'ciya' ? 'CIYA-XXXX-XXXX' : '6-digit code'}
           className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-mono font-bold text-sm rounded-xl p-3 outline-none focus:ring-1 focus:ring-purple-500"
           autoFocus
         />
@@ -5542,6 +5542,14 @@ export default function StudentDashboard() {
       setUnlockGate(null);
       handleSelectCourseId(courseId);
       navigate(`/dashboard?view=courses&courseId=${courseId}&syllabus=false`);
+    } else if (res.status === 'incomplete-code') {
+      setUnlockGate((g) => (g ? { ...g, busy: false, error: 'That code looks incomplete. Your CIYA code looks like CIYA-XXXX-XXXX: copy the whole code, including the CIYA- prefix, from your welcome email.' } : g));
+    } else if (res.status === 'wrong-course') {
+      const boundTitle = (registeredCoursesList.find((c) => c.id === res.boundCourseId) || courses.find((c) => c.id === res.boundCourseId))?.title;
+      const triedTitle = courses.find((c) => c.id === courseId)?.title;
+      const where = boundTitle ? `"${boundTitle}"` : 'your first registered course';
+      const tried = triedTitle ? `"${triedTitle}"` : 'this course';
+      setUnlockGate((g) => (g ? { ...g, busy: false, error: `That is your own CIYA access code, but it unlocks ${where}, not ${tried}. Open ${where} from your course list instead.` } : g));
     } else if (res.status === 'invalid-code') {
       setUnlockGate((g) => (g ? { ...g, busy: false, error: 'That code is not valid. Check your email or ask admin support.' } : g));
     } else {
@@ -5911,7 +5919,9 @@ export default function StudentDashboard() {
       });
       const data = await res.json().catch(() => ({} as any));
       if (!res.ok || !data?.ok) {
-        setActivationError('Invalid access code. Please check the welcome email we sent you.');
+        setActivationError(data?.reason === 'incomplete'
+          ? 'That code looks incomplete. Your CIYA code looks like CIYA-XXXX-XXXX: copy the whole code, including the CIYA- prefix, from your welcome email.'
+          : 'Invalid access code. Please check the welcome email we sent you.');
         return;
       }
       const updatedProfile = {

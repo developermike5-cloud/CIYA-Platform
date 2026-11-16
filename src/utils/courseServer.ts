@@ -78,6 +78,8 @@ export type CourseGateResult =
   | { status: 'ok'; course: Course }
   | { status: 'needs-code'; codeType: 'ciya' | 'beginner' | 'advanced' }
   | { status: 'invalid-code'; codeType?: 'ciya' | 'beginner' | 'advanced' }
+  | { status: 'wrong-course'; boundCourseId?: string; codeType?: 'ciya' | 'beginner' | 'advanced' }
+  | { status: 'incomplete-code'; codeType?: 'ciya' | 'beginner' | 'advanced' }
   | { status: 'error' };
 
 // Fetch a course through the server-side access gate. When the course needs an
@@ -105,6 +107,8 @@ export async function fetchServerCourseGated(courseId: string, accessCode?: stri
       const codeType = data?.codeType;
       if (err === 'access-code-required') return { status: 'needs-code', codeType };
       if (err === 'invalid-access-code') return { status: 'invalid-code', codeType };
+      if (err === 'wrong-course-code') return { status: 'wrong-course', boundCourseId: data?.boundCourseId, codeType };
+      if (err === 'incomplete-access-code') return { status: 'incomplete-code', codeType };
     }
     return { status: 'error' };
   } catch (e) {
