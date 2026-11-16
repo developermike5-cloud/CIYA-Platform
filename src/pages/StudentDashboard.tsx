@@ -2839,19 +2839,54 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   const sk = SKILLS[course.skill || 'web'];
 
   if (!course.days || course.days.length === 0) {
+    if (loading) {
+      return (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-12.5 h-12.5 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mb-4" />
+          <p className="text-slate-600 text-xs font-black uppercase tracking-wider">Loading Syllabus & Lessons...</p>
+        </div>
+      );
+    }
+    // The full lesson content only hydrates for enrolled students; for everyone
+    // else show the published curriculum outline (light stats) instead of a dead end.
+    if (lessonStats && lessonStats.days && lessonStats.days.length > 0) {
+      return (
+        <div className="max-w-3xl mx-auto py-10 px-4">
+          <div className="bg-white p-5 md:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">
+                {lessonStats.dayCount || lessonStats.days.length} {isCourseAdvanced ? 'Module' : 'Day'} Curriculum
+              </h3>
+              <span className="text-xs font-black uppercase tracking-wider text-slate-500">
+                {lessonStats.videoCount} Video Lesson{lessonStats.videoCount === 1 ? '' : 's'}
+              </span>
+            </div>
+            <ul className="space-y-2.5">
+              {lessonStats.days.map((d, dIdx) => (
+                <li key={dIdx} className="flex items-start gap-3 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3">
+                  <span className="text-indigo-500 mt-0.5 select-none shrink-0 text-xs font-black">{d.dayNumber}.</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm md:text-base text-slate-900 font-extrabold leading-snug">{d.title}</span>
+                    {d.videoCount > 0 && (
+                      <span className="block text-xs text-slate-500 font-bold mt-0.5">
+                        {d.videoCount} lesson{d.videoCount === 1 ? '' : 's'}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider text-center pt-1">
+              Full lesson content opens inside the classroom
+            </p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        {loading ? (
-          <>
-            <div className="w-12.5 h-12.5 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-slate-600 text-xs font-black uppercase tracking-wider">Loading Syllabus & Lessons...</p>
-          </>
-        ) : (
-          <>
-            <div className="text-3xl mb-4 select-none">📚</div>
-            <p className="text-slate-600 text-sm font-black uppercase tracking-wider">No lessons published for this path yet.</p>
-          </>
-        )}
+        <div className="text-3xl mb-4 select-none">📚</div>
+        <p className="text-slate-600 text-sm font-black uppercase tracking-wider">No lessons published for this path yet.</p>
       </div>
     );
   }
@@ -8385,10 +8420,16 @@ export default function StudentDashboard() {
                                 No courses available in this track.
                               </div>
                             ) : (() => {
-                              const isAdvCourse = (c: any) => c.tier === 'advanced' || c.tier === 'masterclass' || c.level === 'Advanced' || c.level === 'Masterclass';
-                              const beginnerCourses = filteredCourses.filter((c) => !isAdvCourse(c));
-                              const advancedCourses = filteredCourses.filter((c) => c.tier === 'advanced' || c.level === 'Advanced');
-                              const masterclassCourses = filteredCourses.filter((c) => c.tier === 'masterclass' || c.level === 'Masterclass');
+                              const tierOf = (c: any) => {
+                                const t = String(c.tier || c.level || c.courseType || '').toLowerCase();
+                                if (/master/.test(t)) return 'masterclass';
+                                if (/adv/.test(t)) return 'advanced';
+                                return 'beginner';
+                              };
+                              const isAdvCourse = (c: any) => tierOf(c) !== 'beginner';
+                              const beginnerCourses = filteredCourses.filter((c) => tierOf(c) === 'beginner');
+                              const advancedCourses = filteredCourses.filter((c) => tierOf(c) === 'advanced');
+                              const masterclassCourses = filteredCourses.filter((c) => tierOf(c) === 'masterclass');
 
                               const renderCourseGrid = (list: any[]) => (
                                 <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6">
@@ -8420,9 +8461,9 @@ export default function StudentDashboard() {
                                 <>
                                   {/* BEGINNERS COURSE SECTION */}
                                   <div className="space-y-4">
-                                    <div className="flex items-center gap-3">
-                                      <span className="text-[11px] font-black uppercase tracking-wider bg-emerald-600 text-white px-3.5 py-1.5 rounded-full shadow-xs">Beginners Course</span>
-                                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Free starter tracks</span>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                      <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight text-slate-900">Beginners Course</h3>
+                                      <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full">Free starter tracks</span>
                                     </div>
                                     {/* Auto-scroll info slide: one slide, under the beginners course */}
                                     <AnnouncementCarouselCard
@@ -8437,26 +8478,30 @@ export default function StudentDashboard() {
                                   </div>
 
                                   {/* ADVANCED COURSE SECTION */}
-                                  {advancedCourses.length > 0 && (
-                                    <div className="space-y-4">
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-[11px] font-black uppercase tracking-wider bg-indigo-600 text-white px-3.5 py-1.5 rounded-full shadow-xs">Advanced Course</span>
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Paid professional tracks</span>
-                                      </div>
-                                      {renderCourseGrid(advancedCourses)}
+                                  <div className="space-y-4">
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                      <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight text-slate-900">Advanced Course</h3>
+                                      <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-full">Paid professional tracks</span>
                                     </div>
-                                  )}
+                                    {advancedCourses.length > 0 ? renderCourseGrid(advancedCourses) : (
+                                      <div className="text-center py-10 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                                        No advanced courses available yet.
+                                      </div>
+                                    )}
+                                  </div>
 
                                   {/* MASTERCLASS SECTION */}
-                                  {masterclassCourses.length > 0 && (
-                                    <div className="space-y-4">
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-[11px] font-black uppercase tracking-wider bg-slate-900 text-white px-3.5 py-1.5 rounded-full shadow-xs">Masterclass</span>
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Premium expert tracks</span>
-                                      </div>
-                                      {renderCourseGrid(masterclassCourses)}
+                                  <div className="space-y-4">
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                      <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight text-slate-900">Masterclass</h3>
+                                      <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full">Premium expert tracks</span>
                                     </div>
-                                  )}
+                                    {masterclassCourses.length > 0 ? renderCourseGrid(masterclassCourses) : (
+                                      <div className="text-center py-10 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                                        Masterclass courses are coming soon.
+                                      </div>
+                                    )}
+                                  </div>
                                 </>
                               );
                             })()}
