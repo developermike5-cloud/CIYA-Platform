@@ -24,6 +24,7 @@ import { supabase, getStoragePublicUrl } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { coursesStore } from '../utils/coursesStore';
 import { fetchServerCourseGated, isCourseHydrated } from '../utils/courseServer';
+import { fetchCourseStats, CourseStatsEntry } from '../utils/courseServer';
 import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
 import CIYAMembershipBadge from '../components/CIYAMembershipBadge';
 import CustomDropdown from '../components/CustomDropdown';
@@ -86,7 +87,7 @@ const CAROUSEL_BG_PALETTES = [
 // ==========================================
 // ANNOUNCEMENT CAROUSEL CARD (Larger, No Numbers, Placed under registered courses)
 // ==========================================
-function AnnouncementCarouselCard({ onNavigateTab }: { onNavigateTab?: (tab: string, articleId?: string) => void }) {
+function AnnouncementCarouselCard({ onNavigateTab, maxSlides }: { onNavigateTab?: (tab: string, articleId?: string) => void; maxSlides?: number }) {
   const [announcements, setAnnouncements] = useState<any[]>(() => {
     try {
       const cached = safeStorage.getItem('ciya_cached_announcements');
@@ -98,6 +99,8 @@ function AnnouncementCarouselCard({ onNavigateTab }: { onNavigateTab?: (tab: str
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+
+  const visibleAnnouncements = maxSlides ? announcements.slice(0, maxSlides) : announcements;
 
   useEffect(() => {
     // One-shot read per session: announcements rarely change, so we no longer keep
@@ -114,12 +117,12 @@ function AnnouncementCarouselCard({ onNavigateTab }: { onNavigateTab?: (tab: str
   }, []);
 
   useEffect(() => {
-    if (isHovered || announcements.length <= 1) return;
+    if (isHovered || visibleAnnouncements.length <= 1) return;
     const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % announcements.length);
+      setCurrentIndex(prev => (prev + 1) % visibleAnnouncements.length);
     }, 7000);
     return () => clearInterval(interval);
-  }, [isHovered, announcements.length]);
+  }, [isHovered, visibleAnnouncements.length]);
 
   const handleLinkClick = (e: React.MouseEvent, link: string) => {
     if (!link) return;
@@ -194,7 +197,7 @@ function AnnouncementCarouselCard({ onNavigateTab }: { onNavigateTab?: (tab: str
         className="flex transition-transform duration-700 ease-in-out w-full"
         style={{ transform: `translateX(-${currentIndex * 100}%)` }}
       >
-        {announcements.map((ann, idx) => {
+        {visibleAnnouncements.map((ann, idx) => {
           const bgClass = CAROUSEL_BG_PALETTES[idx % CAROUSEL_BG_PALETTES.length];
           return (
             <div 
@@ -225,9 +228,9 @@ function AnnouncementCarouselCard({ onNavigateTab }: { onNavigateTab?: (tab: str
               </div>
 
               {/* Slider Dots Indicator */}
-              {announcements.length > 1 && (
+              {visibleAnnouncements.length > 1 && (
                 <div className="flex items-center justify-center gap-1.5 pt-4 mt-4 border-t border-white/10">
-                  {announcements.map((_, dotIdx) => (
+                  {visibleAnnouncements.map((_, dotIdx) => (
                     <button
                       key={dotIdx}
                       type="button"
@@ -2033,6 +2036,8 @@ interface CourseViewerProps {
   allMySubmissions?: any[];
   appSettings?: any;
   onRequestUnlockAdvanced?: (course: Course) => void;
+  onRequestCodeGate?: (course: Course) => void;
+  lessonStats?: { videoCount?: number; dayCount?: number; assignmentCount?: number; days?: { dayNumber: number; title: string; videoCount: number; videos: { title: string; duration: string }[] }[] } | null;
 }
 
 function renderBulletList(text: string, icon: string, textClass: string = "text-sm text-slate-800") {
@@ -2054,7 +2059,7 @@ function renderBulletList(text: string, icon: string, textClass: string = "text-
   );
 }
 
-function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false, allMySubmissions = [], appSettings, onRequestUnlockAdvanced }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false, allMySubmissions = [], appSettings, onRequestUnlockAdvanced, onRequestCodeGate, lessonStats }: CourseViewerProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -3000,6 +3005,22 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
               </div>
             )}
 
+            {(!course.days || course.days.length === 0) && lessonStats && lessonStats.days && lessonStats.days.length > 0 && (
+              <div className="md:col-span-2 space-y-2 bg-white p-4 md:p-5 rounded-2xl border border-indigo-100/60">
+                <span className="text-xs md:text-sm font-black uppercase text-slate-500 tracking-wider block">
+                  {lessonStats.dayCount} {isCourseAdvanced ? 'Module' : 'Day'} Curriculum · {lessonStats.videoCount} Video Lessons
+                </span>
+                <ul className="space-y-1.5 mt-1">
+                  {lessonStats.days.map((d, dIdx) => (
+                    <li key={dIdx} className="flex items-start gap-2 text-sm text-slate-700 leading-relaxed font-bold">
+                      <span className="text-indigo-500 mt-0.5 select-none shrink-0 text-xs font-black">{d.dayNumber}.</span>
+                      <span className="min-w-0 flex-1">{d.title}{d.videoCount > 0 ? ` · ${d.videoCount} lesson${d.videoCount === 1 ? '' : 's'}` : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {isRevoked && (
               <div className="md:col-span-2 space-y-2.5 bg-rose-50 p-4 md:p-5 rounded-2xl border-2 border-rose-300">
                 <span className="text-xs md:text-sm font-black uppercase text-rose-850 tracking-wider block">
@@ -3023,6 +3044,18 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                   return;
                 }
                 if (!effectiveIsEnrolled) {
+                  // The access code (or paid-flow unlock) is demanded HERE, on the
+                  // "Enter the Classroom" click, never on the details page itself.
+                  if (onRequestCodeGate) {
+                    if (isRevoked || (course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass') && (appSettings?.advancedCourseSettings?.enabled ?? true)) {
+                      if (onRequestUnlockAdvanced) {
+                        onRequestUnlockAdvanced(course);
+                      }
+                      return;
+                    }
+                    onRequestCodeGate(course);
+                    return;
+                  }
                   const isAdv = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass';
                   const isMonetized = appSettings?.advancedCourseSettings?.enabled ?? true;
                   if (isAdv && isMonetized) {
@@ -4372,6 +4405,26 @@ export default function StudentDashboard() {
     }
     return null;
   });
+  // Light lesson counts for catalog courses that are not hydrated yet (their full
+  // lesson content only loads after registration/unlock).
+  const [courseStats, setCourseStats] = useState<Record<string, CourseStatsEntry>>({});
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const need = courses.filter((c) => c.id && !(c.days && c.days.length > 0)).map((c) => c.id!);
+    if (!need.length) return;
+    let cancelled = false;
+    fetchCourseStats(need).then((entries) => {
+      if (cancelled || !entries.length) return;
+      setCourseStats((prev) => {
+        const next = { ...prev };
+        for (const e of entries) next[e.id] = e;
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [currentUser, courses]);
+
 
   const [userProfile, setUserProfile] = useState<any>(() => {
     const cachedProfile = safeStorage.getItem('ciya_cached_profile');
@@ -5463,6 +5516,18 @@ export default function StudentDashboard() {
   const handleGatedSelectCourseId = (cId: string | null) => {
     if (!cId || isAdmin || isCourseHydrated(cId)) { handleSelectCourseId(cId); return; }
     setUnlockGate({ courseId: cId, codeType: courseCodeGates[cId] || 'ciya', busy: false, error: null });
+  };
+
+  // Public preview: open a course's full details page without any enrollment or
+  // access-code gate. The access code is only demanded when the student clicks
+  // "Enter the Classroom" at the bottom of the details page.
+  const handlePreviewCourseId = (cId: string | null) => {
+    setSelectedCourseId(cId);
+    if (cId) {
+      navigate(`/dashboard?view=${currentView}&courseId=${cId}`);
+    } else {
+      navigate(`/dashboard?view=${currentView}`);
+    }
   };
 
   const handleUnlockSubmit = async (code: string) => {
@@ -8126,6 +8191,8 @@ export default function StudentDashboard() {
                   allMySubmissions={allMySubmissions}
                   appSettings={appSettings}
                   onRequestUnlockAdvanced={(c) => setAdvancedPaymentCourse(c)}
+                  onRequestCodeGate={(c) => setUnlockGate({ courseId: c.id, codeType: courseCodeGates[c.id] || 'ciya', busy: false, error: null })}
+                  lessonStats={courseStats[selectedCourse.id] || null}
                 />
               ) : (
                 <div className="space-y-8">
@@ -8247,13 +8314,6 @@ export default function StudentDashboard() {
                   )}
 
                   <div className="space-y-4 text-left">
-                    {/* Category Banner Carousel for AI Website, AI Video, and AI Image & Graphics */}
-                    <CategoryBannerCarousel 
-                      activeSkillFilter={activeSkillFilter}
-                      setActiveSkillFilter={setActiveSkillFilter}
-                      courseLevelFilter={courseLevelFilter}
-                      setCourseLevelFilter={setCourseLevelFilter}
-                    />
 
                     {(loading && filteredCourses.length === 0) ? (
                       <div className="flex items-center justify-center py-20 bg-white rounded-3xl border">
@@ -8317,42 +8377,89 @@ export default function StudentDashboard() {
                           })()}
                         </div>
 
-                        {/* View 1: 2-Column Responsive Course Cards Grid */}
+                        {/* View 1: Tier sections (Beginners / Advanced / Masterclass) */}
                         {coursesViewTab === 'courses' && (
-                          <div className="space-y-6">
+                          <div className="space-y-8">
                             {filteredCourses.length === 0 ? (
                               <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
                                 No courses available in this track.
                               </div>
-                            ) : (
-                              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                                {filteredCourses.map(course => {
-                                  const isEnrolled = isAdmin || (!isCourseAccessRevoked(userProfile, course) && (!!(userProfile?.progress && userProfile.progress[course.id] && userProfile.progress[course.id].accessStatus !== 'revoked') || isProfileRegisteredForCourse(userProfile, course)));
-                                  return (
-                                    <TwoColumnCourseCard
-                                      key={course.id}
-                                      course={course}
-                                      userProfile={userProfile}
-                                      isEnrolled={isEnrolled}
-                                      onSelect={() => {
-                                        if (isGuest) {
-                                          alert("Please Sign In with Google to unlock full access to mini-videos, daily study materials, quizzes, live assignments and certificate tracking!");
-                                          handleLogin();
-                                          return;
-                                        }
-                                        setSplashPreviewCourse(course);
-                                        setIsCourseCardSplashOpen(true);
-                                      }}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            )}
+                            ) : (() => {
+                              const isAdvCourse = (c: any) => c.tier === 'advanced' || c.tier === 'masterclass' || c.level === 'Advanced' || c.level === 'Masterclass';
+                              const beginnerCourses = filteredCourses.filter((c) => !isAdvCourse(c));
+                              const advancedCourses = filteredCourses.filter((c) => c.tier === 'advanced' || c.level === 'Advanced');
+                              const masterclassCourses = filteredCourses.filter((c) => c.tier === 'masterclass' || c.level === 'Masterclass');
 
-                            {/* CAROUSEL ANNOUNCEMENTS BANNER CARD */}
-                            <div className="pt-2">
-                              <AnnouncementCarouselCard onNavigateTab={(tab) => { if (tab === 'courses' || tab === 'leaderboard') setCoursesViewTab(tab); }} />
-                            </div>
+                              const renderCourseGrid = (list: any[]) => (
+                                <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6">
+                                  {list.map(course => {
+                                    const isEnrolled = isAdmin || (!isCourseAccessRevoked(userProfile, course) && (!!(userProfile?.progress && userProfile.progress[course.id] && userProfile.progress[course.id].accessStatus !== 'revoked') || isProfileRegisteredForCourse(userProfile, course)));
+                                    return (
+                                      <TwoColumnCourseCard
+                                        key={course.id}
+                                        course={course}
+                                        userProfile={userProfile}
+                                        isEnrolled={isEnrolled}
+                                        lessonStats={courseStats[course.id] || null}
+                                        onSelect={() => {
+                                          if (isGuest) {
+                                            alert("Please Sign In with Google to unlock full access to mini-videos, daily study materials, quizzes, live assignments and certificate tracking!");
+                                            handleLogin();
+                                            return;
+                                          }
+                                          setSplashPreviewCourse(course);
+                                          setIsCourseCardSplashOpen(true);
+                                        }}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              );
+
+                              return (
+                                <>
+                                  {/* BEGINNERS COURSE SECTION */}
+                                  <div className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-[11px] font-black uppercase tracking-wider bg-emerald-600 text-white px-3.5 py-1.5 rounded-full shadow-xs">Beginners Course</span>
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Free starter tracks</span>
+                                    </div>
+                                    {/* Auto-scroll info slide: one slide, under the beginners course */}
+                                    <AnnouncementCarouselCard
+                                      maxSlides={1}
+                                      onNavigateTab={(tab) => { if (tab === 'courses' || tab === 'leaderboard') setCoursesViewTab(tab); }}
+                                    />
+                                    {beginnerCourses.length > 0 ? renderCourseGrid(beginnerCourses) : (
+                                      <div className="text-center py-10 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                                        No beginners courses available yet.
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* ADVANCED COURSE SECTION */}
+                                  {advancedCourses.length > 0 && (
+                                    <div className="space-y-4">
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-[11px] font-black uppercase tracking-wider bg-indigo-600 text-white px-3.5 py-1.5 rounded-full shadow-xs">Advanced Course</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Paid professional tracks</span>
+                                      </div>
+                                      {renderCourseGrid(advancedCourses)}
+                                    </div>
+                                  )}
+
+                                  {/* MASTERCLASS SECTION */}
+                                  {masterclassCourses.length > 0 && (
+                                    <div className="space-y-4">
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-[11px] font-black uppercase tracking-wider bg-slate-900 text-white px-3.5 py-1.5 rounded-full shadow-xs">Masterclass</span>
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Premium expert tracks</span>
+                                      </div>
+                                      {renderCourseGrid(masterclassCourses)}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
 
@@ -8966,10 +9073,11 @@ export default function StudentDashboard() {
         course={splashPreviewCourse}
         userProfile={userProfile}
         isAdmin={isAdmin}
+        lessonStats={splashPreviewCourse ? (courseStats[splashPreviewCourse.id] || null) : null}
         onClose={() => setIsCourseCardSplashOpen(false)}
         onViewDescription={(courseId) => {
           setIsCourseCardSplashOpen(false);
-          handleGatedSelectCourseId(courseId);
+          handlePreviewCourseId(courseId);
         }}
       />
 

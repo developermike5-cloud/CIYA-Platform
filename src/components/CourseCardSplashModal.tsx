@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Sparkles, BookOpen, Play, CheckCircle2, Clock, Award, FileText, ArrowRight, ShieldCheck } from 'lucide-react';
+import { X, Sparkles, BookOpen, Play, CheckCircle2, Clock, Award, FileText, ArrowRight } from 'lucide-react';
 import { Course, UserProfile } from '../types';
 
 interface CourseCardSplashModalProps {
@@ -10,6 +10,7 @@ interface CourseCardSplashModalProps {
   isAdmin: boolean;
   onClose: () => void;
   onViewDescription: (courseId: string) => void;
+  lessonStats?: { videoCount?: number; dayCount?: number; assignmentCount?: number } | null;
 }
 
 export default function CourseCardSplashModal({
@@ -19,18 +20,27 @@ export default function CourseCardSplashModal({
   isAdmin,
   onClose,
   onViewDescription,
+  lessonStats,
 }: CourseCardSplashModalProps) {
   if (!isOpen || !course) return null;
 
   const progressObj = userProfile?.progress?.[course.id];
   const completedVideosCount = progressObj?.completedVideos ? Object.keys(progressObj.completedVideos).length : 0;
-  const totalVideos = (course.days || []).reduce((acc, d) => acc + (d.videos?.length || 0), 0) || 1;
-  const progressPercent = Math.min(100, Math.round((completedVideosCount / totalVideos) * 100));
+  // Real lesson counts: prefer hydrated lesson data, then the catalog stats
+  // fetched for courses that are not hydrated yet.
+  const totalVideos = Math.max(
+    (course.days || []).reduce((acc, d) => acc + (d.videos?.length || 0), 0),
+    Number(lessonStats?.videoCount || 0)
+  );
+  const progressPercent = totalVideos > 0 ? Math.min(100, Math.round((completedVideosCount / totalVideos) * 100)) : 0;
 
   const isEnrolled = isAdmin || (!!(userProfile?.progress && userProfile.progress[course.id] && userProfile.progress[course.id].accessStatus !== 'revoked'));
   const isAdvanced = course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass';
 
-  const totalAssignments = (course.days || []).filter(d => !!d.assignment).length;
+  const totalAssignments = Math.max(
+    (course.days || []).filter(d => !!d.assignment).length,
+    Number(lessonStats?.assignmentCount || 0)
+  );
 
   return (
     <AnimatePresence>
@@ -168,19 +178,6 @@ export default function CourseCardSplashModal({
               <div className="text-[10px] font-bold text-slate-500">On 100% Pass</div>
             </div>
           </div>
-
-          {/* Course Description / Overview Excerpt */}
-          {course.description && (
-            <div className="space-y-1 text-left bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200/60">
-              <div className="text-[10px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-                Course Curriculum Overview
-              </div>
-              <p className="text-xs text-slate-700 font-medium leading-relaxed line-clamp-3">
-                {course.description}
-              </p>
-            </div>
-          )}
 
           {/* If Enrolled: Show Progress Bar */}
           {isEnrolled && (

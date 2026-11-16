@@ -113,6 +113,51 @@ export async function fetchServerCourseGated(courseId: string, accessCode?: stri
   }
 }
 
+// Light course outlines for the public catalog: titles and counts only, never
+// video URLs or lesson content. Powers lesson counts on course cards and the
+// public course-details page for students who have not registered yet.
+export interface CourseStatsEntry {
+  id: string;
+  title: string;
+  dayCount: number;
+  videoCount: number;
+  assignmentCount: number;
+  days: { dayNumber: number; title: string; description: string; videoCount: number; videos: { title: string; duration: string }[] }[];
+}
+
+let cachedStats: { at: number; entries: CourseStatsEntry[] } | null = null;
+
+export async function fetchCourseStats(courseIds: string[]): Promise<CourseStatsEntry[]> {
+  if (!courseIds.length) return [];
+  // Session cache: stats are static between deploys, refresh at most every 10 minutes.
+  if (cachedStats && Date.now() - cachedStats.at < 10 * 60 * 1000) {
+    const have = new Set(cachedStats.entries.map((e) => e.id));
+    const missing = courseIds.filter((id) => !have.has(id));
+    if (!missing.length) return cachedStats.entries.filter((e) => courseIds.includes(e.id));
+  }
+  try {
+    const token = await currentIdToken();
+    if (!token) return cachedStats ? cachedStats.entries.filter((e) => courseIds.includes(e.id)) : [];
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      body: JSON.stringify({ op: 'stats', courseIds }),
+    });
+    const data = await res.json().catch(() => ({} as any));
+    if (res.ok && data?.ok && Array.isArray(data.stats)) {
+      const entries = data.stats as CourseStatsEntry[];
+      const merged = cachedStats
+        ? [...cachedStats.entries.filter((e) => !entries.some((n) => n.id === e.id)), ...entries]
+        : entries;
+      cachedStats = { at: Date.now(), entries: merged };
+      return entries;
+    }
+  } catch (e) {
+    console.warn('[course-store] stats fetch failed:', e);
+  }
+  return cachedStats ? cachedStats.entries.filter((e) => courseIds.includes(e.id)) : [];
+}
+
 // Admin-only: a student's unique CIYA access code (held server-side; students
 // can never read it). Used by the admin student-details panel.
 export async function getStudentAccessCode(

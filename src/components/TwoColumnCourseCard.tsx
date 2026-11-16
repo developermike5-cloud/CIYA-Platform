@@ -8,6 +8,7 @@ interface TwoColumnCourseCardProps {
   userProfile?: any;
   isEnrolled?: boolean;
   onSelect: () => void;
+  lessonStats?: { videoCount?: number; dayCount?: number } | null;
 }
 
 export const TwoColumnCourseCard: React.FC<TwoColumnCourseCardProps> = ({
@@ -15,13 +16,18 @@ export const TwoColumnCourseCard: React.FC<TwoColumnCourseCardProps> = ({
   userProfile,
   isEnrolled = false,
   onSelect,
+  lessonStats,
 }) => {
   // Compute progress if enrolled
   const progressObj = userProfile?.progress?.[course.id];
   const completedVideosCount = progressObj?.completedVideos ? Object.keys(progressObj.completedVideos).length : 0;
   
-  // Calculate total videos
-  const totalVideos = (course.days || []).reduce((acc, d) => acc + (d.videos?.length || 0), 0) || 1;
+  // Calculate total videos: prefer real lesson data, then the catalog stats
+  // (titles/counts only) fetched for courses that are not hydrated yet.
+  const totalVideos = Math.max(
+    (course.days || []).reduce((acc, d) => acc + (d.videos?.length || 0), 0),
+    Number(lessonStats?.videoCount || 0)
+  );
   const progressPercent = Math.min(100, Math.round((completedVideosCount / totalVideos) * 100));
   const isCompleted = progressPercent === 100;
 

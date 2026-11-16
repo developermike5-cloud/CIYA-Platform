@@ -556,6 +556,43 @@ export async function handler(event: any) {
       return json(200, { ok: true, course });
     }
 
+    if (op === "stats") {
+      // Public-to-logged-in catalog helper: light course outlines only (titles and
+      // counts, never video URLs or lesson content). Powers lesson counts and the
+      // public course-details view for students who have not registered yet.
+      const courseIds = Array.isArray(body.courseIds) ? body.courseIds.map((x: any) => String(x || "").trim()).filter(Boolean) : [];
+      if (!courseIds.length) return json(200, { ok: true, stats: [] });
+      const out: any[] = [];
+      for (const courseId of courseIds.slice(0, 50)) {
+        const stored = await fetchStoredCourse(PUBLIC_ID_PREFIX + courseId, cloudName, apiKey, apiSecret);
+        if (!stored) continue;
+        const days = Array.isArray(stored.days) ? stored.days : [];
+        let videoCount = 0;
+        let assignmentCount = 0;
+        const outline = days.map((d: any, idx: number) => {
+          const videos = Array.isArray(d.videos) ? d.videos : [];
+          videoCount += videos.length;
+          if (d.assignment) assignmentCount += 1;
+          return {
+            dayNumber: Number(d.dayNumber || idx + 1),
+            title: String(d.title || ""),
+            description: String(d.description || ""),
+            videoCount: videos.length,
+            videos: videos.map((v: any) => ({ title: String(v.title || ""), duration: String(v.duration || "") })),
+          };
+        });
+        out.push({
+          id: String(stored.id || courseId),
+          title: String(stored.title || ""),
+          dayCount: days.length,
+          videoCount,
+          assignmentCount,
+          days: outline,
+        });
+      }
+      return json(200, { ok: true, stats: out });
+    }
+
     if (op === "student-code") {
       // Admin-only: read a student's unique CIYA access code (students can never
       // read this document; Firestore rules deny all client access to accessCodes).
