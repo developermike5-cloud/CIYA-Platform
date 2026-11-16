@@ -315,7 +315,6 @@ export default function Onboarding() {
     const finalActivated = autoApprovalEnabled ? true : false;
 
     setCreationTime(new Date().getTime());
-    const generatedAdminCode = `CIYA-${Math.floor(100000 + Math.random() * 900000)}`;
 
     await setDoc(docRef, {
       email: user.email,
@@ -341,7 +340,6 @@ export default function Onboarding() {
       isActivated: finalActivated,
       referralsCount: 0,
       approvalStatus: finalApprovalStatus,
-      adminCode: generatedAdminCode,
       isDashboardUnlocked: finalDashboardUnlocked,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -374,8 +372,7 @@ export default function Onboarding() {
         isActivated: finalActivated,
         referralsCount: 0,
         approvalStatus: finalApprovalStatus,
-        adminCode: generatedAdminCode,
-        isDashboardUnlocked: finalDashboardUnlocked,
+          isDashboardUnlocked: finalDashboardUnlocked,
         cohort: activeCohort
       };
 

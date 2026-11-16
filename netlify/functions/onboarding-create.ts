@@ -294,7 +294,6 @@ export const handler = async (event: any) => {
     }
 
     const now = Date.now();
-    const generatedAdminCode = `CIYA-${Math.floor(100000 + Math.random() * 900000)}`;
     const userCode = String(uid).slice(0, 6).toUpperCase();
     const ciyaCode = `CIYA-${randomFrom(CODE_ALPHABET, 4)}-${randomFrom(CODE_ALPHABET, 4)}`;
     const recommendedPath = String(body.recommendedPath || "").trim();
@@ -327,7 +326,6 @@ export const handler = async (event: any) => {
       isActivated: B(finalActivated),
       referralsCount: N(0),
       approvalStatus: S(finalApprovalStatus),
-      adminCode: S(generatedAdminCode),
       isDashboardUnlocked: B(finalDashboardUnlocked),
       cohort: S(body?.paid === true ? "" : activeCohort),
       onboardingStatus: S("registered"),

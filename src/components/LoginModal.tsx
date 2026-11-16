@@ -224,7 +224,6 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         const finalDashboardUnlocked = autoApprovalEnabled ? true : false;
         const finalActivated = autoApprovalEnabled ? true : false;
 
-        const generatedAdminCode = `CIYA-${Math.floor(100000 + Math.random() * 900000)}`;
         const freshProfile = {
           email: user.email,
           fullName: signUpFullName,
@@ -241,7 +240,6 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           isDashboardUnlocked: finalDashboardUnlocked,
           myReferralCode: userCode,
           referralCode: referralCode.trim() || '',
-          adminCode: generatedAdminCode,
           cohort: activeCohort
         };
 

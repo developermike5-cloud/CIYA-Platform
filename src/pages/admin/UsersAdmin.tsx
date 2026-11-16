@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp, where, addDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp, where, addDoc, arrayUnion, deleteField } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, getActiveDatabaseId, setActiveDatabaseId, triggerSystemSignal } from '../../firebase';
 import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
@@ -75,7 +75,6 @@ interface UserProfile {
   isActivated?: boolean;
   referralsCount?: number;
   approvalStatus?: string;
-  adminCode?: string;
   isDashboardUnlocked?: boolean;
   hasYearBadge?: boolean;
   membershipId?: string;
@@ -269,8 +268,8 @@ export default function UsersAdmin() {
   const [courseSwitchConfirmId, setCourseSwitchConfirmId] = useState<string | null>(null);
 
   // Local states for activation code controls
-  const [editingCodes, setEditingCodes] = useState<Record<string, string>>({});
-  const [codeSuccessId, setCodeSuccessId] = useState<string | null>(null);
+  const [accessCodes, setAccessCodes] = useState<Record<string, string>>({});
+  const [purgingLegacy, setPurgingLegacy] = useState(false);
 
   // Admins state & Super Admin check
   const [admins, setAdmins] = useState<string[]>([]);
@@ -502,6 +501,45 @@ export default function UsersAdmin() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const fetchAccessCodes = async () => {
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) return;
+      const res = await fetch('/.netlify/functions/access-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'list', idToken }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (data?.codes) setAccessCodes(data.codes);
+    } catch (e) {
+      console.warn('access codes fetch failed:', e);
+    }
+  };
+
+  const handlePurgeLegacyCodes = async () => {
+    const targets = users.filter(u => (u as any).adminCode);
+    if (!targets.length) return;
+    setPurgingLegacy(true);
+    let ok = 0;
+    for (const t of targets) {
+      try {
+        await updateDoc(doc(db, 'users', t.id), { adminCode: deleteField() });
+        ok += 1;
+        setUsers(prev => prev.map(u => {
+          if (u.id !== t.id) return u;
+          const copy: any = { ...u };
+          delete copy.adminCode;
+          return copy;
+        }));
+      } catch (e) {
+        console.error('legacy code purge failed for', t.id, e);
+      }
+    }
+    setPurgingLegacy(false);
+    alert(`Removed legacy codes from ${ok} of ${targets.length} student profile(s). The email access codes are untouched.`);
+  };
+
   const fetchUsers = async (targetCohort: string, forceRefresh = false) => {
     const cacheKey = 'ciya_admin_cached_users_list_All';
 
@@ -516,6 +554,7 @@ export default function UsersAdmin() {
           setUsers(JSON.parse(cachedUsersStr));
           setAdmins(JSON.parse(cachedAdminsStr));
           setAdminsData(JSON.parse(cachedAdminsDataStr));
+          fetchAccessCodes();
           
           const coursesData = coursesStore.getCourses();
           setAllCourses(coursesData);
@@ -554,6 +593,7 @@ export default function UsersAdmin() {
         return getMills(b.createdAt) - getMills(a.createdAt);
       });
       setUsers(data);
+      fetchAccessCodes();
 
       const coursesData = coursesStore.getCourses();
       setAllCourses(coursesData);
@@ -669,23 +709,19 @@ export default function UsersAdmin() {
   const handleApprove = async (userId: string) => {
     setActionLoading(prev => ({ ...prev, [userId]: 'approve' }));
     try {
-      const userDoc = users.find(u => u.id === userId);
-      const generatedCode = userDoc?.adminCode || `CIYA-${Math.floor(100000 + Math.random() * 900000)}`;
       await updateDoc(doc(db, 'users', userId), { 
         approvalStatus: 'Approved',
-        adminCode: generatedCode,
         isDashboardUnlocked: true
       });
       if (rtdb) {
         dbSet(dbRef(rtdb, `users/${userId}`), {
           approvalStatus: 'Approved',
-          adminCode: generatedCode,
           isDashboardUnlocked: true,
           updatedAt: Date.now()
         }).catch(err => console.warn("RTDB sync failed:", err));
       }
       await triggerSystemSignal('user_signals', userId);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Approved', adminCode: generatedCode, isDashboardUnlocked: true } : u));
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, approvalStatus: 'Approved', isDashboardUnlocked: true } : u));
     } catch (error) {
       console.error("Error approving user application:", error);
     } finally {
@@ -713,24 +749,6 @@ export default function UsersAdmin() {
       console.error("Error disapproving user application:", error);
     } finally {
       setActionLoading(prev => ({ ...prev, [userId]: null }));
-    }
-  };
-
-  const handleUpdateAdminCode = async (userId: string, newCode: string) => {
-    try {
-      const codeToSet = newCode.trim().toUpperCase();
-      if (!codeToSet) return;
-      await updateDoc(doc(db, 'users', userId), { adminCode: codeToSet });
-      if (rtdb) {
-        dbSet(dbRef(rtdb, `users/${userId}/adminCode`), codeToSet)
-          .catch(err => console.warn("RTDB sync failed:", err));
-      }
-      await triggerSystemSignal('user_signals', userId);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, adminCode: codeToSet } : u));
-      setCodeSuccessId(userId);
-      setTimeout(() => setCodeSuccessId(null), 2000);
-    } catch (error) {
-      console.error("Error setting custom adminCode:", error);
     }
   };
 
@@ -1345,39 +1363,24 @@ export default function UsersAdmin() {
         {section('Access & Admin Controls', (
           <>
             <div className="mb-3">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">🔑 Training Activation Code</div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">🔑 Course Access Code</div>
               <div className="flex gap-2 items-center text-xs flex-wrap">
-                <input
-                  type="text"
-                  placeholder="No code set"
-                  value={editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || '')}
-                  onChange={(e) => setEditingCodes(prev => ({ ...prev, [u.id]: e.target.value.toUpperCase() }))}
-                  className="bg-white border-2 border-slate-300 rounded px-2.5 py-1 text-xs font-mono font-bold text-slate-950 focus:outline-none focus:border-indigo-600 w-36 shadow-sm transition-all"
-                />
-                <button
-                  onClick={() => handleUpdateAdminCode(u.id, editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || ''))}
-                  className="text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1.5 rounded transition-colors cursor-pointer"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => {
-                    const code = editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || '');
-                    if (code) {
-                      navigator.clipboard.writeText(code);
-                      alert(`Copied activation code: ${code}`);
-                    }
-                  }}
-                  className="text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded transition-colors cursor-pointer"
-                  disabled={!(editingCodes[u.id] !== undefined ? editingCodes[u.id] : (u.adminCode || ''))}
-                >
-                  Copy
-                </button>
+                <span className="bg-amber-50 text-amber-800 border border-amber-200/60 rounded px-2.5 py-1 font-mono font-black text-slate-900 select-all shadow-sm">
+                  {accessCodes[u.id] || 'Not issued yet'}
+                </span>
+                {accessCodes[u.id] && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(accessCodes[u.id]);
+                      alert(`Copied access code: ${accessCodes[u.id]}`);
+                    }}
+                    className="text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded transition-colors cursor-pointer"
+                  >
+                    Copy
+                  </button>
+                )}
               </div>
-              {codeSuccessId === u.id && (
-                <span className="text-[10px] font-bold text-emerald-600 block mt-1">✓ Code saved successfully!</span>
-              )}
-            </div>
+                          </div>
 
             <div className="flex items-center justify-between text-xs py-2 border-t border-slate-100">
               <span className="text-slate-500 font-semibold">Dashboard access:</span>
@@ -1923,6 +1926,17 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-indigo-550' : ''}`} />
               <span>{isRefreshing ? 'Syncing...' : 'Sync Live'}</span>
             </button>
+            {(users.some(u => (u as any).adminCode) || purgingLegacy) && (
+              <button
+                onClick={handlePurgeLegacyCodes}
+                disabled={purgingLegacy}
+                className="p-1.5 px-3 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 bg-white cursor-pointer shadow-sm flex items-center gap-1.5 text-xs font-bold"
+                title="One-time cleanup: remove the unused legacy admin code from every student profile"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{purgingLegacy ? 'Removing...' : 'Remove legacy codes'}</span>
+              </button>
+            )}
           </div>
           
           <div className="relative w-full md:w-64">
@@ -2203,24 +2217,24 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                             );
                           })()}
                           
-                          {u.adminCode && (
+                          {accessCodes[u.id] && (
                             <div className="mt-2 flex items-center gap-1.5 flex-wrap">
                               <span className="px-1.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200/60 rounded font-mono font-black text-xs select-all shadow-sm">
-                                🔑 {u.adminCode}
+                                🔑 {accessCodes[u.id]}
                               </span>
                               <button 
                                 onClick={() => {
-                                  navigator.clipboard.writeText(u.adminCode || '');
-                                  alert(`Copied activation code: ${u.adminCode}`);
+                                  navigator.clipboard.writeText(accessCodes[u.id]);
+                                  alert(`Copied access code: ${accessCodes[u.id]}`);
                                 }}
                                 className="text-[9px] text-slate-600 hover:text-slate-900 font-extrabold bg-slate-50 border border-slate-200/80 px-1.5 py-0.5 rounded cursor-pointer transition-all hover:bg-slate-100"
-                                title="Copy Core Student Code"
+                                title="Copy student access code"
                               >
                                 Copy
                               </button>
                             </div>
                           )}
-                        </td>
+                                                </td>
                         <td className="px-4 py-3 text-slate-800">
                           <div className="font-semibold text-xs text-indigo-900">{u.email}</div>
                           <div className="text-slate-600 text-xs mt-0.5 font-mono">{u.whatsapp || '-'}</div>

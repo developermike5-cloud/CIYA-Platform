@@ -5825,36 +5825,45 @@ export default function StudentDashboard() {
   const handleVerifyCode = async () => {
     setActivationError('');
     const codeEntered = activationCode.trim().toUpperCase();
-    const targetCode = (userProfile?.adminCode || '').trim().toUpperCase();
-    
+
     if (!codeEntered) {
-      setActivationError('Please enter your activation code.');
+      setActivationError('Please enter your access code.');
       return;
     }
-    
-    if (codeEntered === targetCode) {
-      setUnlocking(true);
-      try {
-        const updatedProfile = {
-          ...userProfile,
-          isDashboardUnlocked: true
-        };
-        setUserProfile(updatedProfile);
-        safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
 
-        await updateDoc(doc(db, 'users', currentUser.uid), {
-          isDashboardUnlocked: true,
-          updatedAt: serverTimestamp()
-        });
-        setShowCongratsPopup(true);
-      } catch (err) {
-        console.error('Error unlocking dashboard:', err);
-        setActivationError('Unlock sync failed, please try again.');
-      } finally {
-        setUnlocking(false);
+    setUnlocking(true);
+    try {
+      // The access code from the welcome email is the one true key; it is
+      // verified server-side because student clients can never read the
+      // stored code.
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch('/.netlify/functions/access-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'verify', idToken, code: codeEntered })
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok || !data?.ok) {
+        setActivationError('Invalid access code. Please check the welcome email we sent you.');
+        return;
       }
-    } else {
-      setActivationError('Invalid activation code. Please check with your Admissions administrator.');
+      const updatedProfile = {
+        ...userProfile,
+        isDashboardUnlocked: true
+      };
+      setUserProfile(updatedProfile);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        isDashboardUnlocked: true,
+        updatedAt: serverTimestamp()
+      });
+      setShowCongratsPopup(true);
+    } catch (err) {
+      console.error('Error unlocking dashboard:', err);
+      setActivationError('Unlock sync failed, please try again.');
+    } finally {
+      setUnlocking(false);
     }
   };
 
