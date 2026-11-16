@@ -80,7 +80,7 @@ export type CourseGateResult =
   | { status: 'invalid-code'; codeType?: 'ciya' | 'beginner' | 'advanced' }
   | { status: 'wrong-course'; boundCourseId?: string; codeType?: 'ciya' | 'beginner' | 'advanced' }
   | { status: 'incomplete-code'; codeType?: 'ciya' | 'beginner' | 'advanced' }
-  | { status: 'error' };
+  | { status: 'error'; message?: string };
 
 // Fetch a course through the server-side access gate. When the course needs an
 // access code (the student's CIYA code from their welcome email, or a rotating
@@ -109,6 +109,7 @@ export async function fetchServerCourseGated(courseId: string, accessCode?: stri
       if (err === 'invalid-access-code') return { status: 'invalid-code', codeType };
       if (err === 'wrong-course-code') return { status: 'wrong-course', boundCourseId: data?.boundCourseId, codeType };
       if (err === 'incomplete-access-code') return { status: 'incomplete-code', codeType };
+      if (err === 'not registered for this course') return { status: 'error', message: 'You are not registered for this course yet, so the access code cannot unlock it.' };
     }
     return { status: 'error' };
   } catch (e) {

@@ -203,8 +203,8 @@ export async function handler(event: any) {
       const res = await googleFetch(`${base}/accessCodes/${caller.uid}`);
       if (!res.ok) return json(200, { ok: false, reason: "no-code" });
       const doc: any = await res.json();
-      const real = codeOf(doc?.fields).trim().toUpperCase();
-      const typedNorm = typed.replace(/-+$/, "");
+      const real = codeOf(doc?.fields).trim().toUpperCase().replace(/[-\s]/g, "");
+      const typedNorm = typed.toUpperCase().replace(/[-\s]/g, "");
       // A partial CIYA code reads as an incomplete entry, never as simply wrong.
       if (real && typedNorm !== real && typedNorm.length >= 4 && typedNorm.length < real.length && real.startsWith(typedNorm)) {
         return json(200, { ok: false, reason: "incomplete" });

@@ -229,8 +229,11 @@ async function checkCourseAccessGate(
   //    course the code was first used on). Entering it for any other course is
   //    refused with a clear wrong-course error, never a silent re-bind.
   const boundCourseId = firstCourseId || String(codeDoc.issuedForCourseId || "");
-  const typedNorm = cleanInput.toUpperCase().replace(/-+$/, "");
-  if (cleanInput && typedNorm === ciyaCode.toUpperCase()) {
+  // Compare with every hyphen and space stripped, so "ciyaykekchhv",
+  // "CIYA YKEK CHHV" and "CIYA-YKEK-CHHV" are all the same code.
+  const ciyaNorm = ciyaCode.toUpperCase().replace(/[-\s]/g, "");
+  const typedNorm = cleanInput.toUpperCase().replace(/[-\s]/g, "");
+  if (cleanInput && typedNorm === ciyaNorm) {
     if (boundCourseId && boundCourseId !== courseId) {
       return { ok: false, error: "wrong-course-code", boundCourseId, codeType: isAdv ? "advanced" : "beginner" };
     }
@@ -245,10 +248,10 @@ async function checkCourseAccessGate(
     }
     return { ok: true };
   }
-  // A partial CIYA code (e.g. CIYA-YKEK or CIYA-YKEK-CHH) is reported as an
-  // incomplete entry instead of a wrong rotating passcode. A rotating passcode
-  // can never start with "CIYA-", so this can never mask one.
-  if (cleanInput && typedNorm.length >= 4 && typedNorm.length < ciyaCode.length && ciyaCode.toUpperCase().startsWith(typedNorm)) {
+  // A partial CIYA code (e.g. CIYA-YKEK, CIYAYKEK or CIYA-YKEK-CHH) is reported
+  // as an incomplete entry instead of a wrong rotating passcode. A rotating
+  // passcode can never start with "CIYA", so this can never mask one.
+  if (cleanInput && typedNorm.length >= 4 && typedNorm.length < ciyaNorm.length && ciyaNorm.startsWith(typedNorm)) {
     return { ok: false, error: "incomplete-access-code", codeType: isAdv ? "advanced" : "beginner" };
   }
 

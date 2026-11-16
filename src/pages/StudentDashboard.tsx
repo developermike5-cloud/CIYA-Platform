@@ -5553,7 +5553,7 @@ export default function StudentDashboard() {
     } else if (res.status === 'invalid-code') {
       setUnlockGate((g) => (g ? { ...g, busy: false, error: 'That code is not valid. Check your email or ask admin support.' } : g));
     } else {
-      setUnlockGate((g) => (g ? { ...g, busy: false, error: 'Could not verify the code right now. Please try again.' } : g));
+      setUnlockGate((g) => (g ? { ...g, busy: false, error: (('message' in res && res.message) || 'Could not verify the code right now. Please try again.') } : g));
     }
   };
 
