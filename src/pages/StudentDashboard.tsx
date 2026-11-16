@@ -2037,6 +2037,7 @@ interface CourseViewerProps {
   appSettings?: any;
   onRequestUnlockAdvanced?: (course: Course) => void;
   onRequestCodeGate?: (course: Course) => void;
+  codeGateRequired?: boolean;
   lessonStats?: { videoCount?: number; dayCount?: number; assignmentCount?: number; days?: { dayNumber: number; title: string; videoCount: number; videos: { title: string; duration: string }[] }[] } | null;
 }
 
@@ -2059,7 +2060,7 @@ function renderBulletList(text: string, icon: string, textClass: string = "text-
   );
 }
 
-function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false, allMySubmissions = [], appSettings, onRequestUnlockAdvanced, onRequestCodeGate, lessonStats }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false, allMySubmissions = [], appSettings, onRequestUnlockAdvanced, onRequestCodeGate, lessonStats, codeGateRequired = false }: CourseViewerProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -2847,42 +2848,6 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         </div>
       );
     }
-    // The full lesson content only hydrates for enrolled students; for everyone
-    // else show the published curriculum outline (light stats) instead of a dead end.
-    if (lessonStats && lessonStats.days && lessonStats.days.length > 0) {
-      return (
-        <div className="max-w-3xl mx-auto py-10 px-4">
-          <div className="bg-white p-5 md:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">
-                {lessonStats.dayCount || lessonStats.days.length} {isCourseAdvanced ? 'Module' : 'Day'} Curriculum
-              </h3>
-              <span className="text-xs font-black uppercase tracking-wider text-slate-500">
-                {lessonStats.videoCount} Video Lesson{lessonStats.videoCount === 1 ? '' : 's'}
-              </span>
-            </div>
-            <ul className="space-y-2.5">
-              {lessonStats.days.map((d, dIdx) => (
-                <li key={dIdx} className="flex items-start gap-3 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3">
-                  <span className="text-indigo-500 mt-0.5 select-none shrink-0 text-xs font-black">{d.dayNumber}.</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm md:text-base text-slate-900 font-extrabold leading-snug">{d.title}</span>
-                    {d.videoCount > 0 && (
-                      <span className="block text-xs text-slate-500 font-bold mt-0.5">
-                        {d.videoCount} lesson{d.videoCount === 1 ? '' : 's'}
-                      </span>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider text-center pt-1">
-              Full lesson content opens inside the classroom
-            </p>
-          </div>
-        </div>
-      );
-    }
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <div className="text-3xl mb-4 select-none">📚</div>
@@ -3071,6 +3036,14 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
           <div className="pt-4">
             <button
               onClick={() => {
+                // Registered but still locked: the student must enter the access
+                // code from their welcome email before the classroom opens.
+                if (effectiveIsEnrolled && codeGateRequired && !isRevoked) {
+                  if (onRequestCodeGate) {
+                    onRequestCodeGate(course);
+                  }
+                  return;
+                }
                 if (!currentUser) {
                   alert("This premium classroom is locked. Please sign in to enter the classroom and begin your lessons.");
                   if (onLogin) {
@@ -3142,7 +3115,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                     : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/10 hover:shadow-indigo-600/20"
               }`}
             >
-              {effectiveIsEnrolled ? (
+              {effectiveIsEnrolled && codeGateRequired && !isRevoked ? (
+                <>🔒 Unlock Classroom (Access Code Required) →</>
+              ) : effectiveIsEnrolled ? (
                 <>📊 Enter Classroom & Begin Lessons →</>
               ) : isRevoked ? (
                 <>🔒 Unlock Access (Passcode Required) →</>
@@ -5572,6 +5547,11 @@ export default function StudentDashboard() {
     const res = await fetchServerCourseGated(courseId, code);
     if (res.status === 'ok') {
       coursesStore.upsertFromServer([res.course]);
+      setCourseCodeGates((prev) => {
+        const next = { ...prev };
+        delete next[courseId];
+        return next;
+      });
       setUnlockGate(null);
       handleSelectCourseId(courseId);
       navigate(`/dashboard?view=courses&courseId=${courseId}&syllabus=false`);
@@ -8228,6 +8208,7 @@ export default function StudentDashboard() {
                   onRequestUnlockAdvanced={(c) => setAdvancedPaymentCourse(c)}
                   onRequestCodeGate={(c) => setUnlockGate({ courseId: c.id, codeType: courseCodeGates[c.id] || 'ciya', busy: false, error: null })}
                   lessonStats={courseStats[selectedCourse.id] || null}
+                  codeGateRequired={!isAdmin && !!courseCodeGates[selectedCourse.id] && !unlockedCourseIds.includes(selectedCourse.id)}
                 />
               ) : (
                 <div className="space-y-8">
