@@ -165,6 +165,38 @@ export async function handler(event: any) {
       return json(200, { codes });
     }
 
+    if (op === "purge-admincodes") {
+      // One-time cleanup: strip the retired legacy adminCode field from every
+      // user document. The service account writes directly, so this works
+      // regardless of what the web-client Firestore rules allow.
+      const admin = await isAdminUid(projectId, databaseId, caller.uid);
+      if (!admin) return json(403, { error: "caller is not an admin" });
+      let checked = 0;
+      let removed = 0;
+      let pageToken = "";
+      for (;;) {
+        const url = `${base}/users?pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}&mask.fieldPaths=adminCode`;
+        const res = await googleFetch(url);
+        if (!res.ok) throw new Error(`users list failed (${res.status})`);
+        const data: any = await res.json();
+        for (const doc of data.documents || []) {
+          checked += 1;
+          if (!doc?.fields?.adminCode) continue;
+          const uid = String(doc?.name || "").split("/").pop() || "";
+          if (!uid) continue;
+          const patch = await googleFetch(
+            `${base}/users/${uid}?updateMask=adminCode`,
+            { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields: {} }) }
+          );
+          if (patch.ok) removed += 1;
+          else console.error(`adminCode purge failed for ${uid} (${patch.status})`);
+        }
+        pageToken = data.nextPageToken || "";
+        if (!pageToken) break;
+      }
+      return json(200, { removed, checked });
+    }
+
     if (op === "verify") {
       const typed = String(body.code || "").trim().toUpperCase();
       if (!typed) return json(400, { ok: false, error: "missing code" });

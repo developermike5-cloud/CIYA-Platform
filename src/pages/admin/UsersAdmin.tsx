@@ -521,23 +521,29 @@ export default function UsersAdmin() {
     const targets = users.filter(u => (u as any).adminCode);
     if (!targets.length) return;
     setPurgingLegacy(true);
-    let ok = 0;
-    for (const t of targets) {
-      try {
-        await updateDoc(doc(db, 'users', t.id), { adminCode: deleteField() });
-        ok += 1;
-        setUsers(prev => prev.map(u => {
-          if (u.id !== t.id) return u;
-          const copy: any = { ...u };
-          delete copy.adminCode;
-          return copy;
-        }));
-      } catch (e) {
-        console.error('legacy code purge failed for', t.id, e);
-      }
+    try {
+      // Server-side cleanup: the retired field is removed from every user
+      // document by the access-codes function with the service account.
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch('/.netlify/functions/access-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'purge-admincodes', idToken }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(data?.error || `purge failed (${res.status})`);
+      setUsers(prev => prev.map(u => {
+        const copy: any = { ...u };
+        delete copy.adminCode;
+        return copy;
+      }));
+      alert(`Removed legacy codes from ${data.removed ?? '?'} of ${data.checked ?? targets.length} student profile(s). The email access codes are untouched.`);
+    } catch (e) {
+      console.error('legacy code purge failed:', e);
+      alert('Could not remove the legacy codes. Please try again.');
+    } finally {
+      setPurgingLegacy(false);
     }
-    setPurgingLegacy(false);
-    alert(`Removed legacy codes from ${ok} of ${targets.length} student profile(s). The email access codes are untouched.`);
   };
 
   const fetchUsers = async (targetCohort: string, forceRefresh = false) => {
