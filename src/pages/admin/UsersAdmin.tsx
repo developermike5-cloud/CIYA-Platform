@@ -270,6 +270,10 @@ export default function UsersAdmin() {
   // Local states for activation code controls
   const [accessCodes, setAccessCodes] = useState<Record<string, string>>({});
   const [purgingLegacy, setPurgingLegacy] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkOp, setBulkOp] = useState<'approve' | 'disapprove' | 'delete' | null>(null);
+  const [pendingBulkDelete, setPendingBulkDelete] = useState(false);
 
   // Admins state & Super Admin check
   const [admins, setAdmins] = useState<string[]>([]);
@@ -801,6 +805,29 @@ export default function UsersAdmin() {
     }
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const bulkRun = async (op: 'approve' | 'disapprove' | 'delete') => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    setBulkOp(op);
+    setBulkBusy(true);
+    for (const id of ids) {
+      if (op === 'approve') await handleApprove(id);
+      else if (op === 'disapprove') await handleDisapprove(id);
+      else await performDelete(id);
+    }
+    setBulkBusy(false);
+    setBulkOp(null);
+    setSelectedIds(new Set());
+  };
+
   const getUserRegisteredCourses = (u: any) => {
     if (!allCourses || allCourses.length === 0) return [];
     return allCourses.filter(course => {
@@ -1172,6 +1199,12 @@ export default function UsersAdmin() {
 
     return result;
   }, [cohortFilteredUsers, searchTerm, filterState, filterCourse, filterStatus, filterApproval, filterGender, sortDate, filterStartDate, filterEndDate, filterAgeRange, filterEducationLevel, filterLearningTool]);
+
+  const allVisibleSelected = filteredUsers.length > 0 && filteredUsers.every((u: any) => selectedIds.has(u.id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allVisibleSelected ? new Set() : new Set(filteredUsers.map((u: any) => u.id)));
+  };
 
   const renderUserDetailsBody = (u: any) => {
     // A student who never took a beginner course sees strictly their signup
@@ -2182,10 +2215,58 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
               </span>
             )}
           </div>
+          {selectedIds.size > 0 && (
+            <div className="px-5 py-3 bg-teal-50 border-b border-teal-200 flex flex-wrap items-center gap-2.5">
+              <span className="text-sm font-black text-teal-900">
+                {selectedIds.size} student{selectedIds.size === 1 ? '' : 's'} selected
+              </span>
+              <button
+                disabled={bulkBusy}
+                onClick={() => bulkRun('approve')}
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black cursor-pointer"
+              >
+                Approve Selected
+              </button>
+              <button
+                disabled={bulkBusy}
+                onClick={() => bulkRun('disapprove')}
+                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-black cursor-pointer"
+              >
+                Disapprove Selected
+              </button>
+              <button
+                disabled={bulkBusy}
+                onClick={() => setPendingBulkDelete(true)}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-black cursor-pointer"
+              >
+                Delete Selected
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold cursor-pointer"
+              >
+                Clear
+              </button>
+              {bulkBusy && (
+                <span className="text-xs font-bold text-teal-700">
+                  {bulkOp === 'approve' ? 'Approving…' : bulkOp === 'disapprove' ? 'Disapproving…' : 'Deleting…'}
+                </span>
+              )}
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50">
                 <tr>
+                  <th className="px-4 py-3 text-left w-10">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAll}
+                      title="Select all shown students"
+                      className="w-4 h-4 accent-teal-600 cursor-pointer"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Student</th>
                   <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Contact</th>
                   <th className="px-4 py-3 text-left font-medium text-slate-500 uppercase tracking-wider">Path Details</th>
@@ -2201,6 +2282,14 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                   return (
                     <React.Fragment key={u.id}>
                       <tr className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 w-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(u.id)}
+                            onChange={() => toggleSelect(u.id)}
+                            className="w-4 h-4 accent-teal-600 cursor-pointer"
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <div className="font-bold text-slate-900 leading-tight mb-1">{u.fullName || '-'}</div>
                           <div className="text-slate-500 text-xs">{u.gender ? `${u.gender} • ` : ''}{u.state || '-'}</div>
@@ -2393,6 +2482,18 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
           </SlideOver>
         );
       })()}
+
+      <ConfirmDialog
+        open={pendingBulkDelete}
+        title="Delete selected students"
+        message={`Delete ${selectedIds.size} student record${selectedIds.size === 1 ? '' : 's'} permanently? This cannot be undone.`}
+        confirmLabel="Yes, Delete Permanently"
+        onConfirm={() => {
+          setPendingBulkDelete(false);
+          bulkRun('delete');
+        }}
+        onCancel={() => setPendingBulkDelete(false)}
+      />
 
       <ConfirmDialog
         open={!!pendingDeleteUser}

@@ -33,8 +33,7 @@ const GUIDES: Record<GuideKey, { note: React.ReactNode; steps: Step[] }> = {
   android: {
     note: null,
     steps: [
-      { t: 'Open the page in Chrome', d: 'Open your CIYA link in Chrome. You will see the Install app button.', layer: 'web', pulse: 'pbtn' },
-      { t: 'Tap Install app', d: 'Tap the amber Install app button.', layer: 'web', f: [50, 62] },
+      { t: 'Tap Install app', d: 'Tap the amber Install app button.', layer: 'web', pulse: 'pbtn', f: [50, 62] },
       { t: 'Tap Install', d: 'Your phone asks to confirm. Tap Install.', layer: 'web', dlg: true, f: [80, 61] },
       { t: 'Tap the CIYA icon', d: 'CIYA is now on your home screen. Tap its icon to open the app.', layer: 'home', pop: true, f: [61, 33], late: true },
       { t: 'Sign in', d: 'Sign in with the login details we sent to your email.', layer: 'app' }
@@ -43,12 +42,11 @@ const GUIDES: Record<GuideKey, { note: React.ReactNode; steps: Step[] }> = {
   ios: {
     note: (
       <>
-        <b className="text-amber-400">Use Safari.</b> The Add to Home Screen option works best there. If you opened the link in another app, copy it and paste it into Safari.
+        <b className="text-amber-400">Use Safari.</b> The Add to Home Screen option works best there.
       </>
     ),
     steps: [
-      { t: 'Open the page in Safari', d: 'Open your CIYA link in Safari. The Share button is at the bottom.', layer: 'web', pulse: 'share' },
-      { t: 'Tap the Share button', d: 'Tap the square with the arrow pointing up.', layer: 'web', f: [50, 94], shr: true, late: true },
+      { t: 'Tap the Share button', d: 'Tap the square with the arrow pointing up.', layer: 'web', f: [50, 94], shr: true, pulse: 'share' },
       { t: 'Tap Add to Home Screen', d: 'Find Add to Home Screen in the list and tap it.', layer: 'web', shr: true, hl: true, f: [84, 85] },
       { t: 'Tap Add', d: 'Tap Add at the top right.', layer: 'web', add: true, f: [88, 13] },
       { t: 'Tap the CIYA icon', d: 'CIYA is now on your home screen. Tap its icon to open the app.', layer: 'home', pop: true, f: [61, 33], late: true },
@@ -95,7 +93,7 @@ function SheetRow({ label, icon, hl }: { label: string; icon: React.ReactNode; h
   );
 }
 
-export default function InstallGuide({ paid, whatsappHref, footerNote }: { paid?: boolean; whatsappHref?: string; footerNote?: React.ReactNode } = {}) {
+export default function InstallGuide({ paid, whatsappHref, whatsappLabel, footerNote }: { paid?: boolean; whatsappHref?: string; whatsappLabel?: string; footerNote?: React.ReactNode } = {}) {
   const { isInstallable, isInstalled, isIOS, installApp } = usePWAInstall();
   const [guide, setGuide] = useState<GuideKey>(() =>
     typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(window.navigator.userAgent || '') ? 'ios' : 'android'
@@ -468,16 +466,19 @@ export default function InstallGuide({ paid, whatsappHref, footerNote }: { paid?
                   ? 'After installing the app, you will receive your login details within 10 minutes after your payment is confirmed. If you do not receive them, contact the admin below.'
                   : 'After installing the app, log in with your login details, which you will receive within 10 minutes after your payment is confirmed. If you do not receive them, contact the admin below.'}
             </p>
-            {whatsappHref && (
-              <a
-                href={whatsappHref}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#25D366] hover:brightness-110 text-white text-sm font-black transition-all active:scale-95"
-              >
-                💬 Contact the Admin on WhatsApp
-              </a>
-            )}
+          </div>
+        )}
+
+        {whatsappHref && (
+          <div className={`${paid ? 'mt-4' : 'mt-7'} mx-auto max-w-xl text-center`}>
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#25D366] hover:brightness-110 text-white text-sm font-black transition-all active:scale-95"
+            >
+              {whatsappLabel || '💬 Contact the Admin on WhatsApp'}
+            </a>
           </div>
         )}
 

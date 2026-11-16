@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef} from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import InstallGuide from '../components/InstallGuide';
+import { WHATSAPP_URL } from './home/data';
 import { useNavigate } from 'react-router';
 import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { auth, db } from '../firebase';
@@ -1182,13 +1183,15 @@ function OnboardingComplete({ cohort, emailQueued, studentEmail }: { cohort: str
             &larr; Back
           </button>
           <InstallGuide
+            whatsappHref={WHATSAPP_URL}
+            whatsappLabel="💬 Join the CIYA Community on WhatsApp"
             footerNote={
               <span>
                 <b className="text-amber-400">Your login details are ready.</b> We've sent them to{' '}
                 <span className="text-white font-bold">{studentEmail || 'your email address'}</span>.
                 {emailQueued
-                  ? ' Check your inbox (and your spam folder) for your login email, temporary password, and your unique CIYA access code. No waiting and no admin approval needed. After installing, open the app and log in with them.'
-                  : ' They are being delivered to your inbox right now — check your spam folder too if you do not see them in a moment. No waiting and no admin approval needed. After installing, open the app and log in with your email and temporary password.'}
+                  ? ' Check your inbox (and your spam folder) for your login email, temporary password, and your unique CIYA access code. After installing, open the app and log in with them.'
+                  : ' They are being delivered to your inbox right now — check your spam folder too if you do not see them in a moment. After installing, open the app and log in with your email and temporary password.'}
               </span>
             }
           />
