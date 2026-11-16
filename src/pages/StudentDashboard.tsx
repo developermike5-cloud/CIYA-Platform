@@ -2463,7 +2463,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   const isCheckPassed = checkPassedKeys.includes(checkKey);
   const hasCheck = !!(currentVideo && currentVideo.checkType && currentVideo.checkType !== 'none' && currentVideo.check);
 
-  const totalVideos = days.reduce((sum, d) => sum + (d.videos?.length || 0), 0);
+  const totalVideos = Math.max(days.reduce((sum, d) => sum + (d.videos?.length || 0), 0), (lessonStats && lessonStats.videoCount) || 0);
   const totalWatchedCount = completedKeys.length;
   const progressRatio = totalVideos > 0 ? Math.round((totalWatchedCount / totalVideos) * 100) : 0;
 
@@ -2838,7 +2838,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
   const sk = SKILLS[course.skill || 'web'];
 
-  if (!course.days || course.days.length === 0) {
+  if ((!course.days || course.days.length === 0) && !viewingSyllabus) {
     if (loading) {
       return (
         <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -2918,7 +2918,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                 <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md border ${
                   isExpress 
                     ? 'bg-teal-50 text-teal-700 border-teal-200' 
-                    : 'bg-indigo-50 text-indigo-750 border-indigo-200'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                 }`}>
                   {isExpress ? '⚡ Express Track (3 Days)' : '📚 Standard Track (5 Days)'}
                 </span>
@@ -3024,7 +3024,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
             {course.requirements && (
               <div className="md:col-span-2 space-y-2.5 bg-amber-50/60 p-4 md:p-5 rounded-2xl border border-amber-200">
-                <span className="text-xs md:text-sm font-black uppercase text-amber-850 tracking-wider block">🛠️ Required Prep Tools & Prerequisites</span>
+                <span className="text-xs md:text-sm font-black uppercase text-amber-800 tracking-wider block">🛠️ Required Prep Tools & Prerequisites</span>
                 <div className="text-sm md:text-base text-amber-950 leading-relaxed font-extrabold">
                   {renderBulletList(course.requirements, "✦", "text-sm md:text-base text-amber-950")}
                 </div>
@@ -3033,7 +3033,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
             {course.outcomes && (
               <div className="md:col-span-2 space-y-2.5 bg-teal-50/35 p-4 md:p-5 rounded-2xl border border-teal-200">
-                <span className="text-xs md:text-sm font-black uppercase text-teal-850 tracking-wider block">🚀 Core Professional Objectives & Outcomes</span>
+                <span className="text-xs md:text-sm font-black uppercase text-teal-800 tracking-wider block">🚀 Core Professional Objectives & Outcomes</span>
                 <div className="text-sm md:text-base text-teal-950 leading-relaxed font-extrabold">
                   {renderBulletList(course.outcomes, "✦", "text-sm md:text-base text-teal-950")}
                 </div>
@@ -3058,7 +3058,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
             {isRevoked && (
               <div className="md:col-span-2 space-y-2.5 bg-rose-50 p-4 md:p-5 rounded-2xl border-2 border-rose-300">
-                <span className="text-xs md:text-sm font-black uppercase text-rose-850 tracking-wider block">
+                <span className="text-xs md:text-sm font-black uppercase text-rose-800 tracking-wider block">
                   ⚠️ Access Revoked by Administration
                 </span>
                 <p className="text-xs md:text-sm text-rose-950 leading-relaxed font-bold">
@@ -3557,7 +3557,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                               <button
                                 type="button"
                                 onClick={() => navigate(`/dashboard?view=assignments&courseId=${course.id}&dayIndex=${di}`)}
-                                className="text-teal-700 font-black underline hover:text-teal-850 border-0 bg-transparent cursor-pointer p-0 m-0 inline"
+                                className="text-teal-700 font-black underline hover:text-teal-800 border-0 bg-transparent cursor-pointer p-0 m-0 inline"
                               >
                                 "My Assignments" Workspace
                               </button>
@@ -7933,7 +7933,7 @@ export default function StudentDashboard() {
                         <>
                           {/* Display Assignment Prompt/Question here if available */}
                           {daysList[submitDayIndex]?.assignment?.prompt && (
-                            <div className="bg-teal-50/50 border border-teal-100 rounded-2xl p-4 space-y-2 text-xs text-slate-850">
+                            <div className="bg-teal-50/50 border border-teal-100 rounded-2xl p-4 space-y-2 text-xs text-slate-700">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm">📋</span>
                                 <span className="font-black text-teal-900 uppercase tracking-wider">Day {submitDayIndex + 1} Assignment Question:</span>
@@ -7951,7 +7951,7 @@ export default function StudentDashboard() {
                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-205'
                                 : matchedSubForSelectedDay.status === 'Disapproved'
                                   ? 'bg-rose-50 text-rose-800 border-rose-205'
-                                  : 'bg-amber-50 text-amber-850 border-amber-205'
+                                  : 'bg-amber-50 text-amber-800 border-amber-200'
                             }`}>
                               <div className="flex items-center justify-between font-black uppercase tracking-wider text-[10px] mb-1.5">
                                 <span>Status for Day {submitDayIndex + 1} Assignment:</span>
@@ -8415,11 +8415,8 @@ export default function StudentDashboard() {
                         {/* View 1: Tier sections (Beginners / Advanced / Masterclass) */}
                         {coursesViewTab === 'courses' && (
                           <div className="space-y-8">
-                            {filteredCourses.length === 0 ? (
-                              <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
-                                No courses available in this track.
-                              </div>
-                            ) : (() => {
+                            {(() => {
+                              const tierSource = allPlatformCourses.filter((c) => activeSkillFilter === 'all' || c.skill === activeSkillFilter);
                               const tierOf = (c: any) => {
                                 const t = String(c.tier || c.level || c.courseType || '').toLowerCase();
                                 if (/master/.test(t)) return 'masterclass';
@@ -8427,9 +8424,14 @@ export default function StudentDashboard() {
                                 return 'beginner';
                               };
                               const isAdvCourse = (c: any) => tierOf(c) !== 'beginner';
-                              const beginnerCourses = filteredCourses.filter((c) => tierOf(c) === 'beginner');
-                              const advancedCourses = filteredCourses.filter((c) => tierOf(c) === 'advanced');
-                              const masterclassCourses = filteredCourses.filter((c) => tierOf(c) === 'masterclass');
+                              const beginnerCourses = tierSource.filter((c) => tierOf(c) === 'beginner');
+                              const advancedCourses = tierSource.filter((c) => tierOf(c) === 'advanced');
+                              const masterclassCourses = tierSource.filter((c) => tierOf(c) === 'masterclass');
+                              if (tierSource.length === 0) return (
+                              <div className="text-center py-12 bg-slate-50 border border-slate-200/60 rounded-3xl text-xs font-bold text-slate-500">
+                                No courses available in this track.
+                              </div>
+                              );
 
                               const renderCourseGrid = (list: any[]) => (
                                 <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-6">
