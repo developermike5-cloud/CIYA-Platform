@@ -413,8 +413,26 @@ async function isAdminUid(projectId: string, databaseId: string, uid: string): P
   return res.ok;
 }
 
-async function getRegisteredCourseIds(projectId: string, databaseId: string, uid: string): Promise<string[]> {
-  const ids: string[] = [];
+type StudentRegistration = {
+  ids: string[];
+  revokedCourseIds: string[];
+  recommendedPath: string;
+  courseType: string;
+  pathwaySelection: string;
+};
+
+async function getStudentRegistration(
+  projectId: string,
+  databaseId: string,
+  uid: string,
+): Promise<StudentRegistration> {
+  const out: StudentRegistration = {
+    ids: [],
+    revokedCourseIds: [],
+    recommendedPath: "",
+    courseType: "",
+    pathwaySelection: "",
+  };
   const res = await googleFetch(
     `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/users/${uid}`
   );
@@ -423,17 +441,90 @@ async function getRegisteredCourseIds(projectId: string, databaseId: string, uid
     const data = fieldsToValues({ mapValue: { fields: doc?.fields || {} } }) || {};
     if (Array.isArray(data.registeredCourses)) {
       data.registeredCourses.forEach((x: any) => {
-        if (typeof x === "string") ids.push(x);
-        else if (x && typeof x === "object" && x.id) ids.push(String(x.id));
+        if (typeof x === "string") out.ids.push(x);
+        else if (x && typeof x === "object" && x.id) out.ids.push(String(x.id));
       });
     }
     if (data.progress && typeof data.progress === "object") {
       Object.keys(data.progress).forEach((k) => {
-        if (data.progress[k]?.accessStatus !== "revoked") ids.push(k);
+        if (data.progress[k]?.accessStatus === "revoked") out.revokedCourseIds.push(k);
+        else out.ids.push(k);
       });
     }
+    out.recommendedPath = String(data.recommendedPath || "").trim();
+    out.courseType = String(data.courseType || "").trim();
+    out.pathwaySelection = String(data.pathwaySelection || "").trim();
   }
-  return ids;
+  return out;
+}
+
+// Mirrors the student homepage's isProfileRegisteredForCourse: a student counts as
+// registered for a course when their stored ids/progress name it, or when their
+// onboarding pathway (recommendedPath / courseType / pathwaySelection) matches the
+// course's pathway keywords. New onboarding students have no registeredCourses
+// array yet, so the pathway match is what lets their issued access code open the
+// course they registered for.
+function isStudentRegisteredForCourse(reg: StudentRegistration, courseId: string, course: any): boolean {
+  const cid = String(courseId || "").trim().toLowerCase();
+  if (!cid) return false;
+  const storedId = String(course?.id || "").trim().toLowerCase();
+  const storedTitle = String(course?.title || "").trim().toLowerCase();
+  const matchesTarget = (x: string) => {
+    const v = String(x || "").trim().toLowerCase();
+    return v === cid || (storedId && v === storedId) || (storedTitle && v === storedTitle);
+  };
+  // Revoked access strictly denies, even when an explicit registration exists.
+  if (reg.revokedCourseIds.some(matchesTarget)) return false;
+  if (reg.ids.some(matchesTarget)) return true;
+
+  if (!course || course.isCloned) return false;
+  const isAdv =
+    course.tier === "advanced" ||
+    course.tier === "masterclass" ||
+    (typeof course.level === "string" && ["advanced", "masterclass"].includes(course.level.toLowerCase()));
+  // Advanced / Masterclass courses require explicit registration or progress.
+  if (isAdv) return false;
+
+  const courseTitle = String(course.title || "").toLowerCase();
+  const courseSkillPath = String(course.skillPath || "").toLowerCase();
+  const courseCategory = String(course.category || "").toLowerCase();
+  const recPath = reg.recommendedPath.toLowerCase();
+  const courseType = reg.courseType.toLowerCase();
+  const pathwaySel = reg.pathwaySelection.toLowerCase();
+
+  const isCoursePortfolio =
+    courseTitle.includes("portfolio") || courseSkillPath.includes("portfolio") || courseCategory.includes("portfolio");
+  const isProfilePortfolio =
+    recPath.includes("portfolio") || courseType.includes("portfolio") || pathwaySel.includes("portfolio");
+  if (isCoursePortfolio && isProfilePortfolio) return true;
+
+  const isCourseLanding =
+    courseTitle.includes("landing") || courseSkillPath.includes("landing") || courseCategory.includes("landing") || courseTitle.includes("conversion");
+  const isProfileLanding =
+    recPath.includes("landing") || courseType.includes("landing") || pathwaySel.includes("landing") ||
+    recPath.includes("conversion") || recPath.includes("funnel") || pathwaySel.includes("funnel");
+  if (isCourseLanding && isProfileLanding) return true;
+
+  const isCourseEcommerce =
+    courseTitle.includes("e-commerce") || courseTitle.includes("ecommerce") || courseSkillPath.includes("e-commerce") ||
+    courseSkillPath.includes("ecommerce") || courseTitle.includes("store") || courseCategory.includes("e-commerce") ||
+    courseCategory.includes("ecommerce");
+  const isProfileEcommerce =
+    recPath.includes("e-commerce") || recPath.includes("ecommerce") || courseType.includes("e-commerce") ||
+    courseType.includes("ecommerce") || pathwaySel.includes("e-commerce") || pathwaySel.includes("ecommerce") ||
+    recPath.includes("store") || pathwaySel.includes("store");
+  if (isCourseEcommerce && isProfileEcommerce) return true;
+
+  // Fallback: direct exact or fuzzy title/pathway match.
+  const courseTitleClean = courseTitle.trim();
+  const recPathClean = recPath.trim();
+  if (recPathClean && (
+    courseTitleClean === recPathClean ||
+    courseTitleClean.includes(recPathClean) ||
+    recPathClean.includes(courseTitleClean)
+  )) return true;
+
+  return false;
 }
 
 export async function handler(event: any) {
@@ -538,25 +629,34 @@ export async function handler(event: any) {
         }
         return json(200, { ok: true, courses });
       }
-      let registered = false;
-      if (!admin) {
-        const ids = await getRegisteredCourseIds(projectId, databaseId, caller.uid);
-        registered = ids.includes(courseId);
-      }
-      if (!admin && !registered) {
-        return json(403, { error: "not registered for this course" });
-      }
+      // Fetch the stored course first: the pathway-based registration match below
+      // needs the course's title/keywords to decide whether this student's issued
+      // access code may open it.
       const publicId = PUBLIC_ID_PREFIX + courseId;
       const res = await fetch(storedCourseUrl(publicId, cloudName, apiSecret));
-      if (!res.ok) {
-        return json(404, { error: "course not published to the store yet", cloudinaryStatus: res.status });
+      let course: any = null;
+      let courseFetchStatus = 0;
+      let parseFailed = false;
+      if (res.ok) {
+        const text = await res.text();
+        try {
+          course = JSON.parse(text);
+        } catch {
+          parseFailed = true;
+        }
+      } else {
+        courseFetchStatus = res.status;
       }
-      const text = await res.text();
-      let course: any;
-      try {
-        course = JSON.parse(text);
-      } catch {
-        return json(500, { error: "stored course file is not valid JSON" });
+      if (!admin) {
+        const reg = await getStudentRegistration(projectId, databaseId, caller.uid);
+        const registered = isStudentRegisteredForCourse(reg, courseId, course);
+        if (!registered) {
+          return json(403, { error: "not registered for this course" });
+        }
+      }
+      if (!course) {
+        if (parseFailed) return json(500, { error: "stored course file is not valid JSON" });
+        return json(404, { error: "course not published to the store yet", cloudinaryStatus: courseFetchStatus });
       }
       // Server-side access gate for the CIYA access-code flow (students only).
       if (!admin) {
