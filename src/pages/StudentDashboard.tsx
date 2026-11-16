@@ -3005,21 +3005,6 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
               </div>
             )}
 
-            {(!course.days || course.days.length === 0) && lessonStats && lessonStats.days && lessonStats.days.length > 0 && (
-              <div className="md:col-span-2 space-y-2 bg-white p-4 md:p-5 rounded-2xl border border-indigo-100/60">
-                <span className="text-xs md:text-sm font-black uppercase text-slate-500 tracking-wider block">
-                  {lessonStats.dayCount} {isCourseAdvanced ? 'Module' : 'Day'} Curriculum · {lessonStats.videoCount} Video Lessons
-                </span>
-                <ul className="space-y-1.5 mt-1">
-                  {lessonStats.days.map((d, dIdx) => (
-                    <li key={dIdx} className="flex items-start gap-2 text-sm text-slate-700 leading-relaxed font-bold">
-                      <span className="text-indigo-500 mt-0.5 select-none shrink-0 text-xs font-black">{d.dayNumber}.</span>
-                      <span className="min-w-0 flex-1">{d.title}{d.videoCount > 0 ? ` · ${d.videoCount} lesson${d.videoCount === 1 ? '' : 's'}` : ''}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
 
             {isRevoked && (
               <div className="md:col-span-2 space-y-2.5 bg-rose-50 p-4 md:p-5 rounded-2xl border-2 border-rose-300">
@@ -3058,6 +3043,8 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                     if (isRevoked || (course.tier === 'advanced' || course.tier === 'masterclass' || course.level === 'Advanced' || course.level === 'Masterclass') && (appSettings?.advancedCourseSettings?.enabled ?? true)) {
                       if (onRequestUnlockAdvanced) {
                         onRequestUnlockAdvanced(course);
+                      } else if (onRequestCodeGate) {
+                        onRequestCodeGate(course);
                       }
                       return;
                     }
@@ -6288,6 +6275,7 @@ export default function StudentDashboard() {
   }, [courses, userProfile, isAdmin]);
 
   const [courseCodeGates, setCourseCodeGates] = useState<Record<string, 'ciya' | 'beginner' | 'advanced'>>({});
+  const [gateCheckedIds, setGateCheckedIds] = useState<Set<string>>(new Set());
   const [unlockGate, setUnlockGate] = useState<{ courseId: string; codeType: 'ciya' | 'beginner' | 'advanced'; busy: boolean; error: string | null } | null>(null);
 
   // Pull the latest published copy of every course this student is registered
@@ -6317,6 +6305,7 @@ export default function StudentDashboard() {
         if (cancelled) return;
         const res = await fetchServerCourseGated(id);
         if (cancelled) return;
+        setGateCheckedIds((prev) => { const next = new Set(prev); next.add(id); return next; });
         if (res.status === 'ok') coursesStore.upsertFromServer([res.course]);
         else if (res.status === 'needs-code') setCourseCodeGates((prev) => ({ ...prev, [id]: res.codeType }));
       }
@@ -8208,7 +8197,7 @@ export default function StudentDashboard() {
                   onRequestUnlockAdvanced={(c) => setAdvancedPaymentCourse(c)}
                   onRequestCodeGate={(c) => setUnlockGate({ courseId: c.id, codeType: courseCodeGates[c.id] || 'ciya', busy: false, error: null })}
                   lessonStats={courseStats[selectedCourse.id] || null}
-                  codeGateRequired={!isAdmin && !!courseCodeGates[selectedCourse.id] && !unlockedCourseIds.includes(selectedCourse.id)}
+                  codeGateRequired={!isAdmin && !unlockedCourseIds.includes(selectedCourse.id) && (!!courseCodeGates[selectedCourse.id] || (!isCourseHydrated(selectedCourse.id) && !gateCheckedIds.has(selectedCourse.id)))}
                 />
               ) : (
                 <div className="space-y-8">
