@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useReducedMotion } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 import LoginModal from '../components/LoginModal';
+import InstallGuide from '../components/InstallGuide';
+import { fetchAppAccessGate, isMobileBrowser, isRunningAsPwa } from '../utils/courseServer';
 import InteractiveTemplatesSphere from '../components/InteractiveTemplatesSphere';
 import { Star, Menu, X } from 'lucide-react';
 import { auth, db } from '../firebase';
@@ -147,8 +149,8 @@ function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
               My Dashboard
             </Link>
           ) : (
-            <button onClick={onOpenLogin} title="way" aria-label="way" className="px-2.5 py-1 text-[11px] font-bold text-teal-500/50 hover:text-teal-500 rounded-full transition-all cursor-pointer opacity-70 hover:opacity-100">
-              way
+            <button onClick={onOpenLogin} title="Login" aria-label="Login" className="px-2.5 py-1 text-[11px] font-bold text-teal-500/50 hover:text-teal-500 rounded-full transition-all cursor-pointer opacity-70 hover:opacity-100">
+              Login
             </button>
           )}
         </nav>
@@ -185,7 +187,7 @@ function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
                 }}
                 className="py-3 border-b border-teal-900 text-left text-[11px] font-bold text-teal-500/50"
               >
-                way
+                Login
               </button>
             )}
           </motion.div>
@@ -252,6 +254,20 @@ function Footer() {
 export default function Home() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
+
+  // While app-only access is ON, a phone browser never sees the login page:
+  // the login button opens the install guide instead. Desktop and the
+  // installed app open the login page normally.
+  const handleLoginClick = async () => {
+    if (!isRunningAsPwa() && isMobileBrowser()) {
+      try {
+        const enforced = await fetchAppAccessGate();
+        if (enforced) { setShowInstallGuide(true); return; }
+      } catch { /* fall through to the normal login page */ }
+    }
+    setIsLoginOpen(true);
+  };
   const navigate = useNavigate();
   const location = useLocation();
   const reduced = useReducedMotion() ?? false;
@@ -299,7 +315,7 @@ export default function Home() {
 
   return (
     <div className="bg-teal-950 font-sans text-teal-50 min-h-screen selection:bg-amber-500/30 selection:text-amber-200 flex flex-col overflow-x-clip">
-      <Navbar onOpenLogin={() => setIsLoginOpen(true)} />
+      <Navbar onOpenLogin={handleLoginClick} />
       <main className="flex-1">
         <HeroSection reduced={reduced} />
         <InteractiveTemplatesSphere />
@@ -318,6 +334,30 @@ export default function Home() {
       <Footer />
 
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
+
+      {/* APP-ONLY: the login button on a phone browser shows the install guide */}
+      {showInstallGuide && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 backdrop-blur-md font-sans">
+          <button
+            type="button"
+            onClick={() => setShowInstallGuide(false)}
+            className="fixed top-4 right-4 z-10 w-10 h-10 rounded-full bg-slate-900/80 border border-slate-700 text-slate-200 flex items-center justify-center hover:bg-slate-800 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div className="py-8">
+            <InstallGuide
+              footerNote={
+                <span>
+                  <b className="text-amber-400">The CIYA app is the only way to sign in on your phone.</b> Install
+                  it below, open it from your home screen, and sign in there. The site still works normally on a computer.
+                </span>
+              }
+            />
+          </div>
+        </div>
+      )}
 
       {/* POPUP BLOCKED ALERT MODAL */}
       {showPopupBlocked && (
