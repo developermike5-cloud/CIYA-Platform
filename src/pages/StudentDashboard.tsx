@@ -3092,6 +3092,11 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                   return;
                 }
 
+                // Enter the classroom deterministically: flip the local view
+                // state directly instead of relying only on the URL-sync effect,
+                // which never re-runs when the search string does not change.
+                setViewingSyllabus(false);
+                setShowAssignment(false);
                 updateParams({ syllabus: 'false', assignment: 'false' });
               }}
               className={`w-full py-4 text-white font-extrabold text-sm uppercase rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer transform active:scale-[0.98] border-0 ${
