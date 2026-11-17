@@ -5,6 +5,8 @@ import { Mail, Lock, X, Sparkles, ArrowRight, User, Phone, MapPin, ChevronDown, 
 import { auth, db, safeGetItem, safeSetItem } from '../firebase';
 import BrandingLogo from './BrandingLogo';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, signOut } from 'firebase/auth';
+import InstallGuide from './InstallGuide';
+import { isMobileBrowser } from '../utils/courseServer';
 import { useIntakeRoute } from '../hooks/useIntakeRoute';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
@@ -30,6 +32,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
+  // A student trying to sign in from a phone browser gets the app-install
+  // guide instead of an error: the app is the only way to sign in on a phone.
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   // Password Visibility Toggle State
   const [showPassword, setShowPassword] = useState(false);
@@ -86,7 +91,13 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           const isAdmin = !!adminSnap?.exists() || user.email?.toLowerCase() === 'developermike5@gmail.com';
           if (!isAdmin) {
             await signOut(auth);
-            setError('Students sign in through the CIYA app. Open the installed app on your phone to log in.');
+            if (isMobileBrowser()) {
+              // Phone browser: the app is the only way to sign in. Show the
+              // install guide right here instead of a bare error.
+              setShowInstallGuide(true);
+            } else {
+              setError('Students sign in through the CIYA app. Open the installed app on your phone to log in.');
+            }
             return;
           }
         }
@@ -320,7 +331,13 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           const isAdmin = !!adminSnap?.exists() || user.email?.toLowerCase() === 'developermike5@gmail.com';
           if (!isAdmin) {
             await signOut(auth);
-            setError('Students sign in through the CIYA app. Open the installed app on your phone to log in.');
+            if (isMobileBrowser()) {
+              // Phone browser: the app is the only way to sign in. Show the
+              // install guide right here instead of a bare error.
+              setShowInstallGuide(true);
+            } else {
+              setError('Students sign in through the CIYA app. Open the installed app on your phone to log in.');
+            }
             return;
           }
         }
@@ -369,7 +386,31 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       {isOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md flex justify-center items-start md:items-center p-4 py-8 md:py-16">
           {/* Main Modal Card */}
-          {!showPopupBlocked ? (
+          {showInstallGuide ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: 'spring', duration: 0.4 }}
+              className="relative w-full max-w-lg my-auto"
+            >
+              <button
+                type="button"
+                onClick={() => setShowInstallGuide(false)}
+                className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-slate-900/70 border border-slate-700 text-slate-200 flex items-center justify-center hover:bg-slate-800 transition-colors"
+                aria-label="Back to login"
+              >
+                ✕
+              </button>
+              <InstallGuide
+                footerNote={
+                  <span>
+                    <b className="text-amber-400">The CIYA app is the only way to sign in on your phone.</b> Install
+                    it below, open it from your home screen, and sign in there. The site still works normally on a computer.
+                  </span>
+                }
+              />
+            </motion.div>
+          ) : !showPopupBlocked ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
