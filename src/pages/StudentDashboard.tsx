@@ -23,7 +23,7 @@ import { safeStorage } from '../utils/safeStorage';
 import { supabase, getStoragePublicUrl } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { coursesStore } from '../utils/coursesStore';
-import { fetchServerCourseGated, isCourseHydrated, fetchAppAccessGate, isRunningAsPwa, isMobileBrowser } from '../utils/courseServer';
+import { fetchServerCourseGated, isCourseHydrated, isRunningAsPwa, isMobileBrowser } from '../utils/courseServer';
 import InstallGuide from '../components/InstallGuide';
 import { fetchCourseStats, CourseStatsEntry } from '../utils/courseServer';
 import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
@@ -4533,28 +4533,17 @@ export default function StudentDashboard() {
     return !safeStorage.getItem('ciya_cached_user');
   });
 
-  // App-only enforcement: the admin can close the course portal to mobile
-  // browsers, so phones must open courses inside the installed CIYA app. The
-  // check runs server-side on every dashboard load, so flipping the toggle in
-  // admin settings takes effect immediately.
-  const [appGateBlocked, setAppGateBlocked] = useState(false);
+  // App-only enforcement: the course portal lives inside the installed CIYA
+  // app only. A browser never renders the dashboard, with the toggle on or
+  // off: phones get the app-install guide, desktops are sent back to the
+  // landing page. The installed app keeps full access.
+  const webBlocked = !isRunningAsPwa();
 
   useEffect(() => {
-    let cancelled = false;
-    const probe = () => {
-      fetchAppAccessGate().then((enforced) => {
-        if (cancelled || !enforced) return;
-        if (!isRunningAsPwa() && isMobileBrowser()) setAppGateBlocked(true);
-      });
-    };
-    // Probe at once, then twice more to catch a session that restores a
-    // moment later. The server answers without a sign-in, so this fires for
-    // every phone browser before any course content is touched.
-    probe();
-    const t1 = setTimeout(probe, 1200);
-    const t2 = setTimeout(probe, 4500);
-    return () => { cancelled = true; clearTimeout(t1); clearTimeout(t2); };
-  }, []);
+    if (webBlocked && !isMobileBrowser()) {
+      try { window.location.replace('/'); } catch { /* ignore */ }
+    }
+  }, [webBlocked]);
 
   // Back-button guard: a pending first-login can never land on this dashboard
   useEffect(() => {
@@ -6713,17 +6702,18 @@ export default function StudentDashboard() {
     }
   }, []);
 
-  if (appGateBlocked) {
-    // App-only access is on and this is a phone browser (not the installed
-    // app): the course portal gives way to the app-install guide so the
-    // student installs CIYA and continues learning inside the app.
+  if (webBlocked) {
+    if (!isMobileBrowser()) return null; // desktop browser: back to the landing page
+    // A phone browser (not the installed app): the course portal gives way to
+    // the app-install guide so the student installs CIYA and continues
+    // learning inside the app.
     return (
       <div className="min-h-screen font-sans">
         <InstallGuide
           footerNote={
             <span>
-              <b className="text-amber-400">The course portal is app-only on phones.</b> Install the CIYA app
-              and open it from your home screen to continue learning. The site still works normally on a computer.
+              <b className="text-amber-400">The course portal is app-only.</b> Install the CIYA app
+              and open it from your home screen to continue learning.
             </span>
           }
         />

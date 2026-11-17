@@ -140,7 +140,16 @@ function AppContent() {
         safeStorage.removeItem('ciya_last_visited_path');
         return;
       }
-      
+
+      // The course portal lives inside the installed app only. A browser never
+      // resumes into the dashboard, even when the app's session is shared on
+      // this device: the website stays the website.
+      const isStandaloneApp = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+      if (savedPath.startsWith('/dashboard') && !isStandaloneApp) {
+        safeStorage.removeItem('ciya_last_visited_path');
+        return;
+      }
+
       navigate(savedPath, { replace: true });
     }
   }, [navigate]);

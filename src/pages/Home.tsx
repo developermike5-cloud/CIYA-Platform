@@ -143,7 +143,7 @@ function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
 
         <nav aria-label="Main" className="hidden md:flex items-center gap-[34px] text-sm font-medium text-teal-200">
           {navLinks}
-          {user ? (
+          {user && (isRunningAsPwa() || user.email?.toLowerCase() === 'developermike5@gmail.com') ? (
             <Link to="/dashboard" className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-full text-xs shadow-lg shadow-amber-500/10 transition-all cursor-pointer">
               My Dashboard
             </Link>
@@ -269,7 +269,10 @@ export default function Home() {
 
         if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
           navigate('/admin');
-        } else {
+        } else if (isRunningAsPwa()) {
+          // The installed app still opens straight into the dashboard, but a
+          // normal browser never leaves the landing page: the app's login
+          // session must not take over the website.
           try {
             const docSnap = await getDoc(doc(db, 'users', user.uid));
             if (docSnap.exists()) {
