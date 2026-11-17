@@ -9057,8 +9057,7 @@ export default function StudentDashboard() {
           {/* Slide-Up Sheet Container (Positioned strictly above bottom navigation bar) */}
           <motion.div 
             initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            transition={{ type: "spring", damping: 28, stiffness: 280 }}
+            animate={{ y: 0, transition: { type: 'spring', damping: 30, stiffness: 640, mass: 0.9 } }}
             className="fixed inset-x-0 bottom-[62px] sm:bottom-[68px] z-40 max-w-xl mx-auto bg-white rounded-t-[32px] p-5 pb-6 shadow-[0_-12px_40px_rgba(0,0,0,0.25)] border-t border-slate-200/90 max-h-[calc(85dvh-64px)] overflow-y-auto font-sans text-left pointer-events-auto"
           >
             {/* Grab Handle */}

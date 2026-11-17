@@ -31,18 +31,17 @@ export default function PWAInstallModal({ isOpen, onClose }: PWAInstallModalProp
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          animate={{ opacity: 1, transition: { duration: 0.15 } }}
+          exit={{ opacity: 0, transition: { duration: 0.12 } }}
           className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm"
           onClick={onClose}
         />
 
         {/* Card */}
         <motion.div
-          initial={{ y: '100%', opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: '100%', opacity: 0 }}
-          transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+          initial={{ y: '100%' }}
+          animate={{ y: 0, transition: { type: 'spring', damping: 30, stiffness: 640, mass: 0.9 } }}
+          exit={{ y: '100%', transition: { duration: 0.18, ease: 'easeIn' } }}
           className="relative z-10 w-full sm:max-w-md bg-white rounded-t-[32px] sm:rounded-3xl p-6 shadow-2xl border border-slate-100 text-left overflow-hidden pb-[max(env(safe-area-inset-bottom),24px)]"
         >
           {/* Header */}

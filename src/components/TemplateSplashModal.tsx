@@ -20,18 +20,17 @@ export default function TemplateSplashModal({
       {/* Backdrop below mobile bottom nav bar */}
       <motion.div
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-xs"
+        animate={{ opacity: 1, transition: { duration: 0.15 } }}
+        exit={{ opacity: 0, transition: { duration: 0.12 } }}
+        className="fixed inset-0 z-40 bg-slate-950/70"
         onClick={onClose}
       />
 
       {/* Slide-Up Bottom Splash Sheet (Sits strictly ABOVE bottom navigation bar) */}
       <motion.div
         initial={{ y: '100%' }}
-        animate={{ y: 0 }}
-        exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+        animate={{ y: 0, transition: { type: 'spring', damping: 30, stiffness: 640, mass: 0.9 } }}
+        exit={{ y: '100%', transition: { duration: 0.18, ease: 'easeIn' } }}
         className="fixed inset-x-0 bottom-[62px] sm:bottom-[68px] z-40 max-w-xl mx-auto bg-white rounded-t-[32px] shadow-[0_-12px_40px_rgba(0,0,0,0.25)] border-t border-slate-200/90 flex flex-col max-h-[calc(85dvh-64px)] overflow-hidden font-sans select-none text-left"
       >
         {/* Pull Handle & Header */}
