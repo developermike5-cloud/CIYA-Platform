@@ -84,9 +84,11 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
     // playsinline=1: enables in-line mobile view
     // fs=0: disables native fullscreen button inside YouTube player
     // controls=1: keeps timeline and volume interface readable but secured
-    // cc_load_policy=1: forces captions on for advanced courses
-    // cc_load_policy=3: disables forcing captions for beginner courses
-    const ccParam = isAdvanced ? 'cc_load_policy=1' : 'cc_load_policy=3';
+    // cc_load_policy=1: captions on by default for advanced & masterclass
+    // cc_load_policy=0: captions off by default for beginner courses, whose
+    // videos already carry subtitles edited into the picture. Only 0 and 1 are
+    // valid values; anything else is ignored by YouTube and captions come back.
+    const ccParam = isAdvanced ? 'cc_load_policy=1' : 'cc_load_policy=0';
     return videoId 
       ? `https://www.youtube.com/embed/${videoId}?controls=1&modestbranding=1&rel=0&disablekb=1&playsinline=1&fs=0&${ccParam}`
       : rawUrl;

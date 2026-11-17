@@ -2033,6 +2033,7 @@ interface CourseViewerProps {
   courses: Course[];
   hasCompletedFirstCourse?: boolean;
   loading?: boolean;
+  hydrating?: boolean;
   allMySubmissions?: any[];
   appSettings?: any;
   onRequestUnlockAdvanced?: (course: Course) => void;
@@ -2060,7 +2061,7 @@ function renderBulletList(text: string, icon: string, textClass: string = "text-
   );
 }
 
-function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false, allMySubmissions = [], appSettings, onRequestUnlockAdvanced, onRequestCodeGate, lessonStats, codeGateRequired = false }: CourseViewerProps) {
+function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack, showToast, handleResetProgress, isAdmin = false, isEnrolled = true, onLogin, courses, hasCompletedFirstCourse, loading = false, hydrating = false, allMySubmissions = [], appSettings, onRequestUnlockAdvanced, onRequestCodeGate, lessonStats, codeGateRequired = false }: CourseViewerProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -2840,7 +2841,10 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
   const sk = SKILLS[course.skill || 'web'];
 
   if ((!course.days || course.days.length === 0) && !viewingSyllabus) {
-    if (loading) {
+    // While the student's real course copy is still arriving from the server
+    // store, show the loading state instead of the "no lessons" message; the
+    // local copy has no days yet only because the fetch has not landed.
+    if (loading || hydrating) {
       return (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="w-12.5 h-12.5 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mb-4" />
@@ -8246,6 +8250,7 @@ export default function StudentDashboard() {
                   onRequestUnlockAdvanced={(c) => setAdvancedPaymentCourse(c)}
                   onRequestCodeGate={(c) => setUnlockGate({ courseId: c.id, codeType: courseCodeGates[c.id] || 'ciya', busy: false, error: null })}
                   lessonStats={courseStats[selectedCourse.id] || null}
+                  hydrating={!isAdmin && !isCourseHydrated(selectedCourse.id) && !gateCheckedIds.has(selectedCourse.id)}
                   codeGateRequired={!isAdmin && !unlockedCourseIds.includes(selectedCourse.id) && (!!courseCodeGates[selectedCourse.id] || (!isCourseHydrated(selectedCourse.id) && !gateCheckedIds.has(selectedCourse.id)))}
                 />
               ) : (
