@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './firebase';
+import { isMobileBrowser } from './utils/courseServer';
 import Home from './pages/Home';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminLayout from './pages/admin/AdminLayout';
@@ -141,11 +142,11 @@ function AppContent() {
         return;
       }
 
-      // The course portal lives inside the installed app only. A browser never
-      // resumes into the dashboard, even when the app's session is shared on
-      // this device: the website stays the website.
+      // A phone browser never resumes into the dashboard, even when the
+      // app's session is shared on this device: the website stays the
+      // website. Desktop browsers and the installed app resume normally.
       const isStandaloneApp = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
-      if (savedPath.startsWith('/dashboard') && !isStandaloneApp) {
+      if (savedPath.startsWith('/dashboard') && isMobileBrowser() && !isStandaloneApp) {
         safeStorage.removeItem('ciya_last_visited_path');
         return;
       }

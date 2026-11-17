@@ -4533,17 +4533,11 @@ export default function StudentDashboard() {
     return !safeStorage.getItem('ciya_cached_user');
   });
 
-  // App-only enforcement: the course portal lives inside the installed CIYA
-  // app only. A browser never renders the dashboard, with the toggle on or
-  // off: phones get the app-install guide, desktops are sent back to the
-  // landing page. The installed app keeps full access.
-  const webBlocked = !isRunningAsPwa();
-
-  useEffect(() => {
-    if (webBlocked && !isMobileBrowser()) {
-      try { window.location.replace('/'); } catch { /* ignore */ }
-    }
-  }, [webBlocked]);
+  // App-only enforcement on phones: the course portal lives inside the
+  // installed CIYA app, so a phone browser never renders the dashboard, with
+  // the toggle on or off. Desktop browsers and the installed app keep full
+  // access.
+  const webBlocked = !isRunningAsPwa() && isMobileBrowser();
 
   // Back-button guard: a pending first-login can never land on this dashboard
   useEffect(() => {
@@ -6703,7 +6697,6 @@ export default function StudentDashboard() {
   }, []);
 
   if (webBlocked) {
-    if (!isMobileBrowser()) return null; // desktop browser: back to the landing page
     // A phone browser (not the installed app): the course portal gives way to
     // the app-install guide so the student installs CIYA and continues
     // learning inside the app.
@@ -6712,8 +6705,8 @@ export default function StudentDashboard() {
         <InstallGuide
           footerNote={
             <span>
-              <b className="text-amber-400">The course portal is app-only.</b> Install the CIYA app
-              and open it from your home screen to continue learning.
+              <b className="text-amber-400">The course portal is app-only on phones.</b> Install the CIYA app
+              and open it from your home screen to continue learning. The site still works normally on a computer.
             </span>
           }
         />
