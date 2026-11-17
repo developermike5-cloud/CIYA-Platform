@@ -10,6 +10,7 @@ interface SecureYoutubePlayerProps {
 export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYoutubePlayerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Maintain fullscreen state listener for native esc key or system toggles
   useEffect(() => {
@@ -89,12 +90,35 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
     // videos already carry subtitles edited into the picture. Only 0 and 1 are
     // valid values; anything else is ignored by YouTube and captions come back.
     const ccParam = isAdvanced ? 'cc_load_policy=1' : 'cc_load_policy=0';
+    // enablejsapi lets us switch the caption track off programmatically below
+    // (cc_load_policy=0 alone only sets the default, and a browser whose player
+    // preference has captions toggled on keeps showing them).
+    const originParam = typeof window !== 'undefined' ? `&origin=${encodeURIComponent(window.location.origin)}` : '';
     return videoId 
-      ? `https://www.youtube.com/embed/${videoId}?controls=1&modestbranding=1&rel=0&disablekb=1&playsinline=1&fs=0&${ccParam}`
+      ? `https://www.youtube.com/embed/${videoId}?controls=1&modestbranding=1&rel=0&disablekb=1&playsinline=1&fs=0&enablejsapi=1${originParam}&${ccParam}`
       : rawUrl;
   };
 
   const embedUrl = getEmbedUrl(url);
+
+  // Beginner videos already carry their subtitles inside the picture, so
+  // actively clear the YouTube caption track once the player is ready.
+  // Advanced & masterclass keep captions available on purpose.
+  useEffect(() => {
+    if (isAdvanced) return;
+    let cancelled = false;
+    const sendOff = () => {
+      if (cancelled) return;
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          JSON.stringify({ event: 'command', func: 'setOption', args: ['captions', 'track', {}] }),
+          '*'
+        );
+      } catch (e) {}
+    };
+    const timers = [setTimeout(sendOff, 2500), setTimeout(sendOff, 6000)];
+    return () => { cancelled = true; timers.forEach(clearTimeout); };
+  }, [embedUrl, isAdvanced]);
 
   if (!embedUrl) {
     return (
@@ -116,6 +140,7 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
     >
       {/* 1. Seamless YouTube Iframe Embed */}
       <iframe 
+        ref={iframeRef}
         className="absolute top-0 left-0 w-full h-full z-0"
         src={embedUrl}
         title={title}

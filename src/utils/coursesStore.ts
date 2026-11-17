@@ -477,6 +477,10 @@ if (typeof window !== 'undefined') {
             if (serverVideoCount > localVideoCount) {
               // Server has richer video content - retain server course
               standardMap.set(c.id!, existing);
+            } else if (localVideoCount > serverVideoCount) {
+              // The local copy carries hydrated lesson content a bundled stub
+              // copy lacks; never downgrade it back to the stub.
+              standardMap.set(c.id!, c);
             } else {
               // Apply smart Day 4/5 merging if needed
               const localDay4 = c.days?.find(d => d.dayNumber === 4);
@@ -518,9 +522,13 @@ if (typeof window !== 'undefined') {
               advancedMap.set(c.id!, c);
             }
           } else {
+            const serverVideoCount = existing.days?.reduce((acc, d) => acc + (d.videos?.length || 0), 0) || 0;
+            const localVideoCount = c.days?.reduce((acc, d) => acc + (d.videos?.length || 0), 0) || 0;
             const localTime = new Date(c.updatedAt || 0).getTime();
             const serverTime = new Date(existing.updatedAt || 0).getTime();
-            if (localTime > serverTime) {
+            if (localVideoCount > serverVideoCount) {
+              advancedMap.set(c.id!, c);
+            } else if (localTime > serverTime) {
               advancedMap.set(c.id!, c);
             }
           }

@@ -93,6 +93,23 @@ function AppContent() {
     };
   }, []);
 
+  // When a freshly deployed service worker takes over, reload once so the page
+  // runs the new bundle immediately instead of staying a version behind until a
+  // second manual refresh.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    let refreshing = false;
+    const hadController = !!navigator.serviceWorker.controller;
+    const onChange = () => {
+      if (hadController && !refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', onChange);
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', onChange);
+  }, []);
+
   // Restore last visited path and handle deep links
   useEffect(() => {
     // Only attempt to restore the last visited path ONCE per browser session (tab)

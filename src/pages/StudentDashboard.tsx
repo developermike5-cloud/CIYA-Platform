@@ -2840,6 +2840,15 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
   const sk = SKILLS[course.skill || 'web'];
 
+  // A student whose course still needs its access code should meet the code
+  // prompt immediately on refresh, never an empty classroom state.
+  useEffect(() => {
+    if (loading || hydrating || !codeGateRequired || viewingSyllabus) return;
+    if (!course?.id || (Array.isArray(course?.days) && course.days.length > 0)) return;
+    onRequestCodeGate && onRequestCodeGate(course);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, hydrating, codeGateRequired, viewingSyllabus, course?.id]);
+
   if ((!course.days || course.days.length === 0) && !viewingSyllabus) {
     // While the student's real course copy is still arriving from the server
     // store, show the loading state instead of the "no lessons" message; the
@@ -2852,10 +2861,31 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         </div>
       );
     }
+    if (codeGateRequired) {
+      return (
+        <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+          <div className="text-3xl mb-4 select-none">🔒</div>
+          <p className="text-slate-600 text-sm font-black uppercase tracking-wider mb-5">Enter your access code to open this classroom</p>
+          <button
+            onClick={() => onRequestCodeGate && onRequestCodeGate(course)}
+            className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black uppercase tracking-wider"
+          >
+            Enter Access Code
+          </button>
+        </div>
+      );
+    }
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="flex flex-col items-center justify-center py-24 text-center px-4">
         <div className="text-3xl mb-4 select-none">📚</div>
-        <p className="text-slate-600 text-sm font-black uppercase tracking-wider">No lessons published for this path yet.</p>
+        <p className="text-slate-600 text-sm font-black uppercase tracking-wider mb-1">Couldn't load your lessons just now.</p>
+        <p className="text-slate-400 text-xs mb-5">Check your connection, then tap retry.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-black uppercase tracking-wider"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -5543,6 +5573,7 @@ export default function StudentDashboard() {
     const res = await fetchServerCourseGated(courseId, code);
     if (res.status === 'ok') {
       coursesStore.upsertFromServer([res.course]);
+      applyServerCourse(res.course);
       setCourseCodeGates((prev) => {
         const next = { ...prev };
         delete next[courseId];
@@ -6170,6 +6201,23 @@ export default function StudentDashboard() {
     setLoading(false);
   }, [authChecking]);
 
+  // Merge a freshly hydrated server copy of one course straight into state so
+  // the classroom renders even before (or besides) the store broadcast lands.
+  const applyServerCourse = (incoming: any) => {
+    if (!incoming?.id) return;
+    setCourses((prev: any[]) => {
+      const hasDays = (c: any) => Array.isArray(c?.days) && c.days.length > 0;
+      const i = prev.findIndex((c: any) => c.id === incoming.id);
+      if (i < 0) return [...prev, incoming];
+      if (hasDays(incoming) || !hasDays(prev[i])) {
+        const next = prev.slice();
+        next[i] = incoming;
+        return next;
+      }
+      return prev;
+    });
+  };
+
   // Subscribe to the shared course store: per-course hydration (students) and
   // boot synchronization both broadcast here, so the classroom gets the real
   // course content even when the local cache started as a stub copy.
@@ -6384,7 +6432,10 @@ export default function StudentDashboard() {
         if (cancelled) return;
         gateCheckedIdsRef.current.add(id);
         setGateCheckedIds((prev) => { const next = new Set(prev); next.add(id); return next; });
-        if (res.status === 'ok') coursesStore.upsertFromServer([res.course]);
+        if (res.status === 'ok') {
+          coursesStore.upsertFromServer([res.course]);
+          applyServerCourse(res.course);
+        }
         else if (res.status === 'needs-code') setCourseCodeGates((prev) => ({ ...prev, [id]: res.codeType }));
       }
     })();
@@ -9514,7 +9565,10 @@ export default function StudentDashboard() {
                 try {
                   if (passcode) {
                     const gated = await fetchServerCourseGated(advancedPaymentCourse.id, passcode);
-                    if (gated.status === 'ok') coursesStore.upsertFromServer([gated.course]);
+                    if (gated.status === 'ok') {
+                      coursesStore.upsertFromServer([gated.course]);
+                      applyServerCourse(gated.course);
+                    }
                   }
                   const courseId = advancedPaymentCourse.id;
                   const allAvailableCourses = coursesStore.getCourses();
