@@ -7,10 +7,44 @@ interface SecureYoutubePlayerProps {
   isAdvanced?: boolean;
 }
 
+// Official YouTube IFrame Player API loader (shared across all player instances).
+// The API script is injected once per page; every player waits on this promise.
+let ytApiPromise: Promise<any> | null = null;
+
+function loadYouTubeIframeApi(): Promise<any> {
+  if (typeof window === 'undefined') return Promise.reject(new Error('no window'));
+  const w = window as any;
+  if (w.YT && w.YT.Player) return Promise.resolve(w.YT);
+  if (ytApiPromise) return ytApiPromise;
+
+  ytApiPromise = new Promise((resolve, reject) => {
+    const previous = w.onYouTubeIframeAPIReady;
+    w.onYouTubeIframeAPIReady = () => {
+      if (typeof previous === 'function') previous();
+      resolve(w.YT);
+    };
+    const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+    if (!existing) {
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.async = true;
+      script.onerror = () => reject(new Error('YouTube IFrame API failed to load'));
+      document.head.appendChild(script);
+    }
+    // If the script tag is already in the page but the API never arrives, fail late.
+    setTimeout(() => {
+      if (!(w.YT && w.YT.Player)) reject(new Error('YouTube IFrame API timed out'));
+    }, 10000);
+  });
+  return ytApiPromise;
+}
+
 export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYoutubePlayerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [apiFailed, setApiFailed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const playerHostRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<any>(null);
 
   // Maintain fullscreen state listener for native esc key or system toggles
   useEffect(() => {
@@ -49,12 +83,11 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
   };
 
   // Extract clean YouTube ID or embed URL
-  const getEmbedUrl = (rawUrl: string): string => {
+  const getVideoId = (rawUrl: string): string => {
     if (!rawUrl) return '';
     let videoId = '';
     try {
       if (rawUrl.includes('youtube.com/embed/')) {
-        const urlObj = new URL(rawUrl);
         videoId = rawUrl.split('youtube.com/embed/')[1]?.split('?')[0] || '';
       } else if (rawUrl.includes('youtube.com/watch')) {
         const urlObj = new URL(rawUrl);
@@ -78,47 +111,107 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
       videoId = rawUrl; // fallback if just video ID is passed
     }
 
-    // Embed params to restrict exit routes
-    // modestybranding=1: hides watch on youtube link in bottom right
-    // rel=0: shows recommendations from same channel only
-    // disablekb=1: disables hotkeys
-    // playsinline=1: enables in-line mobile view
-    // fs=0: disables native fullscreen button inside YouTube player
-    // controls=1: keeps timeline and volume interface readable but secured
-    // cc_load_policy=1: captions on by default for advanced & masterclass
-    // cc_load_policy=0: captions off by default for beginner courses, whose
-    // videos already carry subtitles edited into the picture. Only 0 and 1 are
-    // valid values; anything else is ignored by YouTube and captions come back.
-    const ccParam = isAdvanced ? 'cc_load_policy=1' : 'cc_load_policy=0';
-    // enablejsapi lets us switch the caption track off programmatically below
-    // (cc_load_policy=0 alone only sets the default, and a browser whose player
-    // preference has captions toggled on keeps showing them).
-    const originParam = typeof window !== 'undefined' ? `&origin=${encodeURIComponent(window.location.origin)}` : '';
-    return videoId 
-      ? `https://www.youtube.com/embed/${videoId}?controls=1&modestbranding=1&rel=0&disablekb=1&playsinline=1&fs=0&enablejsapi=1${originParam}&${ccParam}`
-      : rawUrl;
+    return videoId;
   };
 
-  const embedUrl = getEmbedUrl(url);
+  const videoId = getVideoId(url);
 
-  // Beginner videos already carry their subtitles inside the picture, so
-  // actively clear the YouTube caption track once the player is ready.
-  // Advanced & masterclass keep captions available on purpose.
+  // Embed params to restrict exit routes
+  // modestbranding=1: hides watch on youtube link in bottom right
+  // rel=0: shows recommendations from same channel only
+  // disablekb=1: disables hotkeys
+  // playsinline=1: enables in-line mobile view
+  // fs=0: disables native fullscreen button inside YouTube player
+  // controls=1: keeps timeline and volume interface readable but secured
+  // cc_load_policy=1: captions available by default for advanced & masterclass
+  // cc_load_policy=0: captions default-off for beginner courses, whose videos
+  // already carry subtitles edited into the picture. cc_load_policy alone is
+  // only the DEFAULT and YouTube still shows captions when the browser's
+  // player preference has them on, so the caption track is switched off
+  // programmatically through the IFrame Player API below.
+  const buildEmbedUrl = (id: string): string => {
+    const ccParam = isAdvanced ? 'cc_load_policy=1' : 'cc_load_policy=0';
+    const originParam = typeof window !== 'undefined' ? `&origin=${encodeURIComponent(window.location.origin)}` : '';
+    return `https://www.youtube.com/embed/${id}?controls=1&modestbranding=1&rel=0&disablekb=1&playsinline=1&fs=0&enablejsapi=1${originParam}&${ccParam}`;
+  };
+
+  const embedUrl = videoId ? buildEmbedUrl(videoId) : url;
+
+  // Beginner videos already carry their subtitles inside the picture, so switch
+  // the YouTube caption track OFF once the player is ready and again when
+  // playback starts. Advanced & masterclass keep captions available on purpose.
+  const switchCaptionsOff = (player: any) => {
+    if (isAdvanced || !player) return;
+    try { player.unloadModule('captions'); } catch (e) {}
+    try { player.setOption('captions', 'track', {}); } catch (e) {}
+  };
+
   useEffect(() => {
-    if (isAdvanced) return;
+    if (!videoId || apiFailed) return;
     let cancelled = false;
-    const sendOff = () => {
-      if (cancelled) return;
-      try {
-        iframeRef.current?.contentWindow?.postMessage(
-          JSON.stringify({ event: 'command', func: 'setOption', args: ['captions', 'track', {}] }),
-          '*'
-        );
-      } catch (e) {}
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    loadYouTubeIframeApi()
+      .then((YT: any) => {
+        if (cancelled || !playerHostRef.current) return;
+        // A fresh host element per player: YT replaces it with the iframe.
+        const host = document.createElement('div');
+        host.id = `yt-player-${Math.random().toString(36).slice(2)}`;
+        host.style.width = '100%';
+        host.style.height = '100%';
+        playerHostRef.current.appendChild(host);
+
+        const player = new YT.Player(host, {
+          videoId,
+          width: '100%',
+          height: '100%',
+          title,
+          playerVars: {
+            controls: 1,
+            modestbranding: 1,
+            rel: 0,
+            disablekb: 1,
+            playsinline: 1,
+            fs: 0,
+            cc_load_policy: isAdvanced ? 1 : 0,
+            origin: typeof window !== 'undefined' ? window.location.origin : undefined
+          },
+          events: {
+            onReady: () => {
+              if (cancelled) return;
+              const iframe = playerHostRef.current?.querySelector('iframe');
+              if (iframe) {
+                iframe.className = 'absolute top-0 left-0 w-full h-full z-0';
+                iframe.setAttribute('title', title);
+                iframe.setAttribute('frameBorder', '0');
+                iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share');
+                iframe.setAttribute('referrerPolicy', 'strict-origin-when-cross-origin');
+              }
+              switchCaptionsOff(player);
+              // One belt-and-braces retry in case the track list lands late.
+              retryTimer = setTimeout(() => switchCaptionsOff(player), 3000);
+            },
+            onStateChange: (event: any) => {
+              if (cancelled) return;
+              if (event.data === YT.PlayerState.PLAYING) {
+                switchCaptionsOff(player);
+              }
+            }
+          }
+        });
+        playerRef.current = player;
+      })
+      .catch(() => {
+        if (!cancelled) setApiFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      try { playerRef.current?.destroy?.(); } catch (e) {}
+      playerRef.current = null;
     };
-    const timers = [setTimeout(sendOff, 2500), setTimeout(sendOff, 6000)];
-    return () => { cancelled = true; timers.forEach(clearTimeout); };
-  }, [embedUrl, isAdvanced]);
+  }, [videoId, isAdvanced, apiFailed, title]);
 
   if (!embedUrl) {
     return (
@@ -138,17 +231,21 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
           : 'rounded-xl sm:rounded-2xl md:rounded-3xl shadow-md sm:shadow-2xl border-0 sm:border-2 md:border-4 border-slate-200/90 aspect-[9/16] sm:aspect-video'
       }`}
     >
-      {/* 1. Seamless YouTube Iframe Embed */}
-      <iframe 
-        ref={iframeRef}
-        className="absolute top-0 left-0 w-full h-full z-0"
-        src={embedUrl}
-        title={title}
-        frameBorder="0" 
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-        referrerPolicy="strict-origin-when-cross-origin"
-        allowFullScreen={false}
-      ></iframe>
+      {/* 1. YouTube player via the official IFrame Player API. When the API
+          script cannot load (rare, offline), fall back to the plain iframe. */}
+      {apiFailed ? (
+        <iframe 
+          className="absolute top-0 left-0 w-full h-full z-0"
+          src={embedUrl}
+          title={title}
+          frameBorder="0" 
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen={false}
+        ></iframe>
+      ) : (
+        <div ref={playerHostRef} className="absolute top-0 left-0 w-full h-full z-0"></div>
+      )}
 
       {/* 2. Custom Native Fullscreen Button */}
       <button 
