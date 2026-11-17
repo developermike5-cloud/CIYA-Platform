@@ -572,13 +572,23 @@ export async function handler(event: any) {
   }
   const op = String(body.op || "");
 
+  const sa = loadServiceAccount();
+  const projectId = sa.project_id;
+  const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-1aaee609-a922-43e7-9568-0b675490ff78";
+
   try {
+    if (op === "access-gate") {
+      // Client helper for the app-only enforcement screen: the dashboard checks
+      // this on load so phones running the site in a browser (not the installed
+      // app) are sent to the install page before any course content is
+      // requested. Answers without a sign-in on purpose: it returns only the
+      // toggle, never content, so cached or guest sessions are covered too.
+      const gate = await readAppGate(projectId, databaseId);
+      return json(200, { ok: true, enforceAppOnly: gate.enforceAppOnly });
+    }
     const idToken = event.headers["x-firebase-id-token"] || event.headers["X-Firebase-Id-Token"];
     if (!idToken) return json(401, { error: "missing id token" });
     const caller = await verifyIdToken(idToken);
-    const sa = loadServiceAccount();
-    const projectId = sa.project_id;
-    const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "ai-studio-1aaee609-a922-43e7-9568-0b675490ff78";
     const { cloudName, apiKey, apiSecret } = cloudinaryCreds();
 
     if (op === "publish") {
@@ -629,14 +639,6 @@ export async function handler(event: any) {
       return json(200, { ok: failed.length === 0, results });
     }
 
-    if (op === "access-gate") {
-      // Client helper for the app-only enforcement screen: the dashboard checks
-      // this on load so phones running the site in a browser (not the installed
-      // app) are sent to the app before any course content is requested.
-      const gate = await readAppGate(projectId, databaseId);
-      return json(200, { ok: true, enforceAppOnly: gate.enforceAppOnly });
-    }
-
     if (op === "get") {
       const courseId = String(body.courseId || "").trim();
       if (!courseId) return json(400, { error: "missing courseId" });
@@ -678,15 +680,18 @@ export async function handler(event: any) {
       } else {
         courseFetchStatus = res.status;
       }
-      if (!admin) {
+      {
         // App-only enforcement: when the admin toggle is ON, phones must open
         // their courses inside the installed CIYA app. A request from a mobile
         // browser (not the installed PWA) is refused here, server-side, on
-        // every fetch. Desktop browsers and the installed app always pass.
+        // every fetch, for every caller. Desktop browsers and the installed
+        // app always pass. The admin catalog listing ("all") stays open.
         const appGate = await readAppGate(projectId, databaseId);
         if (appGate.enforceAppOnly && isMobileUserAgent(event.headers) && !isPwaRequest(event.headers)) {
           return json(403, { error: "app-only-required" });
         }
+      }
+      if (!admin) {
         const reg = await getStudentRegistration(projectId, databaseId, caller.uid);
         const registered = isStudentRegisteredForCourse(reg, courseId, course);
         if (!registered) {

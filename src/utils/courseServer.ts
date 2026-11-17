@@ -357,11 +357,13 @@ export async function fetchAdminWorkingCopies(): Promise<Course[]> {
 // CIYA app. Desktop browsers are never affected.
 export async function fetchAppAccessGate(): Promise<boolean> {
   try {
+    // Works signed-out on purpose: the server answers with only the toggle
+    // (never content), so a phone browser with a cached or no session still
+    // gets sent to the install page while app-only access is on.
     const token = await currentIdToken();
-    if (!token) return false;
     const res = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(token ? { 'x-firebase-id-token': token } : {}), ...pwaHeaders() },
       body: JSON.stringify({ op: 'access-gate' }),
     });
     const data = await res.json().catch(() => ({} as any));
