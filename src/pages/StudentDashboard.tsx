@@ -5539,6 +5539,30 @@ export default function StudentDashboard() {
         delete next[courseId];
         return next;
       });
+      gateCheckedIdsRef.current.add(courseId);
+      // Persist the unlock on the profile so future sessions open the course
+      // straight away instead of asking for the code again.
+      const unlockedAt = new Date().toISOString();
+      const nextProgress: Record<string, any> = { ...(userProfile?.progress || {}) };
+      nextProgress[courseId] = {
+        ...(nextProgress[courseId] || {}),
+        accessStatus: 'active',
+        durationMode: 'standard',
+        unlockedAt,
+        createdAt: nextProgress[courseId]?.createdAt || unlockedAt
+      };
+      const existingRegistered = Array.isArray(userProfile?.registeredCourses) ? userProfile.registeredCourses : [];
+      const updatedRegisteredCourses = Array.from(new Set([...existingRegistered, courseId]));
+      const updatedProfile = { ...userProfile, progress: nextProgress, registeredCourses: updatedRegisteredCourses };
+      setUserProfile(updatedProfile);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updatedProfile));
+      if (currentUser?.uid) {
+        updateDoc(doc(db, 'users', currentUser.uid), {
+          progress: nextProgress,
+          registeredCourses: updatedRegisteredCourses,
+          updatedAt: serverTimestamp()
+        }).catch((persistErr: any) => console.warn("Unlock persistence failed:", persistErr));
+      }
       setUnlockGate(null);
       handleSelectCourseId(courseId);
       navigate(`/dashboard?view=courses&courseId=${courseId}&syllabus=false`);
@@ -6286,6 +6310,7 @@ export default function StudentDashboard() {
 
   const [courseCodeGates, setCourseCodeGates] = useState<Record<string, 'ciya' | 'beginner' | 'advanced'>>({});
   const [gateCheckedIds, setGateCheckedIds] = useState<Set<string>>(new Set());
+  const gateCheckedIdsRef = useRef<Set<string>>(new Set());
   const [unlockGate, setUnlockGate] = useState<{ courseId: string; codeType: 'ciya' | 'beginner' | 'advanced'; busy: boolean; error: string | null } | null>(null);
 
   // Pull the latest published copy of every course this student is registered
@@ -6308,20 +6333,29 @@ export default function StudentDashboard() {
         if (prog[k]?.accessStatus !== 'revoked') ids.add(k);
       });
     }
+    // Also ask the server about the courses this student's onboarding pathway
+    // matched. A course already unlocked with their CIYA code hydrates open on
+    // a fresh session instead of demanding the code again; the server still
+    // enforces the gate (it returns the course only when the code is bound to
+    // it) so an untouched course just comes back needing its code.
+    registeredCoursesList.forEach((c) => {
+      if (!c.isCloned && c.durationMode !== 'express') ids.add(c.id);
+    });
     if (ids.size === 0) return;
     let cancelled = false;
     (async () => {
       for (const id of Array.from(ids)) {
-        if (cancelled) return;
+        if (cancelled || gateCheckedIdsRef.current.has(id)) continue;
         const res = await fetchServerCourseGated(id);
         if (cancelled) return;
+        gateCheckedIdsRef.current.add(id);
         setGateCheckedIds((prev) => { const next = new Set(prev); next.add(id); return next; });
         if (res.status === 'ok') coursesStore.upsertFromServer([res.course]);
         else if (res.status === 'needs-code') setCourseCodeGates((prev) => ({ ...prev, [id]: res.codeType }));
       }
     })();
     return () => { cancelled = true; };
-  }, [currentUser?.uid, isAdmin, userProfile?.registeredCourses]);
+  }, [currentUser?.uid, isAdmin, userProfile?.registeredCourses, registeredCoursesList]);
 
   // Helper to check if student has completed their first course path (at least one registered course is 100% completed)
   const hasCompletedFirstCourse = useMemo((): boolean => {
@@ -8656,7 +8690,7 @@ export default function StudentDashboard() {
       </main>
 
       {/* Mobile Native App Bottom Navigation Bar */}
-      {(!isBuzzChatActive || currentView !== 'buzz') && (
+      {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && (
         <nav 
           className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] px-2 pt-1 pb-[max(env(safe-area-inset-bottom),10px)] select-none transition-all duration-300"
           aria-label="Mobile Navigation"
@@ -9118,8 +9152,15 @@ export default function StudentDashboard() {
         onViewAssignments={() => handleViewChange('assignments')}
         onSelectCourse={(courseId) => {
           setIsRegisteredCoursesSplashOpen(false);
-          handleGatedSelectCourseId(courseId);
-          navigate(`/dashboard?view=courses&courseId=${courseId}&syllabus=false`);
+          if (!courseId || isAdmin || isCourseHydrated(courseId)) {
+            handleSelectCourseId(courseId);
+            navigate(`/dashboard?view=courses&courseId=${courseId}&syllabus=false`);
+          } else {
+            // The access code is demanded here and the app stays put; the
+            // classroom only opens once the code is accepted (or the student
+            // cancels back to the course's splash card below).
+            handleGatedSelectCourseId(courseId);
+          }
         }}
         onBrowseCatalog={() => {
           setIsRegisteredCoursesSplashOpen(false);
@@ -9134,7 +9175,17 @@ export default function StudentDashboard() {
           courseTitle={courses.find((c) => c.id === unlockGate.courseId)?.title || ''}
           busy={unlockGate.busy}
           error={unlockGate.error}
-          onCancel={() => setUnlockGate(null)}
+          onCancel={() => {
+            const cancelledCourse = unlockGate ? courses.find((c) => c.id === unlockGate.courseId) || null : null;
+            const cameFromDetails = !!cancelledCourse && currentView === 'courses' && selectedCourseId === cancelledCourse.id && new URLSearchParams(location.search).get('syllabus') === 'true';
+            setUnlockGate(null);
+            if (cancelledCourse && !cameFromDetails) {
+              // No code entered: fall back to the course's splash card instead
+              // of dropping the student into a locked classroom.
+              setSplashPreviewCourse(cancelledCourse);
+              setIsCourseCardSplashOpen(true);
+            }
+          }}
           onSubmit={handleUnlockSubmit}
         />
       )}
