@@ -6170,6 +6170,31 @@ export default function StudentDashboard() {
     setLoading(false);
   }, [authChecking]);
 
+  // Subscribe to the shared course store: per-course hydration (students) and
+  // boot synchronization both broadcast here, so the classroom gets the real
+  // course content even when the local cache started as a stub copy.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hasDays = (c: any) => Array.isArray(c?.days) && c.days.length > 0;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!Array.isArray(detail) || detail.length === 0) return;
+      setCourses((prev: any[]) => {
+        if (!prev || prev.length === 0) return detail as any[];
+        const byId = new Map(prev.map((c: any) => [c.id, c]));
+        detail.forEach((c: any) => {
+          if (!c?.id) return;
+          const cur = byId.get(c.id);
+          // Never let a dayless stub copy replace a hydrated course with real days
+          if (!cur || hasDays(c) || !hasDays(cur)) byId.set(c.id, c);
+        });
+        return Array.from(byId.values());
+      });
+    };
+    window.addEventListener('ciya_courses_updated', handler);
+    return () => window.removeEventListener('ciya_courses_updated', handler);
+  }, []);
+
   const isProfileRegisteredForCourse = (profile: any, course: any): boolean => {
     if (!profile || !course) return false;
 
