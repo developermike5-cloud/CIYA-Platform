@@ -429,7 +429,7 @@ export default function InstallGuide({ paid, whatsappHref, whatsappLabel, footer
           </p>
         )}
 
-        {guide === 'android' && !appOnPhone && isInstallable && (
+        {guide === 'android' && !appOnPhone && (
           <div className="mt-8 flex justify-center">
             <span className="ig-cta-wrap relative inline-flex">
               <button
@@ -442,6 +442,12 @@ export default function InstallGuide({ paid, whatsappHref, whatsappLabel, footer
                 <svg viewBox="0 0 24 24" className="w-6 h-6 stroke-teal-950 fill-none" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 19h16" /></svg>
                 {installing ? 'Installing…' : 'Install the CIYA app'}
               </button>
+              {!isInstallable && (
+                <p className="mt-3 text-teal-300 text-xs md:text-sm leading-relaxed">
+                  No one-tap prompt? Open your browser menu (the three dots) and tap
+                  {' '}<b>Add to Home screen</b> or <b>Install app</b>.
+                </p>
+              )}
             </span>
           </div>
         )}

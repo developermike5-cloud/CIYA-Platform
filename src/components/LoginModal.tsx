@@ -403,8 +403,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </button>
               <InstallGuide
                 footerNote={
-                  <span>
-                    <b className="text-amber-400">The CIYA app is the only way to sign in on your phone.</b> Install
+                  <span className="text-xs md:text-sm">
+                    <b className="text-amber-400 text-xs md:text-sm">The CIYA app is the only way to sign in on your phone.</b> Install
                     it below, open it from your home screen, and sign in there. The site still works normally on a computer.
                   </span>
                 }

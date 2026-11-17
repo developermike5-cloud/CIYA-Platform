@@ -7,7 +7,7 @@ import LoginModal from '../components/LoginModal';
 import InstallGuide from '../components/InstallGuide';
 import { fetchAppAccessGate, isMobileBrowser, isRunningAsPwa } from '../utils/courseServer';
 import InteractiveTemplatesSphere from '../components/InteractiveTemplatesSphere';
-import { Star, Menu, X } from 'lucide-react';
+import { Star, X } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -102,7 +102,6 @@ const useLogin = () => {
 function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
   const [user, setUser] = useState<any>(null);
   const [scrolled, setScrolled] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -157,42 +156,15 @@ function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
 
         <button
           type="button"
-          className="md:hidden inline-flex items-center justify-center w-11 h-11 rounded-xl bg-teal-900 border border-teal-800 text-teal-50"
-          aria-label="Open menu"
-          aria-expanded={drawerOpen}
-          onClick={() => setDrawerOpen((v) => !v)}
+          className="md:hidden px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-full text-xs shadow-lg shadow-amber-500/10 transition-all cursor-pointer"
+          aria-label="Login"
+          onClick={onOpenLogin}
         >
-          {drawerOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          Login
         </button>
       </div>
 
-      <AnimatePresence>
-        {drawerOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="md:hidden flex flex-col gap-1 px-6 pb-[18px] bg-teal-950/[.97] border-b border-teal-900"
-          >
-            {navLinks}
-            {user ? (
-              <Link to="/dashboard" className="py-3 border-b border-teal-900 text-amber-400 font-bold">
-                My Dashboard
-              </Link>
-            ) : (
-              <button
-                onClick={() => {
-                  setDrawerOpen(false);
-                  onOpenLogin();
-                }}
-                className="py-3 border-b border-teal-900 text-left text-[11px] font-bold text-teal-500/50"
-              >
-                Login
-              </button>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+
     </header>
   );
 }
@@ -275,7 +247,16 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('login') === 'true') {
-      setIsLoginOpen(true);
+      // A ?login=true link must never pop the login page by itself on a
+      // phone: only the Login button leads there. On desktop it opens once,
+      // then the flag is stripped from the address bar so a refresh can't
+      // reopen it either.
+      if (!isMobileBrowser()) setIsLoginOpen(true);
+      try {
+        params.delete('login');
+        const qs = params.toString();
+        window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash);
+      } catch { /* ignore */ }
     }
   }, [location.search]);
 
@@ -349,8 +330,8 @@ export default function Home() {
           <div className="py-8">
             <InstallGuide
               footerNote={
-                <span>
-                  <b className="text-amber-400">The CIYA app is the only way to sign in on your phone.</b> Install
+                <span className="text-xs md:text-sm">
+                  <b className="text-amber-400 text-xs md:text-sm">The CIYA app is the only way to sign in on your phone.</b> Install
                   it below, open it from your home screen, and sign in there. The site still works normally on a computer.
                 </span>
               }
