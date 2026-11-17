@@ -25,6 +25,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const { route: intakeRoute, ready: intakeReady } = useIntakeRoute();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [loading, setLoading] = useState(false);
+  // Google sign-in has its own loading state so the email & password forms
+  // never make the Google button spin (and vice versa).
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPopupBlocked, setShowPopupBlocked] = useState(false);
 
@@ -299,7 +302,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
   // Google authentication proxy
   const handleGoogleLogin = async () => {
-    setLoading(true);
+    setGoogleLoading(true);
     setError('');
     try {
       const provider = new GoogleAuthProvider();
@@ -339,7 +342,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       }
     } catch (e: any) {
       if (e.code === 'auth/cancelled-popup-request' || e.code === 'auth/popup-closed-by-user') {
-        setLoading(false);
+        setGoogleLoading(false);
         return;
       }
       console.error('Google login error:', e);
@@ -357,7 +360,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       }
       setError(e.message || 'Google sign-in failed.');
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   };
 
@@ -532,7 +535,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 <button
                     type="button"
                     onClick={handleGoogleLogin}
-                    disabled={loading}
+                    disabled={googleLoading}
                     className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-xl text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2.5 cursor-pointer border-0 uppercase tracking-wider hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
                     id="login_google_btn"
                   >
@@ -542,25 +545,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       <path fill="#FBBC05" d="M5.29 14.83a7.19 7.19 0 0 1 0-4.57L1.5 7.32a11.95 11.95 0 0 0 0 10.37l3.79-2.86z" />
                       <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.14 0-5.82-2.33-6.71-5.46L1.5 16.29C3.4 20.15 7.35 23 12 23z" />
                     </svg>
-                    <span>{loading ? 'Connecting Google...' : 'Sign In with Google (Recommended)'}</span>
+                    <span>{googleLoading ? 'Connecting Google...' : 'Sign In with Google'}</span>
                   </button>
 
-                  <div className="text-center pt-3 border-t border-teal-900/40">
-                    <p className="text-[11px] text-teal-400 font-semibold">
-                      Don't have an account?{' '}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose();
-                          if (intakeReady) navigate(intakeRoute);
-                        }}
-                        className="text-amber-400 hover:text-amber-300 font-black underline bg-transparent border-0 cursor-pointer p-0 ml-1 inline-flex items-center gap-1"
-                        id="login_signup_redirect_btn"
-                      >
-                        Start Guided Onboarding <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </p>
-                  </div>
                 </div>
               )}
             </motion.div>

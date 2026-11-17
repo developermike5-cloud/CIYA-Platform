@@ -84,6 +84,29 @@ function json(statusCode: number, body: unknown) {
   return { statusCode, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
 }
 
+function isMobileUserAgent(headers: any): boolean {
+  const ua = String(headers?.["user-agent"] || headers?.["User-Agent"] || "");
+  if (!ua) return false;
+  return /Android|iPhone|iPod|iPad|Mobile|webOS|BlackBerry|Opera Mini|IEMobile/i.test(ua);
+}
+
+function isPwaRequest(headers: any): boolean {
+  const marker = String(headers?.["x-ciya-pwa"] || headers?.["X-Ciya-Pwa"] || "").trim();
+  return marker === "1";
+}
+
+// App-only enforcement toggle, stored in its own settings document so the other
+// settings writers never clobber it. Read fresh on every request so flipping
+// the admin toggle takes effect instantly.
+async function readAppGate(projectId: string, databaseId: string): Promise<{ enforceAppOnly: boolean }> {
+  try {
+    const docFields = await getDocFields(projectId, databaseId, "settings/appAccess");
+    return { enforceAppOnly: docFields?.enforceAppOnly === true };
+  } catch {
+    return { enforceAppOnly: false };
+  }
+}
+
 function fieldsToValues(f: any): any {
   if (f === null || f === undefined) return null;
   if (f.stringValue !== undefined) return f.stringValue;
@@ -533,7 +556,7 @@ export async function handler(event: any) {
       statusCode: 200,
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-firebase-id-token",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-firebase-id-token, x-ciya-pwa",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
       },
       body: "",
@@ -606,6 +629,14 @@ export async function handler(event: any) {
       return json(200, { ok: failed.length === 0, results });
     }
 
+    if (op === "access-gate") {
+      // Client helper for the app-only enforcement screen: the dashboard checks
+      // this on load so phones running the site in a browser (not the installed
+      // app) are sent to the app before any course content is requested.
+      const gate = await readAppGate(projectId, databaseId);
+      return json(200, { ok: true, enforceAppOnly: gate.enforceAppOnly });
+    }
+
     if (op === "get") {
       const courseId = String(body.courseId || "").trim();
       if (!courseId) return json(400, { error: "missing courseId" });
@@ -648,6 +679,14 @@ export async function handler(event: any) {
         courseFetchStatus = res.status;
       }
       if (!admin) {
+        // App-only enforcement: when the admin toggle is ON, phones must open
+        // their courses inside the installed CIYA app. A request from a mobile
+        // browser (not the installed PWA) is refused here, server-side, on
+        // every fetch. Desktop browsers and the installed app always pass.
+        const appGate = await readAppGate(projectId, databaseId);
+        if (appGate.enforceAppOnly && isMobileUserAgent(event.headers) && !isPwaRequest(event.headers)) {
+          return json(403, { error: "app-only-required" });
+        }
         const reg = await getStudentRegistration(projectId, databaseId, caller.uid);
         const registered = isStudentRegisteredForCourse(reg, courseId, course);
         if (!registered) {
@@ -798,7 +837,7 @@ export async function handler(event: any) {
       return json(200, { ok: true, courses });
     }
 
-    return json(400, { error: "unknown op", ops: ["publish", "get", "student-code", "delete", "draft-save", "draft-get"] });
+    return json(400, { error: "unknown op", ops: ["access-gate", "publish", "get", "student-code", "delete", "draft-save", "draft-get"] });
   } catch (err: any) {
     return json(500, { error: err.message || String(err) });
   }

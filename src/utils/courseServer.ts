@@ -25,6 +25,34 @@ async function currentIdToken(): Promise<string | null> {
   }
 }
 
+// The installed-app marker: sent with every course-store call so the server can
+// tell the installed CIYA app apart from a mobile browser when the app-only
+// access toggle is enforced.
+export function isRunningAsPwa(): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+  } catch {
+    return false;
+  }
+}
+
+function pwaHeaders(): Record<string, string> {
+  return isRunningAsPwa() ? { 'x-ciya-pwa': '1' } : {};
+}
+
+// Mirrors the server's mobile user-agent check, so the dashboard can render the
+// "open the app" screen for exactly the devices the server would refuse.
+export function isMobileBrowser(): boolean {
+  try {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    return /Android|iPhone|iPod|iPad|Mobile|webOS|BlackBerry|Opera Mini|IEMobile/i.test(ua);
+  } catch {
+    return false;
+  }
+}
+
 export function isCourseHydrated(courseId: string): boolean {
   return hydratedThisSession.has(courseId);
 }
@@ -39,7 +67,7 @@ export async function fetchServerCourse(courseId: string): Promise<Course | null
       if (!token) return null;
       const res = await fetch(ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+        headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
         body: JSON.stringify({ op: 'get', courseId }),
       });
       if (!res.ok) return null;
@@ -80,7 +108,8 @@ export type CourseGateResult =
   | { status: 'invalid-code'; codeType?: 'ciya' | 'beginner' | 'advanced' }
   | { status: 'wrong-course'; boundCourseId?: string; codeType?: 'ciya' | 'beginner' | 'advanced' }
   | { status: 'incomplete-code'; codeType?: 'ciya' | 'beginner' | 'advanced' }
-  | { status: 'error'; message?: string };
+  | { status: 'error'; message?: string }
+  | { status: 'app-required' };
 
 // Fetch a course through the server-side access gate. When the course needs an
 // access code (the student's CIYA code from their welcome email, or a rotating
@@ -94,7 +123,7 @@ export async function fetchServerCourseGated(courseId: string, accessCode?: stri
     if (!token) return { status: 'error' };
     const res = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
       body: JSON.stringify({ op: 'get', courseId, ...(accessCode ? { accessCode } : {}) }),
     });
     const data = await res.json().catch(() => ({} as any));
@@ -110,6 +139,7 @@ export async function fetchServerCourseGated(courseId: string, accessCode?: stri
       if (err === 'wrong-course-code') return { status: 'wrong-course', boundCourseId: data?.boundCourseId, codeType };
       if (err === 'incomplete-access-code') return { status: 'incomplete-code', codeType };
       if (err === 'not registered for this course') return { status: 'error', message: 'You are not registered for this course yet, so the access code cannot unlock it.' };
+      if (err === 'app-only-required') return { status: 'app-required' };
     }
     return { status: 'error' };
   } catch (e) {
@@ -145,7 +175,7 @@ export async function fetchCourseStats(courseIds: string[]): Promise<CourseStats
     if (!token) return cachedStats ? cachedStats.entries.filter((e) => courseIds.includes(e.id)) : [];
     const res = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
       body: JSON.stringify({ op: 'stats', courseIds }),
     });
     const data = await res.json().catch(() => ({} as any));
@@ -174,7 +204,7 @@ export async function getStudentAccessCode(
     if (!token) return null;
     const res = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
       body: JSON.stringify({ op: 'student-code', uid }),
     });
     const data = await res.json().catch(() => ({} as any));
@@ -193,7 +223,7 @@ export async function fetchAllServerCourses(): Promise<Course[]> {
     if (!token) return [];
     const res = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
       body: JSON.stringify({ op: 'get', courseId: 'all' }),
     });
     if (!res.ok) return [];
@@ -215,7 +245,7 @@ export async function publishCoursesToServer(
     if (!token) return { ok: false, error: 'not signed in' };
     const res = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
       body: JSON.stringify({ op: 'publish', courses }),
     });
     const data = await res.json().catch(() => ({}));
@@ -239,7 +269,7 @@ export async function deleteServerCourse(courseId: string): Promise<boolean> {
     if (!token) return false;
     const res = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
       body: JSON.stringify({ op: 'delete', courseId }),
     });
     const data = await res.json().catch(() => ({}));
@@ -274,7 +304,7 @@ export async function saveCourseDrafts(
     if (!token) return { ok: false, error: 'not signed in' };
     const res = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
       body: JSON.stringify({ op: 'draft-save', courses }),
     });
     const data = await res.json().catch(() => ({}));
@@ -300,7 +330,7 @@ export async function fetchAllDraftsCourses(): Promise<Course[]> {
     if (!token) return [];
     const res = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token },
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
       body: JSON.stringify({ op: 'draft-get' }),
     });
     if (!res.ok) return [];
@@ -320,4 +350,23 @@ export async function fetchAdminWorkingCopies(): Promise<Course[]> {
   published.forEach((c) => { if (c?.id) map.set(String(c.id), c); });
   drafts.forEach((c) => { if (c?.id) map.set(String(c.id), c); });
   return Array.from(map.values());
+}
+
+// Check the admin's app-only enforcement toggle server-side. true means the
+// course portal is closed to mobile browsers: phones must use the installed
+// CIYA app. Desktop browsers are never affected.
+export async function fetchAppAccessGate(): Promise<boolean> {
+  try {
+    const token = await currentIdToken();
+    if (!token) return false;
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-firebase-id-token': token, ...pwaHeaders() },
+      body: JSON.stringify({ op: 'access-gate' }),
+    });
+    const data = await res.json().catch(() => ({} as any));
+    return data?.enforceAppOnly === true;
+  } catch {
+    return false;
+  }
 }

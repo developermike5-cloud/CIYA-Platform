@@ -23,7 +23,7 @@ import { safeStorage } from '../utils/safeStorage';
 import { supabase, getStoragePublicUrl } from '../lib/supabase';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { coursesStore } from '../utils/coursesStore';
-import { fetchServerCourseGated, isCourseHydrated } from '../utils/courseServer';
+import { fetchServerCourseGated, isCourseHydrated, fetchAppAccessGate, isRunningAsPwa, isMobileBrowser } from '../utils/courseServer';
 import { fetchCourseStats, CourseStatsEntry } from '../utils/courseServer';
 import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
 import CIYAMembershipBadge from '../components/CIYAMembershipBadge';
@@ -4532,6 +4532,27 @@ export default function StudentDashboard() {
     return !safeStorage.getItem('ciya_cached_user');
   });
 
+  // App-only enforcement: the admin can close the course portal to mobile
+  // browsers, so phones must open courses inside the installed CIYA app. The
+  // check runs server-side on every dashboard load, so flipping the toggle in
+  // admin settings takes effect immediately.
+  const [appGateBlocked, setAppGateBlocked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const probe = () => {
+      fetchAppAccessGate().then((enforced) => {
+        if (cancelled || !enforced) return;
+        if (!isRunningAsPwa() && isMobileBrowser()) setAppGateBlocked(true);
+      });
+    };
+    // Two probes: the first catches an already-restored session, the second
+    // catches one that finishes restoring a moment later.
+    const t1 = setTimeout(probe, 1200);
+    const t2 = setTimeout(probe, 4500);
+    return () => { cancelled = true; clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
   // Back-button guard: a pending first-login can never land on this dashboard
   useEffect(() => {
     try {
@@ -6688,6 +6709,24 @@ export default function StudentDashboard() {
       return { text: "Good Night", emoji: "🌙", desc: "Late night coding creates champions. Secure your learning progress before rest!" };
     }
   }, []);
+
+  if (appGateBlocked) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center space-y-4 shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto text-indigo-400">
+            <Smartphone className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-black text-slate-100 tracking-tight">Open CIYA in the app</h2>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            The course portal is only available inside the installed CIYA app on phones.
+            Open the CIYA app on your phone to continue learning. You can still browse
+            the site normally on a computer.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (authChecking) {
     return (

@@ -157,6 +157,11 @@ export default function UsersAdmin() {
   const [autoApprovalEnabled, setAutoApprovalEnabled] = useState(false);
   const [isUpdatingAutoApproval, setIsUpdatingAutoApproval] = useState(false);
 
+  // App-only access enforcement (stored in its own settings document so no
+  // other settings writer clobbers it)
+  const [appGateEnforced, setAppGateEnforced] = useState(false);
+  const [isUpdatingAppGate, setIsUpdatingAppGate] = useState(false);
+
   const handleToggleAutoApproval = async () => {
     setIsUpdatingAutoApproval(true);
     const newValue = !autoApprovalEnabled;
@@ -244,6 +249,26 @@ export default function UsersAdmin() {
     } catch (err) {
       console.error("Error updating registration intake toggle:", err);
       alert("Failed to update registration status.");
+    }
+  };
+
+  const handleToggleAppGate = async () => {
+    const next = !appGateEnforced;
+    setIsUpdatingAppGate(true);
+    try {
+      await setDoc(doc(db, 'settings', 'appAccess'), {
+        enforceAppOnly: next,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      setAppGateEnforced(next);
+      alert(next
+        ? `App-only access is now ON. On phones, the course portal only opens inside the installed CIYA app (mobile browsers are refused server-side on every request). Desktop browsers and the installed app are unaffected, and the landing page plus all forms stay open on the web.`
+        : `App-only access is now OFF. The course portal can be opened through the web on both mobile and desktop.`);
+    } catch (err) {
+      console.error("Error updating app-only access toggle:", err);
+      alert("Failed to update the app-only access setting.");
+    } finally {
+      setIsUpdatingAppGate(false);
     }
   };
 
@@ -674,6 +699,16 @@ export default function UsersAdmin() {
         }
       } catch (appErr) {
         console.warn("Could not fetch settings/app document on mount:", appErr);
+      }
+
+      // App-only access enforcement toggle
+      try {
+        const gateSnap = await getDoc(doc(db, 'settings', 'appAccess'));
+        if (gateSnap.exists()) {
+          setAppGateEnforced(gateSnap.data()?.enforceAppOnly === true);
+        }
+      } catch (gateErr) {
+        console.warn("Could not fetch settings/appAccess on mount:", gateErr);
       }
       
       // Load all users on mount (uses local storage cache instantly, or falls back to one Firestore query if empty)
@@ -1927,6 +1962,45 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
               disabled={isUpdatingAutoApproval}
               className={`px-5 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all duration-150 border-0 cursor-pointer ${
                 autoApprovalEnabled
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              ON
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* App-Only Access Enforcement */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mb-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div className="space-y-1 md:max-w-xl">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span>📱</span> App-Only Course Access
+            </h3>
+            <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+              When <strong className="text-emerald-600">ON</strong>, on phones the course portal only opens inside the installed CIYA app: every student request is checked live on the server, and mobile browsers are refused instantly. Desktop browsers and the installed app always work, and the landing page plus all forms stay open on the web. When <strong className="text-rose-550">OFF</strong>, the course portal can be opened through the web on both mobile and desktop.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 bg-slate-50 border border-slate-200 p-1.5 rounded-2xl">
+            <button
+              onClick={handleToggleAppGate}
+              disabled={isUpdatingAppGate}
+              className={`px-5 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all duration-150 border-0 cursor-pointer ${
+                !appGateEnforced
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'bg-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              OFF
+            </button>
+            <button
+              onClick={handleToggleAppGate}
+              disabled={isUpdatingAppGate}
+              className={`px-5 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition-all duration-150 border-0 cursor-pointer ${
+                appGateEnforced
                   ? 'bg-emerald-600 text-white shadow-md'
                   : 'bg-transparent text-slate-500 hover:text-slate-800'
               }`}
