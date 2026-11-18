@@ -7485,7 +7485,7 @@ export default function StudentDashboard() {
               <div className="max-w-4xl mx-auto space-y-6 text-left font-sans my-4">
                 
                 {/* CARD 1: PERSONAL PROFILE INFORMATION */}
-<div className={"bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'profile' ? '' : 'hidden'}"}>
+<div className={`bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'profile' ? '' : 'hidden'}`}>
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
@@ -7618,7 +7618,7 @@ export default function StudentDashboard() {
                 </div>
 
                 {/* CARD 2: CIYA PRO MEMBERSHIP & OFFICIAL BADGE */}
-<div className={"bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'membership' ? '' : 'hidden'}"}>
+<div className={`bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'membership' ? '' : 'hidden'}`}>
                   <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
                     <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
                       <Award className="w-5 h-5" />
@@ -7723,7 +7723,7 @@ export default function StudentDashboard() {
                 </div>
 
                 {/* CARD 4: COURSE QUIZ SCORESHEETS & ASSIGNMENT SUBMISSIONS */}
-<div className={"bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'quizscores' ? '' : 'hidden'}"}>
+<div className={`bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'quizscores' ? '' : 'hidden'}`}>
                   <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
                     <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
                       <FileText className="w-5 h-5" />
