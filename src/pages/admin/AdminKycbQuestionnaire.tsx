@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where, limit, onSnapshot } from 'firebase/firestore';
+import ReactMarkdown from 'react-markdown';
 import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock, X, ClipboardList, Archive, ChevronDown, RefreshCw, FileText } from 'lucide-react';
 import { safeStorage } from '../../utils/safeStorage';
 import LpQuestionnaireForm from '../../components/LpQuestionnaireForm';
@@ -1335,7 +1336,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
         navigator.clipboard.writeText(result.prompt);
         setAiGeneratedPrompt(result.prompt);
         setShowAiPromptModal(true);
-        showCiyaToast("AI Master Prompt Generated & Copied to Clipboard! ⚡\n\nYou can now paste this directly into your preferred AI (ChatGPT, Gemini, Claude, Cursor, v0) to build your website.");
+        showCiyaToast("AI Master Prompt Generated & Copied to Clipboard! ⚡\n\nYou can now paste this directly into your preferred AI (ChatGPT, Claude, or Google AI Studio) to build your website.");
       }
     } catch (err: any) {
       console.error("AI Generation failed:", err);
@@ -2698,12 +2699,9 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                 <div>
                   <h3 className="font-black text-sm md:text-base text-white tracking-tight flex items-center gap-2">
                     AI Master Prompt
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">
-                      AI Auto Mode
-                    </span>
                   </h3>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">
-                    Generated from this student's KYCB questionnaire answers. Paste it into any AI (ChatGPT, Gemini, Claude, Cursor, v0) to build the website.
+                  <p className="text-xs md:text-sm font-bold text-slate-200 mt-1">
+                    Generated from this student's KYCB questionnaire answers. Paste it into any AI (ChatGPT, Claude, or Google AI Studio) to build the website.
                   </p>
                 </div>
                 <button
@@ -2727,9 +2725,26 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                       Tailored to the student's business info
                     </span>
                   </div>
-                  <pre className="p-4 bg-slate-950 text-slate-200 rounded-2xl text-xs font-mono leading-relaxed whitespace-pre-wrap border border-slate-800 select-all max-h-64 overflow-y-auto">
-{aiGeneratedPrompt}
-                  </pre>
+                  <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 select-text max-h-[60vh] overflow-y-auto">
+                    <ReactMarkdown
+                      components={{
+                        h1: ({ node, ...props }) => <h1 className="text-base font-black text-white mt-4 mb-2 first:mt-0" {...props} />,
+                        h2: ({ node, ...props }) => <h2 className="text-sm md:text-base font-black text-white mt-4 mb-2 first:mt-0" {...props} />,
+                        h3: ({ node, ...props }) => <h3 className="text-xs md:text-sm font-black text-indigo-300 mt-3 mb-1.5 first:mt-0" {...props} />,
+                        h4: ({ node, ...props }) => <h4 className="text-xs font-black text-indigo-300 mt-3 mb-1 first:mt-0" {...props} />,
+                        p: ({ node, ...props }) => <p className="text-xs md:text-sm text-slate-300 leading-relaxed mb-2" {...props} />,
+                        strong: ({ node, ...props }) => <strong className="font-black text-white" {...props} />,
+                        ul: ({ node, ...props }) => <ul className="list-disc list-outside pl-4 text-xs md:text-sm text-slate-300 space-y-1 mb-2" {...props} />,
+                        ol: ({ node, ...props }) => <ol className="list-decimal list-outside pl-4 text-xs md:text-sm text-slate-300 space-y-1 mb-2" {...props} />,
+                        li: ({ node, ...props }) => <li className="leading-relaxed" {...props} />,
+                        hr: () => <hr className="border-slate-700 my-3" />,
+                        code: ({ node, ...props }) => <code className="text-amber-300" {...props} />,
+                        a: ({ node, ...props }) => <a className="text-indigo-300 underline" {...props} />,
+                      }}
+                    >
+                      {aiGeneratedPrompt}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </div>
 
