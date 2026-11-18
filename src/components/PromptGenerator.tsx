@@ -12,7 +12,6 @@ import {
   Eye, 
   Copy, 
   Check, 
-  ExternalLink, 
   FileText, 
   Smartphone, 
   Wifi, 
@@ -56,18 +55,9 @@ interface PreviewFrameProps {
   expandable?: boolean;
 }
 
-function getHostname(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
-
 function PreviewFrame({ url, title, height = '100%', onExpand, expandable = true }: PreviewFrameProps) {
   const [status, setStatus] = useState<"loading" | "loaded" | "failed">("loading");
   const [reloadKey, setReloadKey] = useState(0);
-  const [viewMode, setViewMode] = useState<"portal" | "iframe">("portal");
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   let iframeSrc = url;
@@ -108,7 +98,6 @@ function PreviewFrame({ url, title, height = '100%', onExpand, expandable = true
 
   useEffect(() => {
     setStatus("loading");
-    setViewMode("iframe");
     startTimeout();
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -174,20 +163,11 @@ function PreviewFrame({ url, title, height = '100%', onExpand, expandable = true
             justifyContent: "center",
             gap: 6
           }}
-          title={url}
+          title="Live preview"
         >
           {status === "loading" && <RefreshCw size={10} className="animate-spin text-indigo-400" />}
-          <span>{getHostname(url)}</span>
+          <span>{title || "Live preview"}</span>
         </div>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: "#94a3b8", display: "flex", cursor: "pointer" }}
-          title="Open in new tab"
-        >
-          <ExternalLink size={14} className="hover:text-white transition-colors" />
-        </a>
         {expandable && (
           <button
             onClick={onExpand}
@@ -213,47 +193,7 @@ function PreviewFrame({ url, title, height = '100%', onExpand, expandable = true
 
       {/* live embedded site */}
       <div style={{ position: "relative", flex: 1, background: "#0f172a", display: "flex", flexDirection: "column" }}>
-        {isProxied && viewMode === "portal" ? (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 24,
-              textAlign: "center",
-              background: "#0f172a",
-              color: "#94a3b8"
-            }}
-          >
-            <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-3 text-indigo-400">
-              <Globe size={24} className="animate-pulse" />
-            </div>
-            <h4 className="text-sm font-semibold text-slate-200 mb-1.5">Secure Workspace Application</h4>
-            <p className="text-xs text-slate-400 max-w-xs leading-relaxed mb-5">
-              This app is hosted on another secure container. For complete access to database operations, sessions, and active assets, view it in a secure top-level tab.
-            </p>
-            <div className="flex flex-col gap-3 w-full max-w-xs items-center">
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 text-xs font-semibold px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-all w-full shadow-lg shadow-indigo-600/10"
-              >
-                <span>Open in Secure Tab</span>
-                <ExternalLink size={13} />
-              </a>
-              <button
-                onClick={() => setViewMode("iframe")}
-                className="text-[10px] text-slate-500 hover:text-slate-400 transition-colors underline underline-offset-4"
-              >
-                Force load inline anyway
-              </button>
-            </div>
-          </div>
-        ) : status === "failed" ? (
+        {status === "failed" ? (
           <div
             style={{
               position: "absolute",
@@ -291,24 +231,6 @@ function PreviewFrame({ url, title, height = '100%', onExpand, expandable = true
               >
                 <RotateCw size={11} /> Retry
               </button>
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontSize: 10.5,
-                  padding: "5px 10px",
-                  borderRadius: 999,
-                  background: "#6366f1",
-                  color: "#fff",
-                  textDecoration: "none",
-                }}
-              >
-                Open <ExternalLink size={11} />
-              </a>
             </div>
           </div>
         ) : (
@@ -562,7 +484,7 @@ export default function PromptGenerator({
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   // Interaction states for the mock phone screen
-  const [isShowingLinkPreview, setIsShowingLinkPreview] = useState(false);
+  const [isShowingLinkPreview, setIsShowingLinkPreview] = useState(true);
   const [isShowingText, setIsShowingText] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   
@@ -749,7 +671,7 @@ export default function PromptGenerator({
   // Handle template selection
   const handleSelectTemplate = (tpl: TemplateItem) => {
     setSelectedTemplate(tpl);
-    setIsShowingLinkPreview(false);
+    setIsShowingLinkPreview(true);
     setIsShowingText(false);
   };
 
@@ -767,16 +689,6 @@ export default function PromptGenerator({
     const currIdx = filteredTemplates.findIndex(t => t.id === selectedTemplate?.id);
     const nextIdx = currIdx === -1 || currIdx === filteredTemplates.length - 1 ? 0 : currIdx + 1;
     handleSelectTemplate(filteredTemplates[nextIdx]);
-  };
-
-  // Toggle showcase link preview
-  const handleToggleLinkPreview = () => {
-    if (!previewLink) {
-      showCiyaToast("No showcase link attached to this template blueprint.");
-      return;
-    }
-    setIsShowingText(false);
-    setIsShowingLinkPreview(!isShowingLinkPreview);
   };
 
   // Copy template text to clipboard
@@ -940,108 +852,7 @@ export default function PromptGenerator({
           {filteredTemplates.length > 0 ? (
             <div className="space-y-5">
               
-              {/* DROPDOWN SELECTOR BLOCK */}
-              <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-md flex items-center justify-between gap-3 border border-slate-800">
-                {/* Dropdown Selector */}
-                <div className="flex-1 min-w-0 flex flex-col items-center">
-                  <span className="text-[10px] uppercase tracking-widest text-indigo-400 font-extrabold mb-1.5">
-                    Select Prompt Template
-                  </span>
-                  <CustomDropdown
-                    value={selectedTemplate?.id || ''}
-                    options={filteredTemplates.map((tpl) => {
-                      const tabIdx = currentTabTemplates.findIndex(t => t.id === tpl.id);
-                      const isFree = tabIdx >= 0 && tabIdx < 3;
-                      return {
-                        label: isFree ? `🌟 ${tpl.name} (Free Access)` : tpl.name,
-                        value: tpl.id
-                      };
-                    })}
-                    onChange={(val) => {
-                      const found = filteredTemplates.find(t => t.id === val);
-                      if (found) handleSelectTemplate(found);
-                    }}
-                    theme="dark"
-                    className="w-full"
-                  />
-                </div>
-              </div>
-
-              {/* SINGLE LISTING COMPONENT DISPLAY */}
-              {selectedTemplate && (
-                <div className="p-6 md:p-8 rounded-2xl border-2 border-indigo-100 bg-indigo-50/10 hover:border-indigo-400 transition-all duration-300 flex flex-col justify-between gap-5 shadow-sm">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center border-b border-indigo-50/50 pb-3">
-                      <div className="flex flex-wrap gap-2 items-center">
-                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-indigo-50 border border-indigo-150 text-indigo-700">
-                          {selectedTemplate.category}
-                        </span>
-                        {isFreeTemplate ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold">
-                            🌟 Free Access Template
-                          </span>
-                        ) : (
-                          !hasYearBadge && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                              🔒 Badge Required
-                            </span>
-                          )
-                        )}
-                        {selectedTemplate.industry && (
-                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-slate-100 text-slate-700">
-                            <Briefcase className="w-3.5 h-3.5" /> {selectedTemplate.industry}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs text-indigo-500 font-extrabold font-mono">
-                        Template {filteredTemplates.findIndex(t => t.id === selectedTemplate.id) + 1} of {filteredTemplates.length}
-                      </span>
-                    </div>
-
-                    <h4 className="font-extrabold text-slate-900 text-lg md:text-xl leading-snug tracking-tight">
-                      {selectedTemplate.name}
-                    </h4>
-
-                    <p className="text-sm md:text-base text-slate-650 font-semibold leading-relaxed">
-                      {selectedTemplate.description}
-                    </p>
-                  </div>
-
-                  {/* COOPERATIVE RESOURCES FOR HIGHLIGHTED CARD */}
-                  {(selectedTemplate.link1 || selectedTemplate.link2) && (
-                    <div className="pt-4.5 border-t border-slate-200 space-y-3 text-left">
-                      <h5 className="font-black text-indigo-900 flex items-center gap-1.5 uppercase text-xs tracking-wider">
-                        <ExternalLink className="w-4 h-4 text-indigo-500" /> Coached Reference Resources
-                      </h5>
-                      <div className="flex flex-col gap-2 font-sans">
-                        {selectedTemplate.link1 && (
-                          <a
-                            href={selectedTemplate.link1}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between p-3.5 bg-white hover:bg-indigo-50 border border-indigo-100 text-indigo-700 font-black rounded-xl transition-all cursor-pointer text-xs md:text-sm"
-                          >
-                            <span className="truncate pr-4">Reference Attachment A</span>
-                            <ChevronRight className="w-4 h-4 shrink-0" />
-                          </a>
-                        )}
-                        {selectedTemplate.link2 && (
-                          <a
-                            href={selectedTemplate.link2}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between p-3.5 bg-white hover:bg-indigo-50 border border-indigo-100 text-indigo-700 font-black rounded-xl transition-all cursor-pointer text-xs md:text-sm"
-                          >
-                            <span className="truncate pr-4">Reference Attachment B</span>
-                            <ChevronRight className="w-4 h-4 shrink-0" />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
+              
             </div>
           ) : (
             <div className="text-center p-16 text-slate-400 font-bold text-sm bg-slate-50 rounded-2xl border border-dashed border-slate-200">
@@ -1073,7 +884,7 @@ export default function PromptGenerator({
             </button>
 
             {/* ANDROID DEVICE SIMULATOR CONTAINER */}
-            <div className="relative rounded-[3.2rem] p-[10px] bg-slate-950 shadow-2xl border-[12px] border-slate-900 w-[290px] h-[550px] flex flex-col overflow-hidden shrink-0">
+            <div className="relative rounded-[3.2rem] p-[10px] bg-slate-950 shadow-2xl border-[12px] border-slate-900 w-[290px] h-[640px] flex flex-col overflow-hidden shrink-0">
               
               {/* Top camera Notch */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-5 bg-slate-900 rounded-b-2xl z-30 flex items-center justify-center">
@@ -1124,7 +935,7 @@ export default function PromptGenerator({
                             onClick={() => setIsShowingText(false)}
                             className="w-full py-1.5 text-[10px] text-slate-500 hover:text-slate-400 transition-colors bg-transparent border-0 cursor-pointer underline underline-offset-4"
                           >
-                            Go Back to Mockup Image
+                            Back to Preview
                           </button>
                         </div>
                       </div>
@@ -1258,7 +1069,7 @@ export default function PromptGenerator({
                               {selectedTemplate?.name}
                             </h4>
                             <p className="text-[10px] text-slate-400 leading-normal mt-1 max-w-[180px] mx-auto">
-                              No layout mockup attached. Click "Open" to inspect prompt templates or "Live Preview" if a live site showcase is available.
+                              No layout mockup attached. Tap "Open Prompt" to inspect the prompt template.
                             </p>
                           </div>
                         </div>
@@ -1294,43 +1105,64 @@ export default function PromptGenerator({
 
           {/* TWO BUTTONS DIRECTLY BELOW MOCK PHONE */}
           <div className="mt-6 w-[290px] grid grid-cols-2 gap-4">
-            {/* Live Preview Button */}
-            <button
-              onClick={handleToggleLinkPreview}
-              disabled={!previewLink}
-              className={`py-3.5 rounded-2xl border-0 font-extrabold text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm ${
-                previewLink 
-                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 cursor-pointer active:scale-95' 
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              }`}
-              title={previewLink ? "Toggle prompt mockup preview" : "No showcase link attached"}
-            >
-              {isShowingLinkPreview ? (
-                <>
-                  <Play className="w-4 h-4" /> Hide
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4" /> Preview
-                </>
-              )}
-            </button>
-
-            {/* Open Button */}
+            {/* Open Prompt Button */}
             <button
               onClick={() => {
+                setIsShowingText(true);
                 setIsShowingLinkPreview(false);
-                setIsShowingText(!isShowingText);
               }}
               className={`py-3.5 rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer active:scale-95 border-0 ${
-                isShowingText 
-                  ? 'bg-slate-900 hover:bg-slate-800 text-white' 
+                isShowingText
+                  ? 'bg-slate-900 hover:bg-slate-800 text-white'
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white'
               }`}
             >
-              <Eye className="w-4 h-4" /> {isShowingText ? 'Show Image' : 'Open'}
+              <Eye className="w-4 h-4" /> Open Prompt
+            </button>
+
+            {/* Show Preview Button */}
+            <button
+              onClick={() => {
+                setIsShowingText(false);
+                setIsShowingLinkPreview(true);
+              }}
+              disabled={!previewLink}
+              className={`py-3.5 rounded-2xl border-0 font-extrabold text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm ${
+                previewLink
+                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 cursor-pointer active:scale-95'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              }`}
+              title={previewLink ? "Show the live template preview" : "No showcase attached"}
+            >
+              <Play className="w-4 h-4" /> Show Preview
             </button>
           </div>
+
+          {/* TEMPLATE NAME, INFO AND NUMBER SWITCHER BELOW THE BUTTONS */}
+          {selectedTemplate && (
+            <div className="mt-5 w-[290px] flex flex-col items-center text-center space-y-2.5">
+              <h4 className="font-extrabold text-slate-900 text-base md:text-lg leading-snug tracking-tight">
+                {selectedTemplate.name}
+              </h4>
+              {selectedTemplate.description && (
+                <p className="text-[11px] md:text-xs text-slate-600 font-medium leading-relaxed">
+                  {selectedTemplate.description}
+                </p>
+              )}
+              <div className="w-full mt-1">
+                <CustomDropdown
+                  value={String(filteredTemplates.findIndex((t) => t.id === selectedTemplate?.id) + 1)}
+                  options={filteredTemplates.map((tpl, i) => ({ label: `#${i + 1}`, value: String(i + 1) }))}
+                  onChange={(val) => {
+                    const n = parseInt(val, 10) - 1;
+                    if (filteredTemplates[n]) handleSelectTemplate(filteredTemplates[n]);
+                  }}
+                  theme="light"
+                  className="w-full"
+                />
+              </div>
+            </div>
+          )}
 
         </div>
 
