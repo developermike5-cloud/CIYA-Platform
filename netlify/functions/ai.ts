@@ -5,16 +5,14 @@
  *   Compiles a student's KYC answers into a tailored master developer prompt
  *   using Vertex AI on Google Cloud (the user's own GCP project and credits).
  *
- * All three credentials stay server-side as Netlify environment variables and
- * are never committed or exposed to the client:
- *   KYCB_API_KEY       the KYCB API key generated for Vertex AI
- *   VERTEX_PROJECT_ID  the Vertex project ID
- *   VERTEX_LOCATION    the Vertex location (e.g. europe-west2)
+ * The credential stays server-side as a Netlify environment variable and is
+ * never committed or exposed to the client:
+ *   KYCB_API_KEY  the KYCB API key generated for Vertex AI
  *
  * Vertex AI runs in API-key (express) mode here: the key authenticates the
- * call and the project ID and location go in the request URL, so all three
- * variables are needed. Calls use the REST API directly so the function
- * carries no extra SDK dependency.
+ * call and carries the project itself, so the global endpoint is used and
+ * neither VERTEX_PROJECT_ID nor VERTEX_LOCATION is needed. Calls use the
+ * REST API directly so the function carries no extra SDK dependency.
  */
 
 type VertexResponse = {
@@ -24,7 +22,7 @@ type VertexResponse = {
   error?: { message?: string; status?: string };
 };
 
-const MODELS_TO_TRY = ["gemini-1.5-pro", "gemini-1.5-flash"];
+const MODELS_TO_TRY = ["gemini-2.5-flash", "gemini-2.0-flash"];
 
 const SYSTEM_INSTRUCTION = `You are an expert Prompt Engineer, Senior Web Architect, and Brand Strategist.
 Your goal is to generate a comprehensive, professional, single-screen or multi-screen developer prompt for a student's business.
@@ -44,8 +42,10 @@ const json = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
-async function callVertex(model: string, apiKey: string, project: string, location: string, contents: string): Promise<string> {
-  const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
+async function callVertex(model: string, apiKey: string, contents: string): Promise<string> {
+  // Express mode (API-key) uses the global endpoint: no project or location
+  // in the URL, the key itself carries the project.
+  const url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent`;
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -91,13 +91,11 @@ async function handler(event: any) {
   if (!businessInfo) return json(400, { error: "businessInfo is required." });
 
   const apiKey = process.env.KYCB_API_KEY || process.env.VERTEX_API_KEY;
-  const project = process.env.VERTEX_PROJECT_ID;
-  const location = process.env.VERTEX_LOCATION;
-  if (!apiKey || !project || !location) {
+  if (!apiKey) {
     return json(500, {
       error: "AI not configured.",
       message:
-        "The server's Vertex AI settings are incomplete. KYCB_API_KEY, VERTEX_PROJECT_ID and VERTEX_LOCATION must all be set in the site's environment variables, then redeploy and try again.",
+        "The server's Vertex AI key is not set up yet. Set KYCB_API_KEY in the site's environment variables, then redeploy and try again.",
     });
   }
 
@@ -116,7 +114,7 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
   let lastError: any = null;
   for (const model of MODELS_TO_TRY) {
     try {
-      generatedText = await callVertex(model, apiKey, project, location, contents);
+      generatedText = await callVertex(model, apiKey, contents);
       break;
     } catch (err: any) {
       lastError = err;
