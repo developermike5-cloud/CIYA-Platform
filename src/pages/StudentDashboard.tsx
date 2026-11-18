@@ -4665,11 +4665,13 @@ export default function StudentDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz'>(() => {
+  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'membership' | 'quizscores' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz'>(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
     if (view === 'prompts') return 'prompts';
     if (view === 'profile') return 'profile';
+    if (view === 'membership') return 'membership';
+    if (view === 'quizscores') return 'quizscores';
     if (view === 'notifications') return 'notifications';
     if (view === 'assignments') return 'assignments';
     if (view === 'kycb') return 'kycb';
@@ -5556,7 +5558,7 @@ export default function StudentDashboard() {
   const [activeDurationFilter, setActiveDurationFilter] = useState<'standard' | 'express'>('standard');
   const navigate = useNavigate();
 
-  const handleViewChange = (view: 'courses' | 'profile' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz', cId: string | null = null) => {
+  const handleViewChange = (view: 'courses' | 'profile' | 'membership' | 'quizscores' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz', cId: string | null = null) => {
     setCurrentView(view);
     setSelectedCourseId(cId);
     setIsMobileMenuOpen(false);
@@ -6697,7 +6699,7 @@ export default function StudentDashboard() {
     const localHour = nigeriaDate.getHours();
 
     if (localHour >= 5 && localHour < 12) {
-      return { text: "Good Morning", emoji: "🌅", desc: "Start your day by building something remarkable today!" };
+      return { text: "Good Morning", emoji: "🌅", desc: "Start your day by learning something remarkable today!" };
     } else if (localHour >= 12 && localHour < 17) {
       return { text: "Good Afternoon", emoji: "☀️", desc: "Keep up the momentum! Consistency is the secret of tech experts." };
     } else if (localHour >= 17 && localHour < 22) {
@@ -7098,6 +7100,30 @@ export default function StudentDashboard() {
               )}
             </button>
           )}
+          {!isGuest && (
+            <button 
+              type="button"
+              onClick={() => handleViewChange('membership', null)}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'membership' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-sm">🏷️</span>
+                <span>CIYA Membership</span>
+              </div>
+            </button>
+          )}
+          {!isGuest && (
+            <button 
+              type="button"
+              onClick={() => handleViewChange('quizscores', null)}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'quizscores' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-sm">📝</span>
+                <span>Quiz Score Sheet</span>
+              </div>
+            </button>
+          )}
           {isAdmin && (
             <Link 
               to="/admin" 
@@ -7441,8 +7467,8 @@ export default function StudentDashboard() {
               currentUser={currentUser}
               appSettings={appSettings}
             />
-          ) : currentView === 'profile' ? (
-            (!isAdmin && appSettings?.lockedSections?.profile) ? (
+          ) : (currentView === 'profile' || currentView === 'membership' || currentView === 'quizscores') ? (
+            (currentView === 'profile' && !isAdmin && appSettings?.lockedSections?.profile) ? (
               <div className="bg-white border text-sm border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
                 <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Lock className="w-8 h-8 text-rose-500" />
@@ -7459,7 +7485,7 @@ export default function StudentDashboard() {
               <div className="max-w-4xl mx-auto space-y-6 text-left font-sans my-4">
                 
                 {/* CARD 1: PERSONAL PROFILE INFORMATION */}
-                <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800">
+<div className={"bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'profile' ? '' : 'hidden'}"}>
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
@@ -7592,7 +7618,7 @@ export default function StudentDashboard() {
                 </div>
 
                 {/* CARD 2: CIYA PRO MEMBERSHIP & OFFICIAL BADGE */}
-                <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800">
+<div className={"bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'membership' ? '' : 'hidden'}"}>
                   <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
                     <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
                       <Award className="w-5 h-5" />
@@ -7697,7 +7723,7 @@ export default function StudentDashboard() {
                 </div>
 
                 {/* CARD 4: COURSE QUIZ SCORESHEETS & ASSIGNMENT SUBMISSIONS */}
-                <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800">
+<div className={"bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'quizscores' ? '' : 'hidden'}"}>
                   <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
                     <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
                       <FileText className="w-5 h-5" />
@@ -8453,16 +8479,6 @@ export default function StudentDashboard() {
                           </button>
                         </div>
 
-                        {/* Student profile picture, compact */}
-                        <div className="shrink-0 flex flex-col items-center select-none">
-                          <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl overflow-hidden bg-white/15 border-2 border-white/30 shadow-inner flex items-center justify-center text-xl md:text-2xl font-black text-white">
-                            {(userProfile?.photoURL || currentUser?.photoURL) ? (
-                              <img src={userProfile?.photoURL || currentUser?.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                            ) : (
-                              (userProfile?.fullName || currentUser?.displayName || 'S').slice(0, 1).toUpperCase()
-                            )}
-                          </div>
-                        </div>
                       </div>
                     </motion.div>
                   )}
@@ -8795,7 +8811,7 @@ export default function StudentDashboard() {
       </main>
 
       {/* Mobile Native App Bottom Navigation Bar */}
-      {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && (
+      {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && !isStudyStatsOpen && (
         <nav 
           className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] px-2 pt-1 pb-[max(env(safe-area-inset-bottom),10px)] select-none transition-all duration-300"
           aria-label="Mobile Navigation"
@@ -9086,10 +9102,10 @@ export default function StudentDashboard() {
                     setIsMobileMenuOpen(false);
                     handleViewChange('profile');
                   }}
-                  className="mt-3.5 w-full py-2.5 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-wide flex items-center justify-center gap-2 shadow-md border-0 cursor-pointer active:scale-[0.98] transition-transform"
+                  className="mt-3 inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 text-white font-black text-[11px] uppercase tracking-wide shadow-md border-0 cursor-pointer active:scale-[0.98] transition-transform"
                 >
-                  <UserIcon className="w-4 h-4" />
-                  Edit Profile
+                  <UserIcon className="w-3.5 h-3.5" />
+                  View Profile
                 </button>
               )}
             </div>
@@ -9099,35 +9115,45 @@ export default function StudentDashboard() {
               Settings
             </div>
             <div className="space-y-1.5 text-xs font-bold">
-                            {/* Notification Desk */}
+                            {/* CIYA Membership */}
               {!isGuest && (
                 <button
                   type="button"
-                  onClick={() => handleViewChange('notifications')}
+                  onClick={() => handleViewChange('membership')}
                   className={`w-full flex items-center justify-between p-3.5 rounded-2xl transition-all border cursor-pointer ${
-                    currentView === 'notifications'
+                    currentView === 'membership'
                       ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-black'
                       : 'bg-white hover:bg-slate-50 border-slate-200/60 text-slate-800 font-extrabold'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                      <Bell className="w-4 h-4" />
-                    </div>
-                    <span>Notification Desk</span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">🏷️</div>
+                    <span>CIYA Membership</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {unreadNotificationsCount > 0 && (
-                      <span className="bg-rose-550 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
-                        {unreadNotificationsCount} new
-                      </span>
-                    )}
-                    <ChevronRight className="w-4 h-4 text-slate-400" />
-                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
                 </button>
               )}
 
-              {/* Admin Panel Link */}
+              {/* Quiz Score Sheet */}
+              {!isGuest && (
+                <button
+                  type="button"
+                  onClick={() => handleViewChange('quizscores')}
+                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl transition-all border cursor-pointer ${
+                    currentView === 'quizscores'
+                      ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-black'
+                      : 'bg-white hover:bg-slate-50 border-slate-200/60 text-slate-800 font-extrabold'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">📝</div>
+                    <span>Quiz Score Sheet</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
+              )}
+
+                            {/* Admin Panel Link */}
               {isAdmin && (
                 <Link
                   to="/admin"

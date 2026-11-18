@@ -104,7 +104,7 @@ export const StudyStatsSplashModal: React.FC<StudyStatsSplashModalProps> = ({ is
         initial={{ y: '100%' }}
         animate={{ y: 0, transition: { type: 'spring', damping: 30, stiffness: 640, mass: 0.9 } }}
         exit={{ y: '100%', transition: { duration: 0.18, ease: 'easeIn' } }}
-        className="fixed inset-x-0 bottom-[62px] sm:bottom-[68px] z-40 max-w-2xl mx-auto bg-white rounded-t-[32px] shadow-[0_-12px_40px_rgba(0,0,0,0.25)] border-t border-slate-200/90 flex flex-col max-h-[calc(85dvh-64px)] overflow-hidden font-sans select-none"
+        className="fixed inset-x-0 bottom-0 z-40 max-w-2xl mx-auto bg-white rounded-t-[32px] shadow-[0_-12px_40px_rgba(0,0,0,0.25)] border-t border-slate-200/90 flex flex-col max-h-[88dvh] overflow-hidden font-sans select-none"
       >
         {/* Pull Handle & Header */}
         <div className="p-4 pb-3 border-b border-slate-100 shrink-0 bg-white">
