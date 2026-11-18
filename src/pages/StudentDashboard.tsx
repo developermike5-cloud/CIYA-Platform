@@ -4771,6 +4771,10 @@ export default function StudentDashboard() {
       setCurrentView('notifications');
     } else if (view === 'buzz') {
       setCurrentView('buzz');
+    } else if (view === 'membership') {
+      setCurrentView('membership');
+    } else if (view === 'quizscores') {
+      setCurrentView('quizscores');
     } else {
       setCurrentView('courses');
     }
