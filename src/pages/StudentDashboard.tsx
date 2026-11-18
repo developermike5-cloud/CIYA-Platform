@@ -31,6 +31,7 @@ import { fetchCourseStats, CourseStatsEntry } from '../utils/courseServer';
 import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
 import CIYAMembershipBadge from '../components/CIYAMembershipBadge';
 import CustomDropdown from '../components/CustomDropdown';
+import { NIGERIAN_STATES } from '../utils/nigerianStates';
 import { verifyTimeBasedCode, getPasscodeSecondsLeft } from '../utils/passcode';
 import { FRONTEND_YEAR_BADGE_SETTINGS } from '../constants/badgeSettings';
 import { staticLeaderboardData } from '../utils/leaderboardData';
@@ -6585,20 +6586,36 @@ export default function StudentDashboard() {
     }
   };
 
+  const openProfileEditor = () => {
+    const fn = (userProfile?.fullName || '').trim();
+    const parts = fn ? fn.split(/\s+/) : [];
+    setUserProfile(prev => ({
+      ...(prev || {}),
+      firstName: prev?.firstName || parts[0] || '',
+      lastName: prev?.lastName || parts.slice(1).join(' ') || ''
+    }));
+    setEditingProfile(true);
+  };
+
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser || !userProfile) return;
     setProfileSaving(true);
     try {
+      const fullName = [userProfile.firstName, userProfile.lastName].filter(Boolean).join(' ').trim() || userProfile.fullName;
+      const updated = { ...userProfile, fullName };
       await updateDoc(doc(db, 'users', currentUser.uid), {
-        fullName: userProfile.fullName,
+        fullName,
+        firstName: userProfile.firstName || '',
+        lastName: userProfile.lastName || '',
         whatsapp: userProfile.whatsapp,
         state: userProfile.state,
         goal: userProfile.goal,
-        photoURL: userProfile.photoURL || '',
+        photoURL: updated.photoURL || '',
         updatedAt: serverTimestamp()
       });
-      safeStorage.setItem('ciya_cached_profile', JSON.stringify(userProfile));
+      setUserProfile(updated);
+      safeStorage.setItem('ciya_cached_profile', JSON.stringify(updated));
       safeStorage.setItem('ciya_cached_profile_time', Date.now().toString());
       setEditingProfile(false);
       alert('Profile updated successfully!');
@@ -7474,6 +7491,16 @@ export default function StudentDashboard() {
           ) : (currentView === 'profile' || currentView === 'membership' || currentView === 'quizscores') ? (
             (currentView === 'profile' && !isAdmin && appSettings?.lockedSections?.profile) ? (
               <div className="bg-white border text-sm border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
+                <div className="text-left mb-4">
+                  <button
+                    type="button"
+                    onClick={() => handleViewChange('courses', null)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-extrabold border-0 cursor-pointer active:scale-[0.98] transition-transform shadow-md"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </button>
+                </div>
                 <div className="w-16 h-16 bg-rose-50 border border-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Lock className="w-8 h-8 text-rose-500" />
                 </div>
@@ -7487,7 +7514,15 @@ export default function StudentDashboard() {
               </div>
             ) : (
               <div className="max-w-4xl mx-auto space-y-6 text-left font-sans my-4">
-                
+                <button
+                  type="button"
+                  onClick={() => handleViewChange('courses', null)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-extrabold border-0 cursor-pointer active:scale-[0.98] transition-transform shadow-md"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </button>
+
                 {/* CARD 1: PERSONAL PROFILE INFORMATION */}
 <div className={`bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'profile' ? '' : 'hidden'}`}>
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
@@ -7500,15 +7535,6 @@ export default function StudentDashboard() {
                         <p className="text-xs text-slate-500 font-medium">Manage your contact details, location, and primary learning goal.</p>
                       </div>
                     </div>
-                    {!editingProfile && (
-                      <button 
-                        type="button"
-                        onClick={() => setEditingProfile(true)}
-                        className="flex items-center gap-1.5 text-xs text-indigo-700 hover:text-indigo-800 font-extrabold bg-indigo-50 hover:bg-indigo-100 px-4 py-2 border border-indigo-200/80 rounded-xl cursor-pointer transition-all shrink-0 self-start sm:self-auto"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" /> Edit Profile
-                      </button>
-                    )}
                   </div>
                   
                   {editingProfile ? (
@@ -7544,8 +7570,12 @@ export default function StudentDashboard() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-sans">
                         <div>
-                          <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Full Name</label>
-                          <input type="text" value={userProfile.fullName || ''} onChange={e => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans" required />
+                          <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">First Name</label>
+                          <input type="text" value={userProfile.firstName || ''} onChange={e => setUserProfile({...userProfile, firstName: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans" required />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Last Name</label>
+                          <input type="text" value={userProfile.lastName || ''} onChange={e => setUserProfile({...userProfile, lastName: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all font-sans" required />
                         </div>
                         <div>
                           <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">WhatsApp Number</label>
@@ -7554,7 +7584,12 @@ export default function StudentDashboard() {
                       </div>
                       <div className="text-xs">
                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">State</label>
-                        <input type="text" value={userProfile.state || ''} onChange={e => setUserProfile({...userProfile, state: e.target.value})} className="w-full bg-white text-slate-950 border border-slate-300 shadow-sm rounded-lg p-3 outline-none text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all" required />
+                        <CustomDropdown
+                          value={userProfile.state || ''}
+                          onChange={(val: string) => setUserProfile({...userProfile, state: val})}
+                          options={[{ label: 'Select State *', value: '' }, ...NIGERIAN_STATES.map(s => ({ label: s, value: s }))]}
+                          className="w-full"
+                        />
                       </div>
                       <div className="text-xs">
                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Your Primary Goal</label>
@@ -7617,8 +7652,33 @@ export default function StudentDashboard() {
                           <p className="text-slate-700 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 italic mt-1 font-medium">{userProfile.goal || 'Not provided'}</p>
                         </div>
                       </div>
+
+                      {/* Edit Profile Button */}
+                      <div>
+                        <button
+                          type="button"
+                          onClick={openProfileEditor}
+                          className="inline-flex items-center gap-1.5 text-xs text-indigo-700 hover:text-indigo-800 font-extrabold bg-indigo-50 hover:bg-indigo-100 px-4 py-2 border border-indigo-200/80 rounded-xl cursor-pointer transition-all"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" /> Edit Profile
+                        </button>
+                      </div>
                     </div>
                   )}
+                </div>
+
+                {/* CARD 1b: SUBMITTED APPLICATIONS */}
+                <div className={`bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 ${currentView === 'profile' ? '' : 'hidden'}`}>
+                  <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 shrink-0">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Submitted Applications</h3>
+                      <p className="text-xs text-slate-500 font-medium">The application details you submitted during registration.</p>
+                    </div>
+                  </div>
+                  <SubmissionDetailsCard profile={userProfile} />
                 </div>
 
                 {/* CARD 2: CIYA PRO MEMBERSHIP & OFFICIAL BADGE */}
@@ -7733,16 +7793,12 @@ export default function StudentDashboard() {
                       <FileText className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Course Quiz Scoresheets & Submissions</h3>
+                      <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Course Quiz Score Sheet</h3>
                       <p className="text-xs text-slate-500 font-medium">Your verified first-attempt quiz scores and assignment submission records.</p>
                     </div>
                   </div>
 
                   {/* Student Submission details card */}
-                  <div className="mb-6">
-                    <SubmissionDetailsCard profile={userProfile} />
-                  </div>
-
                   {/* Quizzes and Checks Score Sheet */}
                   {registeredCoursesList.some(c => userProfile.progress?.[c.id || '']?.quizScores) ? (
                     <div className="space-y-4">
@@ -8815,7 +8871,7 @@ export default function StudentDashboard() {
       </main>
 
       {/* Mobile Native App Bottom Navigation Bar */}
-      {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && !isStudyStatsOpen && (
+      {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && !isStudyStatsOpen && currentView !== 'profile' && currentView !== 'membership' && currentView !== 'quizscores' && (
         <nav 
           className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] px-2 pt-1 pb-[max(env(safe-area-inset-bottom),10px)] select-none transition-all duration-300"
           aria-label="Mobile Navigation"
@@ -9013,7 +9069,7 @@ export default function StudentDashboard() {
 
           {/* 5. Menu / Action Sheet */}
           {(() => {
-            const isActive = isMobileMenuOpen || ((currentView === 'profile' || currentView === 'notifications') && !isRegisteredCoursesSplashOpen && !isBuzzSplashOpen && !isTemplateSplashOpen);
+            const isActive = isMobileMenuOpen || ((currentView === 'notifications') && !isRegisteredCoursesSplashOpen && !isBuzzSplashOpen && !isTemplateSplashOpen);
             return (
               <button
                 type="button"
@@ -9087,8 +9143,8 @@ export default function StudentDashboard() {
                 <X className="w-4 h-4" />
               </button>
               <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-600 text-white font-black text-lg flex items-center justify-center shadow-md overflow-hidden">
-                {currentUser?.photoURL ? (
-                  <img src={currentUser.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                {(userProfile?.photoURL || currentUser?.photoURL) ? (
+                  <img src={userProfile?.photoURL || currentUser?.photoURL} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   (userProfile?.fullName || currentUser?.displayName || 'S').slice(0, 1).toUpperCase()
                 )}
