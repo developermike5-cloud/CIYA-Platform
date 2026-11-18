@@ -108,7 +108,7 @@ function PreviewFrame({ url, title, height = '100%', onExpand, expandable = true
 
   useEffect(() => {
     setStatus("loading");
-    setViewMode(isProxied ? "portal" : "iframe");
+    setViewMode("iframe");
     startTimeout();
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
