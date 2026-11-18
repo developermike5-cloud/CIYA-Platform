@@ -40,6 +40,25 @@ function rewriteNavigation(html: string, finalUrl: string): string {
   });
 }
 
+/**
+ * Inline script injected into proxied HTML before any site script runs.
+ * Sites whose routers call history.pushState/replaceState with absolute URLs
+ * (Next.js and friends resolve them against the injected <base>) crash with a
+ * SecurityError in the proxy origin, which freezes render frameworks mid-
+ * hydration and leaves the page visually blank. We sanitize those calls to
+ * same-origin URLs and swallow any residue.
+ */
+const HISTORY_PATCH = `<script>(function(){var s=function(n){var o;try{o=history[n].bind(history);}catch(e){return;}if(typeof o!=="function")return;history[n]=function(st,t,u){if(u!=null&&u!==""){try{var a=new URL(u,location.href);if(a.origin!==location.origin){u=location.pathname+location.search+location.hash;}}catch(e){return;}}try{return o(st,t,u);}catch(e){}};};try{s("pushState");s("replaceState");}catch(e){}})();</script>`;
+
+function injectHead(html: string, finalUrl: string): string {
+  const head = html.match(/<head[^>]*>/i);
+  if (head && head.index !== undefined) {
+    const at = head.index + head[0].length;
+    return html.slice(0, at) + HISTORY_PATCH + `\n<base href="${finalUrl}">` + html.slice(at);
+  }
+  return html;
+}
+
 export async function handler(event: any) {
   const qs = (event && event.queryStringParameters) || {};
   const target = qs.url;
@@ -71,7 +90,7 @@ export async function handler(event: any) {
       let html = await upstream.text();
       html = rewriteNavigation(html, finalUrl);
       if (!/<base\b/i.test(html)) {
-        html = html.replace(/<head([^>]*)>/i, (m) => `${m}\n<base href="${finalUrl}">`);
+        html = injectHead(html, finalUrl);
       }
       return { statusCode: 200, headers, body: html };
     }
