@@ -5563,7 +5563,14 @@ export default function StudentDashboard() {
   const [activeDurationFilter, setActiveDurationFilter] = useState<'standard' | 'express'>('standard');
   const navigate = useNavigate();
 
+  const menuReturnViewRef = useRef<'courses' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz'>('courses');
   const handleViewChange = (view: 'courses' | 'profile' | 'membership' | 'quizscores' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz', cId: string | null = null) => {
+    // Menu sections (Profile / Membership / Quiz Score Sheet) live under the More
+    // menu popup: remember where the user was so Back can return them there.
+    if ((view === 'profile' || view === 'membership' || view === 'quizscores') &&
+        !(currentView === 'profile' || currentView === 'membership' || currentView === 'quizscores')) {
+      menuReturnViewRef.current = currentView;
+    }
     setCurrentView(view);
     setSelectedCourseId(cId);
     setIsMobileMenuOpen(false);
@@ -5572,6 +5579,11 @@ export default function StudentDashboard() {
     } else {
       navigate(`/dashboard?view=${view}`);
     }
+  };
+
+  const handleSectionBack = () => {
+    handleViewChange(menuReturnViewRef.current || 'courses', null);
+    setIsMobileMenuOpen(true);
   };
 
   const handleGatedSelectCourseId = (cId: string | null) => {
@@ -7494,7 +7506,7 @@ export default function StudentDashboard() {
                 <div className="text-left mb-4">
                   <button
                     type="button"
-                    onClick={() => handleViewChange('courses', null)}
+                    onClick={handleSectionBack}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-extrabold border-0 cursor-pointer active:scale-[0.98] transition-transform shadow-md"
                   >
                     <ArrowLeft className="w-4 h-4" />
@@ -7516,7 +7528,7 @@ export default function StudentDashboard() {
               <div className="max-w-4xl mx-auto space-y-6 text-left font-sans my-4">
                 <button
                   type="button"
-                  onClick={() => handleViewChange('courses', null)}
+                  onClick={handleSectionBack}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-extrabold border-0 cursor-pointer active:scale-[0.98] transition-transform shadow-md"
                 >
                   <ArrowLeft className="w-4 h-4" />

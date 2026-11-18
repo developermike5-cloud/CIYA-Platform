@@ -2,6 +2,7 @@
 
 html {
   scroll-behavior: smooth;
+  overscroll-behavior-y: contain; /* CIYA branded pull-to-refresh replaces the browser's */
   font-size: 18px; /* Increases default root font size so all rem classes scale up */
 }
 
