@@ -31,14 +31,12 @@ import PaidEnroll from './pages/PaidEnroll';
 import PastCohortProjects from './pages/PastCohortProjects';
 import { BrandedAlertContainer } from './components/BrandedAlert';
 import { safeStorage } from './utils/safeStorage';
-import { usePWAInstall } from './hooks/usePWAInstall';
 import CiyaToast from './components/CiyaToast';
 
 function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const locationRef = useRef(location.pathname);
-  const { needRefresh, updateServiceWorker } = usePWAInstall();
   const [user, setUser] = useState<any>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
@@ -50,16 +48,6 @@ function AppContent() {
     });
     return () => unsub();
   }, []);
-
-  // Handle Updates: 
-  // - Unauthenticated users (Landing Page): Auto-refresh immediately for latest version
-  // - Authenticated users (Dashboard): Rely on the "Update Available" amber button
-  useEffect(() => {
-    if (!isAuthLoading && needRefresh && !user) {
-      console.log('[PWA] Unauthenticated user detected on update. Auto-refreshing...');
-      updateServiceWorker();
-    }
-  }, [needRefresh, user, isAuthLoading, updateServiceWorker]);
 
   // Enhanced Update Detection: Check on focus, visibility change, and interval
   useEffect(() => {
