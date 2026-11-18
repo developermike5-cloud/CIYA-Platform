@@ -2,7 +2,7 @@
 
 html {
   scroll-behavior: smooth;
-  overscroll-behavior-y: contain; /* CIYA branded pull-to-refresh replaces the browser's */
+  overscroll-behavior-y: none; /* browser-native pull-to-refresh stays off; the CIYA pull strip owns the gesture */
   font-size: 18px; /* Increases default root font size so all rem classes scale up */
 }
 
@@ -10,6 +10,7 @@ body {
   color: #0f172a; /* Slate 900 for crisp text default */
   font-weight: 500; /* Bolder default font readability */
   background-color: #f8fafc;
+  overscroll-behavior-y: none; /* Chrome takes the viewport's overscroll from body, not html, so this is where native pull-to-refresh is actually killed */
 }
 
 /* Enhance faded classes to be much darker and high contrast for excellent readability */
