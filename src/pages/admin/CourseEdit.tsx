@@ -4,6 +4,7 @@ import { Course, CourseDay, CourseVideo } from '../../types';
 import CustomDropdown from '../../components/CustomDropdown';
 import { ArrowLeft, Save, Sparkles, AlertCircle, Plus, Trash2, HelpCircle } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
+import { showCiyaToast } from '../../components/CiyaToast';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string, defaultSubskills: string[], defaultSkillPaths: string[] }> = {
   web: {
@@ -310,7 +311,7 @@ function CheckEditor({ check, checkType, onChange, onTypeChange }: CheckEditorPr
 
   const handleImport = (replace: boolean) => {
     if (currentParsed.length === 0) {
-      alert("No valid check questions could be parsed from the pasted text. Please verify the format guidelines!");
+      showCiyaToast("No valid check questions could be parsed from the pasted text. Please verify the format guidelines!");
       return;
     }
     const updated = replace ? currentParsed : [...items.filter(it => it.question || it.statement || it.headline), ...currentParsed];
@@ -746,7 +747,7 @@ export default function CourseEdit() {
       return copy;
     });
 
-    alert("🎉 Existing lesson details successfully imported! Don't forget to click 'Save & Update Lesson' to write these changes permanently.");
+    showCiyaToast("🎉 Existing lesson details successfully imported! Don't forget to click 'Save & Update Lesson' to write these changes permanently.");
   };
 
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
@@ -756,7 +757,7 @@ export default function CourseEdit() {
   const generateWithAi = async (dayIdx: number, videoIndex: number, videoObj: CourseVideo) => {
     const videoUrl = videoObj.video_url || videoObj.url;
     if (!videoUrl) {
-      alert("Please enter a valid Lesson Video URL first!");
+      showCiyaToast("Please enter a valid Lesson Video URL first!");
       return;
     }
 
@@ -786,7 +787,7 @@ export default function CourseEdit() {
       const data = await response.json();
       
       if (data.error) {
-        alert(data.error);
+        showCiyaToast(data.error);
         return;
       }
 
@@ -813,7 +814,7 @@ export default function CourseEdit() {
 
     } catch (err: any) {
       console.error(err);
-      alert("AI Generation failed: " + err.message);
+      showCiyaToast("AI Generation failed: " + err.message);
     } finally {
       setAiLoading(prev => ({ ...prev, [videoIdKey]: false }));
     }

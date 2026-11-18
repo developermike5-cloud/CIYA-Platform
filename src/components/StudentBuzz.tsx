@@ -52,6 +52,7 @@ import {
 } from '../services/buzzRtdbService';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { Star, AlertCircle } from 'lucide-react';
+import { showCiyaToast } from './CiyaToast';
 
 interface StudentBuzzProps {
   currentUser: any;
@@ -425,7 +426,7 @@ export default function StudentBuzz({
         mediaType: forwardingMessage.mediaType
       });
       setForwardingMessage(null);
-      alert('Message forwarded!');
+      showCiyaToast('Message forwarded!');
     } catch (e) {
       console.error('Failed to forward message:', e);
     }
@@ -675,7 +676,7 @@ export default function StudentBuzz({
                     id={`buzz-group-${group.id}`}
                     onClick={() => {
                       if (isRestrictedPro) {
-                        alert('This group is only open to Pro Members. Please upgrade to join the discussion!');
+                        showCiyaToast('This group is only open to Pro Members. Please upgrade to join the discussion!');
                         return;
                       }
                       setActiveGroupId(group.id);

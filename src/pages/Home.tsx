@@ -26,6 +26,7 @@ import FaqSection from './home/FaqSection';
 import ClosingCta from './home/ClosingCta';
 import { WHATSAPP_URL } from './home/data';
 import { useIntakeRoute } from '../hooks/useIntakeRoute';
+import { showCiyaToast } from '../components/CiyaToast';
 
 let globalLoginActive = false;
 
@@ -89,9 +90,9 @@ const useLogin = () => {
         return;
       }
       if (e.message?.includes('offline') || e.code === 'unavailable') {
-        alert("Network error: Please check your internet connection and try again.");
+        showCiyaToast("Network error: Please check your internet connection and try again.");
       } else {
-        alert("An error occurred: " + e.message);
+        showCiyaToast("An error occurred: " + e.message);
       }
     } finally {
       globalLoginActive = false;

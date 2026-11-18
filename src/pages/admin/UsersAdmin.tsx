@@ -15,6 +15,7 @@ import { uploadToCloudinary } from '../../utils/cloudinary';
 import { rejectSubmissionMedia } from '../../lib/cloudinaryService';
 import { coursesStore } from '../../utils/coursesStore';
 import { safeStorage } from '../../utils/safeStorage';
+import { showCiyaToast } from '../../components/CiyaToast';
 
 function getFirestoreTime(timestamp: any): number {
   if (!timestamp) return 0;
@@ -179,10 +180,10 @@ export default function UsersAdmin() {
         console.warn("Could not trigger system signal:", sigErr);
       }
       
-      alert(`Automatic student approval setting is now successfully turned ${newValue ? 'ON' : 'OFF'}! 🎉`);
+      showCiyaToast(`Automatic student approval setting is now successfully turned ${newValue ? 'ON' : 'OFF'}! 🎉`);
     } catch (err: any) {
       console.error("Error updating auto-approval setting:", err);
-      alert(`Could not update auto-approval setting: ${err?.message || err}`);
+      showCiyaToast(`Could not update auto-approval setting: ${err?.message || err}`);
     } finally {
       setIsUpdatingAutoApproval(false);
     }
@@ -190,12 +191,12 @@ export default function UsersAdmin() {
 
   const handleCreateCohort = async () => {
     if (!newCohortName.trim()) {
-      alert("Please enter a valid cohort name.");
+      showCiyaToast("Please enter a valid cohort name.");
       return;
     }
     const sanitized = newCohortName.trim();
     if (cohortsConfig.cohortsList.includes(sanitized)) {
-      alert("This cohort already exists!");
+      showCiyaToast("This cohort already exists!");
       return;
     }
     setIsCreatingCohort(true);
@@ -210,10 +211,10 @@ export default function UsersAdmin() {
       }, { merge: true });
       setCohortsConfig({ activeCohort: newActive, cohortsList: updatedList, onboardingActive: cohortsConfig.onboardingActive });
       setNewCohortName('');
-      alert(`Cohort "${sanitized}" created successfully! It is now the ACTIVE cohort for new registrations.`);
+      showCiyaToast(`Cohort "${sanitized}" created successfully! It is now the ACTIVE cohort for new registrations.`);
     } catch (err) {
       console.error("Error creating cohort:", err);
-      alert("Failed to create cohort. Check administrative database permissions.");
+      showCiyaToast("Failed to create cohort. Check administrative database permissions.");
     } finally {
       setIsCreatingCohort(false);
     }
@@ -227,10 +228,10 @@ export default function UsersAdmin() {
         onboardingActive: cohortsConfig.onboardingActive
       }, { merge: true });
       setCohortsConfig(prev => ({ ...prev, activeCohort: newActive }));
-      alert(`Active cohort updated to: ${newActive}`);
+      showCiyaToast(`Active cohort updated to: ${newActive}`);
     } catch (err) {
       console.error("Error updating active cohort:", err);
-      alert("Failed to update active cohort.");
+      showCiyaToast("Failed to update active cohort.");
     }
   };
 
@@ -243,12 +244,12 @@ export default function UsersAdmin() {
         onboardingActive: next
       }, { merge: true });
       setCohortsConfig(prev => ({ ...prev, onboardingActive: next }));
-      alert(next
+      showCiyaToast(next
         ? `Registration intake is now OPEN for ${cohortsConfig.activeCohort}. "Start for Free" buttons send new students straight into the onboarding signup form.`
         : `Registration intake is now CLOSED. "Start for Free" buttons send new students to the waiting list.`);
     } catch (err) {
       console.error("Error updating registration intake toggle:", err);
-      alert("Failed to update registration status.");
+      showCiyaToast("Failed to update registration status.");
     }
   };
 
@@ -261,12 +262,12 @@ export default function UsersAdmin() {
         updatedAt: serverTimestamp()
       }, { merge: true });
       setAppGateEnforced(next);
-      alert(next
+      showCiyaToast(next
         ? `App-only access is now ON. On phones, the course portal only opens inside the installed CIYA app (mobile browsers are refused server-side on every request). Desktop browsers and the installed app are unaffected, and the landing page plus all forms stay open on the web.`
         : `App-only access is now OFF. The course portal can be opened through the web on both mobile and desktop.`);
     } catch (err) {
       console.error("Error updating app-only access toggle:", err);
-      alert("Failed to update the app-only access setting.");
+      showCiyaToast("Failed to update the app-only access setting.");
     } finally {
       setIsUpdatingAppGate(false);
     }
@@ -329,7 +330,7 @@ export default function UsersAdmin() {
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("Please select an image smaller than 2MB.");
+      showCiyaToast("Please select an image smaller than 2MB.");
       return;
     }
 
@@ -345,7 +346,7 @@ export default function UsersAdmin() {
 
       safeStorage.setItem('ciya_brand_logo', publicUrl);
       setCurrentLogo(publicUrl);
-      alert("Website branding logo updated and synchronized successfully via Cloudinary! 🎉");
+      showCiyaToast("Website branding logo updated and synchronized successfully via Cloudinary! 🎉");
     } catch (err: any) {
       console.error("Error saving brand logo to Supabase storage / Firestore:", err);
       const reader = new FileReader();
@@ -359,10 +360,10 @@ export default function UsersAdmin() {
 
           safeStorage.setItem('ciya_brand_logo', base64String);
           setCurrentLogo(base64String);
-          alert("Website branding logo synchronized successfully (Local Fallback)! 🎉");
+          showCiyaToast("Website branding logo synchronized successfully (Local Fallback)! 🎉");
         } catch (subErr) {
           console.error("Local fallback logo save error:", subErr);
-          alert("Could not save branding logo to database settings. Check permission rules.");
+          showCiyaToast("Could not save branding logo to database settings. Check permission rules.");
         }
       };
       reader.readAsDataURL(file);
@@ -381,10 +382,10 @@ export default function UsersAdmin() {
       }, { merge: true });
       safeStorage.removeItem('ciya_brand_logo');
       setCurrentLogo(null);
-      alert("Website logo reset to default.");
+      showCiyaToast("Website logo reset to default.");
     } catch (err) {
       console.error("Error resetting brand logo:", err);
-      alert("Error resetting logo.");
+      showCiyaToast("Error resetting logo.");
     } finally {
       setLogoUploading(false);
     }
@@ -392,14 +393,14 @@ export default function UsersAdmin() {
 
   const handleToggleAdminStatus = async (targetUser: UserProfile) => {
     if (!isSuperAdmin) {
-      alert("Only the super admin can manage administrator privileges.");
+      showCiyaToast("Only the super admin can manage administrator privileges.");
       return;
     }
     const isAdminCurrently = admins.includes(targetUser.id);
     try {
       if (isAdminCurrently) {
         if (targetUser.email?.toLowerCase() === 'developermike5@gmail.com') {
-          alert("Cannot demote the super admin!");
+          showCiyaToast("Cannot demote the super admin!");
           return;
         }
         await deleteDoc(doc(db, 'admins', targetUser.id));
@@ -414,7 +415,7 @@ export default function UsersAdmin() {
           delete next[targetUser.id];
           return next;
         });
-        alert(`${targetUser.fullName || 'User'} has been removed from CIYA admins.`);
+        showCiyaToast(`${targetUser.fullName || 'User'} has been removed from CIYA admins.`);
       } else {
         const newAdmin = {
           email: targetUser.email,
@@ -427,11 +428,11 @@ export default function UsersAdmin() {
           ...prev,
           [targetUser.id]: newAdmin
         }));
-        alert(`${targetUser.fullName || 'User'} has been upgraded to a CIYA Admin! Now configure custom permissions and titles below, then click Save.`);
+        showCiyaToast(`${targetUser.fullName || 'User'} has been upgraded to a CIYA Admin! Now configure custom permissions and titles below, then click Save.`);
       }
     } catch (e) {
       console.error("Error managing admin privileges:", e);
-      alert("Could not update admin privilege. Check database rules.");
+      showCiyaToast("Could not update admin privilege. Check database rules.");
     }
   };
 
@@ -478,7 +479,7 @@ export default function UsersAdmin() {
     const permissions = getAdminPermissionsValue(userId);
 
     if (!role) {
-      alert("Admin Role/Title cannot be empty.");
+      showCiyaToast("Admin Role/Title cannot be empty.");
       return;
     }
 
@@ -519,10 +520,10 @@ export default function UsersAdmin() {
         }
       }
 
-      alert("Admin privileges and configuration updated and saved successfully!");
+      showCiyaToast("Admin privileges and configuration updated and saved successfully!");
     } catch (err: any) {
       console.error("Error saving admin config:", err);
-      alert("Failed to save admin privileges: " + err.message);
+      showCiyaToast("Failed to save admin privileges: " + err.message);
     } finally {
       setSavingAdminId(null);
     }
@@ -566,10 +567,10 @@ export default function UsersAdmin() {
         delete copy.adminCode;
         return copy;
       }));
-      alert(`Removed legacy codes from ${data.removed ?? '?'} of ${data.checked ?? targets.length} student profile(s). The email access codes are untouched.`);
+      showCiyaToast(`Removed legacy codes from ${data.removed ?? '?'} of ${data.checked ?? targets.length} student profile(s). The email access codes are untouched.`);
     } catch (e) {
       console.error('legacy code purge failed:', e);
-      alert('Could not remove the legacy codes. Please try again.');
+      showCiyaToast('Could not remove the legacy codes. Please try again.');
     } finally {
       setPurgingLegacy(false);
     }
@@ -650,13 +651,13 @@ export default function UsersAdmin() {
       safeStorage.setItem('ciya_admin_cached_admins_data', JSON.stringify(adminMap));
 
       if (forceRefresh) {
-        alert("🎉 Success! Latest student data and onboarding statistics successfully synchronized with Cloud Firestore.");
+        showCiyaToast("🎉 Success! Latest student data and onboarding statistics successfully synchronized with Cloud Firestore.");
       }
 
     } catch (error: any) {
       handleFirestoreError(error, OperationType.LIST, 'users');
       if (forceRefresh) {
-        alert(`⚠️ Sync Failed: Could not fetch latest student statistics from Cloud Firestore.\n\nReason: ${error?.message || error || "Connection or permission error"}\n\nOperating on browser local cache instead.`);
+        showCiyaToast(`⚠️ Sync Failed: Could not fetch latest student statistics from Cloud Firestore.\n\nReason: ${error?.message || error || "Connection or permission error"}\n\nOperating on browser local cache instead.`);
       }
     } finally {
       setLoading(false);
@@ -834,7 +835,7 @@ export default function UsersAdmin() {
       if (detailUserId === userId) setDetailUserId(null);
     } catch (error) {
       console.error("Error deleting user application:", error);
-      alert(`Could not fully delete this student. Nothing was removed.\n\n${(error as any)?.message || 'Unknown error'}`);
+      showCiyaToast(`Could not fully delete this student. Nothing was removed.\n\n${(error as any)?.message || 'Unknown error'}`);
     } finally {
       setActionLoading(prev => ({ ...prev, [userId]: null }));
     }
@@ -965,7 +966,7 @@ export default function UsersAdmin() {
 
     } catch (err) {
       console.error("Error toggling day unlock status:", err);
-      alert("Failed to update day unlock. Please try again.");
+      showCiyaToast("Failed to update day unlock. Please try again.");
     }
   };
 
@@ -1019,7 +1020,7 @@ export default function UsersAdmin() {
     try {
       const targetCourse = allCourses.find(c => c.id === targetCourseId);
       if (!targetCourse) {
-        alert("Selected course not found.");
+        showCiyaToast("Selected course not found.");
         return;
       }
 
@@ -1076,11 +1077,11 @@ export default function UsersAdmin() {
         progress: nextProgress
       } : u));
 
-      alert(`Successfully switched student's course path to "${targetCourse.title}" immediately! 🎉`);
+      showCiyaToast(`Successfully switched student's course path to "${targetCourse.title}" immediately! 🎉`);
 
     } catch (err: any) {
       console.error("Error switching student course path:", err);
-      alert("Failed to switch course path: " + err.message);
+      showCiyaToast("Failed to switch course path: " + err.message);
     }
   };
 
@@ -1368,10 +1369,10 @@ export default function UsersAdmin() {
                                           });
                                           await triggerSystemSignal('user_signals', u.id);
                                           setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, cohort: targetCohort } : usr));
-                                          alert(`Moved student to ${targetCohort} successfully!`);
+                                          showCiyaToast(`Moved student to ${targetCohort} successfully!`);
                                         } catch (err) {
                                           console.error("Error moving student cohort:", err);
-                                          alert("Failed to update cohort. Please try again.");
+                                          showCiyaToast("Failed to update cohort. Please try again.");
                                         }
                                       }}
                                       options={allAvailableCohorts.map(cohort => ({
@@ -1446,7 +1447,7 @@ export default function UsersAdmin() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(accessCodes[u.id]);
-                      alert(`Copied access code: ${accessCodes[u.id]}`);
+                      showCiyaToast(`Copied access code: ${accessCodes[u.id]}`);
                     }}
                     className="text-[10px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded transition-colors cursor-pointer"
                   >
@@ -1610,10 +1611,10 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                             await updateDoc(doc(db, 'users', u.id), updateData);
                                             await triggerSystemSignal('user_signals', u.id);
                                             setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, hasYearBadge: nextVal, membershipId: nextVal ? updateData.membershipId : usr.membershipId } : usr));
-                                            alert(`Year badge ${nextVal ? 'granted' : 'revoked'} successfully!`);
+                                            showCiyaToast(`Year badge ${nextVal ? 'granted' : 'revoked'} successfully!`);
                                           } catch (err) {
                                             console.error(err);
-                                            alert("Failed to update Year Badge status.");
+                                            showCiyaToast("Failed to update Year Badge status.");
                                           }
                                         }}
                                         className={`px-2.5 py-1 rounded text-[10px] font-black uppercase transition-all border-0 cursor-pointer ${
@@ -1657,7 +1658,7 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                                     setUsers(prev => prev.map(usr => usr.id === u.id ? { ...usr, completedCoursesOverride: nextCompleted } : usr));
                                                   } catch (err) {
                                                     console.error("Error overriding course complete:", err);
-                                                    alert("Failed to update course override complete. Please try again.");
+                                                    showCiyaToast("Failed to update course override complete. Please try again.");
                                                   }
                                                 }}
                                                 className={`shrink-0 px-2 py-1 rounded text-[9px] font-black uppercase transition-all border-0 cursor-pointer ${
@@ -1732,7 +1733,7 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                       const clearProgress = clearProgressMap[u.id] !== undefined ? clearProgressMap[u.id] : false;
 
                                       if (!selectedId) {
-                                        alert("Please select a target course first.");
+                                        showCiyaToast("Please select a target course first.");
                                         return;
                                       }
 
@@ -2394,7 +2395,7 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                               <button 
                                 onClick={() => {
                                   navigator.clipboard.writeText(accessCodes[u.id]);
-                                  alert(`Copied access code: ${accessCodes[u.id]}`);
+                                  showCiyaToast(`Copied access code: ${accessCodes[u.id]}`);
                                 }}
                                 className="text-[9px] text-slate-600 hover:text-slate-900 font-extrabold bg-slate-50 border border-slate-200/80 px-1.5 py-0.5 rounded cursor-pointer transition-all hover:bg-slate-100"
                                 title="Copy student access code"

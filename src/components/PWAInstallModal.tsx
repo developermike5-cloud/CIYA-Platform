@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Share, PlusSquare, Smartphone, CheckCircle, Download, RefreshCw } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { showCiyaToast } from './CiyaToast';
 
 interface PWAInstallModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ export default function PWAInstallModal({ isOpen, onClose }: PWAInstallModalProp
       }
     } else {
       // If browser hasn't fired the event yet, alert the user to use manual menu
-      alert('The native installation prompt is not yet ready. Please use your browser\'s menu (⋮ or ...) and select "Install app" or "Add to Home Screen" to install CIYA manually.');
+      showCiyaToast('The native installation prompt is not yet ready. Please use your browser\'s menu (⋮ or ...) and select "Install app" or "Add to Home Screen" to install CIYA manually.');
     }
   };
 

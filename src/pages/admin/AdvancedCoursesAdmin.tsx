@@ -7,6 +7,7 @@ import { Course } from '../../types';
 import { Plus, Trash2, Edit3, Eye, Calendar, Sparkles, Download, Upload, ArrowRight, CheckCircle, Copy, Info, RefreshCw, AlertCircle, EyeOff, ShieldCheck } from 'lucide-react';
 import { coursesStore } from '../../utils/coursesStore';
 import { publishCoursesToServer } from '../../utils/courseServer';
+import { showCiyaToast } from '../../components/CiyaToast';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Class", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -238,7 +239,7 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
       })
       .catch((err) => {
         setIsPerformingAction(false);
-        alert("Failed to create advanced course: " + err.message);
+        showCiyaToast("Failed to create advanced course: " + err.message);
       });
   };
 
@@ -254,7 +255,7 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
       })
       .catch((err) => {
         setIsPerformingAction(false);
-        alert("Clone failed: " + err.message);
+        showCiyaToast("Clone failed: " + err.message);
       });
   };
 
@@ -269,7 +270,7 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
       })
       .catch((err) => {
         setIsPerformingAction(false);
-        alert("Delete failed: " + err.message);
+        showCiyaToast("Delete failed: " + err.message);
       });
   };
 

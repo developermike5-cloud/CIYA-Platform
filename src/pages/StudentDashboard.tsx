@@ -41,6 +41,7 @@ import PWAInstallModal from '../components/PWAInstallModal';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { PullToRefresh } from '../components/PullToRefresh';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { showCiyaToast } from '../components/CiyaToast';
 
 // Module-level refresh hooks for the once-per-session Firestore reads in the
 // student dashboard. Submitting an assignment re-reads the assignments list;
@@ -756,7 +757,7 @@ function AssignmentPanel({ assignment, dayIndex, courseId, submissions = {}, onS
   const handleSubmit = async () => {
     if (isApproved || isPending) return;
     if (!submitLink.trim() && !submitText.trim() && uploadedImages.length === 0) {
-      alert("Please provide at least one submission option: link, text, or screenshot.");
+      showCiyaToast("Please provide at least one submission option: link, text, or screenshot.");
       return;
     }
     setIsSubmitting(true);
@@ -1883,7 +1884,7 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
                   type="button"
                   onClick={() => {
                     if (selectedAnswers[currentIdx] === undefined && checkType !== 'fact') {
-                      alert("Please select your answer to advance!");
+                      showCiyaToast("Please select your answer to advance!");
                       return;
                     }
                     
@@ -1912,7 +1913,7 @@ function QuizModal({ check, checkType, checkKey, courseId, currentUser, userProf
                   type="button"
                   onClick={() => {
                     if (selectedAnswers[currentIdx] === undefined && checkType !== 'fact') {
-                      alert("Please select your answer to complete!");
+                      showCiyaToast("Please select your answer to complete!");
                       return;
                     }
 
@@ -2163,7 +2164,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       if (targetCourse && !isAdvCourse) {
         const slot: any = userProfile?.beginnerEnrollment;
         if (slot && slot.courseId && slot.courseId !== courseId && !slot.completed) {
-          alert("Access Restricted: You already have a free (Beginner) course in progress. You must complete it 100% before starting another Beginner course. Paid courses are not affected.");
+          showCiyaToast("Access Restricted: You already have a free (Beginner) course in progress. You must complete it 100% before starting another Beginner course. Paid courses are not affected.");
           return;
         }
         beginnerSlot = { courseId, completed: false };
@@ -2255,7 +2256,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
       updateParams({ syllabus: 'false', assignment: 'false' });
     } catch (e: any) {
       console.error("Error enrolling course:", e);
-      alert(`Failed to enroll in course: ${e?.message || e || 'Unknown Error'}. Please try again.`);
+      showCiyaToast(`Failed to enroll in course: ${e?.message || e || 'Unknown Error'}. Please try again.`);
     }
   };
 
@@ -2654,7 +2655,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
     if (goingToNextLesson) {
       const isNextUnlocked = isAdmin || isLessonUnlockedUnified(nextDayIdx, nextVideoIdx, days, completedKeys, checkPassedKeys, dbSubmissions, isAdmin, !!course.isCloned, userProfile, courseId, appSettings);
       if (!isNextUnlocked) {
-        alert("The next lesson is locked! You must complete the watch requirement and score at least 80% on this lesson's comprehension quiz first.");
+        showCiyaToast("The next lesson is locked! You must complete the watch requirement and score at least 80% on this lesson's comprehension quiz first.");
         return;
       }
     }
@@ -3068,7 +3069,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                   return;
                 }
                 if (!currentUser) {
-                  alert("This premium classroom is locked. Please sign in to enter the classroom and begin your lessons.");
+                  showCiyaToast("This premium classroom is locked. Please sign in to enter the classroom and begin your lessons.");
                   if (onLogin) {
                     onLogin();
                   }
@@ -3115,7 +3116,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
 
                   if (runningCourseId) {
                     const runningCourse = courses.find(item => item.id === runningCourseId);
-                    alert(`You currently have an active running course: "${runningCourse?.title || 'Active Course'}". Please finish your current running course (100% complete) first before you can enroll in a new course. Users cannot enroll in multiple courses at the same time.`);
+                    showCiyaToast(`You currently have an active running course: "${runningCourse?.title || 'Active Course'}". Please finish your current running course (100% complete) first before you can enroll in a new course. Users cannot enroll in multiple courses at the same time.`);
                     return;
                   }
 
@@ -3312,7 +3313,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                               if (isUnlocked) {
                                 handleGoToVideo(di, vi);
                               } else {
-                                alert("This lesson is locked! Complete preceding lesson's understanding check to unlock.");
+                                showCiyaToast("This lesson is locked! Complete preceding lesson's understanding check to unlock.");
                               }
                             }}
                             disabled={!isUnlocked}
@@ -3525,7 +3526,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                                 [di]: !prev[di]
                               }));
                             } else {
-                              alert(`Complete all ${unitLabel.toLowerCase()}'s lessons and understanding checks first to unlock the end-of-${unitLabel.toLowerCase()} assignment!`);
+                              showCiyaToast(`Complete all ${unitLabel.toLowerCase()}'s lessons and understanding checks first to unlock the end-of-${unitLabel.toLowerCase()} assignment!`);
                             }
                           }}
                           className={`w-full p-3 border rounded-xl cursor-pointer text-left flex items-center justify-between text-xs md:text-sm transition-all tracking-wide ${
@@ -3609,9 +3610,9 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
                             handleGoToVideo(di, 0);
                           } else {
                             if (course.isCloned) {
-                              alert(`⚠️ ${unitLabel} ${di + 1} lessons are locked! Please complete all ${unitLabel} ${di} lessons first.`);
+                              showCiyaToast(`⚠️ ${unitLabel} ${di + 1} lessons are locked! Please complete all ${unitLabel} ${di} lessons first.`);
                             } else {
-                              alert(`⚠️ ${unitLabel} ${di + 1} lessons are locked! First submit your ${unitLabel} ${di} assignment and wait for coach approval to unlock ${unitLabel} ${di + 1} training.`);
+                              showCiyaToast(`⚠️ ${unitLabel} ${di + 1} lessons are locked! First submit your ${unitLabel} ${di} assignment and wait for coach approval to unlock ${unitLabel} ${di + 1} training.`);
                             }
                           }
                         }}
@@ -3952,7 +3953,7 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled, curre
     setIsSyncing(true);
     try {
       if (appSettings?.lockedSections?.courses) {
-        alert("The admin has locked the entire courses section. Individual course unlock verification is not available until the courses section is unlocked.");
+        showCiyaToast("The admin has locked the entire courses section. Individual course unlock verification is not available until the courses section is unlocked.");
         setIsSyncing(false);
         return;
       }
@@ -3964,16 +3965,16 @@ function CourseCard({ course, isLocked, onSelect, userProfile, isEnrolled, curre
           if (onCourseUnlocked) {
             onCourseUnlocked(courseItem.id);
           }
-          alert(`🎉 Success! Administrator authorization verified. "${courseItem.title}" has been successfully unlocked for you!`);
+          showCiyaToast(`🎉 Success! Administrator authorization verified. "${courseItem.title}" has been successfully unlocked for you!`);
         } else {
-          alert(`🔒 This course is still locked on the administrator's dashboard. Please contact your instructor to request access.`);
+          showCiyaToast(`🔒 This course is still locked on the administrator's dashboard. Please contact your instructor to request access.`);
         }
       } else {
-        alert(`🔒 This course is still locked on the administrator's dashboard. Please contact your instructor to request access.`);
+        showCiyaToast(`🔒 This course is still locked on the administrator's dashboard. Please contact your instructor to request access.`);
       }
     } catch (err) {
       console.error("Error syncing course unlock:", err);
-      alert("Error checking course lock status. Please try again.");
+      showCiyaToast("Error checking course lock status. Please try again.");
     } finally {
       setIsSyncing(false);
     }
@@ -5668,7 +5669,7 @@ export default function StudentDashboard() {
           const slot: any = userProfile?.beginnerEnrollment;
           const slotBlocks = !!slot && !!slot.courseId && slot.courseId !== cId && !slot.completed;
           if (!isRegistered && (!hasCompletedFirstCourse || slotBlocks)) {
-            alert("Access Restricted: You must fully complete your current free (Beginner) course 100% before enrolling in another Beginner course. Paid courses are not affected.");
+            showCiyaToast("Access Restricted: You must fully complete your current free (Beginner) course 100% before enrolling in another Beginner course. Paid courses are not affected.");
             return;
           }
         }
@@ -5755,7 +5756,7 @@ export default function StudentDashboard() {
     const activeAssignCourseId = selectedAssignCourseId || (registeredCoursesList && registeredCoursesList[0]?.id);
     let registeredCourse = registeredCoursesList.find(c => c.id === activeAssignCourseId) || registeredCoursesList[0];
     if (!registeredCourse) {
-      alert("No active course path assigned to submit an assignment for.");
+      showCiyaToast("No active course path assigned to submit an assignment for.");
       return;
     }
 
@@ -5774,7 +5775,7 @@ export default function StudentDashboard() {
     const existingSub = allMySubmissions.find(s => s.courseId === registeredCourse.id && s.dayIndex === submitDayIndex);
     if (existingSub && !isAdmin) {
       if (existingSub.status !== 'Disapproved') {
-        alert(`You have already submitted an assignment for Day ${submitDayIndex + 1} which is currently in '${existingSub.status}' status. You cannot submit multiple assignments for the same day unless disapproved.`);
+        showCiyaToast(`You have already submitted an assignment for Day ${submitDayIndex + 1} which is currently in '${existingSub.status}' status. You cannot submit multiple assignments for the same day unless disapproved.`);
         return;
       }
     }
@@ -5797,7 +5798,7 @@ export default function StudentDashboard() {
     })();
 
     if (submitDayIndex > lastUnlockedDayIdx) {
-      alert(`Day ${submitDayIndex + 1} assignment is currently locked. Complete preceding days' lessons and assignments to unlock!`);
+      showCiyaToast(`Day ${submitDayIndex + 1} assignment is currently locked. Complete preceding days' lessons and assignments to unlock!`);
       return;
     }
 
@@ -5806,12 +5807,12 @@ export default function StudentDashboard() {
     const hasText = !!submitText.trim();
 
     if (!hasImages && !hasLink && !hasText) {
-      alert("Please provide at least one submission option: paste a live link, write a description, or upload a screenshot image.");
+      showCiyaToast("Please provide at least one submission option: paste a live link, write a description, or upload a screenshot image.");
       return;
     }
 
     if (uploadedImages.length > 3) {
-      alert("You may upload a maximum of 3 screenshot images.");
+      showCiyaToast("You may upload a maximum of 3 screenshot images.");
       return;
     }
 
@@ -5976,7 +5977,7 @@ export default function StudentDashboard() {
       setUploadedImages([]);
     } catch (e: any) {
       console.error(e);
-      alert("Error submitting assignment: " + e.message);
+      showCiyaToast("Error submitting assignment: " + e.message);
     } finally {
       setSubmittingAssignment(false);
     }
@@ -6589,10 +6590,10 @@ export default function StudentDashboard() {
         });
       }
 
-      alert("Profile photo uploaded successfully!");
+      showCiyaToast("Profile photo uploaded successfully!");
     } catch (err) {
       console.error("Failed to upload profile photo:", err);
-      alert("Failed to upload profile photo. Please try again.");
+      showCiyaToast("Failed to upload profile photo. Please try again.");
     } finally {
       setUploadingProfilePhoto(false);
     }
@@ -6630,7 +6631,7 @@ export default function StudentDashboard() {
       safeStorage.setItem('ciya_cached_profile', JSON.stringify(updated));
       safeStorage.setItem('ciya_cached_profile_time', Date.now().toString());
       setEditingProfile(false);
-      alert('Profile updated successfully!');
+      showCiyaToast('Profile updated successfully!');
     } catch (error) {
       console.error(error);
     } finally {
@@ -8291,7 +8292,7 @@ export default function StudentDashboard() {
                                     const files = (Array.from(e.dataTransfer.files) as File[]).filter(f => f.type.startsWith('image/'));
                                     const slots = 3 - uploadedImages.length;
                                     if (slots <= 0) {
-                                      alert("Maximum limit of 3 uploaded screenshot images reached!");
+                                      showCiyaToast("Maximum limit of 3 uploaded screenshot images reached!");
                                       return;
                                     }
                                     files.slice(0, slots).forEach(async (file) => {
@@ -8330,7 +8331,7 @@ export default function StudentDashboard() {
                                         const files = Array.from(e.target.files) as File[];
                                         const slots = 3 - uploadedImages.length;
                                         if (slots <= 0) {
-                                          alert("Maximum limit of 3 uploaded screenshot images reached!");
+                                          showCiyaToast("Maximum limit of 3 uploaded screenshot images reached!");
                                           return;
                                         }
                                         files.slice(0, slots).forEach(async (file) => {
@@ -8653,7 +8654,7 @@ export default function StudentDashboard() {
                                         lessonStats={courseStats[course.id] || null}
                                         onSelect={() => {
                                           if (isGuest) {
-                                            alert("Please Sign In with Google to unlock full access to mini-videos, daily study materials, quizzes, live assignments and certificate tracking!");
+                                            showCiyaToast("Please Sign In with Google to unlock full access to mini-videos, daily study materials, quizzes, live assignments and certificate tracking!");
                                             handleLogin();
                                             return;
                                           }
@@ -9621,11 +9622,11 @@ export default function StudentDashboard() {
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <span className="text-slate-400">Bank Name</span>
                   <div className="flex items-center gap-1 flex-wrap">
-                    <span className="text-slate-900 font-extrabold">{appSettings?.advancedCourseSettings?.bankName ?? 'United Bank for Africa (UBA)'}</span>
+                    <span className="text-slate-900 font-extrabold">{appSettings?.advancedCourseSettings?.bankName ?? 'Moniepoint'}</span>
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText(appSettings?.advancedCourseSettings?.bankName ?? 'United Bank for Africa (UBA)');
+                        navigator.clipboard.writeText(appSettings?.advancedCourseSettings?.bankName ?? 'Moniepoint');
                         showToast('Copied Bank Name! 📋');
                       }}
                       className="text-[10px] text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-0 rounded px-1.5 py-0.5 cursor-pointer font-bold"
@@ -9655,11 +9656,11 @@ export default function StudentDashboard() {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">Account Number</span>
                   <div className="flex items-center gap-1 flex-wrap">
-                    <span className="text-slate-900 font-black tracking-wide">{appSettings?.advancedCourseSettings?.accountNumber ?? '1023948576'}</span>
+                    <span className="text-slate-900 font-black tracking-wide">{appSettings?.advancedCourseSettings?.accountNumber ?? '5070133907'}</span>
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText(appSettings?.advancedCourseSettings?.accountNumber ?? '1023948576');
+                        navigator.clipboard.writeText(appSettings?.advancedCourseSettings?.accountNumber ?? '5070133907');
                         showToast('Copied Account Number! 📋');
                       }}
                       className="text-[10px] text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-0 rounded px-1.5 py-0.5 cursor-pointer font-bold"
@@ -9762,7 +9763,7 @@ export default function StudentDashboard() {
                   showToast(`🎉 Success! Advanced track unlocked!`);
                 } catch (err: any) {
                   console.error("Advanced enrollment error:", err);
-                  alert(`Passcode correct, but failed to save enrollment in database: ${err?.message || err || 'Unknown Error'}. Please check connection and try again.`);
+                  showCiyaToast(`Passcode correct, but failed to save enrollment in database: ${err?.message || err || 'Unknown Error'}. Please check connection and try again.`);
                 }
               }}
               whatsappNumber={appSettings?.advancedCourseSettings?.whatsappNumber ?? '+2349042544355'}

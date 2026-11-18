@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { ADMIN_POWERS, SUPERADMIN_WILDCARD, powerLabel } from '../../constants/adminPowers';
+import { showCiyaToast } from '../../components/CiyaToast';
 
 interface AdminRecord {
   id: string;
@@ -151,7 +152,7 @@ export default function AdminManagement() {
       setEditingId(null);
     } catch (err: any) {
       console.error('Failed to update permissions:', err);
-      alert(err?.message || 'Could not update powers. Only super admins can edit powers.');
+      showCiyaToast(err?.message || 'Could not update powers. Only super admins can edit powers.');
     } finally {
       setSavingId(null);
     }
@@ -164,7 +165,7 @@ export default function AdminManagement() {
       setConfirmRemove(null);
     } catch (err: any) {
       console.error('Failed to remove admin:', err);
-      alert(err?.message || 'Could not remove this admin.');
+      showCiyaToast(err?.message || 'Could not remove this admin.');
     } finally {
       setRemovingId(null);
     }

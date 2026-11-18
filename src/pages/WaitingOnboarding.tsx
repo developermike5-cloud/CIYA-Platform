@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { Check, ArrowRight, ChevronLeft, Globe, Film, Palette, Zap, Briefcase, TrendingUp, Sparkles, User, MessageCircle, MapPin, Gift, Clock, ShoppingBag } from 'lucide-react';
 import { ALL_COUNTRIES } from '../utils/countries';
 import CustomDropdown from '../components/CustomDropdown';
+import { showCiyaToast } from '../components/CiyaToast';
 
 type Pathway = 'A' | 'B' | 'C' | null;
 
@@ -199,7 +200,7 @@ export default function WaitingOnboarding() {
       nextStep();
     } catch (err: any) {
       console.error(err);
-      alert("An error occurred. Please try again.");
+      showCiyaToast("An error occurred. Please try again.");
     } finally {
       setLoading(false);
     }

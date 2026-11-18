@@ -56,6 +56,8 @@ import { generateTimeBasedCode, verifyTimeBasedCode, getPasscodeSecondsLeft } fr
 import CIYAMembershipBadge from '../../components/CIYAMembershipBadge';
 
 import CustomDropdown from '../../components/CustomDropdown';
+import { showCiyaToast } from '../../components/CiyaToast';
+import CiyaBadgePreview from '../../components/CiyaBadgePreview';
 
 interface LockedSections {
   courses: boolean;
@@ -774,8 +776,8 @@ export default function PortalLocksAdmin() {
       enabled: true,
       price: 50000,
       accountName: 'CIYA Academy International Ltd',
-      accountNumber: '1023948576',
-      bankName: 'United Bank for Africa (UBA)',
+      accountNumber: '5070133907',
+      bankName: 'Moniepoint',
       whatsappNumber: '+2349042544355',
       secretPasscode: 'CIYA_ADVANCED_PASSCODE_SECRET_2026',
     },
@@ -853,8 +855,8 @@ export default function PortalLocksAdmin() {
             requireForDay4: data?.yearBadgeSettings?.requireForDay4 ?? true,
             price: data?.yearBadgeSettings?.price ?? 25000,
             accountName: data?.yearBadgeSettings?.accountName ?? 'CIYA Academy International Ltd',
-            accountNumber: data?.yearBadgeSettings?.accountNumber ?? '1023948576',
-            bankName: data?.yearBadgeSettings?.bankName ?? 'United Bank for Africa (UBA)',
+            accountNumber: data?.yearBadgeSettings?.accountNumber ?? '5070133907',
+            bankName: data?.yearBadgeSettings?.bankName ?? 'Moniepoint',
             benefitText: data?.yearBadgeSettings?.benefitText ?? '• Unlocks Day 4 and Day 5 high-income curriculum\n• Professional Certificate of Completion (PDF/Print)\n• Dedicated Masterclass Discord / WhatsApp Group\n• Direct 1-on-1 Admin Priority assignment reviews',
             badgeImageUrl: data?.yearBadgeSettings?.badgeImageUrl ?? 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=500',
             whatsappNumber: data?.yearBadgeSettings?.whatsappNumber ?? '+2348123456789',
@@ -863,8 +865,8 @@ export default function PortalLocksAdmin() {
             enabled: data?.advancedCourseSettings?.enabled ?? true,
             price: data?.advancedCourseSettings?.price ?? 50000,
             accountName: data?.advancedCourseSettings?.accountName ?? 'CIYA Academy International Ltd',
-            accountNumber: data?.advancedCourseSettings?.accountNumber ?? '1023948576',
-            bankName: data?.advancedCourseSettings?.bankName ?? 'United Bank for Africa (UBA)',
+            accountNumber: data?.advancedCourseSettings?.accountNumber ?? '5070133907',
+            bankName: data?.advancedCourseSettings?.bankName ?? 'Moniepoint',
             whatsappNumber: data?.advancedCourseSettings?.whatsappNumber ?? '+2349042544355',
             secretPasscode: data?.advancedCourseSettings?.secretPasscode ?? 'CIYA_ADVANCED_PASSCODE_SECRET_2026',
           },
@@ -1039,8 +1041,8 @@ export default function PortalLocksAdmin() {
           enabled: true,
           price: 50000,
           accountName: 'CIYA Academy International Ltd',
-          accountNumber: '1023948576',
-          bankName: 'United Bank for Africa (UBA)',
+          accountNumber: '5070133907',
+          bankName: 'Moniepoint',
           whatsappNumber: '+2349042544355',
           secretPasscode: 'CIYA_ADVANCED_PASSCODE_SECRET_2026',
         },
@@ -1082,7 +1084,7 @@ export default function PortalLocksAdmin() {
       setGradingLogs(prev => [`[SUCCESS ✅] Admin settings successfully committed to Firestore!`, ...prev]);
     } catch (err) {
       console.error("Failed to save admin settings:", err);
-      alert("Failed to save admin settings. Please try again.");
+      showCiyaToast("Failed to save admin settings. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -1351,8 +1353,8 @@ export default function PortalLocksAdmin() {
           enabled: true,
           price: 50000,
           accountName: 'CIYA Academy International Ltd',
-          accountNumber: '1023948576',
-          bankName: 'United Bank for Africa (UBA)',
+          accountNumber: '5070133907',
+          bankName: 'Moniepoint',
           whatsappNumber: '+2349042544355',
           secretPasscode: 'CIYA_ADVANCED_PASSCODE_SECRET_2026',
         }),
@@ -1392,7 +1394,7 @@ export default function PortalLocksAdmin() {
       setGradingLogs(prev => [`[CLOUDINARY ✅] Badge image uploaded successfully: ${publicUrl}`, ...prev]);
     } catch (err: any) {
       console.error(err);
-      alert("Failed to upload image to Cloudinary. Please try again.");
+      showCiyaToast("Failed to upload image to Cloudinary. Please try again.");
     } finally {
       setUploadingImage(false);
     }
@@ -2025,7 +2027,7 @@ export default function PortalLocksAdmin() {
                       value={beginnersSettings.yearBadgeSettings.bankName || ''}
                       onChange={(e) => handleUpdateYearBadgeSetting('bankName', e.target.value)}
                       className="w-full bg-white border border-slate-200 text-slate-900 font-bold text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500"
-                      placeholder="e.g., United Bank for Africa (UBA)"
+                      placeholder="e.g., Moniepoint"
                     />
                   </div>
 
@@ -2047,7 +2049,7 @@ export default function PortalLocksAdmin() {
                       value={beginnersSettings.yearBadgeSettings.accountNumber || ''}
                       onChange={(e) => handleUpdateYearBadgeSetting('accountNumber', e.target.value)}
                       className="w-full bg-white border border-slate-200 text-slate-900 font-bold text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500"
-                      placeholder="e.g., 1023948576"
+                      placeholder="e.g., 5070133907"
                     />
                   </div>
                 </div>
@@ -2635,10 +2637,10 @@ export default function PortalLocksAdmin() {
                     <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wide">Bank Name</label>
                     <input
                       type="text"
-                      value={beginnersSettings.advancedCourseSettings?.bankName ?? 'United Bank for Africa (UBA)'}
+                      value={beginnersSettings.advancedCourseSettings?.bankName ?? 'Moniepoint'}
                       onChange={(e) => handleUpdateAdvancedCourseSetting('bankName', e.target.value)}
                       className="w-full bg-white border border-slate-200 text-slate-900 font-bold text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-purple-500"
-                      placeholder="e.g., United Bank for Africa (UBA)"
+                      placeholder="e.g., Moniepoint"
                     />
                   </div>
 
@@ -2657,10 +2659,10 @@ export default function PortalLocksAdmin() {
                     <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wide">Account Number</label>
                     <input
                       type="text"
-                      value={beginnersSettings.advancedCourseSettings?.accountNumber ?? '1023948576'}
+                      value={beginnersSettings.advancedCourseSettings?.accountNumber ?? '5070133907'}
                       onChange={(e) => handleUpdateAdvancedCourseSetting('accountNumber', e.target.value)}
                       className="w-full bg-white border border-slate-200 text-slate-900 font-bold text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-purple-500"
-                      placeholder="e.g., 1023948576"
+                      placeholder="e.g., 5070133907"
                     />
                   </div>
                 </div>
@@ -3508,7 +3510,7 @@ export function YearBadgePaymentFlow({
   // Helper to copy account number
   const handleCopyText = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert(`📋 Account details copied!`);
+    showCiyaToast(`📋 Account details copied!`);
   };
 
   const handleStartPurchase = () => {
@@ -3567,11 +3569,6 @@ export function YearBadgePaymentFlow({
     submitBadgeRequest();
   };
 
-  const handleTryAgain = () => {
-    setTimerActive(false);
-    setStep('landing');
-  };
-
   // Log messages for interbank processing
   const getConfirmingMessage = () => {
     if (confirmingTime > 8) return "🔄 Contacting Central Settlement Node...";
@@ -3597,24 +3594,8 @@ export function YearBadgePaymentFlow({
       {step === 'landing' && (
         <div className="space-y-6 animate-fadeIn">
           <div className="text-center space-y-2">
-            <div className="mx-auto w-40 h-40 sm:w-48 sm:h-48 rounded-3xl overflow-hidden bg-slate-50 border-4 border-amber-200 shadow-lg flex items-center justify-center">
-              {userProfile?.photoURL ? (
-                <img
-                  src={userProfile.photoURL}
-                  alt="Your photo on the CIYA Membership Badge"
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : yearBadgeSettings?.badgeImageUrl ? (
-                <img
-                  src={yearBadgeSettings.badgeImageUrl}
-                  alt="Badge Icon"
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span className="text-6xl">🏅</span>
-              )}
+            <div className="w-full max-w-[360px] mx-auto">
+              <CiyaBadgePreview userProfile={userProfile} />
             </div>
             <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
               🏅 CIYA Academy Membership Badge
@@ -3674,7 +3655,7 @@ export function YearBadgePaymentFlow({
           <div className="bg-slate-900 text-white rounded-2xl p-5 space-y-4 border border-slate-800 font-sans shadow-md">
             <div className="space-y-1">
               <span className="text-[9px] uppercase tracking-widest text-slate-400 font-extrabold block">Bank Name</span>
-              <p className="text-sm font-extrabold text-white">{yearBadgeSettings?.bankName || 'United Bank for Africa (UBA)'}</p>
+              <p className="text-sm font-extrabold text-white">{yearBadgeSettings?.bankName || 'Moniepoint'}</p>
             </div>
             
             <div className="space-y-1">
@@ -3685,11 +3666,11 @@ export function YearBadgePaymentFlow({
             <div className="space-y-1 flex justify-between items-center bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
               <div>
                 <span className="text-[8px] uppercase tracking-widest text-teal-400 font-extrabold block">Account Number</span>
-                <p className="text-base font-mono font-black text-white">{yearBadgeSettings?.accountNumber || '1023948576'}</p>
+                <p className="text-base font-mono font-black text-white">{yearBadgeSettings?.accountNumber || '5070133907'}</p>
               </div>
               <button
                 type="button"
-                onClick={() => handleCopyText(yearBadgeSettings?.accountNumber || '1023948576')}
+                onClick={() => handleCopyText(yearBadgeSettings?.accountNumber || '5070133907')}
                 className="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 border-0 rounded text-[10px] text-teal-300 font-mono font-black uppercase tracking-wide cursor-pointer select-none"
               >
                 Copy
@@ -3707,7 +3688,7 @@ export function YearBadgePaymentFlow({
               onClick={handleDecline}
               className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase rounded-lg border-0 cursor-pointer"
             >
-              Decline & Go Back
+              Back
             </button>
             <button
               type="button"
@@ -3746,7 +3727,7 @@ export function YearBadgePaymentFlow({
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span className="text-[9px] uppercase font-black text-slate-400">Bank</span>
-                    <p className="font-extrabold text-slate-800">{yearBadgeSettings?.bankName || 'United Bank for Africa (UBA)'}</p>
+                    <p className="font-extrabold text-slate-800">{yearBadgeSettings?.bankName || 'Moniepoint'}</p>
                   </div>
                   <div>
                     <span className="text-[9px] uppercase font-black text-slate-400">Account Name</span>
@@ -3757,11 +3738,11 @@ export function YearBadgePaymentFlow({
                 <div className="flex items-center justify-between bg-white p-3 border border-slate-150 rounded-xl">
                   <div>
                     <span className="text-[8px] uppercase font-black text-indigo-500">Account Number</span>
-                    <p className="font-mono font-black text-slate-900 text-sm">{yearBadgeSettings?.accountNumber || '1023948576'}</p>
+                    <p className="font-mono font-black text-slate-900 text-sm">{yearBadgeSettings?.accountNumber || '5070133907'}</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleCopyText(yearBadgeSettings?.accountNumber || '1023948576')}
+                    onClick={() => handleCopyText(yearBadgeSettings?.accountNumber || '5070133907')}
                     className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-[10px] rounded border-0 cursor-pointer"
                   >
                     Copy
@@ -3771,13 +3752,6 @@ export function YearBadgePaymentFlow({
 
               {/* Confirm Buttons */}
               <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-slate-150">
-                <button
-                  type="button"
-                  onClick={handleTryAgain}
-                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase tracking-wider rounded-xl border-0 cursor-pointer"
-                >
-                  I will try again
-                </button>
                 <button
                   type="button"
                   onClick={handleIHavePaid}
@@ -3854,17 +3828,6 @@ export function YearBadgePaymentFlow({
               <p className="text-[11px] text-slate-500 font-semibold">💾 Saving your request...</p>
             )}
 
-            <div className="pt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmingTime(0);
-                }}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-black uppercase rounded-xl border-0 cursor-pointer transition-all duration-150 active:scale-95"
-              >
-                Force Skip Countdown & Verify ⚡
-              </button>
-            </div>
           </div>
         </div>
       )}

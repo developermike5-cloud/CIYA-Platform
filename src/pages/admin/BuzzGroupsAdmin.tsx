@@ -34,6 +34,7 @@ import {
 import { uploadToCloudinary } from '../../utils/cloudinary';
 import { auth } from '../../firebase';
 import CustomDropdown from '../../components/CustomDropdown';
+import { showCiyaToast } from '../../components/CiyaToast';
 
 export default function BuzzGroupsAdmin() {
   const [groups, setGroups] = useState<BuzzGroup[]>([]);
@@ -148,7 +149,7 @@ export default function BuzzGroupsAdmin() {
 
   const handleDeleteCategory = async (catToDelete: string) => {
     if (categories.length <= 1) {
-      alert('You must keep at least one category.');
+      showCiyaToast('You must keep at least one category.');
       return;
     }
     

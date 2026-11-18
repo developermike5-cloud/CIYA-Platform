@@ -7,6 +7,7 @@ import LpQuestionnaireForm from '../../components/LpQuestionnaireForm';
 import EcQuestionnaireForm from '../../components/EcQuestionnaireForm';
 import PortfolioQuestionnaireForm from '../../components/PortfolioQuestionnaireForm';
 import CustomDropdown from '../../components/CustomDropdown';
+import { showCiyaToast } from '../../components/CiyaToast';
 
 interface SavedForm {
   id: string;
@@ -1134,12 +1135,12 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
 
   const handleSave = async () => {
     if (!clientName || !businessName) {
-      alert("Please fill in Client Name and Business Name before saving.");
+      showCiyaToast("Please fill in Client Name and Business Name before saving.");
       return;
     }
 
     if (!currentId && hasExceededLimit) {
-      alert(`⚠️ You have reached your archive limit of ${currentLimit} forms. Please delete an old form to save a new one.`);
+      showCiyaToast(`⚠️ You have reached your archive limit of ${currentLimit} forms. Please delete an old form to save a new one.`);
       return;
     }
 
@@ -1268,7 +1269,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
           setPortfolioDraft(null);
         }
       }
-      alert("Questionnaire saved successfully!");
+      showCiyaToast("Questionnaire saved successfully!");
       setCurrentId(null);
       resetForm();
       fetchForms();
@@ -1293,7 +1294,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
       setTimeout(() => setGlobalSettingsSaved(false), 3000);
     } catch (err) {
       console.error("Failed to update global settings:", err);
-      alert("Failed to save settings. Please check your permissions.");
+      showCiyaToast("Failed to save settings. Please check your permissions.");
     } finally {
       setSavingGlobal(false);
     }
@@ -1325,7 +1326,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
         navigator.clipboard.writeText(result.prompt);
         setCopied(true);
         setTimeout(() => setCopied(false), 5000);
-        alert("AI Master Prompt Generated & Copied to Clipboard! ⚡\n\nYou can now paste this directly into your preferred AI (ChatGPT, Gemini, Claude, Cursor, v0) to build your website.");
+        showCiyaToast("AI Master Prompt Generated & Copied to Clipboard! ⚡\n\nYou can now paste this directly into your preferred AI (ChatGPT, Gemini, Claude, Cursor, v0) to build your website.");
       }
     } catch (err: any) {
       console.error("AI Generation failed:", err);
@@ -1345,7 +1346,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
         }
       }
       
-      alert(errorMsg);
+      showCiyaToast(errorMsg);
     } finally {
       setAiGenerating(false);
     }

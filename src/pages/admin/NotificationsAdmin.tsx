@@ -4,6 +4,7 @@ import { db, auth } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import CustomDropdown from '../../components/CustomDropdown';
 import { Mail, Settings, Plus, Trash2, Calendar, Send, Users, AlertCircle, RefreshCw, Layers } from 'lucide-react';
+import { showCiyaToast } from '../../components/CiyaToast';
 
 interface NotificationTemplate {
   id: string;
@@ -127,11 +128,11 @@ export default function NotificationsAdmin() {
   const handleSaveTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isSuperAdmin) {
-      alert("Permission denied! Only the Super Admin can set up notification templates.");
+      showCiyaToast("Permission denied! Only the Super Admin can set up notification templates.");
       return;
     }
     if (!templateTitle.trim() || !templateMsg.trim()) {
-      alert("Please complete both template title and message body.");
+      showCiyaToast("Please complete both template title and message body.");
       return;
     }
 
@@ -166,7 +167,7 @@ export default function NotificationsAdmin() {
   // Super Admin delete template
   const handleDeleteTemplate = async (id: string) => {
     if (!isSuperAdmin) {
-      alert("Permission denied!");
+      showCiyaToast("Permission denied!");
       return;
     }
     if (!confirm(`Are you sure you want to delete template ${id}?`)) return;
@@ -198,7 +199,7 @@ export default function NotificationsAdmin() {
   const handleManualDispatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualTitle.trim() || !manualMessage.trim()) {
-      alert("Dispatch draft is empty. Please describe title and message body.");
+      showCiyaToast("Dispatch draft is empty. Please describe title and message body.");
       return;
     }
 

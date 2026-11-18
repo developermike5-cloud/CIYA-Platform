@@ -9,6 +9,7 @@ import { coursesStore } from '../../utils/coursesStore';
 import { publishCoursesToServer } from '../../utils/courseServer';
 import { collection, doc, getDocs, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { showCiyaToast } from '../../components/CiyaToast';
 
 const SKILLS: Record<string, { label: string, icon: string, color: string, bg: string }> = {
   web: { label: "AI Website Class", icon: "🌐", color: "#0d9488", bg: "#ccfbf1" },
@@ -313,7 +314,7 @@ export default function CoursesAdmin() {
       setDeleteDialogCourse(null);
     } catch (e) {
       console.error(e);
-      alert('Failed to delete course.');
+      showCiyaToast('Failed to delete course.');
     } finally {
       setIsPerformingAction(false);
     }
@@ -327,10 +328,10 @@ export default function CoursesAdmin() {
     try {
       await coursesStore.cloneCourse(cloneDialogCourse, clonedTitle);
       setCloneDialogCourse(null);
-      alert(`Course cloned successfully! Saved as Draft: "${clonedTitle}".`);
+      showCiyaToast(`Course cloned successfully! Saved as Draft: "${clonedTitle}".`);
     } catch (err: any) {
       console.error("Error cloning course:", err);
-      alert("Failed to clone course. Error: " + err.message);
+      showCiyaToast("Failed to clone course. Error: " + err.message);
     } finally {
       setIsPerformingAction(false);
     }

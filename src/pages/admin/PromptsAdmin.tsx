@@ -24,6 +24,7 @@ import {
   Download,
   Upload
 } from 'lucide-react';
+import { showCiyaToast } from '../../components/CiyaToast';
 
 const DEFAULT_FULL_TEMPLATES: FullPromptTemplate[] = [
   {
@@ -707,7 +708,7 @@ export default function PromptsAdmin() {
         showToast("Image optimized and embedded successfully!");
       } catch (compressErr) {
         console.error(compressErr);
-        alert("Error processing image file. Please use a standard JPG/PNG file.");
+        showCiyaToast("Error processing image file. Please use a standard JPG/PNG file.");
       }
     }
   };
@@ -717,7 +718,7 @@ export default function PromptsAdmin() {
     if (!file) return;
 
     if (!file.name.endsWith('.webm') && !file.type.includes('webm')) {
-      alert("Notice: The phone preview simulator player works best with webm files. Standard webm video format is highly recommended.");
+      showCiyaToast("Notice: The phone preview simulator player works best with webm files. Standard webm video format is highly recommended.");
     }
 
     try {

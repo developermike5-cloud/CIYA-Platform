@@ -32,6 +32,7 @@ import {
   Wand2,
   Loader2
 } from 'lucide-react';
+import { showCiyaToast } from './CiyaToast';
 
 interface TemplateItem {
   id: string;
@@ -771,7 +772,7 @@ export default function PromptGenerator({
   // Toggle showcase link preview
   const handleToggleLinkPreview = () => {
     if (!previewLink) {
-      alert("No showcase link attached to this template blueprint.");
+      showCiyaToast("No showcase link attached to this template blueprint.");
       return;
     }
     setIsShowingText(false);
@@ -787,7 +788,7 @@ export default function PromptGenerator({
       if (onTriggerBadgePurchase) {
         onTriggerBadgePurchase();
       } else {
-        alert("Please request your badge to unlock copying for premium templates.");
+        showCiyaToast("Please request your badge to unlock copying for premium templates.");
       }
       return;
     }
@@ -795,7 +796,7 @@ export default function PromptGenerator({
     // Limit check
     const dailyLimit = hasYearBadge ? (appSettings?.promptsProLimit ?? 100) : (appSettings?.promptsFreeLimit ?? 3);
     if (currentDayCopies.length >= dailyLimit) {
-      alert(`⚠️ You have reached your daily copy limit of ${dailyLimit} prompts. It will reset at ${resetTimeStr}.`);
+      showCiyaToast(`⚠️ You have reached your daily copy limit of ${dailyLimit} prompts. It will reset at ${resetTimeStr}.`);
       return;
     }
 
