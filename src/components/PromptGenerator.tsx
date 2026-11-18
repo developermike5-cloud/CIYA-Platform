@@ -1143,7 +1143,7 @@ export default function PromptGenerator({
               <div className="w-full mt-1">
                 <CustomDropdown
                   value={String(filteredTemplates.findIndex((t) => t.id === selectedTemplate?.id) + 1)}
-                  options={filteredTemplates.map((tpl, i) => ({ label: `#${i + 1}`, value: String(i + 1) }))}
+                  options={filteredTemplates.map((tpl, i) => ({ label: `#${i + 1} \u00b7 ${tpl.name}`, value: String(i + 1) }))}
                   onChange={(val) => {
                     const n = parseInt(val, 10) - 1;
                     if (filteredTemplates[n]) handleSelectTemplate(filteredTemplates[n]);

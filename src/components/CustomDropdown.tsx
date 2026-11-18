@@ -108,7 +108,7 @@ export default function CustomDropdown({
             initial={{ opacity: 0, y: openUp ? 10 : -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: openUp ? 10 : -10 }}
-            className={`absolute z-50 w-full ${openUp ? 'bottom-full mb-2' : 'mt-2'} rounded-xl border overflow-hidden py-1 max-h-[300px] overflow-y-auto ${themeClasses.menu}`}
+            className={`absolute z-50 w-full ${openUp ? 'bottom-full mb-2' : 'mt-2'} rounded-xl border py-1 max-h-[60vh] overflow-y-auto overscroll-contain ${themeClasses.menu}`}
           >
             {options.length === 0 ? (
               <div className="px-4 py-3 text-xs text-slate-400 italic text-center">No options available</div>

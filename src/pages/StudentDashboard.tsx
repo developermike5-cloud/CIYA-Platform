@@ -7331,6 +7331,15 @@ export default function StudentDashboard() {
               </div>
             )}
             
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="p-2 md:p-2.5 rounded-full cursor-pointer transition-all border-0 flex items-center justify-center outline-none text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white"
+              title="Refresh app"
+            >
+              <RefreshCw className="w-4 h-4 md:w-4.5 md:h-4.5" />
+            </button>
+
             {!isGuest && (
               <div className="relative z-50">
                 <button 
