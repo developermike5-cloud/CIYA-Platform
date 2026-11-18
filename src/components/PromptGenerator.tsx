@@ -576,7 +576,7 @@ export default function PromptGenerator({
     setTailoringError(null);
   }, [selectedTemplate]);
 
-  const previewLink = selectedTemplate?.videoUrl || selectedTemplate?.link1 || selectedTemplate?.link2;
+  const previewLink = selectedTemplate?.link1 || selectedTemplate?.link2 || selectedTemplate?.videoUrl;
 
   // Function to fetch latest KYCB and call tailoring API
   const handleTailorPrompt = async () => {
