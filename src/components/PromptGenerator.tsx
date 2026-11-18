@@ -1103,38 +1103,29 @@ export default function PromptGenerator({
 
           </div>
 
-          {/* TWO BUTTONS DIRECTLY BELOW MOCK PHONE */}
-          <div className="mt-6 w-[290px] grid grid-cols-2 gap-4">
-            {/* Open Prompt Button */}
+          {/* SINGLE TOGGLE BUTTON DIRECTLY BELOW MOCK PHONE */}
+          <div className="mt-6 w-[290px] flex flex-col items-center">
             <button
               onClick={() => {
-                setIsShowingText(true);
-                setIsShowingLinkPreview(false);
+                if (isShowingText) {
+                  setIsShowingText(false);
+                  setIsShowingLinkPreview(true);
+                } else {
+                  setIsShowingText(true);
+                  setIsShowingLinkPreview(false);
+                }
               }}
-              className={`py-3.5 rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer active:scale-95 border-0 ${
-                isShowingText
-                  ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                  : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-              }`}
+              className="w-full py-3.5 rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer active:scale-95 border-0 bg-indigo-600 hover:bg-indigo-700 text-white"
             >
-              <Eye className="w-4 h-4" /> Open Prompt
-            </button>
-
-            {/* Show Preview Button */}
-            <button
-              onClick={() => {
-                setIsShowingText(false);
-                setIsShowingLinkPreview(true);
-              }}
-              disabled={!previewLink}
-              className={`py-3.5 rounded-2xl border-0 font-extrabold text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm ${
-                previewLink
-                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 cursor-pointer active:scale-95'
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              }`}
-              title={previewLink ? "Show the live template preview" : "No showcase attached"}
-            >
-              <Play className="w-4 h-4" /> Show Preview
+              {isShowingText ? (
+                <>
+                  <Play className="w-4 h-4" /> Show Preview
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4" /> Open Prompt
+                </>
+              )}
             </button>
           </div>
 
@@ -1159,6 +1150,7 @@ export default function PromptGenerator({
                   }}
                   theme="light"
                   className="w-full"
+                  openUp={true}
                 />
               </div>
             </div>

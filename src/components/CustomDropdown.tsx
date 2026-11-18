@@ -17,6 +17,7 @@ interface CustomDropdownProps {
   className?: string;
   disabled?: boolean;
   theme?: 'light' | 'dark' | 'indigo' | 'teal' | 'amber';
+  openUp?: boolean;
 }
 
 export default function CustomDropdown({
@@ -26,7 +27,8 @@ export default function CustomDropdown({
   placeholder = 'Select option',
   className = '',
   disabled = false,
-  theme = 'light'
+  theme = 'light',
+  openUp = false
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -103,10 +105,10 @@ export default function CustomDropdown({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: openUp ? 10 : -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className={`absolute z-50 w-full mt-2 rounded-xl border overflow-hidden py-1 max-h-[300px] overflow-y-auto ${themeClasses.menu}`}
+            exit={{ opacity: 0, y: openUp ? 10 : -10 }}
+            className={`absolute z-50 w-full ${openUp ? 'bottom-full mb-2' : 'mt-2'} rounded-xl border overflow-hidden py-1 max-h-[300px] overflow-y-auto ${themeClasses.menu}`}
           >
             {options.length === 0 ? (
               <div className="px-4 py-3 text-xs text-slate-400 italic text-center">No options available</div>
