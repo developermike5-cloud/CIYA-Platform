@@ -5,7 +5,7 @@ import React from 'react';
  * so the student's own uploaded profile photo sits inside the real badge
  * design, with all of the badge's info visible.
  */
-export default function CiyaBadgePreview({ userProfile }: { userProfile: any }) {
+export default function CiyaBadgePreview({ userProfile, active = false }: { userProfile: any; active?: boolean }) {
   const name = userProfile?.fullName || 'CIYA Student';
   const initials = name.trim().split(/\s+/).map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
   const memberId = String(userProfile?.myReferralCode || userProfile?.uid || 'CIYA').toUpperCase().slice(0, 8);
@@ -38,7 +38,7 @@ export default function CiyaBadgePreview({ userProfile }: { userProfile: any }) 
 
         {/* Photo + name */}
         <div className="mt-5 flex items-center gap-4">
-          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-amber-300/70 bg-emerald-950 flex items-center justify-center shrink-0 shadow-lg">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-amber-300/70 bg-emerald-950 flex items-center justify-center shrink-0 shadow-lg">
             {userProfile?.photoURL ? (
               <img src={userProfile.photoURL} alt="Member photo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
@@ -68,7 +68,7 @@ export default function CiyaBadgePreview({ userProfile }: { userProfile: any }) 
           </div>
           <div>
             <p className="text-[8px] font-black uppercase tracking-widest text-emerald-300/70">Status</p>
-            <p className="text-amber-300 font-mono font-black text-sm">ACTIVE</p>
+            <p className={`font-mono font-black text-sm ${active ? 'text-amber-300' : 'text-slate-300/80'}`}>{active ? 'ACTIVE' : 'INACTIVE'}</p>
           </div>
         </div>
 
