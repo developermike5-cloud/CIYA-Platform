@@ -6999,9 +6999,9 @@ export default function StudentDashboard() {
       {/* Desktop Sidebar navigation (hidden on mobile, or when chat is active) */}
       <aside className={`hidden md:flex md:w-64 bg-slate-900 border-r border-slate-800 flex-col md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-30 shrink-0 overflow-y-auto ${isBuzzChatActive ? 'hidden md:hidden' : ''}`}>
         <div className="p-6 flex flex-col gap-1 relative">
-          <Link to="/" className="hover:opacity-85 transition-opacity">
+          <div className="select-none" aria-hidden="true">
             <BrandingLogo size="sm" />
-          </Link>
+          </div>
           <span className="text-[9px] font-black tracking-[0.25em] text-teal-400 uppercase leading-none mt-1 pl-3">
             CIYA
           </span>
@@ -7252,9 +7252,9 @@ export default function StudentDashboard() {
         <header className={`h-14 md:h-20 bg-slate-900 border-b border-slate-800 text-white flex items-center justify-between px-3.5 sm:px-6 shrink-0 sticky top-0 z-40 shadow-md ${isBuzzChatActive ? 'hidden' : 'flex'}`}>
           {/* Mobile view branding (Left) */}
           <div className="flex md:hidden items-center min-w-0 z-10">
-            <Link to="/" className="hover:opacity-85 transition-opacity shrink-0 flex items-center">
+            <div className="shrink-0 flex items-center select-none" aria-hidden="true">
               <BrandingLogo size="xs" />
-            </Link>
+            </div>
           </div>
 
           {/* Centered Title (Mobile & Desktop) */}
