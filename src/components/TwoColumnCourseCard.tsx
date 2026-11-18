@@ -64,15 +64,7 @@ export const TwoColumnCourseCard: React.FC<TwoColumnCourseCardProps> = ({
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
 
         {/* Badges on Top */}
-        <div className="absolute top-2 left-2 right-2 flex items-center justify-between gap-1 pointer-events-none">
-          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full backdrop-blur-md shadow-xs ${
-            isAdvanced 
-              ? 'bg-amber-500/90 text-slate-950' 
-              : 'bg-emerald-500/90 text-slate-950'
-          }`}>
-            {course.tier || course.level || 'Free'}
-          </span>
-
+        <div className="absolute top-2 left-2 right-2 flex items-center justify-end gap-1 pointer-events-none">
           {isEnrolled ? (
             <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-600/90 text-white backdrop-blur-md flex items-center gap-1 shadow-xs">
               <CheckCircle2 className="w-2.5 h-2.5" /> Enrolled
@@ -132,6 +124,17 @@ export const TwoColumnCourseCard: React.FC<TwoColumnCourseCardProps> = ({
               </span>
             </div>
           )}
+        </div>
+
+        {/* Tier label, centered under the lesson count so it never covers the artwork */}
+        <div className="flex justify-center pt-1.5">
+          <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+            isAdvanced
+              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          }`}>
+            {course.tier || course.level || 'Free'}
+          </span>
         </div>
       </div>
     </motion.button>

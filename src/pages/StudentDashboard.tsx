@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, safeGetItem } from '../firebase';
+import { useStudyTimeTracker } from '../hooks/useStudyTimeTracker';
+import StudyStatsSplashModal from '../components/StudyStatsSplashModal';
 import { ref as dbRef, onValue } from 'firebase/database';
 import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link, useLocation } from 'react-router';
@@ -4681,6 +4683,7 @@ export default function StudentDashboard() {
   const [isRegisteredCoursesSplashOpen, setIsRegisteredCoursesSplashOpen] = useState(false);
   const [isBuzzSplashOpen, setIsBuzzSplashOpen] = useState(false);
   const [isTemplateSplashOpen, setIsTemplateSplashOpen] = useState(false);
+  const [isStudyStatsOpen, setIsStudyStatsOpen] = useState(false);
 
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -4693,6 +4696,14 @@ export default function StudentDashboard() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [selectedCourseId, currentView]);
+
+  // Daily study-time tracking: seconds accrue while the student is inside a
+  // classroom player with the tab visible, then flush to their Firestore profile.
+  useStudyTimeTracker({
+    uid: currentUser?.uid || null,
+    active: !!(selectedCourseId && currentView === 'courses'),
+  });
+  const studyTimeMap = (userProfile?.studyTime || {}) as Record<string, number>;
 
   // Lazy-load full course details (lessons / days) when a course is selected
   useEffect(() => {
@@ -8424,50 +8435,33 @@ export default function StudentDashboard() {
                     >
                       <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16 animate-pulse" />
                       
-                      <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                        <div className="space-y-3">
-                          <span className="inline-block bg-teal-500/20 border border-teal-400/35 text-teal-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full">
-                            {timeOfDayGreeting.emoji} INTEL PORTAL ACTIVE
-                          </span>
+                      <div className="relative z-10 flex items-center justify-between gap-4 md:gap-6">
+                        <div className="space-y-2 min-w-0 text-left">
                           <h1 className="text-xl md:text-2xl font-black tracking-tight leading-tight">
                             {timeOfDayGreeting.text}, <span className="text-amber-400">{userProfile?.fullName || 'Scholar'}</span>!
                           </h1>
                           <p className="text-xs text-slate-300 leading-relaxed font-medium max-w-sm">
-                            {timeOfDayGreeting.desc} Your intranet terminal has synced with Nigeria's local standard time.
+                            {timeOfDayGreeting.desc}
                           </p>
+                          <button
+                            type="button"
+                            onClick={() => setIsStudyStatsOpen(true)}
+                            className="mt-1 inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-[11px] font-black uppercase tracking-wider shadow-xs transition-colors cursor-pointer"
+                          >
+                            <span>📊</span> Study Performance
+                            <span className="text-teal-300">View chart →</span>
+                          </button>
                         </div>
 
-                        <div className="bg-white/5 border border-white/10 rounded-2.5xl p-5 shadow-inner">
-                          <h4 className="text-xs font-black tracking-widest uppercase text-teal-300 mb-3 flex items-center gap-2 select-none">
-                            <span>📈</span> Learning Progress Tracker
-                          </h4>
-                          {registeredCoursesList.length === 0 ? (
-                            <div className="text-[11px] text-slate-400 font-bold bg-white/5 border border-white/5 rounded-2xl p-4 text-center">
-                              No active courses registered yet. Explore the tracks below to enroll!
-                            </div>
-                          ) : (
-                            <div className="space-y-3 max-h-[140px] overflow-y-auto pr-1">
-                              {registeredCoursesList.map(r => {
-                                const progressStore = userProfile?.progress?.[r.id || ''] || { watched: [], checkPassed: [], submissions: {}, quizScores: {} };
-                                const completedKeys: string[] = progressStore.watched || [];
-                                const totalVideos = r.days?.reduce((sum: number, d: any) => sum + (d.videos?.length || 0), 0) || 0;
-                                const progressRatio = totalVideos > 0 ? Math.round((completedKeys.length / totalVideos) * 100) : 0;
-                                return (
-                                  <div key={r.id} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl p-3 flex flex-col gap-1.5 transition-colors">
-                                    <div className="flex justify-between items-center gap-2">
-                                      <span className="font-extrabold text-[11px] text-white truncate max-w-[170px]">{r.title}</span>
-                                      <span className="font-black text-[9px] text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-full shrink-0">
-                                        {progressRatio}% COMPLETE
-                                      </span>
-                                    </div>
-                                    <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                                      <div className="bg-gradient-to-r from-teal-400 to-amber-300 h-full rounded-full transition-all duration-500" style={{ width: `${progressRatio}%` }} />
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                        {/* Student profile picture, compact */}
+                        <div className="shrink-0 flex flex-col items-center select-none">
+                          <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl overflow-hidden bg-white/15 border-2 border-white/30 shadow-inner flex items-center justify-center text-xl md:text-2xl font-black text-white">
+                            {(userProfile?.photoURL || currentUser?.photoURL) ? (
+                              <img src={userProfile?.photoURL || currentUser?.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              (userProfile?.fullName || currentUser?.displayName || 'S').slice(0, 1).toUpperCase()
+                            )}
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -9063,59 +9057,49 @@ export default function StudentDashboard() {
             {/* Grab Handle */}
             <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-4" />
 
-            {/* Profile Overview Card */}
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
-                  {currentUser?.photoURL ? (
-                    <img src={currentUser.photoURL} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    (userProfile?.fullName || currentUser?.displayName || 'S').slice(0, 1).toUpperCase()
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-sm font-black text-slate-900 truncate">
-                    {userProfile?.fullName || currentUser?.displayName || (isGuest ? 'Guest Student' : 'Student')}
-                  </h4>
-                  <p className="text-[11px] text-slate-500 font-semibold truncate font-mono">
-                    {currentUser?.email || 'Browse & preview courses'}
-                  </p>
-                </div>
-              </div>
-
+            {/* Profile Section (photo on top, name + email below, edit at the bottom) */}
+            <div className="relative bg-slate-50 border border-slate-200/80 rounded-3xl p-5 pt-6 pb-4 mb-3 text-center">
               <button
                 type="button"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors shrink-0"
+                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
-            </div>
-
-            {/* Sheet Menu Options */}
-            <div className="space-y-1.5 text-xs font-bold">
-              {/* Profile Settings */}
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-600 text-white font-black text-lg flex items-center justify-center shadow-md overflow-hidden">
+                {currentUser?.photoURL ? (
+                  <img src={currentUser.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  (userProfile?.fullName || currentUser?.displayName || 'S').slice(0, 1).toUpperCase()
+                )}
+              </div>
+              <h4 className="mt-2.5 text-sm font-black text-slate-900 truncate max-w-[250px] mx-auto">
+                {userProfile?.fullName || currentUser?.displayName || (isGuest ? 'Guest Student' : 'Student')}
+              </h4>
+              <p className="text-[11px] text-slate-500 font-semibold font-mono truncate max-w-[250px] mx-auto">
+                {currentUser?.email || 'Browse & preview courses'}
+              </p>
               {!isGuest && (
                 <button
                   type="button"
-                  onClick={() => handleViewChange('profile')}
-                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl transition-all border cursor-pointer ${
-                    currentView === 'profile'
-                      ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-black'
-                      : 'bg-white hover:bg-slate-50 border-slate-200/60 text-slate-800 font-extrabold'
-                  }`}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    handleViewChange('profile');
+                  }}
+                  className="mt-3.5 w-full py-2.5 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-wide flex items-center justify-center gap-2 shadow-md border-0 cursor-pointer active:scale-[0.98] transition-transform"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                      <UserIcon className="w-4 h-4" />
-                    </div>
-                    <span>My Profile & Settings</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                  <UserIcon className="w-4 h-4" />
+                  Edit Profile
                 </button>
               )}
+            </div>
 
-              {/* Notification Desk */}
+            {/* Settings Section */}
+            <div className="px-1 mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400 text-left select-none">
+              Settings
+            </div>
+            <div className="space-y-1.5 text-xs font-bold">
+                            {/* Notification Desk */}
               {!isGuest && (
                 <button
                   type="button"
@@ -9250,6 +9234,13 @@ export default function StudentDashboard() {
           setIsCourseCardSplashOpen(false);
           handlePreviewCourseId(courseId);
         }}
+      />
+
+      {/* Study Performance Bottom Splash Modal */}
+      <StudyStatsSplashModal
+        isOpen={isStudyStatsOpen}
+        onClose={() => setIsStudyStatsOpen(false)}
+        studyTime={studyTimeMap}
       />
 
       {/* 2. Registered Courses Bottom Splash Modal */}
