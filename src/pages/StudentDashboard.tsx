@@ -39,7 +39,6 @@ import { subscribeCohortLeaderboard, upsertLeaderboardEntry, cacheLiveLeaderboar
 import staticAnnouncements from '../data/announcements.json';
 import PWAInstallModal from '../components/PWAInstallModal';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { PullToRefresh } from '../components/PullToRefresh';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { showCiyaToast } from '../components/CiyaToast';
 
@@ -7244,7 +7243,11 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        <PullToRefresh onRefresh={async () => window.location.reload()} disabled={isBuzzChatActive}>
+        <div
+          className={`relative h-full ${isBuzzChatActive ? '' : 'overflow-y-auto'}`}
+          style={{ overscrollBehaviorY: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+        >
+        <div className={`relative z-10 ${isBuzzChatActive ? 'h-full' : ''}`}>
         {/* Responsive Header: Traditional Blue Native Bar matching sidebar branding */}
         <header className={`h-14 md:h-20 bg-slate-900 border-b border-slate-800 text-white flex items-center justify-between px-3.5 sm:px-6 shrink-0 sticky top-0 z-40 shadow-md ${isBuzzChatActive ? 'hidden' : 'flex'}`}>
           {/* Mobile view branding (Left) */}
@@ -8889,7 +8892,8 @@ export default function StudentDashboard() {
           )}
           </motion.div>
         </div>
-        </PullToRefresh>
+        </div>
+        </div>
       </main>
 
       {/* Mobile Native App Bottom Navigation Bar */}
