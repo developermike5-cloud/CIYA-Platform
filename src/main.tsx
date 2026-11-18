@@ -28,7 +28,12 @@ document.addEventListener('touchstart', (e) => {
   ciyaTouchStartY = e.touches[0].clientY;
   ciyaTouchStartX = e.touches[0].clientX;
 }, { passive: true });
+const ciyaIsStandalone = (): boolean =>
+  (typeof window.matchMedia === 'function' &&
+    window.matchMedia('(display-mode: standalone)').matches) ||
+  (window.navigator as any).standalone === true;
 document.addEventListener('touchmove', (e) => {
+  if (!ciyaIsStandalone()) return; // the regular website keeps native pull-to-refresh
   if (e.touches.length !== 1) return;
   const dy = e.touches[0].clientY - ciyaTouchStartY;
   const dx = e.touches[0].clientX - ciyaTouchStartX;
