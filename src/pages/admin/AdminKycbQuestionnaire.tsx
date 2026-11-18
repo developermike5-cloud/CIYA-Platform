@@ -530,6 +530,9 @@ export default function AdminKycbQuestionnaire({
   const [copied, setCopied] = useState(false);
   const [showInstructionalModal, setShowInstructionalModal] = useState(false);
   const [instructionalCopied, setInstructionalCopied] = useState(false);
+  const [showAiPromptModal, setShowAiPromptModal] = useState(false);
+  const [aiGeneratedPrompt, setAiGeneratedPrompt] = useState('');
+  const [aiCopied, setAiCopied] = useState(false);
 
   const INSTRUCTIONAL_PROMPT_TEXT = `Act as a Senior AI Web Development Specialist and Master Prompt Engineer.
 
@@ -555,6 +558,12 @@ INPUT 1: MY BUSINESS KYC & BRAND SPECIFICATIONS
 INPUT 2: WEBSITE PROMPT TEMPLATE
 ==================================================
 [PASTE YOUR COPIED WEBSITE PROMPT TEMPLATE HERE]`;
+
+  const handleCopyAiPrompt = () => {
+    navigator.clipboard.writeText(aiGeneratedPrompt);
+    setAiCopied(true);
+    setTimeout(() => setAiCopied(false), 2000);
+  };
 
   const handleCopyInstructionalPrompt = () => {
     navigator.clipboard.writeText(INSTRUCTIONAL_PROMPT_TEXT);
@@ -1322,10 +1331,10 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
       if (result.error) throw new Error(result.message || result.error);
 
       if (result.prompt) {
-        // Copy to clipboard and notify
+        // Copy to clipboard, then show the generated prompt in a popup
         navigator.clipboard.writeText(result.prompt);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 5000);
+        setAiGeneratedPrompt(result.prompt);
+        setShowAiPromptModal(true);
         showCiyaToast("AI Master Prompt Generated & Copied to Clipboard! ⚡\n\nYou can now paste this directly into your preferred AI (ChatGPT, Gemini, Claude, Cursor, v0) to build your website.");
       }
     } catch (err: any) {
@@ -2674,6 +2683,72 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                 >
                   <Copy className="w-4 h-4 text-amber-300" />
                   {instructionalCopied ? 'Instructional Prompt Copied! ✓' : 'Copy Instructional Prompt'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+    {/* AI Master Prompt Modal */}
+    {showAiPromptModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+              {/* Modal Header */}
+              <div className="p-5 md:p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <div>
+                  <h3 className="font-black text-sm md:text-base text-white tracking-tight flex items-center gap-2">
+                    AI Master Prompt
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">
+                      AI Auto Mode
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    Generated from this student's KYCB questionnaire answers. Paste it into any AI (ChatGPT, Gemini, Claude, Cursor, v0) to build the website.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAiPromptModal(false)}
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-5 md:p-6 overflow-y-auto space-y-5 flex-1 text-slate-700 min-h-0">
+                {/* Prompt Preview Box */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                      Generated Prompt
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      Tailored to the student's business info
+                    </span>
+                  </div>
+                  <pre className="p-4 bg-slate-950 text-slate-200 rounded-2xl text-xs font-mono leading-relaxed whitespace-pre-wrap border border-slate-800 select-all max-h-64 overflow-y-auto">
+{aiGeneratedPrompt}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAiPromptModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyAiPrompt}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-950/20 transition-all cursor-pointer"
+                >
+                  <Copy className="w-4 h-4 text-amber-300" />
+                  {aiCopied ? 'Master Prompt Copied! ✓' : 'Copy Master Prompt'}
                 </button>
               </div>
             </div>
