@@ -1330,7 +1330,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
       }
     } catch (err: any) {
       console.error("AI Generation failed:", err);
-      let errorMsg = err.message || "Failed to generate master prompt via Gemini.";
+      let errorMsg = err.message || "Failed to generate master prompt via AI.";
       
       // Specifically handle the 402 / Resource Exhausted / Credits Depleted error
       if (errorMsg.includes("credits are depleted") || errorMsg.includes("402") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
@@ -2482,7 +2482,6 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  <Sparkles className="w-4 h-4" />
                   AI Auto Mode
                 </button>
               </div>
@@ -2578,8 +2577,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-5 h-5 text-[#D4A017] group-hover:animate-pulse" />
-                        Generate Master Prompt with Gemini
+                        Generate Master Prompt with AI
                       </>
                     )}
                   </button>
@@ -2589,7 +2587,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
             
             {activeButtonView === 'auto' && !aiGenerating && (
               <p className="text-[10px] text-center text-slate-400 font-bold mt-4 uppercase tracking-widest animate-fadeIn">
-                Gemini will scan your KYC data and compile it into a high-fidelity Master prompt automatically.
+                AI will scan your KYC data and compile it into a high-fidelity Master prompt automatically.
               </p>
             )}
           </div>
