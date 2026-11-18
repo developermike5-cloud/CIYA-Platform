@@ -3,21 +3,28 @@
  *
  * POST /api/ai/compile-smart-prompt
  *   Compiles a student's KYC answers into a tailored master developer prompt
- *   using Gemini. The GEMINI_API_KEY stays server-side; it is never committed
- *   or exposed to the client.
+ *   using Vertex AI on Google Cloud (the user's own GCP project and credits).
  *
- * The Gemini call uses the REST API directly so the function carries no extra
- * SDK dependency.
+ * All three credentials stay server-side as Netlify environment variables and
+ * are never committed or exposed to the client:
+ *   KYCB_API_KEY       the KYCB API key generated for Vertex AI
+ *   VERTEX_PROJECT_ID  the Vertex project ID
+ *   VERTEX_LOCATION    the Vertex location (e.g. europe-west2)
+ *
+ * Vertex AI runs in API-key (express) mode here: the key authenticates the
+ * call and the project ID and location go in the request URL, so all three
+ * variables are needed. Calls use the REST API directly so the function
+ * carries no extra SDK dependency.
  */
 
-type GeminiResponse = {
+type VertexResponse = {
   candidates?: Array<{
     content?: { parts?: Array<{ text?: string }> };
   }>;
   error?: { message?: string; status?: string };
 };
 
-const MODELS_TO_TRY = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+const MODELS_TO_TRY = ["gemini-1.5-pro", "gemini-1.5-flash"];
 
 const SYSTEM_INSTRUCTION = `You are an expert Prompt Engineer, Senior Web Architect, and Brand Strategist.
 Your goal is to generate a comprehensive, professional, single-screen or multi-screen developer prompt for a student's business.
@@ -37,28 +44,26 @@ const json = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
-async function callGemini(model: string, apiKey: string, contents: string): Promise<string> {
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: contents }] }],
-        systemInstruction: { role: "system", parts: [{ text: SYSTEM_INSTRUCTION }] },
-        generationConfig: { temperature: 0.3 },
-      }),
-    }
-  );
+async function callVertex(model: string, apiKey: string, project: string, location: string, contents: string): Promise<string> {
+  const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: contents }] }],
+      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+      generationConfig: { temperature: 0.3 },
+    }),
+  });
 
-  const data = (await resp.json()) as GeminiResponse;
+  const data = (await resp.json()) as VertexResponse;
   if (!resp.ok) {
-    const err: any = new Error(data.error?.message || `Gemini model ${model} failed.`);
+    const err: any = new Error(data.error?.message || `Vertex AI model ${model} failed.`);
     err.status = resp.status;
     throw err;
   }
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error(`Gemini model ${model} returned an empty response.`);
+  if (!text) throw new Error(`Vertex AI model ${model} returned an empty response.`);
   return text;
 }
 
@@ -85,12 +90,14 @@ export async function handler(event: any) {
 
   if (!businessInfo) return json(400, { error: "businessInfo is required." });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  const apiKey = process.env.KYCB_API_KEY || process.env.VERTEX_API_KEY;
+  const project = process.env.VERTEX_PROJECT_ID;
+  const location = process.env.VERTEX_LOCATION;
+  if (!apiKey || !project || !location) {
     return json(500, {
-      error: "AI key not configured.",
+      error: "AI not configured.",
       message:
-        "The server's AI key is not set up yet. Add GEMINI_API_KEY in the site's environment variable settings, then try again.",
+        "The server's Vertex AI settings are incomplete. KYCB_API_KEY, VERTEX_PROJECT_ID and VERTEX_LOCATION must all be set in the site's environment variables, then redeploy and try again.",
     });
   }
 
@@ -109,7 +116,7 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
   let lastError: any = null;
   for (const model of MODELS_TO_TRY) {
     try {
-      generatedText = await callGemini(model, apiKey, contents);
+      generatedText = await callVertex(model, apiKey, project, location, contents);
       break;
     } catch (err: any) {
       lastError = err;
