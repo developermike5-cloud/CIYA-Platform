@@ -9,7 +9,6 @@ interface PullToRefreshProps {
 }
 
 const PULL_THRESHOLD = 80;
-const REFRESH_FLAG = 'ciya_branded_refresh';
 
 export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, disabled = false }) => {
   const [pullDistance, setPullDistance] = useState(0);
@@ -51,10 +50,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
       setIsRefreshing(true);
       setPullDistance(PULL_THRESHOLD);
       try {
-        // Show the branded refresh screen briefly before the app reloads,
-        // and flag it so the same branded screen covers the reload itself.
-        try { sessionStorage.setItem(REFRESH_FLAG, '1'); } catch { /* ignore */ }
-        await new Promise(resolve => setTimeout(resolve, 750));
+        // Reload straight away so the platform's own academy-logo loading
+        // animation covers the refresh.
         await onRefresh();
       } finally {
         setIsRefreshing(false);
@@ -102,21 +99,6 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
       >
         {children}
       </motion.div>
-
-      {/* Full-screen branded refresh screen shown while the app reloads */}
-      {isRefreshing && (
-        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-b from-slate-950 via-emerald-950 to-slate-950 font-sans">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 1.2, ease: 'linear' }}
-            className="origin-center"
-          >
-            <CiyaBrandMark size={72} />
-          </motion.div>
-          <p className="mt-5 text-white font-black text-sm tracking-[0.25em] uppercase">Refreshing CIYA</p>
-          <p className="mt-1.5 text-emerald-300/80 text-xs font-semibold">Hang tight, getting your academy ready…</p>
-        </div>
-      )}
     </div>
   );
 };

@@ -32,7 +32,6 @@ import PastCohortProjects from './pages/PastCohortProjects';
 import { BrandedAlertContainer } from './components/BrandedAlert';
 import { safeStorage } from './utils/safeStorage';
 import { usePWAInstall } from './hooks/usePWAInstall';
-import CiyaRefreshSplash from './components/CiyaRefreshSplash';
 
 function AppContent() {
   const location = useLocation();
@@ -253,11 +252,8 @@ function AppContent() {
 
 export default function App() {
   return (
-    <>
-      <CiyaRefreshSplash />
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
-    </>
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
   );
 }

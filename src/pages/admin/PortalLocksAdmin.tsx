@@ -3451,8 +3451,8 @@ export function YearBadgePaymentFlow({
   const finalPrice = price ?? yearBadgeSettings?.price ?? FRONTEND_YEAR_BADGE_SETTINGS.price;
   const [step, setStep] = useState<'landing' | 'setup_popup' | 'countdown' | 'confirming' | 'success'>('landing');
   
-  // 20 Minutes Countdown Timer State (1200 seconds)
-  const [timeLeft, setTimeLeft] = useState(1200);
+  // 5 Minutes Countdown Timer State (300 seconds)
+  const [timeLeft, setTimeLeft] = useState(300);
   const [timerActive, setTimerActive] = useState(false);
 
   // 10 Seconds Confirming Timer State
@@ -3520,7 +3520,7 @@ export function YearBadgePaymentFlow({
   };
 
   const handleProceedPayment = () => {
-    setTimeLeft(1200); // 20 minutes reset
+    setTimeLeft(300); // 5 minutes reset
     setTimerActive(true);
     setStep('countdown');
   };
@@ -3597,8 +3597,15 @@ export function YearBadgePaymentFlow({
       {step === 'landing' && (
         <div className="space-y-6 animate-fadeIn">
           <div className="text-center space-y-2">
-            <div className="mx-auto w-20 h-20 rounded-2xl overflow-hidden bg-slate-50 border border-slate-200 flex items-center justify-center p-1">
-              {yearBadgeSettings?.badgeImageUrl ? (
+            <div className="mx-auto w-40 h-40 sm:w-48 sm:h-48 rounded-3xl overflow-hidden bg-slate-50 border-4 border-amber-200 shadow-lg flex items-center justify-center">
+              {userProfile?.photoURL ? (
+                <img
+                  src={userProfile.photoURL}
+                  alt="Your photo on the CIYA Membership Badge"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : yearBadgeSettings?.badgeImageUrl ? (
                 <img
                   src={yearBadgeSettings.badgeImageUrl}
                   alt="Badge Icon"
@@ -3606,7 +3613,7 @@ export function YearBadgePaymentFlow({
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <span className="text-4xl">🏅</span>
+                <span className="text-6xl">🏅</span>
               )}
             </div>
             <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
@@ -3618,9 +3625,9 @@ export function YearBadgePaymentFlow({
           </div>
 
           {/* Benefits Section */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
-            <span className="block text-[10px] font-black uppercase text-amber-800 tracking-wider">Perks & Benefits of the badge:</span>
-            <div className="text-xs font-semibold text-slate-700 leading-relaxed space-y-2 whitespace-pre-wrap">
+          <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 space-y-4">
+            <span className="block text-xs font-black uppercase text-amber-800 tracking-wider">Perks & Benefits of the badge:</span>
+            <div className="text-sm font-semibold text-slate-700 leading-loose whitespace-pre-wrap">
               {yearBadgeSettings?.benefitText || (
                 <>
                   • Unlocks Day 4 and Day 5 high-income curriculum<br />
@@ -3635,7 +3642,6 @@ export function YearBadgePaymentFlow({
           {/* Price and Trigger Button */}
           <div className="pt-4 border-t border-slate-150 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">One-time Investment</span>
               <span className="text-lg font-black text-slate-900">₦{finalPrice.toLocaleString()}</span>
             </div>
 
@@ -3692,7 +3698,7 @@ export function YearBadgePaymentFlow({
           </div>
 
           <div className="p-4 bg-amber-50 text-amber-900 border border-amber-200/50 rounded-xl text-xs font-semibold leading-relaxed">
-            💡 Clicking <strong>"Proceed to Make Payment"</strong> generates a temporary secure transaction session. Make the transfer within 20 minutes to prevent the account link from expiring.
+            💡 Clicking <strong>"Proceed to Make Payment"</strong> generates a temporary secure transaction session. Make the transfer within 5 minutes to prevent the account link from expiring.
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-150">
@@ -3731,7 +3737,7 @@ export function YearBadgePaymentFlow({
                 </div>
                 
                 <p className="text-xs text-red-500 font-extrabold max-w-sm mx-auto leading-relaxed">
-                  Make your transfer of <strong>₦{finalPrice.toLocaleString()}</strong> to the account below within 20 minutes. After 20 minutes, this temporary account expires and cannot be verified automatically.
+                  Make your transfer of <strong>₦{finalPrice.toLocaleString()}</strong> to the account below within 5 minutes. After 5 minutes, this temporary account expires and cannot be verified automatically.
                 </p>
               </div>
 
@@ -3787,7 +3793,7 @@ export function YearBadgePaymentFlow({
               <div className="space-y-1">
                 <h5 className="font-black text-slate-900 text-base">Temporary Account Expired!</h5>
                 <p className="text-xs text-slate-500 font-semibold max-w-sm mx-auto leading-relaxed">
-                  Your 20-minute transfer session has expired. The account number has been cycled. Please restart to generate a fresh transaction session.
+                  Your 5-minute transfer session has expired. The account number has been cycled. Please restart to generate a fresh transaction session.
                 </p>
               </div>
               <button
@@ -3813,7 +3819,7 @@ export function YearBadgePaymentFlow({
             className="relative w-24 h-24 mx-auto flex flex-col items-center justify-center bg-indigo-50 hover:bg-indigo-100 active:scale-95 transition-all rounded-full border-2 border-indigo-200 shadow-inner cursor-pointer"
             title="Click to force skip"
           >
-            <span className="text-2xl font-black font-mono text-indigo-650">{confirmingTime}s</span>
+            <span className="text-3xl font-black font-mono text-indigo-800">{confirmingTime}s</span>
             <span className="text-[9px] font-black uppercase text-indigo-400 tracking-wider">Skip ⚡</span>
           </div>
 
@@ -3876,8 +3882,6 @@ export function YearBadgePaymentFlow({
               Your payment verification request for <strong>₦{finalPrice.toLocaleString()}</strong> has been submitted.
             </p>
             <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl text-xs text-slate-700 font-semibold leading-relaxed max-w-md mx-auto space-y-2 text-left">
-              <p className="font-bold text-indigo-900 uppercase">⚠️ Manual Verification Pending:</p>
-              <p>Your CIYA Membership Badge is <strong>not yet active</strong>. An administrator must manually verify your bank transfer ledger entry before your account can be approved.</p>
               <p className="bg-white p-3 rounded-xl border border-indigo-100 text-[11px] font-bold text-slate-800">
                 📢 <strong>Action Required:</strong> Click the WhatsApp button below to message the administrator and <strong>forward your bank transfer payment receipt</strong>.
               </p>
