@@ -3,6 +3,7 @@ import { Download, Globe, FileText, Sparkles, CheckCircle2 } from 'lucide-react'
 import LpQuestionnaireForm from '../components/LpQuestionnaireForm';
 import EcQuestionnaireForm from '../components/EcQuestionnaireForm';
 import PortfolioQuestionnaireForm from '../components/PortfolioQuestionnaireForm';
+import CIYADatePicker from '../components/CIYADatePicker';
 
 export default function ClientKycbForm() {
   const [activeTab, setActiveTab] = useState<'lp' | 'ec' | 'portfolio'>('lp');
@@ -575,12 +576,7 @@ export default function ClientKycbForm() {
               </div>
               <div>
                 <label className="block text-xs font-black uppercase text-slate-500 mb-1">Date Completed</label>
-                <input 
-                  type="date" 
-                  value={dateCompleted} 
-                  onChange={e => setDateCompleted(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-teal-500 font-semibold text-slate-500"
-                />
+                <CIYADatePicker value={dateCompleted} onChange={setDateCompleted} />
               </div>
               <div>
                 <label className="block text-xs font-black uppercase text-slate-500 mb-1">Business Name <span className="text-red-500">*</span></label>

@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where, limit, onSnapshot } from 'firebase/firestore';
 import ReactMarkdown from 'react-markdown';
-import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock, X, ClipboardList, Archive, ChevronDown, RefreshCw, FileText } from 'lucide-react';
+import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock, X, ClipboardList, Archive, RefreshCw } from 'lucide-react';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import CIYADatePicker from '../../components/CIYADatePicker';
 import { safeStorage } from '../../utils/safeStorage';
 import LpQuestionnaireForm from '../../components/LpQuestionnaireForm';
 import EcQuestionnaireForm from '../../components/EcQuestionnaireForm';
@@ -113,8 +115,7 @@ export default function AdminKycbQuestionnaire({
 
   // Gemini state
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [activeButtonView, setActiveButtonView] = useState<'manual' | 'auto'>('manual');
-  const [manualDropdownOpen, setManualDropdownOpen] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Settings listener
   useEffect(() => {
@@ -528,7 +529,6 @@ export default function AdminKycbQuestionnaire({
     setPortfolioAdditionalNotes(snap.portfolioAdditionalNotes ?? '');
   };
 
-  const [copied, setCopied] = useState(false);
   const [showInstructionalModal, setShowInstructionalModal] = useState(false);
   const [instructionalCopied, setInstructionalCopied] = useState(false);
   const [showAiPromptModal, setShowAiPromptModal] = useState(false);
@@ -828,13 +828,6 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
     text += `    END OF SPECIFICATION. USE THIS LOG AS A BASIS FOR THE PROMPT BUILDER.\n`;
     text += `========================================================================\n`;
     return text;
-  };
-
-  const handleCopy = () => {
-    const text = generatePromptText();
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = () => {
@@ -2001,12 +1994,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
             </div>
             <div>
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Date Completed</label>
-              <input 
-                type="date" 
-                value={dateCompleted} 
-                onChange={e => setDateCompleted(e.target.value)} 
-                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
-              />
+              <CIYADatePicker value={dateCompleted} onChange={setDateCompleted} />
             </div>
           </div>
 
@@ -2467,139 +2455,59 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
           </div>
 
           {/* Global form controls */}
-          <div className="mt-8 pt-4 border-t border-slate-200">
-            <div className="flex flex-col sm:flex-row gap-6 items-center justify-between">
-              {/* Auto vs Manual Tabs */}
-              <div className="flex bg-slate-100 p-1 rounded-2xl shadow-inner w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setActiveButtonView('manual')}
-                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    activeButtonView === 'manual' 
-                      ? 'bg-white text-[#1A3C6E] shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <ClipboardList className="w-4 h-4" />
-                  Manual Mode
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveButtonView('auto')}
-                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    activeButtonView === 'auto' 
-                      ? 'bg-[#1A3C6E] text-[#D4A017] shadow-md' 
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  AI Auto Mode
-                </button>
-              </div>
-
-              {activeButtonView === 'manual' ? (
-                <div className="relative w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => setManualDropdownOpen(!manualDropdownOpen)}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black cursor-pointer shadow-lg transition-all active:scale-95"
-                  >
-                    Manage KYC Draft
-                    <ChevronDown className={`w-4 h-4 transition-transform ${manualDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {manualDropdownOpen && (
-                    <div className="absolute bottom-full right-0 mb-3 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden z-30 animate-in slide-in-from-bottom-2 duration-200">
-                      <div className="p-2 space-y-1">
-                        <button
-                          type="button"
-                          onClick={() => { handleCopy(); setManualDropdownOpen(false); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left rounded-xl transition-all group"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                            <Copy className="w-4 h-4" />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-black text-slate-800">{copied ? 'Copied!' : 'Copy KYC Text'}</span>
-                            <span className="text-[10px] text-slate-400 font-bold">Raw data for AI chatbots</span>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => { setShowInstructionalModal(true); setManualDropdownOpen(false); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left rounded-xl transition-all group"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                            <FileText className="w-4 h-4" />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-black text-slate-800">Copy AI Instructions</span>
-                            <span className="text-[10px] text-slate-400 font-bold">Merge KYC with templates</span>
-                          </div>
-                        </button>
-
-                        <div className="h-px bg-slate-100 my-1 mx-2" />
-
-                        <button
-                          type="button"
-                          onClick={() => { handleSave(); setManualDropdownOpen(false); }}
-                          disabled={saving}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left rounded-xl transition-all group disabled:opacity-50"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                            <Save className="w-4 h-4" />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-black text-slate-800">{saving ? 'Saving...' : 'Save Current Work'}</span>
-                            <span className="text-[10px] text-slate-400 font-bold">Store securely in archives</span>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => { resetFormDetails(); setManualDropdownOpen(false); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-rose-50 text-left rounded-xl transition-all group"
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-black text-rose-800">Clear Draft Inputs</span>
-                            <span className="text-[10px] text-rose-400 font-bold">Reset this entire form</span>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={handleAiGenerate}
-                    disabled={aiGenerating}
-                    className="w-full flex items-center justify-center gap-3 px-8 py-3 bg-gradient-to-r from-[#1A3C6E] to-indigo-600 hover:from-[#15325C] hover:to-indigo-700 text-white rounded-xl text-sm font-black cursor-pointer shadow-xl shadow-indigo-900/20 transition-all active:scale-95 disabled:opacity-50 group"
-                  >
-                    {aiGenerating ? (
-                      <>
-                        <RefreshCw className="w-5 h-5 animate-spin" />
-                        AI is compiling your Master Prompt...
-                      </>
-                    ) : (
-                      <>
-                        Generate Master Prompt with AI
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
+          <div className="mt-8 pt-4 border-t border-slate-200 space-y-5">
+            {/* Save & Clear draft controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-3 px-5 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-black cursor-pointer shadow-lg shadow-emerald-900/15 transition-all active:scale-[0.98] disabled:opacity-50 text-left"
+              >
+                <span className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+                  <Save className="w-5 h-5" />
+                </span>
+                <span className="flex flex-col">
+                  <span>{saving ? 'Saving...' : 'Save My Work'}</span>
+                  <span className="text-[10px] font-bold text-emerald-100/90">Keep your answers so you can continue anytime</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(true)}
+                className="flex items-center gap-3 px-5 py-3.5 bg-white hover:bg-rose-50 text-rose-700 border-2 border-rose-200 rounded-xl text-sm font-black cursor-pointer shadow-sm transition-all active:scale-[0.98] text-left"
+              >
+                <span className="w-9 h-9 rounded-lg bg-rose-100 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </span>
+                <span className="flex flex-col">
+                  <span>Clear Form</span>
+                  <span className="text-[10px] font-bold text-rose-400">Erase all your answers and start afresh</span>
+                </span>
+              </button>
             </div>
-            
-            {activeButtonView === 'auto' && !aiGenerating && (
-              <p className="text-[10px] text-center text-slate-400 font-bold mt-4 uppercase tracking-widest animate-fadeIn">
+
+            {/* Generate Master Prompt with AI */}
+            <div className="flex flex-col items-center gap-3">
+              <button
+                type="button"
+                onClick={handleAiGenerate}
+                disabled={aiGenerating}
+                className="w-full flex items-center justify-center gap-3 px-8 py-3 bg-gradient-to-r from-[#1A3C6E] to-indigo-600 hover:from-[#15325C] hover:to-indigo-700 text-white rounded-xl text-sm font-black cursor-pointer shadow-xl shadow-indigo-900/20 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {aiGenerating ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    AI is compiling your Master Prompt...
+                  </>
+                ) : (
+                  <>Generate Master Prompt with AI</>
+                )}
+              </button>
+              <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-widest animate-fadeIn">
                 AI will scan your KYC data and compile it into a high-fidelity Master prompt automatically.
               </p>
-            )}
+            </div>
           </div>
         </div>
       )}
@@ -2608,7 +2516,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
 
     {/* Instructional Prompt Modal */}
     {showInstructionalModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
               {/* Modal Header */}
               <div className="p-5 md:p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
@@ -2626,9 +2534,9 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                 <button
                   type="button"
                   onClick={() => setShowInstructionalModal(false)}
-                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-9 h-9 rounded-full bg-slate-700 hover:bg-slate-600 text-white border-2 border-slate-500 shadow-md flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
@@ -2692,7 +2600,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
 
     {/* AI Master Prompt Modal */}
     {showAiPromptModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
               {/* Modal Header */}
               <div className="p-5 md:p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
@@ -2707,9 +2615,9 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                 <button
                   type="button"
                   onClick={() => setShowAiPromptModal(false)}
-                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-9 h-9 rounded-full bg-slate-700 hover:bg-slate-600 text-white border-2 border-slate-500 shadow-md flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
@@ -2769,6 +2677,15 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
             </div>
           </div>
         )}
+      <ConfirmDialog
+        open={showClearConfirm}
+        title="Clear the whole form?"
+        message="This erases every answer you have entered in this KYC form. This cannot be undone."
+        confirmLabel="Yes, clear it"
+        cancelLabel="Keep my answers"
+        onConfirm={() => { setShowClearConfirm(false); resetFormDetails(); }}
+        onCancel={() => setShowClearConfirm(false)}
+      />
       </div>
     );
 }
