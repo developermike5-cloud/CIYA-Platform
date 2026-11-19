@@ -4,7 +4,7 @@ import { promptsStore } from '../utils/promptsStore';
 import staticFullPrompts from '../data/full_prompts.json';
 import staticModularPrompts from '../data/modular_prompts.json';
 import { db } from '../firebase';
-import { doc, updateDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, orderBy, limit, getDocs, deleteDoc } from 'firebase/firestore';
 import CustomDropdown from './CustomDropdown';
 import { 
   Play, 
@@ -29,8 +29,10 @@ import {
   AlertTriangle,
   RotateCw,
   Wand2,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
+import ConfirmDialog from './ConfirmDialog';
 import { showCiyaToast } from './CiyaToast';
 
 interface TemplateItem {
@@ -387,6 +389,7 @@ interface PromptGeneratorProps {
   setUserProfile?: any;
   currentUser?: any;
   appSettings?: any;
+  onNavigateToKycb?: () => void;
 }
 
 export function getPromptResetTimestamps(resetTimeStr: string = '00:00') {
@@ -427,7 +430,8 @@ export default function PromptGenerator({
   userProfile,
   setUserProfile,
   currentUser,
-  appSettings
+  appSettings,
+  onNavigateToKycb
 }: PromptGeneratorProps) {
   const [templates, setTemplates] = useState<TemplateItem[]>(() => {
     const fulls = promptsStore.getFullTemplates();
@@ -492,65 +496,111 @@ export default function PromptGenerator({
   const [isTailoring, setIsTailoring] = useState(false);
   const [tailoredPrompt, setTailoredPrompt] = useState<string | null>(null);
   const [tailoringError, setTailoringError] = useState<string | null>(null);
+  const [tailoringDoc, setTailoringDoc] = useState<any | null>(null);
+  const [kycbForms, setKycbForms] = useState<any[]>([]);
+  const [loadingKycb, setLoadingKycb] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     setTailoredPrompt(null);
     setTailoringError(null);
+    setTailoringDoc(null);
   }, [selectedTemplate]);
 
   const previewLink = selectedTemplate?.link1 || selectedTemplate?.link2 || selectedTemplate?.videoUrl;
 
-  // Function to fetch latest KYCB and call tailoring API
-  const handleTailorPrompt = async () => {
-    if (!selectedTemplate || !currentUser) return;
-    
-    setIsTailoring(true);
-    setTailoringError(null);
-    
+  // Load every saved KYCB form for this user so they can pick one to tailor with
+  const fetchKycbForms = async () => {
+    if (!currentUser?.uid) {
+      setKycbForms([]);
+      return;
+    }
+    setLoadingKycb(true);
     try {
-      // 1. Fetch latest saved KYCB from Firestore
       const q = query(
         collection(db, 'kycb_questionnaires'),
         where('userId', '==', currentUser.uid),
         orderBy('createdAt', 'desc'),
-        limit(1)
+        limit(50)
       );
-      
-      const qSnap = await getDocs(q);
-      
-      if (qSnap.empty) {
-        setTailoringError("No saved KYCB form found. Please fill out your KYCB form first in the KYCB section!");
-        setIsTailoring(false);
-        return;
+      const snap = await getDocs(q);
+      setKycbForms(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error("Failed to load saved KYCB forms:", err);
+      setKycbForms([]);
+    } finally {
+      setLoadingKycb(false);
+    }
+  };
+
+  // Delete a saved KYCB form (with confirmation handled by ConfirmDialog)
+  const handleConfirmDeleteKycb = async () => {
+    if (!confirmDeleteId) return;
+    setDeletingId(confirmDeleteId);
+    try {
+      await deleteDoc(doc(db, 'kycb_questionnaires', confirmDeleteId));
+      if (tailoringDoc?.id === confirmDeleteId) setTailoringDoc(null);
+      showCiyaToast("Saved KYCB form deleted.");
+      setConfirmDeleteId(null);
+      await fetchKycbForms();
+    } catch (err) {
+      console.error("Failed to delete KYCB form:", err);
+      showCiyaToast("Failed to delete the KYCB form. Please try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // Tailor the selected template with a specific saved KYCB form
+  const runTailor = async (formDoc: any) => {
+    if (!selectedTemplate || !currentUser) return;
+
+    setTailoringDoc(formDoc);
+    setIsTailoring(true);
+    setTailoringError(null);
+
+    try {
+      // 1. Format the chosen KYCB form for the AI
+      const answers = formDoc?.data || {};
+      let businessInfo = `Client Name: ${formDoc.clientName || 'N/A'}\n`;
+      businessInfo += `Business Name: ${formDoc.businessName || 'N/A'}\n`;
+      businessInfo += `Industry: ${answers.industry || 'N/A'}\n`;
+      businessInfo += `Phone: ${answers.phone || 'N/A'}\n`;
+      businessInfo += `Email: ${answers.email || 'N/A'}\n`;
+      businessInfo += `Location: ${answers.address || 'N/A'}\n`;
+      businessInfo += `Website Type: ${formDoc.type === 'lp' ? 'Landing Page' : formDoc.type === 'ec' ? 'Ecommerce Store' : 'Portfolio Website'}\n`;
+
+      if (Array.isArray(answers.brandColors) && answers.brandColors.length > 0) {
+        const count = Number(answers.colorsCount) > 0 ? Number(answers.colorsCount) : answers.brandColors.length;
+        businessInfo += `Brand Colors: ${answers.brandColors.slice(0, count).join(', ')}\n`;
       }
-      
-      const kycbData = qSnap.docs[0].data();
-      
-      // 2. Format the KYCB data for the AI (heuristic summary)
-      let businessInfo = `Business Name: ${kycbData.businessName || 'N/A'}\n`;
-      businessInfo += `Industry: ${kycbData.industry || 'N/A'}\n`;
-      businessInfo += `Client Name: ${kycbData.clientName || 'N/A'}\n`;
-      businessInfo += `Phone: ${kycbData.phone || 'N/A'}\n`;
-      businessInfo += `Email: ${kycbData.email || 'N/A'}\n`;
-      businessInfo += `Location: ${kycbData.address || 'N/A'}\n`;
-      
-      if (kycbData.brandColors) {
-        businessInfo += `Brand Colors: ${kycbData.brandColors.join(', ')}\n`;
+      if (Array.isArray(answers.visitorActions) && answers.visitorActions.length > 0) {
+        businessInfo += `Target Actions: ${answers.visitorActions.join(', ')}\n`;
       }
-      
-      if (kycbData.visitorActions) {
-        businessInfo += `Target Actions: ${kycbData.visitorActions.join(', ')}\n`;
+      if (Array.isArray(answers.idealAge) && answers.idealAge.length > 0) {
+        businessInfo += `Target Audience: ${answers.idealAge.join(', ')}\n`;
       }
-      
-      if (kycbData.idealAge) {
-        businessInfo += `Target Audience: ${kycbData.idealAge.join(', ')}\n`;
+      if (answers.lpOfferMain) {
+        businessInfo += `Main Offer: ${answers.lpOfferMain}\n`;
       }
-      
-      if (kycbData.lpOfferMain) {
-        businessInfo += `Main Offer: ${kycbData.lpOfferMain}\n`;
+      if (answers.lpWhatMakesSpecial) {
+        businessInfo += `What Makes Them Special: ${answers.lpWhatMakesSpecial}\n`;
+      }
+      if (Array.isArray(answers.sectionsToInclude) && answers.sectionsToInclude.length > 0) {
+        businessInfo += `Requested Sections: ${answers.sectionsToInclude.join(', ')}\n`;
+      }
+      if (Array.isArray(answers.functionalFeatures) && answers.functionalFeatures.length > 0) {
+        businessInfo += `Features Required: ${answers.functionalFeatures.join(', ')}\n`;
+      }
+      if (answers.budgetRange) {
+        businessInfo += `Budget Range: ${answers.budgetRange}\n`;
+      }
+      if (answers.additionalNotes) {
+        businessInfo += `Additional Notes: ${answers.additionalNotes}\n`;
       }
 
-      // 3. Call the backend AI tailoring endpoint
+      // 2. Call the backend AI tailoring endpoint
       const response = await fetch("/api/ai/compile-smart-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -560,20 +610,19 @@ export default function PromptGenerator({
           referenceTemplate: selectedTemplate.template
         })
       });
-      
+
       const result = await response.json();
-      
+
       if (result.error) {
         throw new Error(result.message || result.error);
       }
-      
+
       if (result.prompt) {
         setTailoredPrompt(result.prompt);
-        setIsShowingText(true);
       } else {
         throw new Error("Received an empty tailored prompt from AI.");
       }
-      
+
     } catch (err: any) {
       console.error("AI Tailoring failed:", err);
       setTailoringError(err.message || "Failed to tailor prompt with AI. Please check your connection and try again.");
@@ -941,93 +990,151 @@ export default function PromptGenerator({
                       </div>
                     ) : (
                       <div className="absolute inset-0 bg-slate-950 p-4 pt-8 flex flex-col justify-between z-10 text-white animate-in fade-in slide-in-from-bottom-4 duration-300">
-                        <div className="flex-1 overflow-y-auto pr-1 space-y-3 pt-2">
+                        <div className="flex-1 overflow-y-auto pr-1 space-y-3 pt-2 min-h-0">
                           <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
                             <div className="flex items-center gap-1.5">
                               <FileText className="w-3.5 h-3.5 text-indigo-400" />
                               <span className="font-extrabold text-[10px] tracking-wider uppercase text-slate-400">
-                                {tailoredPrompt ? 'Tailored AI Prompt' : 'Prompt Template Body'}
+                                {tailoredPrompt ? 'Tailored AI Prompt' : 'Choose Your KYCB'}
                               </span>
                             </div>
                             {tailoredPrompt && (
-                              <button 
-                                onClick={() => setTailoredPrompt(null)}
+                              <button
+                                onClick={() => { setTailoredPrompt(null); setTailoringDoc(null); }}
                                 className="text-[9px] font-black text-indigo-400 hover:text-indigo-300 transition-colors uppercase border-0 bg-transparent cursor-pointer"
                               >
-                                Reset to Template
+                                Choose another KYCB
                               </button>
                             )}
                           </div>
-                          
+
                           {isTailoring ? (
                             <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
                               <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
                               <div className="space-y-1">
                                 <p className="text-[11px] font-black text-white uppercase tracking-widest">Tailoring for your business</p>
-                                <p className="text-[9px] text-slate-500 font-medium">Gemini is merging your KYCB with this blueprint...</p>
+                                <p className="text-[9px] text-slate-500 font-medium">AI is merging your KYCB with this blueprint...</p>
                               </div>
                             </div>
                           ) : tailoringError ? (
                             <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-center space-y-3 my-4">
                               <AlertTriangle className="w-6 h-6 text-rose-500 mx-auto" />
                               <p className="text-[10px] text-rose-200 font-bold leading-relaxed">{tailoringError}</p>
-                              <button 
-                                onClick={handleTailorPrompt}
-                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black uppercase rounded-lg transition-all border-0 cursor-pointer"
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => tailoringDoc && runTailor(tailoringDoc)}
+                                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black uppercase rounded-lg transition-all border-0 cursor-pointer"
+                                >
+                                  Try Again
+                                </button>
+                                <button
+                                  onClick={() => setTailoringError(null)}
+                                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-[9px] font-black uppercase rounded-lg transition-all border-0 cursor-pointer"
+                                >
+                                  Back
+                                </button>
+                              </div>
+                            </div>
+                          ) : tailoredPrompt ? (
+                            <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
+                              {tailoredPrompt}
+                            </p>
+                          ) : loadingKycb ? (
+                            <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
+                              <Loader2 className="w-7 h-7 text-indigo-500 animate-spin" />
+                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Loading your saved KYCB forms</p>
+                            </div>
+                          ) : kycbForms.length === 0 ? (
+                            <div className="py-10 flex flex-col items-center justify-center text-center space-y-4 px-2">
+                              <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                                <FileText className="w-6 h-6 text-amber-400" />
+                              </div>
+                              <h3 className="text-[11px] font-black text-white uppercase tracking-wider leading-snug">No saved KYCB form yet</h3>
+                              <p className="text-[10px] text-slate-400 leading-relaxed max-w-[200px] mx-auto font-medium">
+                                You must complete and save a KYCB form first. The AI uses it to tailor this prompt for your client's business.
+                              </p>
+                              <button
+                                onClick={() => {
+                                  if (onNavigateToKycb) {
+                                    onNavigateToKycb();
+                                  } else {
+                                    showCiyaToast("Open the KYCB section, fill the form and save it first.");
+                                  }
+                                }}
+                                className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-[10px] font-black uppercase rounded-xl flex items-center justify-center gap-1.5 transition-all border-0 cursor-pointer active:scale-95"
                               >
-                                Try Again
+                                <Wand2 className="w-3.5 h-3.5 text-amber-300" />
+                                Go Save a KYCB
                               </button>
                             </div>
                           ) : (
-                            <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
-                              {tailoredPrompt || selectedTemplate?.template}
-                            </p>
+                            <div className="space-y-2 pb-2">
+                              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider px-0.5">Tap a saved form to tailor with it</p>
+                              {kycbForms.map((f) => (
+                                <div
+                                  key={f.id}
+                                  onClick={() => runTailor(f)}
+                                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all relative group overflow-hidden bg-slate-900/60 hover:bg-slate-800/60 ${tailoringDoc?.id === f.id ? 'border-indigo-500 ring-1 ring-indigo-500/40' : 'border-slate-800 hover:border-slate-700'}`}
+                                >
+                                  <div className="space-y-1 pr-2">
+                                    <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-400">
+                                      {f.type === 'lp' ? 'LANDING PAGE' : f.type === 'ec' ? 'ECOMMERCE' : 'PORTFOLIO'}
+                                    </span>
+                                    <div className="font-extrabold text-white text-[11px] truncate">{f.clientName || 'Unnamed client'}</div>
+                                    <div className="text-[9px] text-slate-400 font-bold truncate">{f.businessName || ''}</div>
+                                  </div>
+                                  <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(f.id); }}
+                                      disabled={deletingId === f.id}
+                                      title="Delete this saved KYCB form"
+                                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors border-0 bg-transparent cursor-pointer disabled:opacity-50"
+                                    >
+                                      {deletingId === f.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                    </button>
+                                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+                                      Tailor <ChevronRight className="w-3 h-3" />
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
 
-                        {/* Copy Prompt triggers with tracking */}
-                        <div className="pt-3 border-t border-slate-900 bg-slate-950 space-y-2">
-                          {!tailoredPrompt && !isTailoring && !tailoringError && (
-                            <button
-                              onClick={handleTailorPrompt}
-                              className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-[10px] font-black uppercase rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 transition-all border-0 cursor-pointer active:scale-95 mb-1"
-                            >
-                              <Wand2 className="w-3.5 h-3.5 text-amber-300" />
-                              Tailor with my KYCB (AI)
-                            </button>
-                          )}
-
-                          <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold px-1 uppercase tracking-wider">
-                            <span>Daily Copy Tracker</span>
-                            <span className={hasExceededLimit ? "text-rose-400 font-extrabold" : "text-emerald-400 font-extrabold"}>
-                              {remainingCopies} / 3 left today
-                            </span>
-                          </div>
-
-                          <button
-                            onClick={handleCopyText}
-                            disabled={hasExceededLimit && !copySuccess}
-                            className={`w-full py-2.5 rounded-xl text-xs font-black uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-all border-0 ${
-                              copySuccess 
-                                ? 'bg-green-600 text-white' 
-                                : hasExceededLimit
-                                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-900/30'
-                            }`}
-                          >
-                            {copySuccess ? 'Copied to clipboard!' : hasExceededLimit ? 'Limit Reached' : (
-                              <>
-                                <Copy className="w-3.5 h-3.5" /> Copy Prompt Text
-                              </>
+                        {/* Copy controls (only once a tailored prompt exists) */}
+                        {tailoredPrompt && (
+                          <div className="pt-3 border-t border-slate-900 bg-slate-950 space-y-2">
+                            <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold px-1 uppercase tracking-wider">
+                              <span>Daily Copy Tracker</span>
+                              <span className={hasExceededLimit ? "text-rose-400 font-extrabold" : "text-emerald-400 font-extrabold"}>
+                                {remainingCopies} / {dailyLimit} left today
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-center">
+                              <button
+                                onClick={handleCopyText}
+                                disabled={hasExceededLimit && !copySuccess}
+                                title="Copy tailored prompt"
+                                className={`px-3.5 py-2 rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-1.5 cursor-pointer transition-all border-0 active:scale-95 ${
+                                  copySuccess
+                                    ? 'bg-green-600 text-white'
+                                    : hasExceededLimit
+                                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                      : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-900/30'
+                                }`}
+                              >
+                                {copySuccess ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                {copySuccess ? 'Copied' : hasExceededLimit ? 'Limit' : 'Copy'}
+                              </button>
+                            </div>
+                            {hasExceededLimit && (
+                              <p className="text-[9px] text-slate-500 text-center italic leading-relaxed mt-1">
+                                Your copy limit resets today at {resetTimeStr} (Nigeria Time).
+                              </p>
                             )}
-                          </button>
-
-                          {hasExceededLimit && (
-                            <p className="text-[9px] text-slate-500 text-center italic leading-relaxed mt-1">
-                              Your copy limit resets today at {resetTimeStr} (Nigeria Time).
-                            </p>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )
                   ) : null}
@@ -1069,7 +1176,7 @@ export default function PromptGenerator({
                               {selectedTemplate?.name}
                             </h4>
                             <p className="text-[10px] text-slate-400 leading-normal mt-1 max-w-[180px] mx-auto">
-                              No layout mockup attached. Tap "Open Prompt" to inspect the prompt template.
+                              No layout mockup attached. Tap "Tailor with my KYCB" to tailor this prompt with your saved KYCB form.
                             </p>
                           </div>
                         </div>
@@ -1113,6 +1220,7 @@ export default function PromptGenerator({
                 } else {
                   setIsShowingText(true);
                   setIsShowingLinkPreview(false);
+                  fetchKycbForms();
                 }
               }}
               className="w-full py-3.5 rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer active:scale-95 border-0 bg-indigo-600 hover:bg-indigo-700 text-white"
@@ -1123,7 +1231,7 @@ export default function PromptGenerator({
                 </>
               ) : (
                 <>
-                  <Eye className="w-4 h-4" /> Open Prompt
+                  <Wand2 className="w-4 h-4 text-amber-300" /> Tailor with my KYCB
                 </>
               )}
             </button>
@@ -1159,6 +1267,15 @@ export default function PromptGenerator({
         </div>
 
       </div>
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        title="Delete saved KYCB form?"
+        message={`Delete the saved KYCB form for ${kycbForms.find(x => x.id === confirmDeleteId)?.clientName || 'this client'}? This cannot be undone.`}
+        confirmLabel="Yes, delete"
+        cancelLabel="Keep it"
+        onConfirm={handleConfirmDeleteKycb}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   );
 }

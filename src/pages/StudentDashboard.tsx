@@ -7533,6 +7533,7 @@ export default function StudentDashboard() {
               setUserProfile={setUserProfile}
               currentUser={currentUser}
               appSettings={appSettings}
+              onNavigateToKycb={() => setCurrentView('kycb')}
             />
           ) : (currentView === 'profile' || currentView === 'membership' || currentView === 'quizscores') ? (
             (currentView === 'profile' && !isAdmin && appSettings?.lockedSections?.profile) ? (
