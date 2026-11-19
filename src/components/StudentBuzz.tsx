@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, 
+  Info, 
   User as UserIcon,
   Send, 
   ArrowLeft, 
@@ -82,6 +83,23 @@ interface StudentBuzzProps {
   onActiveChatChange?: (active: boolean) => void;
 }
 
+// WhatsApp-style day separators for the chat stream
+const sameCalendarDay = (a?: number, b?: number) => {
+  const da = new Date(a || 0), db = new Date(b || 0);
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+};
+const formatBuzzDateDivider = (ts?: number) => {
+  const d = new Date(ts || 0);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((today.getTime() - day.getTime()) / 86400000);
+  if (diff <= 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  if (diff < 7) return d.toLocaleDateString(undefined, { weekday: 'long' });
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 export default function StudentBuzz({
   currentUser,
   userProfile,
@@ -116,6 +134,11 @@ export default function StudentBuzz({
   // Selected comment inside the comments panel (reactions / copy / delete)
   const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null);
   const [showCommentDeleteConfirm, setShowCommentDeleteConfirm] = useState<string | null>(null);
+  // Jump straight to a saved favourite message when its group opens
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [messageLimit, setMessageLimit] = useState(50);
+  const pendingJumpRef = useRef<string | null>(null);
   const commentFileInputRef = useRef<HTMLInputElement | null>(null);
   const [categories, setCategories] = useState<string[]>(['All', 'Favourite', 'Website Development', 'Mobile App Development']);
 
@@ -252,7 +275,7 @@ export default function StudentBuzz({
     const unsubMessages = subscribeToGroupMessagesRTDB(activeGroupId, (loadedMessages) => {
       setMessages(loadedMessages);
       setLoadingMessages(false);
-    }, 50);
+    }, messageLimit);
 
     // Subscribe to typing notifications in this group
     const unsubTyping = subscribeToGroupTyping(
@@ -269,7 +292,7 @@ export default function StudentBuzz({
         setUserTyping(activeGroupId, currentUser.uid, '', false);
       }
     };
-  }, [activeGroupId, currentUser?.uid]);
+  }, [activeGroupId, currentUser?.uid, messageLimit]);
 
   // Subscribe to comments of the message the comments panel is open on
   useEffect(() => {
@@ -290,10 +313,30 @@ export default function StudentBuzz({
 
   // Scroll to bottom when messages update
   useEffect(() => {
-    if (activeGroupId && messagesEndRef.current) {
+    if (activeGroupId && messagesEndRef.current && !pendingJumpRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, activeGroupId]);
+
+  // Jump to a saved favourite message right after the chat opens
+  useEffect(() => {
+    if (!activeGroupId || !pendingJumpRef.current) return;
+    const target = pendingJumpRef.current;
+    const el = document.getElementById(`buzz-msg-${target}`);
+    if (el) {
+      pendingJumpRef.current = null;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMessageId(target);
+      const t = setTimeout(() => setHighlightedMessageId(null), 2500);
+      return () => clearTimeout(t);
+    }
+    // Not inside the loaded window: widen the history window and try again
+    if (messageLimit < 500) {
+      setMessageLimit((l) => Math.min(500, l * 4));
+    } else {
+      pendingJumpRef.current = null;
+    }
+  }, [messages, activeGroupId, messageLimit]);
 
   // Handle typing debounce
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -845,7 +888,11 @@ export default function StudentBuzz({
                       <div 
                         key={msg.id} 
                         className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs hover:border-emerald-500/50 transition-colors cursor-pointer"
-                        onClick={() => setActiveGroupId(msg.groupId)}
+                        onClick={() => {
+                          pendingJumpRef.current = msg.id;
+                          setShowGroupInfo(false);
+                          setActiveGroupId(msg.groupId);
+                        }}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -1149,71 +1196,103 @@ export default function StudentBuzz({
       ) : (
         /* View 2: Active Group Live Chat */
         <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden">
-          {/* Chat Room Top Bar (Fixed) */}
-          <div className="p-5 sm:p-7 border-b border-slate-100 bg-white/95 backdrop-blur-md flex items-center justify-between gap-3 shrink-0 relative z-20 shadow-sm">
-            <div className="flex items-center gap-5 min-w-0">
-              <button
-                type="button"
-                onClick={() => setActiveGroupId(null)}
-                className="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer transition-colors shrink-0"
-                title="Back to all groups"
-              >
-                <ArrowLeft className="w-5 h-5 stroke-[3]" />
-              </button>
+          {/* Chat Room Top Bar (Fixed, unique dark style) */}
+          <div className="p-3 sm:p-4 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border-b border-emerald-900/50 flex items-center gap-3 shrink-0 relative z-20 shadow-lg">
+            <button
+              type="button"
+              onClick={() => { setActiveGroupId(null); setShowGroupInfo(false); }}
+              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer transition-colors shrink-0"
+              title="Back to all groups"
+            >
+              <ArrowLeft className="w-5 h-5 stroke-[3]" />
+            </button>
 
-              <div className="flex flex-col items-center gap-1.5 shrink-0">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shadow-sm">
-                  {activeGroup?.imageUrl ? (
-                    <img
-                      src={activeGroup.imageUrl}
-                      alt={activeGroup.name}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <Users className="w-5 h-5 text-slate-400" />
-                  )}
-                </div>
-                <div className="flex flex-col items-center gap-1">
-                  {activeGroup?.category === 'Personal' ? (
-                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200/80 whitespace-nowrap">
-                      Private
-                    </span>
-                  ) : activeGroup?.allowStudentsChat === false ? (
-                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80 flex items-center gap-1 whitespace-nowrap">
-                      <Lock className="w-2 h-2 text-amber-600" /> Broadcast
-                    </span>
-                  ) : (
-                    <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 flex items-center gap-1 whitespace-nowrap">
-                      <BadgeCheck className="w-2.5 h-2.5" /> Joined
-                    </span>
-                  )}
-                </div>
-              </div>
+            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/15 overflow-hidden flex items-center justify-center shrink-0">
+              {activeGroup?.imageUrl ? (
+                <img
+                  src={activeGroup.imageUrl}
+                  alt={activeGroup.name}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <Users className="w-5 h-5 text-white/50" />
+              )}
+            </div>
 
-              <div className="min-w-0">
-                <h3 className="text-base sm:text-lg font-black text-slate-900 truncate tracking-tight">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="text-base sm:text-lg font-black text-white leading-tight tracking-tight line-clamp-2 break-words">
                   {activeGroup?.name || 'Study Room'}
                 </h3>
+                {activeGroup?.category === 'Personal' ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-indigo-500/20 text-indigo-200 border border-indigo-300/30 whitespace-nowrap shrink-0">
+                    Private
+                  </span>
+                ) : activeGroup?.allowStudentsChat === false ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-amber-500/20 text-amber-200 border border-amber-300/30 flex items-center gap-1 whitespace-nowrap shrink-0">
+                    <Lock className="w-2 h-2" /> Broadcast
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-emerald-400/15 text-emerald-200 border border-emerald-300/30 flex items-center gap-1 whitespace-nowrap shrink-0">
+                    <BadgeCheck className="w-2.5 h-2.5" /> Joined
+                  </span>
+                )}
+              </div>
 
-                {/* Realtime Subtitle: Typing indicator */}
-                <div className="text-xs font-semibold truncate leading-tight mt-0.5">
-                  {typingUsers.length > 0 ? (
-                    <span className="text-emerald-600 font-black flex items-center gap-1.5 animate-pulse">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      {typingUsers.join(', ')} typing...
-                    </span>
-                  ) : (
-                    <span className="text-slate-500">
-                      {activeGroup?.description || 'Collaborative study space'}
-                    </span>
-                  )}
-                </div>
+              {/* Realtime Subtitle: Typing indicator */}
+              <div className="text-xs font-semibold truncate leading-tight mt-0.5">
+                {typingUsers.length > 0 ? (
+                  <span className="text-emerald-300 font-black flex items-center gap-1.5 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    {typingUsers.join(', ')} typing...
+                  </span>
+                ) : (
+                  <span className="text-slate-300">
+                    {activeGroup?.category === 'Personal' ? 'Private space' : 'Group chat'}
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="shrink-0 flex items-center gap-2">
-            </div>
+            {/* Group info: tap to splash the group's details */}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowGroupInfo((v) => !v); }}
+              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer transition-colors shrink-0"
+              title="Group info"
+            >
+              <Info className="w-[18px] h-[18px]" />
+            </button>
+
+            {showGroupInfo && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShowGroupInfo(false)} />
+                <div className="absolute top-full right-2 sm:right-4 mt-2 z-40 w-80 max-w-[92vw] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="p-4 bg-gradient-to-r from-emerald-600 to-teal-500 text-white flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/15 overflow-hidden flex items-center justify-center shrink-0">
+                      {activeGroup?.imageUrl ? (
+                        <img src={activeGroup.imageUrl} alt={activeGroup.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <Users className="w-5 h-5 text-white/80" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-black leading-tight break-words">{activeGroup?.name || 'Study Room'}</h4>
+                      <p className="text-[10px] font-semibold text-emerald-100">
+                        {activeGroup?.category === 'Personal' ? 'Private space' : activeGroup?.allowStudentsChat === false ? 'Broadcast group' : 'Study group'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-1.5">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">About this group</p>
+                    <p className="text-xs font-medium text-slate-700 whitespace-pre-wrap break-words leading-relaxed">
+                      {activeGroup?.description?.trim() ? activeGroup.description : 'No description for this group yet.'}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Messages Stream Container */}
@@ -1234,7 +1313,8 @@ export default function StudentBuzz({
                 </p>
               </div>
             ) : (
-              messages.map((msg) => {
+              messages.map((msg, idx) => {
+                  const showDateDivider = idx === 0 || !sameCalendarDay(messages[idx - 1].timestamp, msg.timestamp);
                 const isMe = currentUser?.uid && msg.senderUid === currentUser.uid;
                 const isStarred = !!msg.starredBy?.[currentUser?.uid || ''];
                 const myReaction = currentUser?.uid ? msg.user_reactions?.[currentUser.uid] : null;
@@ -1248,10 +1328,18 @@ export default function StudentBuzz({
                 }
 
                 return (
-                  <div
-                    key={msg.id}
-                    className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group/msg relative`}
-                  >
+                  <React.Fragment key={msg.id}>
+                    {showDateDivider && (
+                      <div className="flex justify-center py-1">
+                        <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wide shadow-xs">
+                          {formatBuzzDateDivider(msg.timestamp)}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      id={`buzz-msg-${msg.id}`}
+                      className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group/msg relative ${highlightedMessageId === msg.id ? 'rounded-3xl bg-amber-50/70 ring-2 ring-amber-400/80 transition-all' : ''}`}
+                    >
                     {/* Message Bubble */}
                     <div
                       onClick={() => {
@@ -1545,6 +1633,7 @@ export default function StudentBuzz({
                       </div>
                     )}
                   </div>
+                    </React.Fragment>
                 );
               })
             )}
