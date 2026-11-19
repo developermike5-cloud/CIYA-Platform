@@ -123,6 +123,31 @@ export default async (req: Request) => {
       for (const [name, scope] of candidates) out[name] = (await tryMint(scope)).detail;
       return new Response(JSON.stringify(out, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
     }
+    if (req.method === 'GET' && new URL(req.url).searchParams.get('probe2') === '1') {
+      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
+      const now = Math.floor(Date.now() / 1000);
+      const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })))
+        + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+      const signature = await signJwtInput(input);
+      const assertion = `${input}.${signature}`;
+      const body = 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(assertion);
+      const endpoints = [
+        'https://oauth2.googleapis.com/token',
+        'https://www.googleapis.com/oauth2/v4/token',
+        'https://accounts.google.com/o/oauth2/token',
+      ];
+      const out: Record<string, string> = {};
+      for (const ep of endpoints) {
+        try {
+          const r = await fetch(ep, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
+          const t = await r.text();
+          out[ep] = `http=${r.status} ${t.slice(0, 140)}`;
+        } catch (e: any) {
+          out[ep] = `threw: ${e?.message || String(e)}`;
+        }
+      }
+      return new Response(JSON.stringify(out, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
+    }
     if (req.method === 'GET' && new URL(req.url).searchParams.get('echo') === '1') {
       const assertion = await buildAssertion();
       const r = await fetch('https://postman-echo.com/post', {
