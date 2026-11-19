@@ -12,7 +12,7 @@
 type ServiceAccount = { project_id: string; client_email: string; private_key: string };
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const SCOPES = 'https://www.googleapis.com/auth/cloud-platform';
+const SCOPES = 'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email';
 let cachedToken: { token: string; exp: number } | null = null;
 
 function strToBytes(s: string): Uint8Array {
@@ -44,8 +44,9 @@ async function tryMint(scope: string): Promise<{ ok: boolean; detail: string }> 
   try {
     const now = Math.floor(Date.now() / 1000);
     const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
-    const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope, aud: TOKEN_URL, iat: now, exp: now + 3600 })))
-      + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+    const headerSeg = bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+      const claimsSeg = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: scope, aud: TOKEN_URL, iat: now, exp: now + 3600 })));
+      const input = headerSeg + '.' + claimsSeg;
     const signature = await signJwtInput(input);
     const body = 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(`${input}.${signature}`);
     const res = await fetch(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
@@ -62,8 +63,9 @@ async function getAccessToken(): Promise<string> {
   if (cachedToken && cachedToken.exp - 60 > now) return cachedToken.token;
   const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
   if (!sa.private_key || !sa.client_email) throw new Error('service account env missing or malformed');
-  const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: TOKEN_URL, iat: now, exp: now + 3600 })))
-    + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+  const headerSeg = bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+      const claimsSeg = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: TOKEN_URL, iat: now, exp: now + 3600 })));
+      const input = headerSeg + '.' + claimsSeg;
   const signature = await signJwtInput(input);
   const assertion = `${input}.${signature}`;
   const body = 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(assertion);
@@ -101,8 +103,9 @@ const corsHeaders = {
 async function buildAssertion(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
-  const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: TOKEN_URL, iat: now, exp: now + 3600 })))
-    + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+  const headerSeg = bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+      const claimsSeg = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: TOKEN_URL, iat: now, exp: now + 3600 })));
+      const input = headerSeg + '.' + claimsSeg;
   return `${input}.${await signJwtInput(input)}`;
 }
 
@@ -126,8 +129,9 @@ export default async (req: Request) => {
     if (req.method === 'GET' && new URL(req.url).searchParams.get('probe2') === '1') {
       const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
       const now = Math.floor(Date.now() / 1000);
-      const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })))
-        + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+      const headerSeg = bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+      const claimsSeg = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })));
+      const input = headerSeg + '.' + claimsSeg;
       const signature = await signJwtInput(input);
       const assertion = `${input}.${signature}`;
       const body = 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(assertion);
@@ -223,8 +227,9 @@ export default async (req: Request) => {
     if (req.method === 'GET' && new URL(req.url).searchParams.get('tamper') === '1') {
       const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
       const now = Math.floor(Date.now() / 1000);
-      const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })))
-        + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+      const headerSeg = bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+      const claimsSeg = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })));
+      const input = headerSeg + '.' + claimsSeg;
       const signature = await signJwtInput(input);
       const tampered = signature.slice(0, 20) + (signature[20] === 'A' ? 'B' : 'A') + signature.slice(21);
       const mint = async (assertion: string) => {
