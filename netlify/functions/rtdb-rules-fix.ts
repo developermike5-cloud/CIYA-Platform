@@ -148,6 +148,17 @@ export default async (req: Request) => {
       }
       return new Response(JSON.stringify(out, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
     }
+    if (req.method === 'GET' && new URL(req.url).searchParams.get('legacytest') === '1') {
+      const origin = new URL(req.url).origin;
+      const key = process.env.FIREBASE_PROXY_KEY || '';
+      const out: Record<string, unknown> = { origin, keyPresent: !!key, keyLen: key.length };
+      const url = `${origin}/.netlify/functions/firebase-proxy?op=rules-list`;
+      const r = await fetch(url, { headers: { 'x-proxy-key': key } });
+      const t = await r.text();
+      out.proxyHttp = r.status;
+      out.proxyBody = t.slice(0, 300);
+      return new Response(JSON.stringify(out, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
+    }
     if (req.method === 'GET' && new URL(req.url).searchParams.get('echo') === '1') {
       const assertion = await buildAssertion();
       const r = await fetch('https://postman-echo.com/post', {
