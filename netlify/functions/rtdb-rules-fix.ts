@@ -270,7 +270,8 @@ export default async (req: Request) => {
     }
     const token = await getAccessToken();
     if (req.method === 'GET') {
-      const rules = await readRules(token);
+      const wrapper = await readRules(token);
+      const rules = wrapper.rules || wrapper;
       const b = JSON.stringify(rules?.buzz_comments || {});
       return new Response(JSON.stringify({ hasBuzzComments: !!rules?.buzz_comments, hasReactionsChild: b.includes('"reactions"') }), {
         status: 200,
@@ -278,7 +279,8 @@ export default async (req: Request) => {
       });
     }
     if (req.method === 'POST') {
-      const rules = await readRules(token);
+      const wrapper = await readRules(token);
+      const rules = wrapper.rules || wrapper;
       rules.buzz_comments = rules.buzz_comments || {};
       rules.buzz_comments['$groupId'] = rules.buzz_comments['$groupId'] || {};
       rules.buzz_comments['$groupId']['$messageId'] = rules.buzz_comments['$groupId']['$messageId'] || {};
