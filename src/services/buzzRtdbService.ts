@@ -48,6 +48,8 @@ export interface BuzzGroup {
   ownerUid?: string;
   isProOnly?: boolean;
   isAdminOnly?: boolean;
+  rules?: string; // Group rules & regulations shown before joining (admin editable)
+  members?: Record<string, number>; // uid -> joinedAt ms. Students must join before seeing content
 }
 
 export interface BuzzMessage {
@@ -298,6 +300,32 @@ export async function deleteBuzzGroup(groupId: string): Promise<void> {
 
   localGroupsCache = localGroupsCache.filter((g) => g.id !== groupId);
   safeStorage.setItem('ciya_buzz_rtdb_groups_cache', JSON.stringify(localGroupsCache));
+}
+
+/**
+ * Joins a student into a Buzz group (membership gate).
+ * Students must join before they can see a group's conversation or send messages.
+ * Uses a transaction so double-joins never inflate the member count.
+ */
+export async function joinBuzzGroup(groupId: string, uid: string): Promise<void> {
+  if (!rtdb || !groupId || !uid) return;
+  const memberRef = ref(rtdb, `buzz_groups/${groupId}/members/${uid}`);
+  const result = await runTransaction(memberRef, (current) => {
+    if (current) return undefined; // already a member, abort
+    return Date.now();
+  });
+  if (result.committed) {
+    try {
+      await update(ref(rtdb, `buzz_groups/${groupId}`), { membersCount: increment(1) });
+    } catch (e) {}
+    const now = Date.now();
+    localGroupsCache = localGroupsCache.map((g) =>
+      g.id === groupId
+        ? { ...g, members: { ...(g.members || {}), [uid]: now }, membersCount: (g.membersCount || 0) + 1 }
+        : g
+    );
+    safeStorage.setItem('ciya_buzz_rtdb_groups_cache', JSON.stringify(localGroupsCache));
+  }
 }
 
 /**

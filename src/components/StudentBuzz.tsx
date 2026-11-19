@@ -27,7 +27,10 @@ import {
   Bookmark,
   MoreVertical,
   ChevronRight,
-  Download
+  Download,
+  BadgeCheck,
+  ListChecks,
+  UserPlus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
@@ -48,11 +51,21 @@ import {
   subscribeToGroupTyping,
   subscribeToBuzzCategories,
   DEFAULT_BUZZ_CATEGORIES,
-  subscribeToStarredMessages
+  subscribeToStarredMessages,
+  joinBuzzGroup
 } from '../services/buzzRtdbService';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { Star, AlertCircle } from 'lucide-react';
 import { showCiyaToast } from './CiyaToast';
+
+// Fallback rules shown in the join popup when the admin has not written custom rules
+const DEFAULT_GROUP_RULES = [
+  '1. Be respectful and kind to every member of this group.',
+  '2. No spam, scams, or irrelevant promotions.',
+  '3. Keep discussions on the topic of this group.',
+  '4. Never share another student\'s personal information.',
+  '5. Report any concern to a CIYA admin.'
+].join('\n');
 
 interface StudentBuzzProps {
   currentUser: any;
@@ -317,6 +330,18 @@ export default function StudentBuzz({
       return;
     }
 
+    // Membership gate: only joined members can chat in a group
+    if (
+      activeGroup &&
+      !activeGroup.isPersonal &&
+      activeGroup.category !== 'Personal' &&
+      !effectiveIsAdmin &&
+      !(activeGroup.members && currentUser.uid && activeGroup.members[currentUser.uid])
+    ) {
+      setUploadError('Join this group before sending messages.');
+      return;
+    }
+
     try {
       setSendingMessage(true);
       setUploadError(null);
@@ -414,6 +439,18 @@ export default function StudentBuzz({
 
   const handleForwardMessage = async (targetGroupId: string) => {
     if (!forwardingMessage) return;
+    // Membership gate: only joined members can forward into a group
+    const targetGroup = groups.find((g) => g.id === targetGroupId);
+    if (
+      targetGroup &&
+      !targetGroup.isPersonal &&
+      targetGroup.category !== 'Personal' &&
+      !effectiveIsAdmin &&
+      !(targetGroup.members && currentUser?.uid && targetGroup.members[currentUser.uid])
+    ) {
+      showCiyaToast('Join that group first to forward messages into it.');
+      return;
+    }
     try {
       await sendBuzzMessage(targetGroupId, {
         senderUid: currentUser.uid,
@@ -435,6 +472,38 @@ export default function StudentBuzz({
   const activeGroup = groups.find((g) => g.id === activeGroupId);
   const isStarredCategory = selectedCategory === 'Favourite';
   const canSendMessages = !isStarredCategory && (effectiveIsAdmin || activeGroup?.allowStudentsChat !== false);
+
+  // Group membership gate: students must join a group before seeing its content
+  const activeUid = currentUser?.uid || '';
+  const activeIsPersonal = !!activeGroup && (activeGroup.isPersonal || activeGroup.category === 'Personal');
+  const activeIsMember = !activeGroup ? false : (
+    activeIsPersonal ||
+    effectiveIsAdmin ||
+    !!(activeGroup.members && activeGroup.members[activeUid])
+  );
+  const activeNeedsJoin = !!activeGroup && !activeIsPersonal && !activeIsMember;
+  const activeProLocked = !!activeGroup?.isProOnly && userProfile?.membership !== 'pro' && !effectiveIsAdmin;
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [joiningGroup, setJoiningGroup] = useState(false);
+
+  const handleEnterGroup = async () => {
+    if (!activeGroupId) return;
+    if (!activeUid) {
+      onLoginRequest();
+      return;
+    }
+    try {
+      setJoiningGroup(true);
+      await joinBuzzGroup(activeGroupId, activeUid);
+      setShowRulesModal(false);
+      showCiyaToast(`Welcome to ${activeGroup?.name || 'the group'}! You are now a member.`);
+    } catch (e) {
+      console.error('Failed to join group:', e);
+      showCiyaToast('Could not join the group. Please check your connection and try again.');
+    } finally {
+      setJoiningGroup(false);
+    }
+  };
 
   // Filter groups
   const filteredGroups = groups.filter((g) => {
@@ -667,8 +736,10 @@ export default function StudentBuzz({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {filteredGroups.map((group) => {
                 const isAnnouncementsOnly = group.allowStudentsChat === false;
-                const isPersonal = group.category === 'Personal';
+                const isPersonal = group.isPersonal || group.category === 'Personal';
                 const isRestrictedPro = group.isProOnly && userProfile?.membership !== 'pro' && !effectiveIsAdmin;
+                const joinedCount = group.members ? Object.keys(group.members).length : (group.membersCount || 0);
+                const isMember = isPersonal || effectiveIsAdmin || !!(group.members && currentUser?.uid && group.members[currentUser.uid]);
 
                 return (
                   <div
@@ -681,12 +752,17 @@ export default function StudentBuzz({
                       }
                       setActiveGroupId(group.id);
                     }}
-                    className={`group p-5 rounded-3xl border transition-all cursor-pointer shadow-xs hover:shadow-md flex flex-col gap-4 text-left relative overflow-hidden ${
-                      isPersonal 
-                        ? 'bg-indigo-50/30 border-indigo-200/80 hover:border-indigo-400' 
+                    className={`group p-5 rounded-3xl border transition-all cursor-pointer shadow-xs hover:shadow-lg flex flex-col gap-3.5 text-left relative overflow-hidden ${
+                      isPersonal
+                        ? 'bg-gradient-to-br from-indigo-50/70 via-white to-indigo-100/40 border-indigo-200/70 hover:border-indigo-400'
                         : 'bg-white hover:bg-emerald-50/10 border-slate-200/80 hover:border-emerald-500/50'
                     } ${isRestrictedPro ? 'opacity-75' : ''}`}
                   >
+                    {/* Accent ribbon */}
+                    {!isPersonal && (
+                      <div className={`absolute top-0 inset-x-0 h-1 ${isMember ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200'}`} />
+                    )}
+
                     {/* Restricted Overlay */}
                     {isRestrictedPro && (
                       <div className="absolute inset-0 z-10 bg-slate-900/10 backdrop-blur-[1px] flex items-center justify-center">
@@ -697,9 +773,9 @@ export default function StudentBuzz({
                     )}
 
                     <div className="flex items-start gap-4">
-                      {/* Avatar & Badges Column */}
+                      {/* Avatar & Badge Column */}
                       <div className="flex flex-col items-center gap-2 shrink-0">
-                        <div className={`w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform duration-300 ${isPersonal ? 'bg-indigo-100/50 text-indigo-600' : 'bg-slate-100 border border-slate-200 text-slate-300'}`}>
+                        <div className={`w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform duration-300 ${isPersonal ? 'bg-indigo-100/60 text-indigo-600' : 'bg-slate-100 border border-slate-200 text-slate-300'}`}>
                           {group.imageUrl ? (
                             <img
                               src={group.imageUrl}
@@ -723,9 +799,13 @@ export default function StudentBuzz({
                             <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-100">
                               Broadcast
                             </span>
+                          ) : isMember ? (
+                            <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-0.5">
+                              <BadgeCheck className="w-2.5 h-2.5" /> Joined
+                            </span>
                           ) : (
-                            <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100">
-                              Open Chat
+                            <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-slate-50 text-slate-500 border border-slate-200">
+                              Not joined
                             </span>
                           )}
                         </div>
@@ -739,18 +819,165 @@ export default function StudentBuzz({
                           <p className="text-xs text-slate-500 line-clamp-1 font-medium leading-relaxed">
                             {group.lastMessage || group.description || 'No recent activity.'}
                           </p>
+                          <div className="flex items-center gap-2 pt-0.5">
+                            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-600">{group.category}</span>
+                            {!isPersonal && (
+                              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                                <Users className="w-2.5 h-2.5" /> {joinedCount} member{joinedCount === 1 ? '' : 's'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-end pt-2 border-t border-slate-50">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${isPersonal ? 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white'}`}>
+                      {!isPersonal && !isMember && (
+                        <span className="mr-auto text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-full flex items-center gap-1">
+                          <UserPlus className="w-3 h-3" /> Join to enter
+                        </span>
+                      )}
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${isPersonal ? 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white' : isMember ? 'bg-emerald-100 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white'}`}>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </div>
                     </div>
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      ) : activeNeedsJoin ? (
+        /* View 2a: Group Preview — students must join before seeing the conversation */
+        <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden">
+          {/* Top Bar */}
+          <div className="p-4 sm:p-6 border-b border-slate-100 bg-white/95 backdrop-blur-md flex items-center gap-4 shrink-0 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setActiveGroupId(null)}
+              className="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer transition-colors shrink-0"
+              title="Back to all groups"
+            >
+              <ArrowLeft className="w-5 h-5 stroke-[3]" />
+            </button>
+            <div className="min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Group Info</div>
+              <div className="text-xs font-bold text-slate-500 truncate">Join this group to see the conversation</div>
+            </div>
+          </div>
+
+          {/* Scrollable Details */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="relative h-44 sm:h-60 w-full bg-slate-100 overflow-hidden shrink-0">
+              {activeGroup?.imageUrl ? (
+                <img
+                  src={activeGroup.imageUrl}
+                  alt={activeGroup.name}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-emerald-500/15 via-white to-indigo-500/15 flex items-center justify-center">
+                  <Users className="w-14 h-14 text-slate-300" />
+                </div>
+              )}
+              <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white/95 to-transparent" />
+            </div>
+
+            <div className="px-5 sm:px-8 pb-8 space-y-5">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-700 border border-slate-200">{activeGroup?.category || 'Group'}</span>
+                  {activeGroup?.allowStudentsChat === false && (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Broadcast only
+                    </span>
+                  )}
+                  {activeGroup?.isProOnly && (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                      <Shield className="w-2.5 h-2.5" /> Pro members
+                    </span>
+                  )}
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <Users className="w-2.5 h-2.5" /> {activeGroup?.members ? Object.keys(activeGroup.members).length : (activeGroup?.membersCount || 0)} joined
+                  </span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{activeGroup?.name || 'Study Group'}</h2>
+                <p className="text-sm text-slate-600 font-medium leading-relaxed">{activeGroup?.description || 'No description yet.'}</p>
+              </div>
+
+              {/* Rules preview */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  <ListChecks className="w-3.5 h-3.5 text-emerald-600" /> Group Rules
+                </div>
+                <p className="mt-2 text-xs sm:text-sm font-medium text-slate-600 whitespace-pre-wrap leading-relaxed line-clamp-4">{activeGroup?.rules || DEFAULT_GROUP_RULES}</p>
+                <p className="mt-2 text-[11px] font-bold text-emerald-700">Tap Join Group below to read the full rules and enter.</p>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/50 p-4 flex items-start gap-3">
+                <UserPlus className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                <p className="text-xs font-medium text-emerald-900 leading-relaxed">You must join this group before you can view its conversation or send messages. Tap Join Group to get started.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Sticky Join Button */}
+          <div className="shrink-0 p-4 sm:p-6 border-t border-slate-100 bg-white/95 backdrop-blur-md">
+            {activeProLocked ? (
+              <button
+                type="button"
+                onClick={() => showCiyaToast('This group is only open to Pro Members. Please upgrade to join the discussion!')}
+                className="w-full py-4 rounded-2xl bg-slate-100 border border-slate-200 text-slate-500 font-black text-sm flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Lock className="w-4 h-4" /> Pro Members Only
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowRulesModal(true)}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white font-black text-sm tracking-wide shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.99]"
+              >
+                <UserPlus className="w-4 h-4" /> Join Group
+              </button>
+            )}
+          </div>
+
+          {/* Rules & Regulations Popup */}
+          {showRulesModal && (
+            <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 bg-slate-950/60 backdrop-blur-sm">
+              <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full max-h-[85dvh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+                <div className="p-5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white flex items-center gap-3 shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                    <ListChecks className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-black tracking-tight">Group Rules & Regulations</h3>
+                    <p className="text-[11px] font-medium text-emerald-100 truncate">{activeGroup?.name}</p>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                  <p className="text-xs sm:text-sm font-medium text-slate-700 whitespace-pre-wrap leading-relaxed">{activeGroup?.rules || DEFAULT_GROUP_RULES}</p>
+                  <p className="text-[11px] italic text-slate-400 leading-relaxed">By tapping Enter you agree to follow the rules and regulations of this group.</p>
+                </div>
+                <div className="p-4 border-t border-slate-100 flex items-center gap-2 shrink-0 bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setShowRulesModal(false)}
+                    className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleEnterGroup}
+                    disabled={joiningGroup}
+                    className="flex-[2] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black text-xs tracking-wide flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    {joiningGroup ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Enter
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -793,7 +1020,7 @@ export default function StudentBuzz({
                     </span>
                   ) : (
                     <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 flex items-center gap-1 whitespace-nowrap">
-                      <span className="w-1 h-1 rounded-full bg-emerald-500" /> Open Chat
+                      <BadgeCheck className="w-2.5 h-2.5" /> Joined
                     </span>
                   )}
                 </div>

@@ -53,6 +53,7 @@ export default function BuzzGroupsAdmin() {
   const [allowStudentsChat, setAllowStudentsChat] = useState(true);
   const [isProOnly, setIsProOnly] = useState(false);
   const [isAdminOnly, setIsAdminOnly] = useState(false);
+  const [groupRules, setGroupRules] = useState('');
 
   // Category state
   const [categories, setCategories] = useState<string[]>(DEFAULT_BUZZ_CATEGORIES);
@@ -182,6 +183,7 @@ export default function BuzzGroupsAdmin() {
     setAllowStudentsChat(true);
     setIsProOnly(false);
     setIsAdminOnly(false);
+    setGroupRules('');
     setUploadError(null);
     setShowAddCategory(false);
     setIsModalOpen(true);
@@ -196,6 +198,7 @@ export default function BuzzGroupsAdmin() {
     setAllowStudentsChat(group.allowStudentsChat !== false);
     setIsProOnly(!!group.isProOnly);
     setIsAdminOnly(!!group.isAdminOnly);
+    setGroupRules(group.rules || '');
     setUploadError(null);
     setShowAddCategory(false);
     setIsModalOpen(true);
@@ -247,7 +250,8 @@ export default function BuzzGroupsAdmin() {
           imageUrl: groupImageUrl.trim() || undefined,
           allowStudentsChat: allowStudentsChat,
           isProOnly: isProOnly,
-          isAdminOnly: isAdminOnly
+          isAdminOnly: isAdminOnly,
+          rules: groupRules.trim() || undefined
         });
         setActionSuccess(`Group "${groupName}" updated successfully.`);
       } else {
@@ -259,6 +263,7 @@ export default function BuzzGroupsAdmin() {
           allowStudentsChat: allowStudentsChat,
           isProOnly: isProOnly,
           isAdminOnly: isAdminOnly,
+          rules: groupRules.trim() || undefined,
           createdBy: adminEmail
         });
         setActionSuccess(`New group "${groupName}" created successfully.`);
@@ -487,6 +492,8 @@ export default function BuzzGroupsAdmin() {
                       </p>
 
                       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 font-medium pt-0.5">
+                        <span>Joined: {group.members ? Object.keys(group.members).length : 0}</span>
+                        <span className="text-slate-300">|</span>
                         <span>Members: ~{group.membersCount || 1}</span>
                         {group.lastMessage && (
                           <span className="truncate max-w-xs text-slate-500">
@@ -777,6 +784,20 @@ export default function BuzzGroupsAdmin() {
                   placeholder="A short description of the cohort's focus or rules..."
                   value={groupDesc}
                   onChange={(e) => setGroupDesc(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-medium resize-none !text-slate-900"
+                />
+              </div>
+
+              {/* Group Rules & Regulations */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Rules & Regulations (shown before students join)
+                </label>
+                <textarea
+                  rows={5}
+                  placeholder="Write the rules students must agree to before entering this group. Leave empty to use the default CIYA rules."
+                  value={groupRules}
+                  onChange={(e) => setGroupRules(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-medium resize-none !text-slate-900"
                 />
               </div>
