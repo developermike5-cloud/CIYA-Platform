@@ -70,7 +70,6 @@ const corsHeaders = {
 
 export default async (req: Request) => {
   try {
-    const token = await getAccessToken();
     if (req.method === 'GET' && new URL(req.url).searchParams.get('debug') === '1') {
       const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
       const now = Math.floor(Date.now() / 1000);
@@ -85,6 +84,7 @@ export default async (req: Request) => {
         payloadB64: b64url(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: TOKEN_URL, iat: now, exp: now + 3600 })),
       }, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
     }
+    const token = await getAccessToken();
     if (req.method === 'GET') {
       const rules = await readRules(token);
       const b = JSON.stringify(rules?.buzz_comments || {});
