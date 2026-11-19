@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Users, 
   Info, 
-  User as UserIcon,
   Send, 
   ArrowLeft, 
   Search, 
@@ -35,7 +34,7 @@ import {
   Copy,
   MessageCircle,
   ChevronDown,
-  Timer
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
@@ -214,12 +213,12 @@ export default function StudentBuzz({
         uid: currentUser.uid,
         name: userProfile?.fullName || currentUser.displayName || 'Student',
         email: currentUser.email || '',
-        photoUrl: userProfile?.photoUrl || currentUser.photoURL || ''
+        photoUrl: userProfile?.photoURL || currentUser.photoURL || ''
       },
       activeGroupId || undefined
     );
     return () => cleanupPresence();
-  }, [currentUser?.uid, userProfile?.fullName, userProfile?.photoUrl, activeGroupId]);
+  }, [currentUser?.uid, userProfile?.fullName, userProfile?.photoURL, activeGroupId]);
 
   // 2. Subscribe to online academy students
   useEffect(() => {
@@ -337,7 +336,8 @@ export default function StudentBuzz({
         profilePhotoFetchedRef.current.add(uid);
         try {
           const snap = await getDoc(doc(db, 'users', uid));
-          const photo = (snap.data() as { photoUrl?: string } | undefined)?.photoUrl || '';
+          const uDoc = snap.data() as { photoURL?: string; photoUrl?: string } | undefined;
+          const photo = uDoc?.photoURL || uDoc?.photoUrl || '';
           if (photo) results[uid] = photo;
         } catch {
           // Profile not readable: the initials fallback stays for this sender
@@ -497,7 +497,7 @@ export default function StudentBuzz({
         senderUid: currentUser.uid,
         senderName: userProfile?.fullName || currentUser.displayName || 'Student',
         senderEmail: currentUser.email || '',
-        senderPhoto: userProfile?.photoUrl || currentUser.photoURL || undefined,
+        senderPhoto: userProfile?.photoURL || currentUser.photoURL || undefined,
         isAdmin: effectiveIsAdmin,
         text: cleanText,
         mediaUrl: uploadedMediaUrl,
@@ -575,7 +575,7 @@ export default function StudentBuzz({
         senderUid: currentUser.uid,
         senderName: userProfile?.fullName || currentUser.displayName || 'Student',
         senderEmail: currentUser.email || '',
-        senderPhoto: userProfile?.photoUrl || currentUser.photoURL || undefined,
+        senderPhoto: userProfile?.photoURL || currentUser.photoURL || undefined,
         isAdmin: effectiveIsAdmin,
         text: cleanText,
         imageUrl: commentImageUrl
@@ -691,7 +691,7 @@ export default function StudentBuzz({
         senderUid: currentUser.uid,
         senderName: userProfile?.fullName || currentUser.displayName || 'Student',
         senderEmail: currentUser.email || '',
-        senderPhoto: userProfile?.photoUrl || currentUser.photoURL || undefined,
+        senderPhoto: userProfile?.photoURL || currentUser.photoURL || undefined,
         isAdmin: effectiveIsAdmin,
         text: forwardingMessage.text,
         mediaUrl: forwardingMessage.mediaUrl,
@@ -727,10 +727,12 @@ export default function StudentBuzz({
   const cooldownRemaining = cooldownSeconds && lastOwnPostTs
     ? Math.max(0, Math.ceil((lastOwnPostTs + cooldownSeconds * 1000 - cooldownTick) / 1000))
     : 0;
-  const cooldownLabel = `${Math.floor(cooldownRemaining / 60)}:${String(cooldownRemaining % 60).padStart(2, '0')}`;
 
   // Personal ("You") rooms show the user's own uploaded profile photo, never a placeholder image
-  const personalPhoto = userProfile?.photoUrl || currentUser?.photoURL || '';
+  const personalPhoto = userProfile?.photoURL || currentUser?.photoURL || '';
+  const personalInitials = (userProfile?.fullName || currentUser?.displayName || 'S')
+    .trim().split(/\s+/).map(w => w.charAt(0)).slice(0, 2).join('').toUpperCase() || 'S';
+  const isPersonalRoom = !!(activeGroup && (activeGroup.isPersonal || activeGroup.category === 'Personal'));
   const groupAvatarSrc = (g: { imageUrl?: string; isPersonal?: boolean; category?: string } | null | undefined) =>
     g && (g.isPersonal || g.category === 'Personal') && personalPhoto ? personalPhoto : g?.imageUrl;
 
@@ -1066,7 +1068,7 @@ export default function StudentBuzz({
                               referrerPolicy="no-referrer"
                             />
                           ) : isPersonal ? (
-                            <UserIcon className="w-6 h-6" />
+                            <span className="text-sm font-black text-indigo-600 tracking-wide">{personalInitials}</span>
                           ) : (
                             <Users className="w-6 h-6" />
                           )}
@@ -1285,6 +1287,8 @@ export default function StudentBuzz({
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
+              ) : isPersonalRoom ? (
+                <span className="text-sm font-black text-white/90 tracking-wide">{personalInitials}</span>
               ) : (
                 <Users className="w-5 h-5 text-white/50" />
               )}
@@ -1362,6 +1366,8 @@ export default function StudentBuzz({
                           <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 overflow-hidden flex items-center justify-center shrink-0">
                             {groupAvatarSrc(activeGroup) ? (
                               <img src={groupAvatarSrc(activeGroup)} alt={activeGroup.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : isPersonalRoom ? (
+                              <span className="text-sm font-black text-emerald-600 tracking-wide">{personalInitials}</span>
                             ) : (
                               <Users className="w-5 h-5 text-emerald-600" />
                             )}
@@ -1931,9 +1937,9 @@ export default function StudentBuzz({
               </div>
             ) : cooldownRemaining > 0 ? (
               <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold flex items-center justify-center gap-2 text-center">
-                <Timer className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 <span>
-                  Posting cooldown: you can post again in {cooldownLabel}.
+                  You can keep using the comment section to continue the conversation until the cooldown is over.
                 </span>
               </div>
             ) : (
