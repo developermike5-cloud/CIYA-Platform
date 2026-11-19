@@ -195,6 +195,7 @@ export default function StudentBuzz({
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const autoScrollHoldRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -311,32 +312,37 @@ export default function StudentBuzz({
     };
   }, [commentsMessage?.id, activeGroupId]);
 
-  // Scroll to bottom when messages update
+  // Scroll to bottom when messages update (held while a favourite jump settles)
   useEffect(() => {
-    if (activeGroupId && messagesEndRef.current && !pendingJumpRef.current) {
+    if (activeGroupId && messagesEndRef.current && !pendingJumpRef.current && Date.now() >= (autoScrollHoldRef.current || 0)) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, activeGroupId]);
 
   // Jump to a saved favourite message right after the chat opens
   useEffect(() => {
-    if (!activeGroupId || !pendingJumpRef.current) return;
+    if (!activeGroupId || !pendingJumpRef.current || loadingMessages) return;
     const target = pendingJumpRef.current;
     const el = document.getElementById(`buzz-msg-${target}`);
     if (el) {
       pendingJumpRef.current = null;
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setHighlightedMessageId(target);
-      const t = setTimeout(() => setHighlightedMessageId(null), 2500);
-      return () => clearTimeout(t);
-    }
-    // Not inside the loaded window: widen the history window and try again
-    if (messageLimit < 500) {
+      // Anchor instantly, then re-anchor as images/layout settle so the target stays centred
+      const anchor = () => el.scrollIntoView({ behavior: 'auto', block: 'center' });
+      anchor();
+      setTimeout(anchor, 400);
+      setTimeout(anchor, 1000);
+      window.setTimeout(() => setHighlightedMessageId(null), 3000);
+      // Hold auto-scroll-to-bottom while the jump settles
+      autoScrollHoldRef.current = Date.now() + 3600;
+    } else if (messageLimit < 500) {
+      // Not inside the loaded window: widen the history window and try again
       setMessageLimit((l) => Math.min(500, l * 4));
     } else {
       pendingJumpRef.current = null;
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
     }
-  }, [messages, activeGroupId, messageLimit]);
+  }, [messages, activeGroupId, messageLimit, loadingMessages]);
 
   // Handle typing debounce
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1225,19 +1231,6 @@ export default function StudentBuzz({
                 <h3 className="text-base sm:text-lg font-black text-white leading-tight tracking-tight line-clamp-2 break-words">
                   {activeGroup?.name || 'Study Room'}
                 </h3>
-                {activeGroup?.category === 'Personal' ? (
-                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-indigo-500/20 text-indigo-200 border border-indigo-300/30 whitespace-nowrap shrink-0">
-                    Private
-                  </span>
-                ) : activeGroup?.allowStudentsChat === false ? (
-                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-amber-500/20 text-amber-200 border border-amber-300/30 flex items-center gap-1 whitespace-nowrap shrink-0">
-                    <Lock className="w-2 h-2" /> Broadcast
-                  </span>
-                ) : (
-                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-emerald-400/15 text-emerald-200 border border-emerald-300/30 flex items-center gap-1 whitespace-nowrap shrink-0">
-                    <BadgeCheck className="w-2.5 h-2.5" /> Joined
-                  </span>
-                )}
               </div>
 
               {/* Realtime Subtitle: Typing indicator */}
@@ -1253,6 +1246,23 @@ export default function StudentBuzz({
                   </span>
                 )}
               </div>
+
+              {/* Status tag: sits at the bottom of the header */}
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {activeGroup?.category === 'Personal' ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-indigo-500/20 text-indigo-200 border border-indigo-300/30 whitespace-nowrap shrink-0">
+                    Private
+                  </span>
+                ) : activeGroup?.allowStudentsChat === false ? (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-amber-500/20 text-amber-200 border border-amber-300/30 flex items-center gap-1 whitespace-nowrap shrink-0">
+                    <Lock className="w-2 h-2" /> Broadcast
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-emerald-400/15 text-emerald-200 border border-emerald-300/30 flex items-center gap-1 whitespace-nowrap shrink-0">
+                    <BadgeCheck className="w-2.5 h-2.5" /> Joined
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Group info: tap to splash the group's details */}
@@ -1265,34 +1275,62 @@ export default function StudentBuzz({
               <Info className="w-[18px] h-[18px]" />
             </button>
 
-            {showGroupInfo && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setShowGroupInfo(false)} />
-                <div className="absolute top-full right-2 sm:right-4 mt-2 z-40 w-80 max-w-[92vw] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="p-4 bg-gradient-to-r from-emerald-600 to-teal-500 text-white flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/15 overflow-hidden flex items-center justify-center shrink-0">
-                      {activeGroup?.imageUrl ? (
-                        <img src={activeGroup.imageUrl} alt={activeGroup.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        <Users className="w-5 h-5 text-white/80" />
-                      )}
+            <AnimatePresence>
+              {showGroupInfo && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1, transition: { duration: 0.15 } }}
+                    exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                    className="fixed inset-0 z-40 bg-slate-950/70"
+                    onClick={() => setShowGroupInfo(false)}
+                  />
+                  <motion.div
+                    initial={{ y: '100%' }}
+                    animate={{ y: 0, transition: { type: 'spring', damping: 30, stiffness: 640, mass: 0.9 } }}
+                    exit={{ y: '100%', transition: { duration: 0.18, ease: 'easeIn' } }}
+                    className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-[32px] shadow-[0_-12px_40px_rgba(0,0,0,0.25)] border-t border-slate-200/90 flex flex-col max-h-[72dvh] overflow-hidden select-none"
+                  >
+                    <div className="p-4 pb-3 border-b border-slate-100 shrink-0 bg-white">
+                      <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-3" />
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 overflow-hidden flex items-center justify-center shrink-0">
+                            {activeGroup?.imageUrl ? (
+                              <img src={activeGroup.imageUrl} alt={activeGroup.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              <Users className="w-5 h-5 text-emerald-600" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="text-base font-black text-slate-900 tracking-tight leading-tight break-words">{activeGroup?.name || 'Study Room'}</h3>
+                            <p className="text-[11px] text-slate-500 font-semibold">
+                              {activeGroup?.category === 'Personal'
+                                ? 'Private space'
+                                : `${activeGroup?.allowStudentsChat === false ? 'Broadcast group' : 'Study group'} · ${activeGroup?.members ? Object.keys(activeGroup.members).length : (activeGroup?.membersCount || 0)} members`}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowGroupInfo(false)}
+                          className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center border-0 cursor-pointer transition-colors shrink-0"
+                          aria-label="Close group info"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <h4 className="text-sm font-black leading-tight break-words">{activeGroup?.name || 'Study Room'}</h4>
-                      <p className="text-[10px] font-semibold text-emerald-100">
-                        {activeGroup?.category === 'Personal' ? 'Private space' : activeGroup?.allowStudentsChat === false ? 'Broadcast group' : 'Study group'}
+                    <div className="p-4 sm:p-5 overflow-y-auto space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">About this group</p>
+                      <p className="text-sm font-medium text-slate-700 whitespace-pre-wrap break-words leading-relaxed">
+                        {activeGroup?.description?.trim() ? activeGroup.description : 'No description for this group yet.'}
                       </p>
                     </div>
-                  </div>
-                  <div className="p-4 space-y-1.5">
-                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">About this group</p>
-                    <p className="text-xs font-medium text-slate-700 whitespace-pre-wrap break-words leading-relaxed">
-                      {activeGroup?.description?.trim() ? activeGroup.description : 'No description for this group yet.'}
-                    </p>
-                  </div>
-                </div>
-              </>
-            )}
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Messages Stream Container */}
