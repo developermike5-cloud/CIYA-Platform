@@ -115,7 +115,7 @@ export default async (req: Request) => {
       const token = await getAccessToken();
       const res = await fetch(`${rtdbBase()}/.settings/rules.json`, { headers: { Authorization: `Bearer ${token}` } });
       const text = await res.text();
-      return new Response(`http=${res.status}\n\n${text.slice(0, 1200)}`, { status: 200, headers: { 'content-type': 'text/plain', ...corsHeaders } });
+      return new Response(`http=${res.status}\n\n${text.slice(0, 8000)}`, { status: 200, headers: { 'content-type': 'text/plain', ...corsHeaders } });
     }
     if (req.method === 'GET' && new URL(req.url).searchParams.get('probe') === '1') {
       const candidates: Array<[string, string]> = [
