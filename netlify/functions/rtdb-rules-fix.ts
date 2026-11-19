@@ -48,10 +48,12 @@ async function getAccessToken(): Promise<string> {
   const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: TOKEN_URL, iat: now, exp: now + 3600 })))
     + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
   const signature = await signJwtInput(input);
+  const assertion = `${input}.${signature}`;
+  const body = 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(assertion);
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${input}.${signature}` }),
+    body,
   });
   const text = await res.text();
   let data: any = {};
@@ -79,8 +81,34 @@ const corsHeaders = {
   'access-control-allow-headers': 'content-type',
 };
 
+async function buildAssertion(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
+  const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: TOKEN_URL, iat: now, exp: now + 3600 })))
+    + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+  return `${input}.${await signJwtInput(input)}`;
+}
+
 export default async (req: Request) => {
   try {
+    if (req.method === 'GET' && new URL(req.url).searchParams.get('echo') === '1') {
+      const assertion = await buildAssertion();
+      const r = await fetch('https://postman-echo.com/post', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }),
+      });
+      const t = await r.text();
+      let received: any = {};
+      try { received = JSON.parse(t); } catch {}
+      return new Response(JSON.stringify({
+        assertionSent: assertion.slice(0, 60) + '...',
+        sentGrantType: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        echoStatus: r.status,
+        echoForm: received?.form || null,
+        echoJson: received?.json || null,
+      }, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
+    }
     const token = await getAccessToken();
     if (req.method === 'GET') {
       const rules = await readRules(token);
