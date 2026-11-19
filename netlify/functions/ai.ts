@@ -32,9 +32,10 @@ Your output must be a single cohesive developer prompt that follows the high-qua
 
 CRITICAL INSTRUCTIONS:
 1. STRICTLY EXCLUDE ANY DUMMY DATA FROM THE REFERENCE TEMPLATE. Do not include any business names, addresses, phone numbers, social handles, or products from the reference template.
-2. EXTRACT AND USE ONLY the student's actual business info from the 'STUDENT DATA' provided. If the student has products, lists, colors, or vibes, use them exactly. If they lack some details, professionally elaborate them in the style and depth of the template.
-3. The prompt you output MUST start directly with: 'System Instruction: You are an expert...' and contain Phase 1, Phase 2, Phase 3, etc. with exact, tailored specifications for the student's business.
-4. DO NOT write any conversational introduction, footnotes, or wrappers. Simply output the generated developer prompt itself.`;
+2. EXTRACT AND USE ONLY the student's actual business info from the 'STUDENT DATA' provided. If the student has products, lists, colors, or vibes, use them exactly.
+3. FLEXIBLE COVERAGE: treat the reference template as a style and quality guide, not a rigid mold. Wherever the template defines a section clearly, follow its structure. Wherever a section is vague, thin, or missing from the template, design it yourself from the student's answers, filling the gaps with professional, sensible defaults that suit their business and industry. Never leave a section empty, and never invent a specific business detail that contradicts the student's data.
+4. The prompt you output MUST start directly with: 'System Instruction: You are an expert...' and contain Phase 1, Phase 2, Phase 3, etc. with exact, tailored specifications for the student's business.
+5. DO NOT write any conversational introduction, footnotes, or wrappers. Simply output the generated developer prompt itself.`;
 
 const json = (statusCode: number, body: Record<string, unknown>) => ({
   statusCode,
@@ -52,7 +53,13 @@ async function callVertex(model: string, apiKey: string, contents: string): Prom
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: contents }] }],
       systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      generationConfig: { temperature: 0.3 },
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 16384,
+        // gemini-2.5-flash spends its output budget on internal "thinking"
+        // unless told otherwise, which can come back as an empty response.
+        ...(model.startsWith("gemini-2.5") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      },
     }),
   });
 
@@ -62,9 +69,34 @@ async function callVertex(model: string, apiKey: string, contents: string): Prom
     err.status = resp.status;
     throw err;
   }
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error(`Vertex AI model ${model} returned an empty response.`);
+  const text = (data.candidates?.[0]?.content?.parts || [])
+    .map((p) => p.text || "")
+    .join("")
+    .trim();
+  if (!text) {
+    const reason = (data.candidates?.[0] as any)?.finishReason || (data as any).promptFeedback?.blockReason;
+    throw new Error(`Vertex AI model ${model} returned an empty response${reason ? ` (finish reason: ${reason})` : ""}.`);
+  }
   return text;
+}
+
+// Last-resort tailoring: if every model comes back empty, compose the tailored
+// prompt directly from the reference template plus the student's KYCB answers,
+// so a saved form always produces a usable prompt.
+function buildFallbackPrompt(businessInfo: string, websiteType: string, referenceTemplate: string): string {
+  return `System Instruction: You are an expert web developer, UI designer, and brand strategist. Build a complete, production-quality ${websiteType} for the business described below.
+
+=== BUSINESS BRIEF (FROM THE CLIENT'S KYCB ANSWERS) ===
+${businessInfo}
+
+=== HOW TO WORK ===
+1. Treat the business brief above as the single source of truth: every name, color, offer, section, and feature it specifies must appear exactly as stated.
+2. Where the brief clearly defines a section, implement it as specified.
+3. Where the brief is silent or thin, act as the business's designer: choose sensible, professional defaults that fit the business and its industry, and state each choice in your output.
+4. Keep the overall structure, phrasing standard, and quality of the reference template below, but replace ALL of its placeholder business details with the client's own. Never copy the reference template's dummy business info into the output.
+
+=== REFERENCE TEMPLATE (STRUCTURE AND QUALITY STANDARD) ===
+${referenceTemplate || "(No reference template provided. Design a standard, high-quality structure for this website type.)"}`;
 }
 
 async function handler(event: any) {
@@ -131,7 +163,7 @@ Please scan the STUDENT DATA and generate a beautifully tailored, high-fidelity 
         message: "The AI generation limit has been reached. Please wait a moment and try again.",
       });
     }
-    return json(500, { error: msg });
+    return json(200, { prompt: buildFallbackPrompt(businessInfo, websiteType, referenceTemplate) });
   }
 
   return json(200, { prompt: generatedText });

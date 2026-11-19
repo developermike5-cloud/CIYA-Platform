@@ -602,6 +602,24 @@ export default function PromptGenerator({
         businessInfo += `Additional Notes: ${answers.additionalNotes}\n`;
       }
 
+      // Every other saved answer, so any saved form (landing page, ecommerce or
+      // portfolio) tailors fully no matter how much or little data it holds.
+      const alreadySent = new Set([
+        "industry", "phone", "email", "address", "brandColors", "colorsCount",
+        "visitorActions", "idealAge", "lpOfferMain", "lpWhatMakesSpecial",
+        "sectionsToInclude", "functionalFeatures", "budgetRange", "additionalNotes"
+      ]);
+      const label = (k: string) => k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+      Object.entries(answers).forEach(([key, value]) => {
+        if (alreadySent.has(key) || value == null) return;
+        let val = "";
+        if (Array.isArray(value)) val = value.filter(Boolean).join(", ");
+        else if (typeof value === "string") val = value.trim();
+        else if (typeof value === "boolean") val = value ? "Yes" : "No";
+        else if (typeof value === "number") val = String(value);
+        if (val) businessInfo += `${label(key)}: ${val}\n`;
+      });
+
       // 2. Call the backend AI tailoring endpoint
       const response = await fetch("/api/ai/compile-smart-prompt", {
         method: "POST",
