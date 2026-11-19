@@ -40,6 +40,33 @@ async function signJwtInput(input: string): Promise<string> {
   return bytesToB64url(new Uint8Array(sig));
 }
 
+async function tryMint(scope: string): Promise<{ ok: boolean; detail: string }> {
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
+    const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope, aud: TOKEN_URL, iat: now, exp: now + 3600 })))
+      + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+    const signature = await signJwtInput(input);
+    // self-verify with the public half of the same key
+    const keyObj = await crypto.subtle.importKey('pkcs8', pemToDer(sa.private_key), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, true, ['sign']);
+    const spki = await crypto.subtle.exportKey('spki', keyObj);
+    const pub = await crypto.subtle.importKey('spki', spki, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+    const sigB64 = signature.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = sigB64 + '==='.slice((sigB64.length + 3) % 4);
+    const bin = atob(padded);
+    const sigBytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) sigBytes[i] = bin.charCodeAt(i);
+    const selfVerified = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', pub, sigBytes, strToBytes(input));
+    const body = 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(`${input}.${signature}`);
+    const res = await fetch(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
+    const text = await res.text();
+    let d: any = {}; try { d = JSON.parse(text); } catch {}
+    return { ok: !!(res.ok && d.access_token), detail: selfVerified ? `selfVerified=true http=${res.status} ${text.slice(0, 120)}` : `selfVerified=FALSE http=${res.status} ${text.slice(0, 120)}` };
+  } catch (e: any) {
+    return { ok: false, detail: `threw: ${e?.message || String(e)}` };
+  }
+}
+
 async function getAccessToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   if (cachedToken && cachedToken.exp - 60 > now) return cachedToken.token;
@@ -91,6 +118,21 @@ async function buildAssertion(): Promise<string> {
 
 export default async (req: Request) => {
   try {
+    if (req.method === 'GET' && new URL(req.url).searchParams.get('probe') === '1') {
+      const candidates: Array<[string, string]> = [
+        ['cloud-platform', 'https://www.googleapis.com/auth/cloud-platform'],
+        ['userinfo.email', 'https://www.googleapis.com/auth/userinfo.email'],
+        ['firebase.database', 'https://www.googleapis.com/auth/firebase.database'],
+        ['firebase(readonly)', 'https://www.googleapis.com/auth/firebase.database.readonly'],
+        ['datastore', 'https://www.googleapis.com/auth/datastore'],
+        ['firebase-admin(firebase)', 'https://www.googleapis.com/auth/firebase'],
+        ['legacy-3-scope', 'https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/firebase https://www.googleapis.com/auth/datastore'],
+        ['userinfo+firebasedb', 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/firebase.database'],
+      ];
+      const out: Record<string, string> = {};
+      for (const [name, scope] of candidates) out[name] = (await tryMint(scope)).detail;
+      return new Response(JSON.stringify(out, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
+    }
     if (req.method === 'GET' && new URL(req.url).searchParams.get('echo') === '1') {
       const assertion = await buildAssertion();
       const r = await fetch('https://postman-echo.com/post', {
