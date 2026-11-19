@@ -76,7 +76,14 @@
           ".read": "auth != null",
           "$commentId": {
             // Only the comment author can create, edit or delete their comment
-            ".write": "auth != null && (!data.exists() || data.child('senderUid').val() === auth.uid)"
+            ".write": "auth != null && (!data.exists() || data.child('senderUid').val() === auth.uid)",
+            "reactions": {
+              // Users can only react for themselves
+              "$uid": {
+                ".write": "auth != null && $uid === auth.uid",
+                ".validate": "newData.isString() && newData.val().length <= 8"
+              }
+            }
           }
         }
       }

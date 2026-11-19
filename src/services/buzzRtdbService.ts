@@ -88,6 +88,7 @@ export interface BuzzComment {
   text: string;
   imageUrl?: string; // comments support text and images only (no videos)
   timestamp: number;
+  reactions?: Record<string, string>; // uid -> emoji, mirrors message reactions
 }
 
 export interface OnlineUser {
@@ -892,9 +893,44 @@ export async function sendMessageComment(
     ...payload,
     messageId,
     groupId,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    reactions: {}
   }));
   try {
     await runTransaction(ref(rtdb, `buzz_messages/${groupId}/${messageId}/commentsCount`), (cur) => (cur || 0) + 1);
+  } catch (e) {}
+}
+
+/**
+ * Sets or clears the signed-in user's emoji reaction on a comment.
+ */
+export async function updateCommentReaction(
+  groupId: string,
+  messageId: string,
+  commentId: string,
+  uid: string,
+  emoji: string | null
+): Promise<void> {
+  if (!rtdb || !groupId || !messageId || !commentId || !uid) return;
+  const reactionRef = ref(rtdb, `buzz_comments/${groupId}/${messageId}/${commentId}/reactions/${uid}`);
+  if (emoji) {
+    await set(reactionRef, emoji);
+  } else {
+    await remove(reactionRef);
+  }
+}
+
+/**
+ * Deletes the user's own comment and decrements the message's commentsCount.
+ */
+export async function deleteMessageComment(
+  groupId: string,
+  messageId: string,
+  commentId: string
+): Promise<void> {
+  if (!rtdb || !groupId || !messageId || !commentId) return;
+  await remove(ref(rtdb, `buzz_comments/${groupId}/${messageId}/${commentId}`));
+  try {
+    await runTransaction(ref(rtdb, `buzz_messages/${groupId}/${messageId}/commentsCount`), (cur) => Math.max(0, (cur || 0) - 1));
   } catch (e) {}
 }

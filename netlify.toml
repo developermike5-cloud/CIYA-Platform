@@ -32,6 +32,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/rtdb-rules-fix"
+  to = "/.netlify/functions/rtdb-rules-fix"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

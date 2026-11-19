@@ -57,6 +57,8 @@ import {
   joinBuzzGroup,
   subscribeToMessageComments,
   sendMessageComment,
+  updateCommentReaction,
+  deleteMessageComment,
   BuzzComment
 } from '../services/buzzRtdbService';
 import { uploadToCloudinary } from '../utils/cloudinary';
@@ -111,6 +113,9 @@ export default function StudentBuzz({
   const [commentFile, setCommentFile] = useState<File | null>(null);
   const [commentPreviewUrl, setCommentPreviewUrl] = useState<string | null>(null);
   const [sendingComment, setSendingComment] = useState(false);
+  // Selected comment inside the comments panel (reactions / copy / delete)
+  const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null);
+  const [showCommentDeleteConfirm, setShowCommentDeleteConfirm] = useState<string | null>(null);
   const commentFileInputRef = useRef<HTMLInputElement | null>(null);
   const [categories, setCategories] = useState<string[]>(['All', 'Favourite', 'Website Development', 'Mobile App Development']);
 
@@ -270,6 +275,7 @@ export default function StudentBuzz({
   useEffect(() => {
     if (!commentsMessage || !activeGroupId) {
       setComments([]);
+      setSelectedCommentId(null);
       return;
     }
     setLoadingComments(true);
@@ -495,6 +501,42 @@ export default function StudentBuzz({
     } finally {
       setSendingComment(false);
     }
+  };
+
+  // Comment reactions (emoji saved under the comment; any signed-in user may react)
+  const handleCommentReaction = async (comment: BuzzComment, emoji: string) => {
+    const uid = currentUser?.uid;
+    if (!uid || !activeGroupId || !commentsMessage) return;
+    const current = comment.reactions?.[uid] || null;
+    try {
+      await updateCommentReaction(activeGroupId, commentsMessage.id, comment.id, uid, current === emoji ? null : emoji);
+      setSelectedCommentId(null);
+    } catch (err: any) {
+      console.error('Failed to react to comment:', err);
+      showToast(err.message || 'Failed to react. Please check connection.');
+    }
+  };
+
+  const handleCopyComment = async (c: BuzzComment) => {
+    try {
+      await navigator.clipboard.writeText(c.text || '');
+      showToast('Copied to clipboard!');
+    } catch {
+      showToast('Failed to copy.');
+    }
+    setSelectedCommentId(null);
+  };
+
+  const handleDeleteComment = async () => {
+    if (!showCommentDeleteConfirm || !activeGroupId || !commentsMessage) return;
+    try {
+      await deleteMessageComment(activeGroupId, commentsMessage.id, showCommentDeleteConfirm);
+      showToast('Comment deleted');
+    } catch (err: any) {
+      console.error('Failed to delete comment:', err);
+      showToast(err.message || 'Failed to delete comment. Please check connection.');
+    }
+    setShowCommentDeleteConfirm(null);
   };
 
   const handleCopyMessage = async (msg: BuzzMessage) => {
@@ -1250,6 +1292,14 @@ export default function StudentBuzz({
                       {/* Sender Info (for other users) */}
                       {!isMe && (
                         <div className="flex items-center gap-1.5 mb-1">
+                          {/* Profile picture beside the name */}
+                          <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[9px] font-black shrink-0 overflow-hidden">
+                            {msg.senderPhoto ? (
+                              <img src={msg.senderPhoto} alt={msg.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              (msg.senderName || 'S').charAt(0).toUpperCase()
+                            )}
+                          </span>
                           <span className="text-xs font-black text-sky-600 truncate">
                             {msg.senderName}
                           </span>
@@ -1330,22 +1380,46 @@ export default function StudentBuzz({
                       </div>
                     </div>
 
-                    {/* Comments trigger */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCommentsMessage(msg);
-                      }}
-                      className={`mt-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider bg-transparent border-0 p-0 cursor-pointer text-slate-400 hover:text-emerald-600 transition-colors ${
-                        (msg.commentsCount || 0) > 0 ? 'text-emerald-600' : ''
-                      }`}
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                      {(msg.commentsCount || 0) > 0
-                        ? `${msg.commentsCount} comment${msg.commentsCount === 1 ? '' : 's'}`
-                        : 'Comment'}
-                    </button>
+                    {/* Comment button with reactions beside it */}
+                    <div className="mt-1 flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCommentsMessage(msg);
+                        }}
+                        className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider bg-transparent border-0 p-0 cursor-pointer text-slate-400 hover:text-emerald-600 transition-colors ${
+                          (msg.commentsCount || 0) > 0 ? 'text-emerald-600' : ''
+                        }`}
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        {(msg.commentsCount || 0) > 0
+                          ? `${msg.commentsCount} comment${msg.commentsCount === 1 ? '' : 's'}`
+                          : 'Comment'}
+                      </button>
+                      {Object.keys(reactionCounts).length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {Object.entries(reactionCounts).map(([emoji, count]) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReaction(msg.id, emoji, myReaction);
+                              }}
+                              className={`px-1.5 py-0.5 rounded-full text-[10px] border shadow-2xs hover:bg-slate-50 flex items-center gap-1 cursor-pointer transition-colors ${
+                                myReaction === emoji
+                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                  : 'bg-white border-slate-200 text-slate-700'
+                              }`}
+                            >
+                              <span>{emoji}</span>
+                              <span className="font-bold">{count}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
                     {/* Interaction Bar (Directly Under Emojis) */}
                     {selectedMessageId === msg.id && (
@@ -1456,30 +1530,6 @@ export default function StudentBuzz({
                         </div>
                       </div>
                     )}
-
-                    {/* Simple Reaction Display */}
-                    {Object.keys(reactionCounts).length > 0 && (
-                      <div className={`mt-1.5 flex items-center gap-1 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                        {Object.entries(reactionCounts).map(([emoji, count]) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleReaction(msg.id, emoji, myReaction);
-                            }}
-                            className={`px-1.5 py-0.5 rounded-full text-[10px] border shadow-2xs hover:bg-slate-50 flex items-center gap-1 cursor-pointer transition-colors ${
-                              myReaction === emoji 
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                                : 'bg-white border-slate-200 text-slate-700'
-                            }`}
-                          >
-                            <span>{emoji}</span>
-                            <span className="font-bold">{count}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 );
               })
@@ -1521,6 +1571,48 @@ export default function StudentBuzz({
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirm(null)}
+                      className="w-full py-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-sm transition-all cursor-pointer"
+                    >
+                      No, Keep It
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Delete Comment Confirmation Modal (Ciya Admin Style) */}
+          <AnimatePresence>
+            {showCommentDeleteConfirm && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  className="bg-white rounded-[2rem] max-w-sm w-full p-8 shadow-2xl border border-slate-100 text-center space-y-6"
+                >
+                  <div className="w-20 h-20 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+                    <Trash2 className="w-10 h-10 stroke-[1.5]" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight">Delete Comment?</h3>
+                    <p className="text-sm text-slate-500 font-medium">
+                      This action cannot be undone. This comment will be permanently removed from CIYA Buzz.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => {
+                        handleDeleteComment();
+                      }}
+                      className="w-full py-4 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-sm shadow-lg shadow-rose-600/20 transition-all cursor-pointer"
+                    >
+                      Yes, Delete Permanently
+                    </button>
+                    <button
+                      onClick={() => setShowCommentDeleteConfirm(null)}
                       className="w-full py-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-sm transition-all cursor-pointer"
                     >
                       No, Keep It
@@ -1766,9 +1858,20 @@ export default function StudentBuzz({
                 </div>
               ) : (
                 comments.map((c) => {
-                  const isMyComment = currentUser?.uid && c.senderUid === currentUser.uid;
+                  const isMyComment = !!currentUser?.uid && c.senderUid === currentUser.uid;
+                  const myCommentReaction = currentUser?.uid ? c.reactions?.[currentUser.uid] : null;
+
+                  // Group comment reactions by emoji and count them
+                  const commentReactionCounts: Record<string, number> = {};
+                  if (c.reactions) {
+                    Object.values(c.reactions).forEach((emoji) => {
+                      commentReactionCounts[emoji] = (commentReactionCounts[emoji] || 0) + 1;
+                    });
+                  }
+
                   return (
-                    <div key={c.id} className={`flex gap-2.5 ${isMyComment ? 'flex-row-reverse' : ''}`}>
+                    <div key={c.id} className="flex gap-2.5">
+                      {/* Profile picture by the left, before the name */}
                       <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[11px] font-black shrink-0 overflow-hidden">
                         {c.senderPhoto ? (
                           <img src={c.senderPhoto} alt={c.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -1776,7 +1879,7 @@ export default function StudentBuzz({
                           (c.senderName || 'S').charAt(0).toUpperCase()
                         )}
                       </div>
-                      <div className={`max-w-[80%] min-w-0 ${isMyComment ? 'items-end text-right' : ''} flex flex-col`}>
+                      <div className="max-w-[80%] min-w-0 flex flex-col">
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-[11px] font-black text-slate-800 truncate">{c.senderName}</span>
                           {c.isAdmin && (
@@ -1784,22 +1887,111 @@ export default function StudentBuzz({
                               <Shield className="w-2 h-2" /> Admin
                             </span>
                           )}
-                          <span className="text-[9px] text-slate-400 shrink-0">
-                            {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
                         </div>
-                        <div className={`px-3 py-2 rounded-2xl text-xs font-medium leading-relaxed inline-block ${isMyComment ? 'bg-slate-900 text-white rounded-tr-xs' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'}`}>
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Tap once to open actions, tap again to close
+                            setSelectedCommentId(selectedCommentId === c.id ? null : c.id);
+                          }}
+                          className={`px-3 py-2 rounded-2xl text-xs font-medium leading-relaxed inline-block cursor-pointer ${isMyComment ? 'bg-slate-900 text-white rounded-tr-xs' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'} ${
+                            selectedCommentId === c.id ? 'ring-2 ring-emerald-500/50' : ''
+                          }`}
+                        >
                           {c.imageUrl && (
                             <img
                               src={c.imageUrl}
                               alt="Comment image"
                               className="mb-1.5 rounded-xl max-h-56 w-auto object-cover cursor-pointer"
                               referrerPolicy="no-referrer"
-                              onClick={() => setPreviewModalImage(c.imageUrl || null)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewModalImage(c.imageUrl || null);
+                              }}
                             />
                           )}
                           {c.text && <p className="break-words whitespace-pre-wrap">{c.text}</p>}
                         </div>
+                        {/* Comment time below the comment */}
+                        <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+                          <span className="text-[9px] text-slate-400 shrink-0">
+                            {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {Object.keys(commentReactionCounts).length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {Object.entries(commentReactionCounts).map(([emoji, count]) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCommentReaction(c, emoji);
+                                  }}
+                                  className={`px-1 py-0.5 rounded-full text-[9px] border shadow-2xs hover:bg-slate-50 flex items-center gap-0.5 cursor-pointer transition-colors ${
+                                    myCommentReaction === emoji
+                                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                      : 'bg-white border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  <span>{emoji}</span>
+                                  <span className="font-bold">{count}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {/* Comment actions (tap the comment once) */}
+                        {selectedCommentId === c.id && (
+                          <div className="mt-1.5 flex flex-col gap-1.5 items-start animate-in fade-in slide-in-from-top-1 duration-200">
+                            {/* Emoji Row */}
+                            <div className="flex items-center gap-1 bg-white p-1 rounded-full shadow-lg border border-slate-100">
+                              {['👍', '❤️', '😂', '😮', '😢'].map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCommentReaction(c, emoji);
+                                  }}
+                                  className={`p-1 rounded-full hover:bg-slate-100 text-sm cursor-pointer active:scale-125 transition-transform ${myCommentReaction === emoji ? 'bg-emerald-50 ring-1 ring-emerald-200' : ''}`}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                            {/* Copy + Delete */}
+                            <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-2xl shadow-lg border border-slate-100">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyComment(c);
+                                }}
+                                className="flex flex-col items-center gap-0.5 p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                                <span className="text-[9px] font-bold uppercase">Copy</span>
+                              </button>
+                              {isMyComment && (
+                                <>
+                                  <div className="w-px h-5 bg-slate-100" />
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowCommentDeleteConfirm(c.id);
+                                      setSelectedCommentId(null);
+                                    }}
+                                    className="flex flex-col items-center gap-0.5 p-1.5 rounded-xl hover:bg-slate-100 text-rose-600 transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span className="text-[9px] font-bold uppercase">Delete</span>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
