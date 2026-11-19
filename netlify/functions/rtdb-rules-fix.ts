@@ -159,6 +159,67 @@ export default async (req: Request) => {
       out.proxyBody = t.slice(0, 300);
       return new Response(JSON.stringify(out, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
     }
+    if (req.method === 'GET' && new URL(req.url).searchParams.get('keycheck') === '1') {
+      // Parse the PKCS#8 DER to pull the RSA modulus, hash it, and compare
+      // against the public JWK set Google publishes for this service account.
+      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
+      const b64 = sa.private_key.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+      const bin = atob(b64);
+      const der = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) der[i] = bin.charCodeAt(i);
+      let off = 0;
+      const readTlv = (d: Uint8Array, o: number) => {
+        // returns [tag, contentStart, contentEnd, nextOffset]
+        const tag = d[o];
+        let len = d[o + 1];
+        let hdr = 2;
+        if (len & 0x80) { const nBytes = len & 0x7f; len = 0; for (let i = 0; i < nBytes; i++) len = len * 256 + d[o + 2 + i]; hdr = 2 + nBytes; }
+        return [tag, o + hdr, o + hdr + len, o + hdr + len];
+      };
+      const [t1, c1s, c1e] = readTlv(der, 0); // outer SEQUENCE
+      let o = c1s;
+      // version INTEGER
+      const [, , , o2] = readTlv(der, o); o = o2;
+      // AlgorithmIdentifier SEQUENCE
+      const [, , , o3] = readTlv(der, o); o = o3;
+      // OCTET STRING
+      const [t4, c4s, c4e] = readTlv(der, o);
+      if (t4 !== 0x04) throw new Error('expected OCTET STRING, got ' + t4);
+      const [t5, c5s] = readTlv(der, c4s); // RSAPrivateKey SEQUENCE
+      if (t5 !== 0x30) throw new Error('expected SEQUENCE, got ' + t5);
+      // version INTEGER
+      const [, , , o6] = readTlv(der, c5s);
+      // modulus INTEGER
+      const [t7, nStart, nEnd] = readTlv(der, o6);
+      if (t7 !== 0x02) throw new Error('expected INTEGER, got ' + t7);
+      // strip leading zero byte if present
+      let nStartAdj = nStart;
+      if (der[nStart] === 0) nStartAdj = nStart + 1;
+      const ourN = der.slice(nStartAdj, nEnd);
+      const ourHash = new Uint8Array(await crypto.subtle.digest('SHA-256', ourN));
+      const ourHex = Array.from(ourHash).map(b => b.toString(16).padStart(2, '0')).join('');
+      // Google's public JWK set for this SA (public, no auth)
+      const metaRes = await fetch(`https://www.googleapis.com/robot/v1/metadata/jwk/${encodeURIComponent(sa.client_email)}`);
+      const metaText = await metaRes.text();
+      let jwks: any = {}; try { jwks = JSON.parse(metaText); } catch {}
+      const keys: any[] = jwks.keys || [];
+      const out: Record<string, unknown> = { ourNHash8: ourHex.slice(0, 8), ourNBytes: ourN.length, metaHttp: metaRes.status, googleKeyCount: keys.length, match: null, matchedKid: null, googleKeyHashes: [] as string[] };
+      for (const k of keys) {
+        const kb = atob(k.n.replace(/-/g, '+').replace(/_/g, '/'));
+        const kn = new Uint8Array(kb.length);
+        for (let i = 0; i < kb.length; i++) kn[i] = kb.charCodeAt(i);
+        if (kn[0] === 0) kn.slice(1);
+        const knAdj = kn[0] === 0 ? kn.slice(1) : kn;
+        const kh = new Uint8Array(await crypto.subtle.digest('SHA-256', knAdj));
+        const khex = Array.from(kh).map(b => b.toString(16).padStart(2, '0')).join('');
+        out.googleKeyHashes.push(`${k.kid}:${khex.slice(0, 8)}:${knAdj.length}b`);
+        const sameLen = knAdj.length === ourN.length;
+        const sameHash = khex === ourHex;
+        if (sameHash && sameLen) { out.match = true; out.matchedKid = k.kid; }
+      }
+      if (out.match === null) out.match = keys.length === 0 ? 'no-jwk-keys-returned' : false;
+      return new Response(JSON.stringify(out, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
+    }
     if (req.method === 'GET' && new URL(req.url).searchParams.get('echo') === '1') {
       const assertion = await buildAssertion();
       const r = await fetch('https://postman-echo.com/post', {
