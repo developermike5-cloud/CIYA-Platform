@@ -284,21 +284,21 @@ export default function EcQuestionnaireForm({
       
       {/* SECTION 1: BUSINESS INFORMATION */}
       <fieldset className="border border-amber-150/80 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">1</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">1</span>
           {qL("Business Information", "Client Business Profile")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Do you have an existing website?", "Does the client have an existing website?")}
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" checked={hasSite === 'yes'} onChange={() => setHasSite('yes')} /> Yes
               </label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" checked={hasSite === 'no'} onChange={() => setHasSite('no')} /> No
               </label>
             </div>
@@ -308,20 +308,20 @@ export default function EcQuestionnaireForm({
                 value={siteUrl} 
                 onChange={e => setSiteUrl(e.target.value)} 
                 placeholder="Paste link here..." 
-                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none"
               />
             )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-sm font-semibold text-slate-700 block mb-1">
                 {qL("Business Name *", "Client's Business Name *")}
               </label>
-              <input type="text" value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="e.g. Apex Beauty Studio" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium" />
+              <input type="text" value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="e.g. Apex Beauty Studio" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-sm font-semibold text-slate-700 block mb-1">
                 {qL("Industry / Niche", "Business Industry / Niche")}
               </label>
               <div className="relative">
@@ -350,40 +350,40 @@ export default function EcQuestionnaireForm({
                     value={industry} 
                     onChange={e => setIndustry(e.target.value)} 
                     placeholder="Add custom industry niche..." 
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white"
                   />
                 )}
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-sm font-semibold text-slate-700 block mb-1">
                 {qL("Phone Number", "Client's Phone Number")}
               </label>
-              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. +234 81 2345" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
+              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. +234 81 2345" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-sm font-semibold text-slate-700 block mb-1">
                 {qL("Email Address", "Client's Email Address")}
               </label>
-              <input type="text" value={email} onChange={e => setEmail(e.target.value)} placeholder="e.g. hello@yourbrand.com" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
+              <input type="text" value={email} onChange={e => setEmail(e.target.value)} placeholder="e.g. hello@yourbrand.com" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
             </div>
             <div className="md:col-span-2">
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-sm font-semibold text-slate-700 block mb-1">
                 {qL("Business Address", "Client's Business Address")}
               </label>
-              <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="City, State" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
+              <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="City, State" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Do you have Social Media accounts?", "Does the client have Social Media accounts?")}
             </label>
             <div className="flex gap-4 mb-3">
-              <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" name="has_soc_med_ec" checked={hasSocialMediaAsked === 'yes'} onChange={() => { setHasSocialMediaAsked('yes'); }} /> Yes
               </label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" name="has_soc_med_ec" checked={hasSocialMediaAsked === 'no'} onChange={() => { setHasSocialMediaAsked('no'); setSocialLinks(['']); }} /> No
               </label>
             </div>
@@ -391,14 +391,14 @@ export default function EcQuestionnaireForm({
             {hasSocialMediaAsked === 'no' && (
               <div className="mb-3 bg-amber-50/50 border border-amber-200 rounded-xl p-3 animate-fadeIn">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span className="text-[10px] text-amber-800 font-bold block">No official handles yet? You can temporarily bundle placeholder accounts.</span>
+                  <span className="text-xs text-amber-800 font-bold block">No official handles yet? You can temporarily bundle placeholder accounts.</span>
                   <button
                     type="button"
                     onClick={() => {
                       setHasSocialMediaAsked('yes');
                       setSocialLinks(['https://instagram.com/your_industry_brand_placeholder', 'https://facebook.com/your_industry_brand_placeholder']);
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-black transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black transition-all cursor-pointer"
                   >
                     💡 Use Placeholder Accounts
                   </button>
@@ -415,7 +415,7 @@ export default function EcQuestionnaireForm({
                       value={link} 
                       onChange={e => updateArrayItem(idx, e.target.value, socialLinks, setSocialLinks)} 
                       placeholder={`Social media link ${idx + 1}`} 
-                      className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
+                      className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
                     />
                     <button type="button" onClick={() => removeArrayItem(idx, socialLinks, setSocialLinks)} className="p-2 border rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors">
                       <Trash2 className="w-4 h-4" />
@@ -425,7 +425,7 @@ export default function EcQuestionnaireForm({
                 <button 
                   type="button" 
                   onClick={() => addArrayItem(socialLinks, setSocialLinks)}
-                  className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed rounded-lg text-xs font-bold text-slate-400 hover:text-[#1A3C6E] hover:border-[#1A3C6E] transition-colors"
+                  className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed rounded-lg text-sm font-bold text-slate-400 hover:text-[#1A3C6E] hover:border-[#1A3C6E] transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add social link
                 </button>
@@ -437,21 +437,21 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 2: BUSINESS MODEL */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">2</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">2</span>
           {qL("Business Model", "eCommerce Store Business Model")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Which model describes your eCommerce business? (Select multi)", "What is the client's store type model? (Select multi)")}</label>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Which model describes your eCommerce business? (Select multi)", "What is the client's store type model? (Select multi)")}</label>
+            <div className="flex flex-wrap gap-2 text-sm">
               {["Single product store", "Multi-product store", "Dropshipping", "Wholesale / bulk sales", "Print-on-demand", "Digital products", "Subscription-based"].map(m => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => toggleMultiSelect(m, ecommerceType, setEcommerceType)}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg border text-sm font-bold transition-all cursor-pointer ${
                     ecommerceType.includes(m) ? 'bg-[#1A3C6E] text-[#D4A017]' : 'bg-white text-slate-600 border-slate-200'
                   }`}
                 >
@@ -462,10 +462,10 @@ export default function EcQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Do you currently have stock / inventory in hand?", "Does the client physically have inventory stocks ready?")}</label>
+            <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Do you currently have stock / inventory in hand?", "Does the client physically have inventory stocks ready?")}</label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={hasInventory === 'yes'} onChange={() => setHasInventory('yes')} /> Yes</label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={hasInventory === 'no'} onChange={() => setHasInventory('no')} /> No</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={hasInventory === 'yes'} onChange={() => setHasInventory('yes')} /> Yes</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={hasInventory === 'no'} onChange={() => setHasInventory('no')} /> No</label>
             </div>
             {hasInventory === 'yes' && (
               <input 
@@ -473,7 +473,7 @@ export default function EcQuestionnaireForm({
                 value={inventoryLocation} 
                 onChange={e => setInventoryLocation(e.target.value)} 
                 placeholder="Where is the inventory stored? (e.g. Lagos Warehouse)" 
-                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none"
               />
             )}
           </div>
@@ -482,20 +482,20 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 3: PROJECT GOAL */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">3</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">3</span>
           {qL("Project Goal", "Core Action Metrics")}
         </legend>
 
         <div className="space-y-4 pt-3">
-          <label className="text-xs font-semibold text-slate-700 block">{qL("What action should visitors take? (Select multi)", "What conversion action do we want to trigger on visitor entry? (Select multi)")}</label>
-          <div className="flex flex-wrap gap-2 text-xs">
+          <label className="text-sm font-semibold text-slate-700 block">{qL("What action should visitors take? (Select multi)", "What conversion action do we want to trigger on visitor entry? (Select multi)")}</label>
+          <div className="flex flex-wrap gap-2 text-sm">
             {["Buy Now", "Add to Cart", "Subscribe", "Contact via WhatsApp", "Get a Quote", "Join Waitlist", "Create Account", "Claim Coupon", "View Catalogue", "Book an Order"].map(act => (
               <button
                 key={act}
                 type="button"
                 onClick={() => toggleMultiSelect(act, visitorActions, setVisitorActions)}
-                className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg border text-sm font-bold transition-all cursor-pointer ${
                   visitorActions.includes(act) ? 'bg-[#1A3C6E] text-[#D4A017]' : 'bg-white text-slate-600 border-slate-200'
                 }`}
               >
@@ -504,23 +504,23 @@ export default function EcQuestionnaireForm({
             ))}
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Any other action?", "Other custom action metrics:")}</label>
-            <input type="text" value={otherAction} onChange={e => setOtherAction(e.target.value)} placeholder="Describe custom action..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
+            <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Any other action?", "Other custom action metrics:")}</label>
+            <input type="text" value={otherAction} onChange={e => setOtherAction(e.target.value)} placeholder="Describe custom action..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
           </div>
         </div>
       </fieldset>
 
       {/* SECTION 4: TARGET AUDIENCE */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">4</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">4</span>
           {qL("Target Audience", "Consumer Demographic Profile")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Age range of ideal customers (Select multi)", "Target Age Group demographics: (Select multi)")}</label>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Age range of ideal customers (Select multi)", "Target Age Group demographics: (Select multi)")}</label>
+            <div className="grid grid-cols-2 gap-2 text-sm">
               {["All ages", "18 – 35 (Gen Z & Millennials)", "36 – 55 (Gen X)", "56 and above"].map(ageRange => (
                 <button
                   key={ageRange}
@@ -547,14 +547,14 @@ export default function EcQuestionnaireForm({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Gender Focus", "Core Gender Segment")}</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Gender Focus", "Core Gender Segment")}</label>
               <div className="flex flex-wrap gap-2">
                 {["All genders", "Primarily female", "Primarily male"].map(gf => (
                   <button
                     key={gf}
                     type="button"
                     onClick={() => toggleMultiSelect(gf, genderFocus, setGenderFocus)}
-                    className={`px-3 py-1.5 border text-xs font-bold rounded-lg ${
+                    className={`px-3 py-1.5 border text-sm font-bold rounded-lg ${
                       genderFocus.includes(gf) ? 'bg-[#1A3C6E] text-[#D4A017]' : 'bg-white text-slate-600 border-slate-200'
                     }`}
                   >
@@ -565,7 +565,7 @@ export default function EcQuestionnaireForm({
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Income Level", "Socioeconomic Segment")}</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Income Level", "Socioeconomic Segment")}</label>
               <CustomDropdown
                 value={incomeLevel}
                 onChange={val => setIncomeLevel(val)}
@@ -580,8 +580,8 @@ export default function EcQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Consumer Interests (Select multi)", "Target User lifestyle interests: (Select multi)")}</label>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Consumer Interests (Select multi)", "Target User lifestyle interests: (Select multi)")}</label>
+            <div className="flex flex-wrap gap-2 text-sm">
               {["Fashion & style", "Beauty & skincare", "Health & fitness", "Food & lifestyle", "Tech & gadgets", "Home & decor", "Business & finance", "Travel & adventure"].map(interest => (
                 <button
                   key={interest}
@@ -598,7 +598,7 @@ export default function EcQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Target Audience Locations", "Geographical user target locales")}
             </label>
             <div className="space-y-2">
@@ -609,7 +609,7 @@ export default function EcQuestionnaireForm({
                     value={loc} 
                     onChange={e => updateArrayItem(idx, e.target.value, locations, setLocations)} 
                     placeholder={`e.g. Lagos, Nigeria`} 
-                    className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+                    className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none"
                   />
                   <button type="button" onClick={() => removeArrayItem(idx, locations, setLocations)} className="p-2 border rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors bg-white shadow-sm">
                     <Trash2 className="w-4 h-4" />
@@ -620,15 +620,15 @@ export default function EcQuestionnaireForm({
             <button 
               type="button" 
               onClick={() => addArrayItem(locations, setLocations)}
-              className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed rounded-lg text-xs font-bold text-slate-400 hover:text-[#1A3C6E] hover:border-[#1A3C6E] transition-colors"
+              className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed rounded-lg text-sm font-bold text-slate-400 hover:text-[#1A3C6E] hover:border-[#1A3C6E] transition-colors"
             >
               <Plus className="w-3.5 h-3.5" /> Add Location
             </button>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("What core problem does your product solve?", "Core utility value resolved:")}</label>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("What core problem does your product solve?", "Core utility value resolved:")}</label>
+            <div className="flex flex-wrap gap-2 text-sm">
               {["Saves time", "Saves money", "Improves appearance", "Boosts confidence", "Solves a health issue", "Provides convenience", "Grows business", "Educates / informs"].map(prob => (
                 <button
                   key={prob}
@@ -642,21 +642,21 @@ export default function EcQuestionnaireForm({
                 </button>
               ))}
             </div>
-            <input type="text" value={problemsSolvedDetail} onChange={e => setProblemsSolvedDetail(e.target.value)} placeholder="Describe further..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
+            <input type="text" value={problemsSolvedDetail} onChange={e => setProblemsSolvedDetail(e.target.value)} placeholder="Describe further..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
           </div>
         </div>
       </fieldset>
 
       {/* SECTION 5: PRODUCT CATALOGUE */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">5</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">5</span>
           {qL("Product Details", "eCommerce Inventory Specs")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("List your main product lines", "Core physical product categories:")}</label>
+            <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("List your main product lines", "Core physical product categories:")}</label>
             <div className="space-y-2">
               {mainProducts.map((p, idx) => (
                 <div key={idx} className="flex gap-2">
@@ -665,7 +665,7 @@ export default function EcQuestionnaireForm({
                     value={p}
                     onChange={e => updateArrayItem(idx, e.target.value, mainProducts, setMainProducts)}
                     placeholder={`e.g. Skin Whitening Creams, Glow Toners`}
-                    className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+                    className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none"
                   />
                   <button type="button" onClick={() => removeArrayItem(idx, mainProducts, setMainProducts)} className="p-2 border rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors bg-white">
                     <Trash2 className="w-4 h-4" />
@@ -676,19 +676,19 @@ export default function EcQuestionnaireForm({
             <button
               type="button"
               onClick={() => addArrayItem(mainProducts, setMainProducts)}
-              className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed rounded-lg text-xs font-bold text-slate-400 hover:text-[#1A3C6E] hover:border-[#1A3C6E] transition-colors"
+              className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed rounded-lg text-sm font-bold text-slate-400 hover:text-[#1A3C6E] hover:border-[#1A3C6E] transition-colors"
             >
               <Plus className="w-3.5 h-3.5" /> Add Product Line
             </button>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-3">{qL("Product Card Mock-up Details (Lock up to 3 for visual preview)", "Configure standard active showcase cards:")}</label>
+            <label className="text-sm font-semibold text-slate-700 block mb-3">{qL("Product Card Mock-up Details (Lock up to 3 for visual preview)", "Configure standard active showcase cards:")}</label>
             <div className="space-y-4">
               {productCards.map((card, idx) => (
                 <div key={idx} className="bg-white border rounded-2xl p-4 relative space-y-3 shadow-sm animate-fadeIn">
                   <div className="flex justify-between items-center border-b pb-2">
-                    <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Product Card {idx + 1}</span>
+                    <span className="text-sm font-black text-slate-700 uppercase tracking-wider">Product Card {idx + 1}</span>
                     {productCards.length > 1 && (
                       <button
                         type="button"
@@ -696,7 +696,7 @@ export default function EcQuestionnaireForm({
                           const next = productCards.filter((_, i) => i !== idx);
                           setProductCards(next);
                         }}
-                        className="text-red-500 hover:text-red-700 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                        className="text-red-500 hover:text-red-700 text-sm font-semibold inline-flex items-center gap-1 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Remove Card
                       </button>
@@ -705,7 +705,7 @@ export default function EcQuestionnaireForm({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Product Title</label>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Product Title</label>
                       <input 
                         type="text" 
                         value={card.name} 
@@ -715,11 +715,11 @@ export default function EcQuestionnaireForm({
                           setProductCards(next);
                         }} 
                         placeholder="e.g. Lavender Night Essential Glow Oil" 
-                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-white outline-none"	
+                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm bg-white outline-none"	
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Price Indicator</label>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Price Indicator</label>
                       <input 
                         type="text" 
                         value={card.price} 
@@ -729,11 +729,11 @@ export default function EcQuestionnaireForm({
                           setProductCards(next);
                         }} 
                         placeholder="e.g. ₦18,500"
-                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-white outline-none font-bold text-emerald-700"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm bg-white outline-none font-bold text-emerald-700"
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Short Product Description</label>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Short Product Description</label>
                       <input 
                         type="text" 
                         value={card.desc} 
@@ -743,11 +743,11 @@ export default function EcQuestionnaireForm({
                           setProductCards(next);
                         }} 
                         placeholder="e.g. Hydrates facial tissues with cucumber extract..." 
-                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-white outline-none"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm bg-white outline-none"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Initial Stock Quantity</label>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Initial Stock Quantity</label>
                       <input 
                         type="text" 
                         value={card.quantity} 
@@ -757,11 +757,11 @@ export default function EcQuestionnaireForm({
                           setProductCards(next);
                         }} 
                         placeholder="e.g. 100 units"
-                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-white outline-none"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm bg-white outline-none"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Color / Size Variants (optional)</label>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">Color / Size Variants (optional)</label>
                       <input 
                         type="text" 
                         value={card.variants} 
@@ -771,7 +771,7 @@ export default function EcQuestionnaireForm({
                           setProductCards(next);
                         }} 
                         placeholder="e.g. Blue, Pink, Large"
-                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-white outline-none"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm bg-white outline-none"
                       />
                     </div>
                   </div>
@@ -781,7 +781,7 @@ export default function EcQuestionnaireForm({
               <button
                 type="button"
                 onClick={() => setProductCards([...productCards, { name: '', desc: '', price: '', quantity: '', variants: '' }])}
-                className="w-full flex items-center justify-center gap-1.5 py-2 border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl text-xs font-black text-indigo-600 hover:text-indigo-800 bg-white transition-all cursor-pointer"
+                className="w-full flex items-center justify-center gap-1.5 py-2 border-2 border-dashed border-indigo-200 hover:border-indigo-400 rounded-xl text-sm font-black text-indigo-600 hover:text-indigo-800 bg-white transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4" /> Add dynamic Product Card
               </button>
@@ -792,15 +792,15 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 6: PRICING & OFFERS */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">6</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">6</span>
           {qL("Pricing & Offers", "Discount Matrix & Special Offers")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Which promotional techniques do you offer to trigger quick checkouts?", "Promotional offers structure: (Select multi)")}</label>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Which promotional techniques do you offer to trigger quick checkouts?", "Promotional offers structure: (Select multi)")}</label>
+            <div className="flex flex-wrap gap-2 text-sm">
               {["Percentage discount", "Free delivery", "Buy 1 Get 1 Free", "Free bonus gift", "Limited time offer", "Coupon codes", "Early bird pricing", "No promotions currently"].map(off => (
                 <button
                   key={off}
@@ -816,13 +816,13 @@ export default function EcQuestionnaireForm({
             </div>
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Describe structural pricing or offers in detail", "Provide discount rates & custom pricing guidelines:")}</label>
+            <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Describe structural pricing or offers in detail", "Provide discount rates & custom pricing guidelines:")}</label>
             <input 
               type="text" 
               value={ecSpecialOffersDetail}
               onChange={e => setEcSpecialOffersDetail(e.target.value)}
               placeholder="e.g. Free shipping on all products above ₦25,000; 10% off using coupon NEWYEAR"
-              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none"
             />
           </div>
         </div>
@@ -830,15 +830,15 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 7: UNIQUE SELLING POINT (USP) */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">7</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">7</span>
           {qL("Unique Selling Point", "Product Differentiation & USP Factors")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Why should customers buy from your store? (Select multi)", "Why should customers buy from the client's store? (Select multi)")}</label>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Why should customers buy from your store? (Select multi)", "Why should customers buy from the client's store? (Select multi)")}</label>
+            <div className="flex flex-wrap gap-2 text-sm">
               {["Affordable pricing", "Premium quality", "Fast delivery", "Unique products", "Verified / certified", "Strong reviews", "Easy returns", "Local trusted brand"].map(factor => (
                 <button
                   key={factor}
@@ -855,8 +855,8 @@ export default function EcQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("What elements differentiate your brand? (Select multi)", "Core differentiation vectors: (Select multi)")}</label>
-            <div className="flex flex-wrap gap-2 text-xs mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("What elements differentiate your brand? (Select multi)", "Core differentiation vectors: (Select multi)")}</label>
+            <div className="flex flex-wrap gap-2 text-sm mb-2">
               {["Price", "Quality", "Speed", "Packaging", "Brand story", "Customisation", "Exclusivity"].map(elem => (
                 <button
                   key={elem}
@@ -875,7 +875,7 @@ export default function EcQuestionnaireForm({
               value={ecProductDiffDetail}
               onChange={e => setEcProductDiffDetail(e.target.value)}
               placeholder="Describe differentiation in Detail (e.g. Our products are organic, locally sourced, and packaged in reusable wooden tins)" 
-              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none"
             />
           </div>
         </div>
@@ -883,38 +883,38 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 8: BRANDING DETAILS */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">8</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">8</span>
           {qL("Branding Details", "Brand Guideline & Aesthetic Style")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Do you have a Logo?", "Does the client have an official Logo?")}
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" name="has_logo_ec" checked={hasLogo === 'yes'} onChange={() => setHasLogo('yes')} /> Yes</label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" name="has_logo_ec" checked={hasLogo === 'no'} onChange={() => setHasLogo('no')} /> No</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="has_logo_ec" checked={hasLogo === 'yes'} onChange={() => setHasLogo('yes')} /> Yes</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="has_logo_ec" checked={hasLogo === 'no'} onChange={() => setHasLogo('no')} /> No</label>
             </div>
             {hasLogo === 'yes' ? (
-              <div className="mt-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl font-bold flex items-center gap-1.5">
+              <div className="mt-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl font-bold flex items-center gap-1.5">
                 <Check className="w-4 h-4" /> Great! Have the client hand over the high-resolution vector assets.
               </div>
             ) : (
               <div className="mt-2 bg-slate-100/50 p-3 rounded-xl space-y-2 border">
-                <span className="text-[11px] font-semibold text-slate-600 block">Does the client need you to provide custom Logo construction services?</span>
+                <span className="text-xs font-semibold text-slate-600 block">Does the client need you to provide custom Logo construction services?</span>
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={logoDesign === 'yes'} onChange={() => setLogoDesign('yes')} /> Yes</label>
-                  <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={logoDesign === 'no'} onChange={() => setLogoDesign('no')} /> No</label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={logoDesign === 'yes'} onChange={() => setLogoDesign('yes')} /> Yes</label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={logoDesign === 'no'} onChange={() => setLogoDesign('no')} /> No</label>
                 </div>
               </div>
             )}
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Which aesthetic style should your website feel like? (Select multi)", "What is the client's aesthetic styling choice? (Select multi)")}</label>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Which aesthetic style should your website feel like? (Select multi)", "What is the client's aesthetic styling choice? (Select multi)")}</label>
+            <div className="flex flex-wrap gap-2 text-sm">
               {["Minimal / Clean", "Luxury / Premium", "Bold / Vibrant", "Playful / Fun", "Corporate", "Feminine / Elegant"].map(style => (
                 <button
                   key={style}
@@ -931,24 +931,24 @@ export default function EcQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Do you have specific brand colors in mind?", "Does the client have specific brand hex/color codes locked?")}
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={hasBrandColors === 'yes'} onChange={() => setHasBrandColors('yes')} /> Custom colors</label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={hasBrandColors === 'no'} onChange={() => setHasBrandColors('no')} /> Freelancer choice</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={hasBrandColors === 'yes'} onChange={() => setHasBrandColors('yes')} /> Custom colors</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={hasBrandColors === 'no'} onChange={() => setHasBrandColors('no')} /> Freelancer choice</label>
             </div>
 
             {hasBrandColors === 'yes' && (
               <div className="mt-3 bg-slate-100/50 p-4 border rounded-2xl space-y-3 animate-fadeIn">
-                <span className="text-xs font-semibold block">How many brand colors to lock?</span>
+                <span className="text-sm font-semibold block">How many brand colors to lock?</span>
                 <div className="flex gap-2">
                   {[1, 2, 3].map(n => (
                     <button
                       key={n}
                       type="button"
                       onClick={() => setColorsCount(n)}
-                      className={`px-3 py-1 border text-xs font-bold rounded-lg ${
+                      className={`px-3 py-1 border text-sm font-bold rounded-lg ${
                         colorsCount === n ? 'bg-[#1A3C6E] text-white border-[#1A3C6E]' : 'bg-white text-slate-600 border-slate-200'
                       }`}
                     >
@@ -960,7 +960,7 @@ export default function EcQuestionnaireForm({
                 <div className="flex gap-4 items-center">
                   {Array.from({ length: colorsCount }).map((_, i) => (
                     <div key={i} className="flex flex-col items-center gap-1">
-                      <span className="text-[10px] font-mono text-slate-400">Color {i + 1}</span>
+                      <span className="text-xs font-mono text-slate-400">Color {i + 1}</span>
                       <div className="w-10 h-10 rounded-xl overflow-hidden border shadow-sm relative shrink-0">
                         <input 
                           type="color" 
@@ -974,7 +974,7 @@ export default function EcQuestionnaireForm({
                           className="w-[140%] h-[140%] -translate-x-[15%] -translate-y-[15%] border-none cursor-pointer" 
                         />
                       </div>
-                      <span className="text-[9px] font-mono font-bold text-slate-600 uppercase">{brandColors[i]}</span>
+                      <span className="text-[10px] font-mono font-bold text-slate-600 uppercase">{brandColors[i]}</span>
                     </div>
                   ))}
                 </div>
@@ -983,16 +983,16 @@ export default function EcQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Brand Tone (Select all that apply)", "Client Brand Tone & Design Aesthetic (Select all that apply)")}
             </label>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <div className="flex flex-wrap gap-2 text-sm">
               {["Professional", "Friendly", "Luxury", "Playful", "Bold / Edgy", "Minimalist", "Energetic", "Elegant / Feminine"].map(tone => (
                 <button
                   key={tone}
                   type="button"
                   onClick={() => toggleMultiSelect(tone, brandTones, setBrandTones)}
-                  className={`px-3 py-1 rounded border text-xs font-semibold cursor-pointer ${
+                  className={`px-3 py-1 rounded border text-sm font-semibold cursor-pointer ${
                     brandTones.includes(tone) ? 'bg-[#1A3C6E] text-white border-[#1A3C6E]' : 'bg-white border-slate-200 text-slate-600'
                   }`}
                 >
@@ -1006,32 +1006,32 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 9: CONTENT & MEDIA */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">9</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">9</span>
           {qL("Content & Media", "Client Sourced Visual Assets")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Product Images", "Product Images Sourced")}</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Product Images", "Product Images Sourced")}</label>
               <div className="flex gap-4">
-                <label className="flex items-center gap-1 text-xs cursor-pointer"><input type="radio" name="has_img_ec" checked={hasImages === 'yes'} onChange={() => setHasImages('yes')} /> Yes, I have</label>
-                <label className="flex items-center gap-1 text-xs cursor-pointer"><input type="radio" name="has_img_ec" checked={hasImages === 'no'} onChange={() => setHasImages('no')} /> No, mock them</label>
+                <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="has_img_ec" checked={hasImages === 'yes'} onChange={() => setHasImages('yes')} /> Yes, I have</label>
+                <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="has_img_ec" checked={hasImages === 'no'} onChange={() => setHasImages('no')} /> No, mock them</label>
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Product Videos", "Product Videos Sourced")}</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Product Videos", "Product Videos Sourced")}</label>
               <div className="flex gap-4">
-                <label className="flex items-center gap-1 text-xs cursor-pointer"><input type="radio" name="has_vid_ec" checked={hasVideos === 'yes'} onChange={() => setHasVideos('yes')} /> Yes, I have</label>
-                <label className="flex items-center gap-1 text-xs cursor-pointer"><input type="radio" name="has_vid_ec" checked={hasVideos === 'no'} onChange={() => setHasVideos('no')} /> No, mock them</label>
+                <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="has_vid_ec" checked={hasVideos === 'yes'} onChange={() => setHasVideos('yes')} /> Yes, I have</label>
+                <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="has_vid_ec" checked={hasVideos === 'no'} onChange={() => setHasVideos('no')} /> No, mock them</label>
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Testimonials / Reviews", "Customer Testimonials Sourced")}</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Testimonials / Reviews", "Customer Testimonials Sourced")}</label>
               <div className="flex gap-4">
-                <label className="flex items-center gap-1 text-xs cursor-pointer"><input type="radio" name="has_test_ec" checked={hasTestimonials === 'yes'} onChange={() => setHasTestimonials('yes')} /> Yes, I have</label>
-                <label className="flex items-center gap-1 text-xs cursor-pointer"><input type="radio" name="has_test_ec" checked={hasTestimonials === 'no'} onChange={() => setHasTestimonials('no')} /> No, mock them</label>
+                <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="has_test_ec" checked={hasTestimonials === 'yes'} onChange={() => setHasTestimonials('yes')} /> Yes, I have</label>
+                <label className="flex items-center gap-1 text-sm cursor-pointer"><input type="radio" name="has_test_ec" checked={hasTestimonials === 'no'} onChange={() => setHasTestimonials('no')} /> No, mock them</label>
               </div>
             </div>
           </div>
@@ -1040,15 +1040,15 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 10: WEBSITE STRUCTURE */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">10</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">10</span>
           {qL("Website Structure", "Retail Pages & Sitemap Scheme")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Which pages / segments do you want on your website? (Select multi)", "What pages are required for building the sitemap schema? (Select multi)")}</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Which pages / segments do you want on your website? (Select multi)", "What pages are required for building the sitemap schema? (Select multi)")}</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
               {["Home page", "Shop page", "Product details page", "About us", "Contact page", "FAQ page", "Blog details", "Cart / Checkout", "Privacy Policy", "Refund policy"].map(page => (
                 <label key={page} className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-slate-100 rounded-lg">
                   <input
@@ -1067,15 +1067,15 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 11: PAYMENT METHODS */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">11</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">11</span>
           {qL("Payment Methods", "Financial Integrations")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("How do you plan to accept customer payment payments? (Select multi)", "Which local financial gateway hooks are required? (Select multi)")}</label>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("How do you plan to accept customer payment payments? (Select multi)", "Which local financial gateway hooks are required? (Select multi)")}</label>
+            <div className="flex flex-wrap gap-2 text-sm">
               {["Cash on Delivery (COD)", "Local Bank Transfer details", "Card payment via Paystack", "Universal Flutterwave integrations", "Monnify / Opay gateway integrations", "Manual WhatsApp checkouts"].map(opt => (
                 <button
                   key={opt}
@@ -1095,21 +1095,21 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 12: SHIPPING & DELIVERY */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">12</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">12</span>
           {qL("Shipping & Delivery", "Logistics & Delivery Settings")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Where do you deliver products to?", "Target delivery scope bounds")}</label>
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Where do you deliver products to?", "Target delivery scope bounds")}</label>
             <div className="flex flex-wrap gap-2">
               {["Nationwide delivery", "Specific local states", "International shipping"].map(scope => (
                 <button
                   key={scope}
                   type="button"
                   onClick={() => toggleMultiSelect(scope, deliveryScope, setDeliveryScope)}
-                  className={`px-3 py-1 text-xs font-bold rounded-lg border ${
+                  className={`px-3 py-1 text-sm font-bold rounded-lg border ${
                     deliveryScope.includes(scope) ? 'bg-[#1A3C6E] text-[#D4A017]' : 'bg-white text-slate-600 border-slate-200'
                   }`}
                 >
@@ -1120,7 +1120,7 @@ export default function EcQuestionnaireForm({
 
             {deliveryScope.includes("Specific local states") && (
               <div className="mt-3 bg-slate-100/50 p-4 border rounded-2xl space-y-2 animate-fadeIn">
-                <span className="text-[11px] font-semibold text-slate-600 block">Deliverable State Areas:</span>
+                <span className="text-xs font-semibold text-slate-600 block">Deliverable State Areas:</span>
                 {deliveryStates.map((st, sIdx) => (
                   <div key={sIdx} className="flex gap-2">
                     <input 
@@ -1128,7 +1128,7 @@ export default function EcQuestionnaireForm({
                       value={st} 
                       onChange={e => updateArrayItem(sIdx, e.target.value, deliveryStates, setDeliveryStates)} 
                       placeholder="e.g. Lagos, Abuja, Rivers" 
-                      className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+                      className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none"
                     />
                     <button type="button" onClick={() => removeArrayItem(sIdx, deliveryStates, setDeliveryStates)} className="p-2 border rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors bg-white">
                       <Trash2 className="w-4 h-4" />
@@ -1138,7 +1138,7 @@ export default function EcQuestionnaireForm({
                 <button 
                   type="button" 
                   onClick={() => addArrayItem(deliveryStates, setDeliveryStates)}
-                  className="mt-1 inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-slate-400 hover:text-indigo-600"
+                  className="mt-1 inline-flex items-center gap-1 px-3 py-1 text-sm font-bold text-slate-400 hover:text-indigo-600"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add State
                 </button>
@@ -1148,8 +1148,8 @@ export default function EcQuestionnaireForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Delivery Options Sourced", "Retail delivery options")}</label>
-              <div className="flex flex-wrap gap-2 text-xs">
+              <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Delivery Options Sourced", "Retail delivery options")}</label>
+              <div className="flex flex-wrap gap-2 text-sm">
                 {["Standard delivery", "Express delivery", "Local pickup centers"].map(o => (
                   <button
                     key={o}
@@ -1166,10 +1166,10 @@ export default function EcQuestionnaireForm({
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Do you charge shipping delivery rates?", "Enable custom shipping rates calculation?")}</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Do you charge shipping delivery rates?", "Enable custom shipping rates calculation?")}</label>
               <div className="flex gap-4">
-                <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="radio" checked={chargeDelivery === 'yes'} onChange={() => setChargeDelivery('yes')} /> Yes, flat rate fee</label>
-                <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="radio" checked={chargeDelivery === 'no'} onChange={() => setChargeDelivery('no')} /> No, free shipping</label>
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" checked={chargeDelivery === 'yes'} onChange={() => setChargeDelivery('yes')} /> Yes, flat rate fee</label>
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" checked={chargeDelivery === 'no'} onChange={() => setChargeDelivery('no')} /> No, free shipping</label>
               </div>
               {chargeDelivery === 'yes' && (
                 <input
@@ -1177,20 +1177,20 @@ export default function EcQuestionnaireForm({
                   value={deliveryFee}
                   onChange={e => setDeliveryFee(e.target.value)}
                   placeholder="e.g. ₦2,500 flat fee"
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none"
                 />
               )}
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Which Logistics Partner do you use?", "Logistics Partner / Courier service:")}</label>
+            <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Which Logistics Partner do you use?", "Logistics Partner / Courier service:")}</label>
             <input
               type="text"
               value={logisticsPartner}
               onChange={e => setLogisticsPartner(e.target.value)}
               placeholder="e.g. GIG Logistics, DHL Express, local riders"
-              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none"
             />
           </div>
         </div>
@@ -1198,16 +1198,16 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 13: ORDER MANAGEMENT */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">13</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">13</span>
           {qL("Order Management", "Order Fulfilment Notification Flow")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Where do you want to receive order notifications?", "Fulfilment Notification triggers: (Select multi)")}</label>
-              <div className="flex flex-wrap gap-2 text-xs">
+              <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Where do you want to receive order notifications?", "Fulfilment Notification triggers: (Select multi)")}</label>
+              <div className="flex flex-wrap gap-2 text-sm">
                 {["Email alerts", "WhatsApp chat ping", "Dashboard / admin panel alerts"].map(method => (
                   <button
                     key={method}
@@ -1224,10 +1224,10 @@ export default function EcQuestionnaireForm({
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Do you want automated email confirmation templates sent to customers?", "Do we trigger automated check-out receipts?")}</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Do you want automated email confirmation templates sent to customers?", "Do we trigger automated check-out receipts?")}</label>
               <div className="flex gap-4">
-                <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={autoConf === 'yes'} onChange={() => setAutoConf('yes')} /> Yes</label>
-                <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={autoConf === 'no'} onChange={() => setAutoConf('no')} /> No</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={autoConf === 'yes'} onChange={() => setAutoConf('yes')} /> Yes</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={autoConf === 'no'} onChange={() => setAutoConf('no')} /> No</label>
               </div>
             </div>
           </div>
@@ -1236,15 +1236,15 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 14: FUNCTIONAL REQUIREMENTS */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">14</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">14</span>
           {qL("Functional Requirements", "Interactive eCommerce Store Features")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Which functional features do you need in your store? (Select multi)", "Retail interactive modular specs: (Select multi)")}</label>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Which functional features do you need in your store? (Select multi)", "Retail interactive modular specs: (Select multi)")}</label>
+            <div className="grid grid-cols-2 gap-2 text-sm">
               {["Shopping cart", "Wishlist / Save item", "Customer accounts login", "Product reviews section", "Live chat / WhatsApp floating CTA", "Discount coupon box", "SEO schema markup", "Inventory tracking limits", "Search and advanced filters"].map(feat => (
                 <label key={feat} className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-slate-100 rounded-lg">
                   <input
@@ -1261,7 +1261,7 @@ export default function EcQuestionnaireForm({
               value={otherRequirements}
               onChange={e => setOtherRequirements(e.target.value)}
               placeholder="Describe any other complex interactive elements or functions..."
-              className="w-full mt-3 border border-slate-200 rounded-xl px-4 py-2 text-xs bg-white min-h-[60px]"
+              className="w-full mt-3 border border-slate-200 rounded-xl px-4 py-2 text-sm bg-white min-h-[60px]"
             />
           </div>
         </div>
@@ -1269,21 +1269,21 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 15: TRAFFIC & MARKETING */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">15</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">15</span>
           {qL("Traffic & Marketing", "Social Traffic & Lead Acquisition Strategy")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Will you be running paid advertisements?", "Will the client deploy paid advertising channels?")}</label>
+              <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Will you be running paid advertisements?", "Will the client deploy paid advertising channels?")}</label>
               <div className="flex gap-4">
-                <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="radio" checked={runPaidAds === 'yes'} onChange={() => setRunPaidAds('yes')} /> Yes</label>
-                <label className="flex items-center gap-1.5 text-xs cursor-pointer"><input type="radio" checked={runPaidAds === 'no'} onChange={() => setRunPaidAds('no')} /> No</label>
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" checked={runPaidAds === 'yes'} onChange={() => setRunPaidAds('yes')} /> Yes</label>
+                <label className="flex items-center gap-1.5 text-sm cursor-pointer"><input type="radio" checked={runPaidAds === 'no'} onChange={() => setRunPaidAds('no')} /> No</label>
               </div>
               {runPaidAds === 'yes' && (
-                <div className="mt-2 text-[11px] space-y-1.5">
+                <div className="mt-2 text-xs space-y-1.5">
                   <span className="font-semibold block text-slate-500">Pick Active Ad Channels:</span>
                   {["Facebook Ads", "Instagram Ads", "TikTok Ads", "Google Display network"].map(plat => (
                     <label key={plat} className="flex items-center gap-1.5 cursor-pointer">
@@ -1301,8 +1301,8 @@ export default function EcQuestionnaireForm({
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-2">{qL("Which organic traffic generators will you utilize? (Select multi)", "Organic social traffic engines: (Select multi)")}</label>
-              <div className="flex flex-wrap gap-2 text-xs">
+              <label className="text-sm font-semibold text-slate-700 block mb-2">{qL("Which organic traffic generators will you utilize? (Select multi)", "Organic social traffic engines: (Select multi)")}</label>
+              <div className="flex flex-wrap gap-2 text-sm">
                 {["Organic social media", "Search engine SEO", "Influencer marketing", "Customer referrals program", "Fliers & physical prints"].map(source => (
                   <button
                     key={source}
@@ -1320,12 +1320,12 @@ export default function EcQuestionnaireForm({
           </div>
 
           <div className="pt-2 border-t">
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Do you need help setting up Facebook pixel, Google analytics, or Instagram Shop tags?", "Does the client require assistance with pixel tracking setup / tag integrations?")}
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={ecMarketingHelp === 'yes'} onChange={() => setEcMarketingHelp('yes')} /> Yes</label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={ecMarketingHelp === 'no'} onChange={() => setEcMarketingHelp('no')} /> No</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={ecMarketingHelp === 'yes'} onChange={() => setEcMarketingHelp('yes')} /> Yes</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={ecMarketingHelp === 'no'} onChange={() => setEcMarketingHelp('no')} /> No</label>
             </div>
           </div>
         </div>
@@ -1333,12 +1333,12 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 16: LEGAL & TRUST */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">16</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">16</span>
           {qL("Legal Pages & Trust", "Official Legal Policies & Safe Checkout Badges")}
         </legend>
 
-        <div className="space-y-4 pt-3 text-xs text-slate-700">
+        <div className="space-y-4 pt-3 text-sm text-slate-700">
           <span className="font-semibold block text-slate-600">{qL("Select legal policy requirements:", "Map active policy sheets:")}</span>
           
           <div className="space-y-3 bg-white p-4 border rounded-2xl">
@@ -1351,7 +1351,7 @@ export default function EcQuestionnaireForm({
               </div>
             </div>
             {privacyPolicy === 'no' && (
-              <div className="text-[11px] text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 rounded p-1.5 animate-fadeIn">
+              <div className="text-xs text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 rounded p-1.5 animate-fadeIn">
                 <span>{qL("Instruct freelance developer to draft and prepare this template?", "Draft customized privacy statement for client?")}</span>
                 <div className="flex gap-3">
                   <label className="flex items-center gap-1 cursor-pointer"><input type="radio" checked={privacyPolicyPrep === 'yes'} onChange={() => setPrivacyPolicyPrep('yes')} /> Yes</label>
@@ -1369,7 +1369,7 @@ export default function EcQuestionnaireForm({
               </div>
             </div>
             {termsPolicy === 'no' && (
-              <div className="text-[11px] text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 rounded p-1.5 animate-fadeIn">
+              <div className="text-xs text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 rounded p-1.5 animate-fadeIn">
                 <span>{qL("Instruct freelance developer to draft terms agreement?", "Draft customized terms agreement for client?")}</span>
                 <div className="flex gap-3">
                   <label className="flex items-center gap-1 cursor-pointer"><input type="radio" checked={termsPolicyPrep === 'yes'} onChange={() => setTermsPolicyPrep('yes')} /> Yes</label>
@@ -1387,7 +1387,7 @@ export default function EcQuestionnaireForm({
               </div>
             </div>
             {refundPolicy === 'no' && (
-              <div className="text-[11px] text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 rounded p-1.5 mt-2 animate-fadeIn">
+              <div className="text-xs text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 rounded p-1.5 mt-2 animate-fadeIn">
                 <span>{qL("Instruct freelance developer to draft refund policy template?", "Draft customized refund parameters?")}</span>
                 <div className="flex gap-3">
                   <label className="flex items-center gap-1 cursor-pointer"><input type="radio" checked={refundPolicyPrep === 'yes'} onChange={() => setRefundPolicyPrep('yes')} /> Yes</label>
@@ -1401,25 +1401,25 @@ export default function EcQuestionnaireForm({
 
       {/* SECTION 17: TIMELINE & BUDGET */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left animate-fadeIn">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">17</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">17</span>
           {qL("Timeline & Budget", "Project Timelines & Target Sourcing Budget")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Project Deadline Range", "Expected Delivery Date Indicator")}</label>
-              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium cursor-pointer" />
+              <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Project Deadline Range", "Expected Delivery Date Indicator")}</label>
+              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium cursor-pointer" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Target Budget Range", "Aesthetic Sourcing Budget Size")}</label>
-              <input type="text" value={budgetRange} onChange={e => setBudgetRange(e.target.value)} placeholder="e.g. ₦150,000 – ₦300,000" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium" />
+              <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Target Budget Range", "Aesthetic Sourcing Budget Size")}</label>
+              <input type="text" value={budgetRange} onChange={e => setBudgetRange(e.target.value)} placeholder="e.g. ₦150,000 – ₦300,000" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium" />
             </div>
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Additional Sourcing / Consulting Notes", "Additional Freelancer Instructions")}</label>
-            <textarea value={additionalNotes} onChange={e => setAdditionalNotes(e.target.value)} placeholder="Describe any special customization or technical integrations instructions..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs min-h-[100px] focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white" />
+            <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Additional Sourcing / Consulting Notes", "Additional Freelancer Instructions")}</label>
+            <textarea value={additionalNotes} onChange={e => setAdditionalNotes(e.target.value)} placeholder="Describe any special customization or technical integrations instructions..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm min-h-[100px] focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white" />
           </div>
         </div>
       </fieldset>

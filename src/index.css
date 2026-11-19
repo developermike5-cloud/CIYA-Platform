@@ -103,3 +103,8 @@ body.template-modal-open header {
   50% { width: 65%; opacity: 1; }
   100% { width: 8%; opacity: 0.55; }
 }
+
+/* Hide the app bottom navigation bar while a KYCB popup is open */
+body.ciya-modal-open .ciya-bottom-nav {
+  display: none !important;
+}

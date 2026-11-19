@@ -116,6 +116,11 @@ export default function AdminKycbQuestionnaire({
   // Gemini state
   const [aiGenerating, setAiGenerating] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showNewClientModal, setShowNewClientModal] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [showClientLinkModal, setShowClientLinkModal] = useState(false);
+  const [clientLinkForm, setClientLinkForm] = useState<SavedForm | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
 
   // Settings listener
   useEffect(() => {
@@ -1575,6 +1580,12 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
     resetFormDetails();
   };
 
+  const openClientLink = (form: SavedForm) => {
+    setClientLinkForm(form);
+    setLinkCopied(false);
+    setShowClientLinkModal(true);
+  };
+
   const toggleMultiSelect = (item: string, list: string[], setList: (v: string[]) => void) => {
     if (list.includes(item)) {
       setList(list.filter(x => x !== item));
@@ -1596,6 +1607,13 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
     }
   };
 
+  // Hide the app bottom navigation bar whenever a KYCB popup is open
+  const anyKycbModalOpen = showAiPromptModal || showInstructionalModal || showClearConfirm || showNewClientModal || showClientLinkModal || showViewModal;
+  useEffect(() => {
+    document.body.classList.toggle('ciya-modal-open', anyKycbModalOpen);
+    return () => { document.body.classList.remove('ciya-modal-open'); };
+  }, [anyKycbModalOpen]);
+
   return (
     <div className="flex flex-col gap-6 p-1 md:p-4 text-slate-800">
       {/* Branded Section Header */}
@@ -1616,14 +1634,14 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
           <div className="flex bg-slate-100 p-1 rounded-2xl self-start md:self-center border border-slate-200 shadow-inner">
             <button
               onClick={() => setLocalActiveSubView('form')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-200 border-0 cursor-pointer ${localActiveSubView === 'form' ? 'bg-[#1A3C6E] text-[#D4A017] shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all duration-200 border-0 cursor-pointer ${localActiveSubView === 'form' ? 'bg-[#1A3C6E] text-[#D4A017] shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
             >
               <ClipboardList className="w-4 h-4" />
               KYCB Form
             </button>
             <button
               onClick={() => setLocalActiveSubView('saved')}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all duration-200 border-0 cursor-pointer ${localActiveSubView === 'saved' ? 'bg-[#1A3C6E] text-[#D4A017] shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all duration-200 border-0 cursor-pointer ${localActiveSubView === 'saved' ? 'bg-[#1A3C6E] text-[#D4A017] shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
             >
               <Archive className="w-4 h-4" />
               Saved Forms
@@ -1651,12 +1669,12 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                     <Smartphone className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Student Tier</span>
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Student Tier</span>
                     <span className="text-sm font-black text-slate-900">Free Members</span>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-2 uppercase tracking-wide">Max Saved Forms</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">Max Saved Forms</label>
                   <div className="flex items-center gap-3">
                     <input 
                       type="number"
@@ -1665,7 +1683,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                       value={localKycbFreeLimit}
                       onChange={(e) => setLocalKycbFreeLimit(parseInt(e.target.value) || 0)}
                     />
-                    <span className="text-xs font-bold text-slate-400 whitespace-nowrap">Forms Allowed</span>
+                    <span className="text-sm font-bold text-slate-400 whitespace-nowrap">Forms Allowed</span>
                   </div>
                 </div>
               </div>
@@ -1677,12 +1695,12 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                     <Sparkles className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-wider block">Student Tier</span>
+                    <span className="text-xs font-black text-indigo-400 uppercase tracking-wider block">Student Tier</span>
                     <span className="text-sm font-black text-[#1A3C6E]">CIYA Student Pro</span>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-indigo-700 mb-2 uppercase tracking-wide">Max Saved Forms</label>
+                  <label className="block text-xs font-bold text-indigo-700 mb-2 uppercase tracking-wide">Max Saved Forms</label>
                   <div className="flex items-center gap-3">
                     <input 
                       type="number"
@@ -1691,7 +1709,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                       value={localKycbProLimit}
                       onChange={(e) => setLocalKycbProLimit(parseInt(e.target.value) || 0)}
                     />
-                    <span className="text-xs font-bold text-indigo-400 whitespace-nowrap">Forms Allowed</span>
+                    <span className="text-sm font-bold text-indigo-400 whitespace-nowrap">Forms Allowed</span>
                   </div>
                 </div>
               </div>
@@ -1700,13 +1718,13 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
             <div className="pt-6 border-t border-slate-100 flex items-center justify-between gap-3 text-emerald-600 bg-emerald-50/50 -mx-6 -mb-6 p-6 rounded-b-3xl">
               <div className="flex items-center gap-2">
                 <Check className="w-5 h-5" />
-                <span className="text-xs font-black uppercase tracking-wider">Settings are synced automatically across all student dashboards.</span>
+                <span className="text-sm font-black uppercase tracking-wider">Settings are synced automatically across all student dashboards.</span>
               </div>
               <button
                 type="button"
                 onClick={() => handleUpdateGlobalSettings()}
                 disabled={savingGlobal}
-                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black shadow-md transition-all active:scale-95 disabled:opacity-50"
               >
                 {savingGlobal ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {globalSettingsSaved ? 'Settings Saved! ✓' : 'Save All Settings'}
@@ -1731,12 +1749,12 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                     <Smartphone className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Student Tier</span>
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-wider block">Student Tier</span>
                     <span className="text-sm font-black text-slate-900">Free Members</span>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-2 uppercase tracking-wide">Daily Copy Limit</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">Daily Copy Limit</label>
                   <div className="flex items-center gap-3">
                     <input 
                       type="number"
@@ -1745,7 +1763,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                       value={localPromptsFreeLimit}
                       onChange={(e) => setLocalPromptsFreeLimit(parseInt(e.target.value) || 0)}
                     />
-                    <span className="text-xs font-bold text-slate-400 whitespace-nowrap">Copies Allowed</span>
+                    <span className="text-sm font-bold text-slate-400 whitespace-nowrap">Copies Allowed</span>
                   </div>
                 </div>
               </div>
@@ -1757,12 +1775,12 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                     <Sparkles className="w-5 h-5" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">Student Tier</span>
+                    <span className="text-xs font-black text-amber-400 uppercase tracking-wider block">Student Tier</span>
                     <span className="text-sm font-black text-[#1A3C6E]">CIYA Student Pro</span>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-amber-700 mb-2 uppercase tracking-wide">Daily Copy Limit</label>
+                  <label className="block text-xs font-bold text-amber-700 mb-2 uppercase tracking-wide">Daily Copy Limit</label>
                   <div className="flex items-center gap-3">
                     <input 
                       type="number"
@@ -1771,7 +1789,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                       value={localPromptsProLimit}
                       onChange={(e) => setLocalPromptsProLimit(parseInt(e.target.value) || 0)}
                     />
-                    <span className="text-xs font-bold text-amber-400 whitespace-nowrap">Copies Allowed</span>
+                    <span className="text-sm font-bold text-amber-400 whitespace-nowrap">Copies Allowed</span>
                   </div>
                 </div>
               </div>
@@ -1780,13 +1798,13 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
             <div className="pt-6 border-t border-slate-100 flex items-center justify-between gap-3 text-emerald-600 bg-emerald-50/50 -mx-6 -mb-6 p-6 rounded-b-3xl">
               <div className="flex items-center gap-2">
                 <Check className="w-5 h-5" />
-                <span className="text-xs font-black uppercase tracking-wider">Prompt usage limits are synced in real-time.</span>
+                <span className="text-sm font-black uppercase tracking-wider">Prompt usage limits are synced in real-time.</span>
               </div>
               <button
                 type="button"
                 onClick={() => handleUpdateGlobalSettings()}
                 disabled={savingGlobal}
-                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black shadow-md transition-all active:scale-95 disabled:opacity-50"
               >
                 {savingGlobal ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {globalSettingsSaved ? 'Settings Saved! ✓' : 'Save All Settings'}
@@ -1802,165 +1820,64 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
         <div className="w-full lg:w-72 bg-white rounded-2xl border border-slate-200 p-4 shrink-0 shadow-sm flex flex-col gap-4">
           <div className="flex justify-between items-center pb-2 border-b">
             <span className="font-extrabold text-sm text-slate-900 tracking-wider">SAVED FORMS</span>
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${hasExceededLimit ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
+            <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${hasExceededLimit ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
               {savedForms.length} / {currentLimit}
             </span>
           </div>
 
-          <button
-            onClick={resetForm}
-            disabled={hasExceededLimit}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-black shadow-lg transition-all cursor-pointer ${
-              hasExceededLimit 
-                ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none' 
-                : 'bg-[#1A3C6E] text-white shadow-indigo-950/20 hover:bg-[#15325C]'
-            }`}
-          >
-            <Plus className={`w-4 h-4 ${hasExceededLimit ? 'text-slate-300' : 'text-amber-400'}`} />
-            {hasExceededLimit ? 'Limit Reached' : 'Create New Sheet'}
-          </button>
-
           <div className="flex-1 overflow-y-auto max-h-[350px] lg:max-h-[600px] space-y-2 pr-1">
             {loading ? (
-              <div className="py-4 text-center text-xs text-slate-400 font-bold">Syncing archives...</div>
+              <div className="py-4 text-center text-sm text-slate-400 font-bold">Syncing archives...</div>
             ) : savedForms.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400 font-semibold italic">No saved questionnaires securely stored.</div>
+              <div className="py-8 text-center text-sm text-slate-400 font-semibold italic">No saved questionnaires securely stored.</div>
             ) : (
               savedForms.map(form => (
                 <div
                   key={form.id}
                   onClick={() => handleEdit(form)}
-                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex justify-between items-start gap-2 relative group overflow-hidden ${
+                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-2 relative group overflow-hidden ${
                     currentId === form.id 
                       ? 'border-[#1A3C6E] bg-slate-50 ring-1 ring-[#1A3C6E]' 
                       : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
                   }`}
                 >
-                  <div className="space-y-1">
-                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-[#D4A017] flex items-center gap-1">
-                      {form.type === 'lp' ? '✏️ LANDING PAGE' : (form.type === 'ec' ? '🛒 ECOMMERCE' : '💼 PORTFOLIO')}
-                    </span>
-                    <div className="font-extrabold text-[#1A3C6E] text-xs truncate max-w-[150px]">{form.clientName}</div>
-                    <div className="text-[10px] text-slate-400 font-bold truncate max-w-[150px]">{form.businessName}</div>
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="space-y-1 min-w-0">
+                      <span className="text-xs uppercase tracking-wider font-extrabold text-[#D4A017] flex items-center gap-1">
+                        {form.type === 'lp' ? '✏️ LANDING PAGE' : (form.type === 'ec' ? '🛒 ECOMMERCE' : '💼 PORTFOLIO')}
+                      </span>
+                      <div className="font-extrabold text-[#1A3C6E] text-sm truncate max-w-[150px]">{form.clientName}</div>
+                      <div className="text-xs text-slate-400 font-bold truncate max-w-[150px]">{form.businessName}</div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(form.id, e); }}
+                      aria-label="Delete questionnaire"
+                      className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    onClick={(e) => handleDelete(form.id, e)}
-                    aria-label="Delete questionnaire"
-                    className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="pt-2 border-t border-slate-100 grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+                    <span />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleEdit(form); setShowViewModal(true); }}
+                      className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black uppercase tracking-wider cursor-pointer transition-colors"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openClientLink(form); }}
+                      className="justify-self-end px-2.5 py-1.5 rounded-lg bg-[#1A3C6E] hover:bg-[#15325C] text-white text-xs font-black cursor-pointer transition-colors flex items-center gap-1"
+                    >
+                      <Link2 className="w-3 h-3 text-amber-400" />
+                      Client Link
+                    </button>
+                  </div>
                 </div>
               ))
             )}
           </div>
 
-          {/* CLIENT LINK GENERATOR */}
-          <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 relative">
-            {hasExceededLimit && (
-              <div className="absolute inset-0 bg-white/95 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-center p-4 rounded-2xl border border-dashed border-rose-200">
-                <div className="p-3 bg-rose-50 rounded-full mb-3 text-rose-500 border border-rose-200 shadow-sm">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <h5 className="text-xs font-black text-slate-800 uppercase tracking-wider">KYCB Archive Full</h5>
-                <p className="text-[10px] text-slate-500 font-bold max-w-[200px] leading-relaxed mt-2">
-                  {isPro 
-                    ? `You have reached your maximum limit of ${currentLimit} saved forms. Please delete an old form to generate a new client link.`
-                    : `Free members can save up to ${currentLimit} forms. Upgrade to CIYA Student Pro to increase your archive capacity!`}
-                </p>
-                {!isPro && (
-                  <div className="mt-4 text-[9px] font-black uppercase text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-150">
-                    UPGRADE TO PRO
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <h4 className="text-xs font-black text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
-                <Link2 className="w-4 h-4 text-[#1A3C6E]" /> Client Share Link
-              </h4>
-              <p className="text-[10px] text-slate-400 font-bold leading-normal">
-                Generate a secure link for clients to fill out their design brief.
-              </p>
-            </div>
-
-            <div className="space-y-2 text-left">
-              <div>
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1.5">Target Form Profile</label>
-                <CustomDropdown
-                  disabled={hasExceededLimit}
-                  value={shareType}
-                  options={[
-                    { label: '✏️ Landing Page', value: 'lp' },
-                    { label: '🛒 eCommerce Store', value: 'ec' },
-                    { label: '💼 Portfolio Website', value: 'portfolio' }
-                  ]}
-                  onChange={(val) => setShareType(val as any)}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">
-                  Custom Form Title {isPro ? '✨' : '📝'}
-                </label>
-                <input
-                  type="text"
-                  value={shareTitle}
-                  disabled={hasExceededLimit}
-                  onChange={(e) => setShareTitle(e.target.value)}
-                  placeholder="e.g. Website Requirements Form"
-                  className={`w-full text-xs font-semibold border rounded-xl px-2.5 py-2 focus:outline-none ${
-                    !hasExceededLimit 
-                      ? 'border-slate-200 bg-white text-slate-800' 
-                      : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">Developer Name</label>
-                <input
-                  type="text"
-                  disabled={hasExceededLimit}
-                  value={shareStudent}
-                  onChange={(e) => setShareStudent(e.target.value)}
-                  placeholder="Your Name / Agency"
-                  className="w-full text-xs font-semibold border border-slate-200 rounded-xl px-2.5 py-2 focus:outline-none bg-white text-slate-800 disabled:opacity-50"
-                />
-              </div>
-            </div>
-
-            {linkCopied && (
-              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-center text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider animate-fadeIn">
-                Copied to Clipboard! ⚡ Send it to your Client!
-              </div>
-            )}
-
-            <button
-              type="button"
-              disabled={hasExceededLimit}
-              onClick={() => {
-                if (hasExceededLimit) return;
-                const origin = window.location.origin;
-                const params = new URLSearchParams();
-                params.set('type', shareType);
-                params.set('title', shareTitle || 'CIYA Academy Website Requirements Form');
-                if (shareStudent) {
-                  params.set('student', shareStudent);
-                }
-                const fullUrl = `${origin}/client-form?${params.toString()}`;
-                navigator.clipboard.writeText(fullUrl);
-                setLinkCopied(true);
-                setTimeout(() => setLinkCopied(false), 3000);
-              }}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-4 bg-teal-600 hover:bg-teal-700 hover:scale-[1.01] transition-all text-white rounded-xl text-xs font-black cursor-pointer shadow-md shadow-teal-700/10 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Link2 className="w-4 h-4" />
-              Generate & Copy Link
-            </button>
-          </div>
         </div>
       )}
 
@@ -1983,17 +1900,30 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
           {/* Global Metadata Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-left">
             <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Client Full Name *</label>
-              <input 
-                type="text" 
-                value={clientName} 
-                onChange={e => setClientName(e.target.value)} 
-                placeholder="e.g. Sandra Johnson" 
-                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-2 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
+              <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Client Full Name *</label>
+              <CustomDropdown
+                value={clientName}
+                options={savedForms.map(f => ({ label: `${f.clientName}${f.businessName ? ` · ${f.businessName}` : ''}`, value: f.id }))}
+                onChange={(val) => {
+                  const form = savedForms.find(x => x.id === val);
+                  if (form) handleEdit(form);
+                }}
+                placeholder="Select a saved client or create new"
+                className="w-full"
+                footer={
+                  <button
+                    type="button"
+                    onClick={() => setShowNewClientModal(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 mt-1 rounded-xl bg-[#1A3C6E] hover:bg-[#15325C] text-white text-sm font-black cursor-pointer transition-all"
+                  >
+                    <Plus className="w-4 h-4 text-amber-400" />
+                    Create New
+                  </button>
+                }
               />
             </div>
             <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Date Completed</label>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-wider block mb-1">Date Completed</label>
               <CIYADatePicker value={dateCompleted} onChange={setDateCompleted} />
             </div>
           </div>
@@ -2001,14 +1931,14 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
           {/* Toggle Mode Perspective Selector */}
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border border-slate-200/60 bg-slate-50/60 rounded-2xl p-4 mb-6 shadow-sm">
             <div className="flex flex-col text-left">
-              <span className="text-xs font-black text-[#1A3C6E] tracking-tight uppercase">View Mode Perspective</span>
-              <span className="text-[10px] text-slate-400 font-bold">Swap questions framing for clients or freelancers</span>
+              <span className="text-sm font-black text-[#1A3C6E] tracking-tight uppercase">View Mode Perspective</span>
+              <span className="text-xs text-slate-400 font-bold">Swap questions framing for clients or freelancers</span>
             </div>
             <div className="flex bg-white border border-slate-200 p-1 rounded-xl shadow-inner shrink-0">
               <button
                 type="button"
                 onClick={() => setViewPerspective('client')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${
                   viewPerspective === 'client' 
                     ? 'bg-[#1A3C6E] text-[#D4A017] shadow-sm font-black' 
                     : 'text-slate-500 hover:text-slate-800'
@@ -2019,7 +1949,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
               <button
                 type="button"
                 onClick={() => setViewPerspective('freelancer')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${
                   viewPerspective === 'freelancer' 
                     ? 'bg-[#1A3C6E] text-[#D4A017] shadow-sm font-black' 
                     : 'text-slate-500 hover:text-slate-800'
@@ -2035,7 +1965,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
             <button
               type="button"
               onClick={() => handleTabToggle('lp')}
-              className={`flex-1 py-3 px-3 text-center rounded-lg text-xs font-black transition-all cursor-pointer ${
+              className={`flex-1 py-3 px-3 text-center rounded-lg text-sm font-black transition-all cursor-pointer ${
                 activeTab === 'lp' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
               }`}
             >
@@ -2044,7 +1974,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
             <button
               type="button"
               onClick={() => handleTabToggle('ec')}
-              className={`flex-1 py-3 px-3 text-center rounded-lg text-xs font-black transition-all cursor-pointer ${
+              className={`flex-1 py-3 px-3 text-center rounded-lg text-sm font-black transition-all cursor-pointer ${
                 activeTab === 'ec' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
               }`}
             >
@@ -2053,7 +1983,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
             <button
               type="button"
               onClick={() => handleTabToggle('portfolio')}
-              className={`flex-1 py-3 px-3 text-center rounded-lg text-xs font-black transition-all cursor-pointer ${
+              className={`flex-1 py-3 px-3 text-center rounded-lg text-sm font-black transition-all cursor-pointer ${
                 activeTab === 'portfolio' ? 'bg-[#1A3C6E] text-[#D4A017] shadow' : 'text-slate-600 hover:text-slate-900 bg-transparent'
               }`}
             >
@@ -2454,60 +2384,50 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
             )}
           </div>
 
-          {/* Global form controls */}
-          <div className="mt-8 pt-4 border-t border-slate-200 space-y-5">
-            {/* Save & Clear draft controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-3 px-5 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-black cursor-pointer shadow-lg shadow-emerald-900/15 transition-all active:scale-[0.98] disabled:opacity-50 text-left"
-              >
-                <span className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-                  <Save className="w-5 h-5" />
-                </span>
-                <span className="flex flex-col">
-                  <span>{saving ? 'Saving...' : 'Save My Work'}</span>
-                  <span className="text-[10px] font-bold text-emerald-100/90">Keep your answers so you can continue anytime</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowClearConfirm(true)}
-                className="flex items-center gap-3 px-5 py-3.5 bg-white hover:bg-rose-50 text-rose-700 border-2 border-rose-200 rounded-xl text-sm font-black cursor-pointer shadow-sm transition-all active:scale-[0.98] text-left"
-              >
-                <span className="w-9 h-9 rounded-lg bg-rose-100 flex items-center justify-center shrink-0">
-                  <Trash2 className="w-5 h-5" />
-                </span>
-                <span className="flex flex-col">
-                  <span>Clear Form</span>
-                  <span className="text-[10px] font-bold text-rose-400">Erase all your answers and start afresh</span>
-                </span>
-              </button>
-            </div>
+          {/* Save & Clear draft controls */}
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setShowClearConfirm(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 rounded-lg text-sm font-black cursor-pointer shadow-sm transition-all active:scale-95"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Clear Form
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-black cursor-pointer shadow-sm transition-all active:scale-95 disabled:opacity-50"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {saving ? 'Saving...' : 'Save My Work'}
+            </button>
+          </div>
+          <p className="mt-1.5 text-xs text-center text-slate-400 font-bold">
+            Save keeps your answers so you can continue anytime. Clear erases everything and starts afresh.
+          </p>
 
-            {/* Generate Master Prompt with AI */}
-            <div className="flex flex-col items-center gap-3">
-              <button
-                type="button"
-                onClick={handleAiGenerate}
-                disabled={aiGenerating}
-                className="w-full flex items-center justify-center gap-3 px-8 py-3 bg-gradient-to-r from-[#1A3C6E] to-indigo-600 hover:from-[#15325C] hover:to-indigo-700 text-white rounded-xl text-sm font-black cursor-pointer shadow-xl shadow-indigo-900/20 transition-all active:scale-95 disabled:opacity-50"
-              >
-                {aiGenerating ? (
-                  <>
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    AI is compiling your Master Prompt...
-                  </>
-                ) : (
-                  <>Generate Master Prompt with AI</>
-                )}
-              </button>
-              <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-widest animate-fadeIn">
-                AI will scan your KYC data and compile it into a high-fidelity Master prompt automatically.
-              </p>
-            </div>
+          {/* Generate Master Prompt with AI */}
+          <div className="mt-5 pt-4 border-t border-slate-200 flex flex-col items-center gap-3">
+            <button
+              type="button"
+              onClick={handleAiGenerate}
+              disabled={aiGenerating}
+              className="w-full flex items-center justify-center gap-3 px-8 py-3 bg-gradient-to-r from-[#1A3C6E] to-indigo-600 hover:from-[#15325C] hover:to-indigo-700 text-white rounded-xl text-sm font-black cursor-pointer shadow-xl shadow-indigo-900/20 transition-all active:scale-95 disabled:opacity-50"
+            >
+              {aiGenerating ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  AI is compiling your Master Prompt...
+                </>
+              ) : (
+                <>Generate Master Prompt with AI</>
+              )}
+            </button>
+            <p className="text-xs text-center text-slate-400 font-bold uppercase tracking-widest animate-fadeIn">
+              AI will scan your KYC data and compile it into a high-fidelity Master prompt automatically.
+            </p>
           </div>
         </div>
       )}
@@ -2523,11 +2443,11 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                 <div>
                   <h3 className="font-black text-sm md:text-base text-white tracking-tight flex items-center gap-2">
                     Instructional Prompt
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">
+                    <span className="text-xs font-extrabold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">
                       KYC + Template Converter
                     </span>
                   </h3>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  <p className="text-sm text-slate-400 font-medium mt-0.5">
                     Instructions for AI chatbots (ChatGPT, Gemini, Claude, Cursor, v0) to merge your KYC with any Website Prompt Template.
                   </p>
                 </div>
@@ -2544,10 +2464,10 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
               <div className="p-5 md:p-6 overflow-y-auto space-y-5 flex-1 text-slate-700 min-h-0">
                 {/* How To Steps */}
                 <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-2xl p-4 space-y-2.5">
-                  <h4 className="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <h4 className="text-sm font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
                     <Check className="w-4 h-4 text-indigo-600" /> Workflow Steps
                   </h4>
-                  <ol className="text-xs text-indigo-900 font-medium space-y-1.5 list-decimal list-inside leading-relaxed">
+                  <ol className="text-sm text-indigo-900 font-medium space-y-1.5 list-decimal list-inside leading-relaxed">
                     <li>
                       <strong>1. Copy your KYC:</strong> Click <span className="px-2 py-0.5 rounded bg-white text-indigo-900 font-bold border border-indigo-200">Copy Prompt Text</span> at the bottom of the KYCB page.
                     </li>
@@ -2563,14 +2483,14 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                 {/* Prompt Preview Box */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                    <span className="text-sm font-black text-slate-800 uppercase tracking-wider">
                       Instructional Blueprint Text
                     </span>
-                    <span className="text-[11px] font-semibold text-slate-500">
+                    <span className="text-xs font-semibold text-slate-500">
                       Auto-swaps all brand & business details into your template
                     </span>
                   </div>
-                  <pre className="p-4 bg-slate-950 text-slate-200 rounded-2xl text-xs font-mono leading-relaxed whitespace-pre-wrap border border-slate-800 select-all max-h-64 overflow-y-auto">
+                  <pre className="p-4 bg-slate-950 text-slate-200 rounded-2xl text-sm font-mono leading-relaxed whitespace-pre-wrap border border-slate-800 select-all max-h-64 overflow-y-auto">
 {INSTRUCTIONAL_PROMPT_TEXT}
                   </pre>
                 </div>
@@ -2581,14 +2501,14 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                 <button
                   type="button"
                   onClick={() => setShowInstructionalModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-bold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
                 >
                   Close
                 </button>
                 <button
                   type="button"
                   onClick={handleCopyInstructionalPrompt}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-950/20 transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black shadow-md shadow-indigo-950/20 transition-all cursor-pointer"
                 >
                   <Copy className="w-4 h-4 text-amber-300" />
                   {instructionalCopied ? 'Instructional Prompt Copied! ✓' : 'Copy Instructional Prompt'}
@@ -2608,7 +2528,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                   <h3 className="font-black text-sm md:text-base text-white tracking-tight flex items-center gap-2">
                     AI Master Prompt
                   </h3>
-                  <p className="text-xs md:text-sm font-bold text-slate-200 mt-1">
+                  <p className="text-sm md:text-sm font-bold text-slate-200 mt-1">
                     Generated from this student's KYCB questionnaire answers. Paste it into any AI (ChatGPT, Claude, or Google AI Studio) to build the website.
                   </p>
                 </div>
@@ -2626,10 +2546,10 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                 {/* Prompt Preview Box */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                    <span className="text-sm font-black text-slate-800 uppercase tracking-wider">
                       Generated Prompt
                     </span>
-                    <span className="text-[11px] font-semibold text-slate-500">
+                    <span className="text-xs font-semibold text-slate-500">
                       Tailored to the student's business info
                     </span>
                   </div>
@@ -2638,12 +2558,12 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                       components={{
                         h1: ({ node, ...props }) => <h1 className="text-base font-black text-white mt-4 mb-2 first:mt-0" {...props} />,
                         h2: ({ node, ...props }) => <h2 className="text-sm md:text-base font-black text-white mt-4 mb-2 first:mt-0" {...props} />,
-                        h3: ({ node, ...props }) => <h3 className="text-xs md:text-sm font-black text-indigo-300 mt-3 mb-1.5 first:mt-0" {...props} />,
-                        h4: ({ node, ...props }) => <h4 className="text-xs font-black text-indigo-300 mt-3 mb-1 first:mt-0" {...props} />,
-                        p: ({ node, ...props }) => <p className="text-xs md:text-sm text-slate-300 leading-relaxed mb-2" {...props} />,
+                        h3: ({ node, ...props }) => <h3 className="text-sm md:text-sm font-black text-indigo-300 mt-3 mb-1.5 first:mt-0" {...props} />,
+                        h4: ({ node, ...props }) => <h4 className="text-sm font-black text-indigo-300 mt-3 mb-1 first:mt-0" {...props} />,
+                        p: ({ node, ...props }) => <p className="text-sm md:text-sm text-slate-300 leading-relaxed mb-2" {...props} />,
                         strong: ({ node, ...props }) => <strong className="font-black text-white" {...props} />,
-                        ul: ({ node, ...props }) => <ul className="list-disc list-outside pl-4 text-xs md:text-sm text-slate-300 space-y-1 mb-2" {...props} />,
-                        ol: ({ node, ...props }) => <ol className="list-decimal list-outside pl-4 text-xs md:text-sm text-slate-300 space-y-1 mb-2" {...props} />,
+                        ul: ({ node, ...props }) => <ul className="list-disc list-outside pl-4 text-sm md:text-sm text-slate-300 space-y-1 mb-2" {...props} />,
+                        ol: ({ node, ...props }) => <ol className="list-decimal list-outside pl-4 text-sm md:text-sm text-slate-300 space-y-1 mb-2" {...props} />,
                         li: ({ node, ...props }) => <li className="leading-relaxed" {...props} />,
                         hr: () => <hr className="border-slate-700 my-3" />,
                         code: ({ node, ...props }) => <code className="text-amber-300" {...props} />,
@@ -2661,14 +2581,14 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                 <button
                   type="button"
                   onClick={() => setShowAiPromptModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-bold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
                 >
                   Close
                 </button>
                 <button
                   type="button"
                   onClick={handleCopyAiPrompt}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-950/20 transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black shadow-md shadow-indigo-950/20 transition-all cursor-pointer"
                 >
                   <Copy className="w-4 h-4 text-amber-300" />
                   {aiCopied ? 'Master Prompt Copied! ✓' : 'Copy Master Prompt'}
@@ -2677,6 +2597,229 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
             </div>
           </div>
         )}
+      {/* New Client popup (from the Client Full Name dropdown) */}
+      {showNewClientModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-sm w-full border border-slate-200 shadow-2xl overflow-hidden">
+            <div className="p-5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+              <div>
+                <h3 className="font-black text-sm md:text-base text-white tracking-tight">New Client Form</h3>
+                <p className="text-sm font-bold text-slate-200 mt-1">Start a fresh KYCB form for a new client.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewClientModal(false)}
+                className="w-9 h-9 rounded-full bg-slate-700 hover:bg-slate-600 text-white border-2 border-slate-500 shadow-md flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-black uppercase text-slate-400 tracking-wider block mb-1.5">Client Full Name</label>
+                <input
+                  type="text"
+                  value={newClientName}
+                  onChange={(e) => setNewClientName(e.target.value)}
+                  placeholder="e.g. Sandra Johnson"
+                  autoFocus
+                  className="w-full text-sm font-semibold border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1A3C6E]/30 bg-white text-slate-800"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowNewClientModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-black hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const name = newClientName.trim();
+                    if (!name) return;
+                    resetForm();
+                    setClientName(name);
+                    setShowNewClientModal(false);
+                    setNewClientName('');
+                    showCiyaToast(`New KYCB form started for ${name}. Fill it in and save it to the archive.`);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-[#1A3C6E] hover:bg-[#15325C] text-white text-sm font-black transition-all cursor-pointer disabled:opacity-50"
+                  disabled={!newClientName.trim()}
+                >
+                  Start New Form
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Client Share Link popup (per saved form) */}
+      {showClientLinkModal && clientLinkForm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+              <div>
+                <h3 className="font-black text-sm md:text-base text-white tracking-tight flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-[#D4A017]" />
+                  Client Share Link
+                </h3>
+                <p className="text-sm font-bold text-slate-200 mt-1 truncate max-w-[240px]">
+                  {clientLinkForm.clientName}{clientLinkForm.businessName ? ` · ${clientLinkForm.businessName}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowClientLinkModal(false)}
+                className="w-9 h-9 rounded-full bg-slate-700 hover:bg-slate-600 text-white border-2 border-slate-500 shadow-md flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-4 flex-1 min-h-0">
+              <p className="text-sm font-semibold text-slate-600 leading-relaxed">
+                The Client Share Link lets your client fill out their own design brief online. Generate it, copy it, and send it to your client on WhatsApp or email. Their answers come straight back to your KYCB archive.
+              </p>
+
+              <div>
+                <label className="text-xs font-black uppercase text-slate-400 tracking-wider block mb-1.5">Website Type (fixed to this form)</label>
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-100 border border-slate-200">
+                  <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span className="text-sm font-black text-slate-800">
+                    {clientLinkForm.type === 'lp' ? '✏️ Landing Page' : clientLinkForm.type === 'ec' ? '🛒 eCommerce Store' : '💼 Portfolio Website'}
+                  </span>
+                  <span className="ml-auto text-xs font-bold text-slate-400">Cannot be changed</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-black uppercase text-slate-400 tracking-wider block mb-1">Custom Form Title</label>
+                <input
+                  type="text"
+                  value={shareTitle}
+                  onChange={(e) => setShareTitle(e.target.value)}
+                  placeholder="e.g. Website Requirements Form"
+                  className="w-full text-sm font-semibold border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none bg-white text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-black uppercase text-slate-400 tracking-wider block mb-1">Developer Name</label>
+                <input
+                  type="text"
+                  value={shareStudent}
+                  onChange={(e) => setShareStudent(e.target.value)}
+                  placeholder="Your Name / Agency"
+                  className="w-full text-sm font-semibold border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none bg-white text-slate-800"
+                />
+              </div>
+
+              {hasExceededLimit && (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs font-bold text-rose-700 leading-relaxed">
+                  Your KYCB archive is full ({savedForms.length}/{currentLimit}). Delete an old form to generate a new client link.
+                </div>
+              )}
+
+              {linkCopied && (
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-center text-xs font-extrabold text-emerald-800 uppercase tracking-wider animate-fadeIn">
+                  Copied to Clipboard! ⚡ Send it to your Client!
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-200">
+              <button
+                type="button"
+                disabled={hasExceededLimit}
+                onClick={() => {
+                  if (!clientLinkForm || hasExceededLimit) return;
+                  const origin = window.location.origin;
+                  const params = new URLSearchParams();
+                  params.set('type', clientLinkForm.type);
+                  params.set('title', shareTitle || 'CIYA Academy Website Requirements Form');
+                  if (shareStudent) {
+                    params.set('student', shareStudent);
+                  }
+                  navigator.clipboard.writeText(`${origin}/client-form?${params.toString()}`);
+                  setLinkCopied(true);
+                  setTimeout(() => setLinkCopied(false), 3000);
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-black cursor-pointer shadow-md shadow-teal-700/10 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Link2 className="w-4 h-4" />
+                Generate & Copy Link
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Saved form answers popup */}
+      {showViewModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+              <div>
+                <h3 className="font-black text-sm md:text-base text-white tracking-tight">Saved Form Answers</h3>
+                <p className="text-sm font-bold text-slate-200 mt-1 truncate max-w-[280px]">{clientName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowViewModal(false)}
+                className="w-9 h-9 rounded-full bg-slate-700 hover:bg-slate-600 text-white border-2 border-slate-500 shadow-md flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-1.5">
+              {(() => {
+                const lines = generatePromptText().split('\n');
+                const nodes: React.ReactNode[] = [];
+                let started = false;
+                lines.forEach((line, i) => {
+                  const t = line.trim();
+                  if (!started) {
+                    if (t.startsWith('[') && t.endsWith(']')) started = true;
+                    else return;
+                  }
+                  if (!t || /^[=]+$/.test(t)) return;
+                  if (t.startsWith('[') && t.endsWith(']')) {
+                    nodes.push(<div key={i} className="text-sm font-black text-[#1A3C6E] uppercase tracking-wider pt-3">{t.slice(1, -1)}</div>);
+                    return;
+                  }
+                  if (t.startsWith('- ')) {
+                    const body = t.slice(2);
+                    const ci = body.indexOf(':');
+                    const label = ci >= 0 ? body.slice(0, ci) : body;
+                    const value = ci >= 0 ? body.slice(ci + 1).trim() : '';
+                    const empty = !value || value === 'Not specified' || value === 'None';
+                    nodes.push(
+                      <div key={i} className="flex items-start gap-2 text-sm leading-relaxed">
+                        <span className="font-black text-slate-800 shrink-0 max-w-[45%]">{label}:</span>
+                        <span className={`font-semibold ${empty ? 'text-slate-400 italic' : 'text-slate-700'}`}>{empty ? '—' : value}</span>
+                      </div>
+                    );
+                    return;
+                  }
+                  nodes.push(<div key={i} className="text-sm text-slate-600 font-semibold">{t}</div>);
+                });
+                return nodes;
+              })()}
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowViewModal(false)}
+                className="px-6 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ConfirmDialog
         open={showClearConfirm}
         title="Clear the whole form?"

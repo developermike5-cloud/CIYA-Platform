@@ -18,6 +18,7 @@ interface CustomDropdownProps {
   disabled?: boolean;
   theme?: 'light' | 'dark' | 'indigo' | 'teal' | 'amber';
   openUp?: boolean;
+  footer?: React.ReactNode;
 }
 
 export default function CustomDropdown({
@@ -28,7 +29,8 @@ export default function CustomDropdown({
   className = '',
   disabled = false,
   theme = 'light',
-  openUp = false
+  openUp = false,
+  footer
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -97,7 +99,7 @@ export default function CustomDropdown({
       >
         <div className="flex items-center gap-2 truncate">
           {selectedOption?.icon}
-          <span className="truncate">{selectedOption?.label || placeholder}</span>
+          <span className="truncate">{selectedOption?.label || value || placeholder}</span>
         </div>
         <ChevronDown className={`w-4 h-4 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -130,6 +132,9 @@ export default function CustomDropdown({
                   {value === option.value && <Check className="w-3.5 h-3.5" />}
                 </div>
               ))
+            )}
+            {footer && (
+              <div className="border-t border-slate-100 mt-1 px-2 py-1.5">{footer}</div>
             )}
           </motion.div>
         )}

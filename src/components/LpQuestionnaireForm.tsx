@@ -245,21 +245,21 @@ export default function LpQuestionnaireForm({
     <div className="space-y-6">
       {/* SECTION 1: Business Information */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">1</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">1</span>
           {qL("Business Information", "Client Business Information")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Do you have an existing website?", "Does the client have an existing website?")}
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" checked={hasSite === 'yes'} onChange={() => setHasSite('yes')} /> Yes
               </label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" checked={hasSite === 'no'} onChange={() => setHasSite('no')} /> No
               </label>
             </div>
@@ -269,20 +269,20 @@ export default function LpQuestionnaireForm({
                 value={siteUrl} 
                 onChange={e => setSiteUrl(e.target.value)} 
                 placeholder="Paste link here..." 
-                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+                className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none"
               />
             )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-sm font-semibold text-slate-700 block mb-1">
                 {qL("Business Name *", "Client's Business Name *")}
               </label>
-              <input type="text" value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="e.g. Apex Beauty Studio" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium" />
+              <input type="text" value={businessName} onChange={e => setBusinessName(e.target.value)} placeholder="e.g. Apex Beauty Studio" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-sm font-semibold text-slate-700 block mb-1">
                 {qL("Industry / Niche", "Business Industry / Niche")}
               </label>
               <div className="relative">
@@ -311,40 +311,40 @@ export default function LpQuestionnaireForm({
                     value={industry} 
                     onChange={e => setIndustry(e.target.value)} 
                     placeholder="Add custom industry niche..." 
-                    className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white"
                   />
                 )}
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-sm font-semibold text-slate-700 block mb-1">
                 {qL("Phone Number", "Client's Phone Number")}
               </label>
-              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. +234 81 2345" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
+              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. +234 81 2345" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-sm font-semibold text-slate-700 block mb-1">
                 {qL("Email Address", "Client's Email Address")}
               </label>
-              <input type="text" value={email} onChange={e => setEmail(e.target.value)} placeholder="e.g. hello@yourbrand.com" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
+              <input type="text" value={email} onChange={e => setEmail(e.target.value)} placeholder="e.g. hello@yourbrand.com" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
             </div>
             <div className="md:col-span-2">
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
+              <label className="text-sm font-semibold text-slate-700 block mb-1">
                 {qL("Business Address", "Client's Business Address")}
               </label>
-              <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="City, State" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
+              <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="City, State" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Do you have Social Media accounts?", "Does the client have Social Media accounts?")}
             </label>
             <div className="flex gap-4 mb-3">
-              <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" name="has_soc_med_lp_custom" checked={hasSocialMediaAsked === 'yes'} onChange={() => { setHasSocialMediaAsked('yes'); }} /> Yes
               </label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" name="has_soc_med_lp_custom" checked={hasSocialMediaAsked === 'no'} onChange={() => { setHasSocialMediaAsked('no'); setSocialLinks(['']); }} /> No
               </label>
             </div>
@@ -352,14 +352,14 @@ export default function LpQuestionnaireForm({
             {hasSocialMediaAsked === 'no' && (
               <div className="mb-3 bg-amber-50/50 border border-amber-200 rounded-xl p-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span className="text-[10px] text-amber-800 font-bold block">No official handles yet? Build dynamic placeholder accounts.</span>
+                  <span className="text-xs text-amber-800 font-bold block">No official handles yet? Build dynamic placeholder accounts.</span>
                   <button
                     type="button"
                     onClick={() => {
                       setHasSocialMediaAsked('yes');
                       setSocialLinks(['https://instagram.com/your_industry_brand_placeholder', 'https://facebook.com/your_industry_brand_placeholder']);
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1A3C6E] hover:bg-[#15325C] text-white rounded-lg text-[10px] font-black transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1A3C6E] hover:bg-[#15325C] text-white rounded-lg text-xs font-black transition-all cursor-pointer"
                   >
                     💡 Use Placeholder Accounts
                   </button>
@@ -376,7 +376,7 @@ export default function LpQuestionnaireForm({
                       value={link} 
                       onChange={e => updateArrayItem(idx, e.target.value, socialLinks, setSocialLinks)} 
                       placeholder={`Social media link ${idx + 1}`} 
-                      className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
+                      className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
                     />
                     <button type="button" onClick={() => removeArrayItem(idx, socialLinks, setSocialLinks)} className="p-2 border rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors">
                       <Trash2 className="w-4 h-4" />
@@ -386,7 +386,7 @@ export default function LpQuestionnaireForm({
                 <button 
                   type="button" 
                   onClick={() => addArrayItem(socialLinks, setSocialLinks)}
-                  className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed rounded-lg text-xs font-bold text-slate-400 hover:text-[#1A3C6E] hover:border-[#1A3C6E] transition-colors"
+                  className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed rounded-lg text-sm font-bold text-slate-400 hover:text-[#1A3C6E] hover:border-[#1A3C6E] transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add social link
                 </button>
@@ -398,13 +398,13 @@ export default function LpQuestionnaireForm({
 
       {/* SECTION 2: Project Goal & Actions */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">2</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">2</span>
           {qL("Project Goal & Actions", "Project Goal & Customer Actions")}
         </legend>
         
         <div className="space-y-4 pt-3">
-          <label className="text-xs font-semibold text-slate-700 block">
+          <label className="text-sm font-semibold text-slate-700 block">
             {qL("What action do you want visitors to take? (Select multi)", "What action should visitors take on the Landing Page? (Select multi)")}
           </label>
           <div className="flex flex-wrap gap-2">
@@ -417,7 +417,7 @@ export default function LpQuestionnaireForm({
                 key={action}
                 type="button"
                 onClick={() => toggleMultiSelect(action, visitorActions, setVisitorActions)}
-                className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg border text-sm font-bold transition-all cursor-pointer ${
                   visitorActions.includes(action) 
                     ? 'bg-[#1A3C6E] text-[#D4A017] border-[#1A3C6E]' 
                     : 'bg-white border-slate-200 text-slate-600 hover:border-[#1A3C6E]'
@@ -428,24 +428,24 @@ export default function LpQuestionnaireForm({
             ))}
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Any other action?", "Any other custom action required?")}
             </label>
-            <input type="text" value={otherAction} onChange={e => setOtherAction(e.target.value)} placeholder="Describe here..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
+            <input type="text" value={otherAction} onChange={e => setOtherAction(e.target.value)} placeholder="Describe here..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none" />
           </div>
         </div>
       </fieldset>
 
       {/* SECTION 3: Target Audience Definition */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">3</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">3</span>
           {qL("Target Audience Profile", "Target Audience Demographics")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("Age range of ideal customers (Select multi)", "Age range of the client's ideal customers (Select multi)")}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -476,8 +476,8 @@ export default function LpQuestionnaireForm({
                         : 'border-slate-200 hover:border-[#1A3C6E] bg-white text-slate-600'
                     }`}
                   >
-                    <span className="font-bold text-xs block">{item.val}</span>
-                    <span className="text-[10px] text-slate-400 mt-1">{item.d}</span>
+                    <span className="font-bold text-sm block">{item.val}</span>
+                    <span className="text-xs text-slate-400 mt-1">{item.d}</span>
                   </button>
                 );
               })}
@@ -485,7 +485,7 @@ export default function LpQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Locations of target audience", "Geographical locations of target audience")}
             </label>
             <div className="space-y-2">
@@ -496,7 +496,7 @@ export default function LpQuestionnaireForm({
                     value={loc} 
                     onChange={e => updateArrayItem(idx, e.target.value, locations, setLocations)} 
                     placeholder={`e.g. Lagos, Nigeria`} 
-                    className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
+                    className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
                   />
                   <button type="button" onClick={() => removeArrayItem(idx, locations, setLocations)} className="p-2 border rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors">
                     <Trash2 className="w-4 h-4" />
@@ -507,14 +507,14 @@ export default function LpQuestionnaireForm({
             <button 
               type="button" 
               onClick={() => addArrayItem(locations, setLocations)}
-              className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed rounded-lg text-xs font-bold text-slate-400 hover:text-[#1A3C6E] hover:border-[#1A3C6E] transition-colors"
+              className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 border border-dashed rounded-lg text-sm font-bold text-slate-400 hover:text-[#1A3C6E] hover:border-[#1A3C6E] transition-colors"
             >
               <Plus className="w-3.5 h-3.5" /> {qL("Add location", "Add Target Location")}
             </button>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("Occupation of target customers (Select multi)", "Target audience occupations (Select multi)")}
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
@@ -536,7 +536,7 @@ export default function LpQuestionnaireForm({
                         setOccupation([...list, occ]);
                       }
                     }}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg border text-sm font-bold transition-all cursor-pointer ${
                       isSelected 
                         ? 'bg-[#1A3C6E] text-[#D4A017] border-[#1A3C6E]' 
                         : 'bg-white border-slate-200 text-slate-600 hover:border-[#1A3C6E]'
@@ -550,7 +550,7 @@ export default function LpQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("What problem does your business solve?", "What problem does the client's business solve?")}
             </label>
             <div className="flex flex-wrap gap-2">
@@ -559,7 +559,7 @@ export default function LpQuestionnaireForm({
                   key={prob}
                   type="button"
                   onClick={() => toggleMultiSelect(prob, problemsSolved, setProblemsSolved)}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg border text-sm font-semibold transition-all cursor-pointer ${
                     problemsSolved.includes(prob) 
                       ? 'bg-[#1A3C6E] text-[#D4A017] border-[#1A3C6E]' 
                       : 'bg-white border-slate-200 text-slate-600 hover:border-[#1A3C6E]'
@@ -569,21 +569,21 @@ export default function LpQuestionnaireForm({
                 </button>
               ))}
             </div>
-            <input type="text" value={problemsSolvedDetail} onChange={e => setProblemsSolvedDetail(e.target.value)} placeholder="Describe further..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium" />
+            <input type="text" value={problemsSolvedDetail} onChange={e => setProblemsSolvedDetail(e.target.value)} placeholder="Describe further..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm mt-2 focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium" />
           </div>
         </div>
       </fieldset>
 
       {/* SECTION 4: Offer Details */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">4</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">4</span>
           {qL("Offer Details", "Offer Structures & Categories")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("What type of offer are you showcasing? (Select all)", "Type of product/service structure (Select all)")}
             </label>
             <div className="flex flex-wrap gap-2">
@@ -592,7 +592,7 @@ export default function LpQuestionnaireForm({
                   key={off}
                   type="button"
                   onClick={() => toggleMultiSelect(off, lpOfferType, setLpOfferType)}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg border text-sm font-semibold transition-all cursor-pointer ${
                     lpOfferType.includes(off) 
                       ? 'bg-[#1A3C6E] text-[#D4A017] border-[#1A3C6E]' 
                       : 'bg-white border-slate-200 text-slate-600 hover:border-[#1A3C6E]'
@@ -605,19 +605,19 @@ export default function LpQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Describe your main offer / premium package in one simple sentence *", "Client's main featured core offer/slogan *")}
             </label>
             <textarea 
               value={lpOfferMain} 
               onChange={e => setLpOfferMain(e.target.value)} 
               placeholder="e.g. Total Hair Rejuvenation Package which includes clarifying wash, protective treatment, trim, and standard custom style for only ₦45,000"
-              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs min-h-[60px] focus:ring-1 focus:ring-[#1A3C6E] outline-none" 
+              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm min-h-[60px] focus:ring-1 focus:ring-[#1A3C6E] outline-none" 
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("Select services / categories to list (Select multi)", "Target service categories to list (Select multi)")}
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
@@ -626,7 +626,7 @@ export default function LpQuestionnaireForm({
                   key={srv}
                   type="button"
                   onClick={() => toggleMultiSelect(srv, lpOfferServices, setLpOfferServices)}
-                  className={`px-3 py-1 rounded border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded border text-sm font-semibold transition-all cursor-pointer ${
                     lpOfferServices.includes(srv) 
                       ? 'bg-[#1A3C6E] text-[#D4A017] border-[#1A3C6E]' 
                       : 'bg-white border-slate-200 text-slate-600 hover:border-[#1A3C6E]'
@@ -641,12 +641,12 @@ export default function LpQuestionnaireForm({
               value={lpOfferServicesDetail} 
               onChange={e => setLpOfferServicesDetail(e.target.value)} 
               placeholder="Any specific list of custom physical services and deliverables..." 
-              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("Promotional tactics / Specials to showcase (Select all)", "Commercial conversion multipliers (Select all)")}
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
@@ -655,7 +655,7 @@ export default function LpQuestionnaireForm({
                   key={prm}
                   type="button"
                   onClick={() => toggleMultiSelect(prm, lpOfferPromo, setLpOfferPromo)}
-                  className={`px-2.5 py-1 rounded border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded border text-sm font-semibold transition-all cursor-pointer ${
                     lpOfferPromo.includes(prm) 
                       ? 'bg-[#1A3C6E] text-[#D4A017] border-[#1A3C6E]' 
                       : 'bg-white border-slate-200 text-slate-600 hover:border-[#1A3C6E]'
@@ -670,7 +670,7 @@ export default function LpQuestionnaireForm({
               value={lpOfferPromoDetail} 
               onChange={e => setLpOfferPromoDetail(e.target.value)} 
               placeholder="Add specifics on discounts or specific promo terms..." 
-              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium"
             />
           </div>
         </div>
@@ -678,14 +678,14 @@ export default function LpQuestionnaireForm({
 
       {/* SECTION 5: Unique Selling Point (USP) */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">5</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">5</span>
           {qL("Unique Selling Point (USP)", "Primary Core Differentiators")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("Why should customers buy from you instead of competitors? (Select multi)", "Core reason why customers choose the client (Select multi)")}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -699,7 +699,7 @@ export default function LpQuestionnaireForm({
                   key={choose}
                   type="button"
                   onClick={() => toggleMultiSelect(choose, lpWhyChoose, setLpWhyChoose)}
-                  className={`p-2.5 text-left border rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`p-2.5 text-left border rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                     lpWhyChoose.includes(choose) 
                       ? 'bg-[#1A3C6E] text-[#D4A017] border-[#1A3C6E]' 
                       : 'bg-white border-slate-200 text-slate-600 hover:border-[#1A3C6E]'
@@ -712,7 +712,7 @@ export default function LpQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("What makes your business special / unique? (Select all)", "Differentiating elements of the client's business (Select all)")}
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
@@ -721,7 +721,7 @@ export default function LpQuestionnaireForm({
                   key={spc}
                   type="button"
                   onClick={() => toggleMultiSelect(spc, lpWhatMakesSpecial, setLpWhatMakesSpecial)}
-                  className={`px-3 py-1 rounded border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded border text-sm font-semibold transition-all cursor-pointer ${
                     lpWhatMakesSpecial.includes(spc) 
                       ? 'bg-[#1A3C6E] text-[#D4A017] border-[#1A3C6E]' 
                       : 'bg-white border-slate-200 text-slate-600 hover:border-[#1A3C6E]'
@@ -736,7 +736,7 @@ export default function LpQuestionnaireForm({
               value={lpWhatMakesSpecialDetail} 
               onChange={e => setLpWhatMakesSpecialDetail(e.target.value)} 
               placeholder="Further clarify what sets you/your client apart..." 
-              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none"
+              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none"
             />
           </div>
         </div>
@@ -744,56 +744,56 @@ export default function LpQuestionnaireForm({
 
       {/* SECTION 6: Branding Details */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">6</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">6</span>
           {qL("Branding Details", "Client Brand & Art Guidelines")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Do you have a Logo?", "Does the client have an official Logo?")}
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={hasLogo === 'yes'} onChange={() => setHasLogo('yes')} /> Yes</label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={hasLogo === 'no'} onChange={() => setHasLogo('no')} /> No</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={hasLogo === 'yes'} onChange={() => setHasLogo('yes')} /> Yes</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={hasLogo === 'no'} onChange={() => setHasLogo('no')} /> No</label>
             </div>
             {hasLogo === 'yes' ? (
-              <div className="mt-2 text-xs text-emerald-600 bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl font-bold flex items-center gap-1.5">
+              <div className="mt-2 text-sm text-emerald-600 bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl font-bold flex items-center gap-1.5">
                 <Check className="w-4 h-4" /> {qL("Great! Hand over high-res PNG or SVG to your Freelancer.", "Great! Handover the high-resolution vector assets (PNG/SVG).")}
               </div>
             ) : (
               <div className="mt-2 bg-slate-100/50 p-3 rounded-xl space-y-2 border">
-                <span className="text-[11px] font-semibold text-slate-600 block">
+                <span className="text-xs font-semibold text-slate-600 block">
                   {qL("Would you like your Freelancer to bundle logo construction?", "Does the client need you to provide custom Logo construction services?")}
                 </span>
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" name="logo_design_lp" checked={logoDesign === 'yes'} onChange={() => setLogoDesign('yes')} /> Yes</label>
-                  <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" name="logo_design_lp" checked={logoDesign === 'no'} onChange={() => setLogoDesign('no')} /> No</label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="logo_design_lp" checked={logoDesign === 'yes'} onChange={() => setLogoDesign('yes')} /> Yes</label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="logo_design_lp" checked={logoDesign === 'no'} onChange={() => setLogoDesign('no')} /> No</label>
                 </div>
               </div>
             )}
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-[#1A3C6E] block mb-1">
+            <label className="text-sm font-semibold text-[#1A3C6E] block mb-1">
               {qL("Do you have specific brand colors in mind?", "Does the client have specific brand hex/color codes locked?")}
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={hasBrandColors === 'yes'} onChange={() => setHasBrandColors('yes')} /> Custom colors</label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={hasBrandColors === 'no'} onChange={() => setHasBrandColors('no')} /> Freelancer choice</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={hasBrandColors === 'yes'} onChange={() => setHasBrandColors('yes')} /> Custom colors</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={hasBrandColors === 'no'} onChange={() => setHasBrandColors('no')} /> Freelancer choice</label>
             </div>
 
             {hasBrandColors === 'yes' && (
               <div className="mt-3 bg-slate-100/50 p-4 border rounded-2xl space-y-3">
-                <span className="text-xs font-semibold block">{qL("How many brand colors to lock?", "How many specific color nodes are being registered?")}</span>
+                <span className="text-sm font-semibold block">{qL("How many brand colors to lock?", "How many specific color nodes are being registered?")}</span>
                 <div className="flex gap-2">
                   {[1, 2, 3].map(n => (
                     <button
                       key={n}
                       type="button"
                       onClick={() => setColorsCount(n)}
-                      className={`px-3 py-1 border text-xs font-bold rounded-lg ${
+                      className={`px-3 py-1 border text-sm font-bold rounded-lg ${
                         colorsCount === n ? 'bg-[#1A3C6E] text-white border-[#1A3C6E]' : 'bg-white text-slate-600 border-slate-200'
                       }`}
                     >
@@ -805,7 +805,7 @@ export default function LpQuestionnaireForm({
                 <div className="flex gap-4 items-center">
                   {Array.from({ length: colorsCount }).map((_, i) => (
                     <div key={i} className="flex flex-col items-center gap-1 animate-fadeIn">
-                      <span className="text-[10px] font-mono text-slate-400">Color {i + 1}</span>
+                      <span className="text-xs font-mono text-slate-400">Color {i + 1}</span>
                       <div className="w-10 h-10 rounded-xl overflow-hidden border shadow-sm relative shrink-0">
                         <input 
                           type="color" 
@@ -819,7 +819,7 @@ export default function LpQuestionnaireForm({
                           className="w-[140%] h-[140%] -translate-x-[15%] -translate-y-[15%] border-none cursor-pointer" 
                         />
                       </div>
-                      <span className="text-[9px] font-mono font-bold text-slate-600 uppercase">{brandColors[i]}</span>
+                      <span className="text-[10px] font-mono font-bold text-slate-600 uppercase">{brandColors[i]}</span>
                     </div>
                   ))}
                 </div>
@@ -828,16 +828,16 @@ export default function LpQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Brand Tone / Mood (Select all that apply)", "Client Brand Tone & Design Aesthetic (Select all that apply)")}
             </label>
-            <div className="flex flex-wrap gap-2 text-xs">
+            <div className="flex flex-wrap gap-2 text-sm">
               {["Professional", "Friendly", "Luxury", "Playful", "Bold / Edgy", "Minimalist", "Energetic", "Elegant / Feminine"].map(tone => (
                 <button
                   key={tone}
                   type="button"
                   onClick={() => toggleMultiSelect(tone, brandTones, setBrandTones)}
-                  className={`px-3 py-1 rounded border text-xs font-semibold cursor-pointer ${
+                  className={`px-3 py-1 rounded border text-sm font-semibold cursor-pointer ${
                     brandTones.includes(tone) ? 'bg-[#1A3C6E] text-white border-[#1A3C6E]' : 'bg-white border-slate-200 text-slate-600'
                   }`}
                 >
@@ -851,12 +851,12 @@ export default function LpQuestionnaireForm({
 
       {/* SECTION 7: Content & Media Assets */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">7</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">7</span>
           {qL("Content & Media Assets", "Source Assets & Gallery Media")}
         </legend>
 
-        <div className="space-y-4 pt-3 text-xs text-slate-700">
+        <div className="space-y-4 pt-3 text-sm text-slate-700">
           <div>
             <label className="font-semibold text-slate-700 block mb-1">
               {qL("Do you have professional images for the page?", "What is the status of product/brand images?")}
@@ -891,17 +891,17 @@ export default function LpQuestionnaireForm({
 
       {/* SECTION 8: Skeleton Layout Sections */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">8</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">8</span>
           {qL("Skeleton Layout Sections", "Landing Page Skeleton & Components")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("Sections to include on the page", "Layout modules to mock and build on canvas")}
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
               {[
                 "Hero section with CTA", "About the business", "Services list", "Pricing section", 
                 "Testimonials", "FAQs", "Gallery / portfolio", "Team section", "Countdown timer", "Booking scheduler",
@@ -921,23 +921,23 @@ export default function LpQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Do you want pricing displayed on the page?", "Should pricing packages be openly displayed on the page?")}
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={displayPricing === 'yes'} onChange={() => setDisplayPricing('yes')} /> Yes</label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" checked={displayPricing === 'no'} onChange={() => setDisplayPricing('no')} /> No</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={displayPricing === 'yes'} onChange={() => setDisplayPricing('yes')} /> Yes</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" checked={displayPricing === 'no'} onChange={() => setDisplayPricing('no')} /> No</label>
             </div>
             {displayPricing === 'yes' && (
               <div className="mt-2 p-3 bg-slate-100/50 rounded-xl space-y-2 border">
-                <span className="text-[11px] font-semibold text-slate-600 block">{qL("Select target pricing tier indicators:", "Provide pricing indicators:")}</span>
+                <span className="text-xs font-semibold text-slate-600 block">{qL("Select target pricing tier indicators:", "Provide pricing indicators:")}</span>
                 <div className="flex flex-wrap gap-2">
                   {["Under ₦10,000", "₦10,000 – ₦50,000", "₦50,000 – ₦150,000", "₦150,000 – ₦500,000", "Above ₦500,000"].map(range => (
                     <button
                       key={range}
                       type="button"
                       onClick={() => toggleMultiSelect(range, pricingRanges, setPricingRanges)}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded ${
+                      className={`px-2.5 py-1 text-xs font-bold rounded ${
                         pricingRanges.includes(range) ? 'bg-[#1A3C6E] text-[#D4A017]' : 'bg-white border text-slate-600'
                       }`}
                     >
@@ -950,7 +950,7 @@ export default function LpQuestionnaireForm({
                   value={pricingDetail} 
                   onChange={e => setPricingDetail(e.target.value)} 
                   placeholder="Specific starting prices or pricing rules..."
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none" 
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none" 
                 />
               </div>
             )}
@@ -960,17 +960,17 @@ export default function LpQuestionnaireForm({
 
       {/* SECTION 9: Functional Requirements */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">9</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">9</span>
           {qL("Functional Requirements", "Functional Integrations & Extra Scripts")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("What functional integrations are required? (Select all)", "Interactive features and systems to setup (Select all)")}
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
               {[
                 "Instant WhatsApp chat button", "Google Maps location embedding", 
                 "Live appointment scheduler (Calendly)", "Email list popup collector", 
@@ -981,7 +981,7 @@ export default function LpQuestionnaireForm({
                   key={feat}
                   type="button"
                   onClick={() => toggleMultiSelect(feat, functionalFeatures, setFunctionalFeatures)}
-                  className={`p-2.5 text-left border rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`p-2.5 text-left border rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                     functionalFeatures.includes(feat) 
                       ? 'bg-[#1A3C6E] text-[#D4A017] border-[#1A3C6E]' 
                       : 'bg-white border-slate-200 text-slate-600 hover:border-[#1A3C6E]'
@@ -994,14 +994,14 @@ export default function LpQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Other specific functional expectations", "Technical/functional notes for build specs")}
             </label>
             <textarea 
               value={otherRequirements} 
               onChange={e => setOtherRequirements(e.target.value)} 
               placeholder="e.g. Needs beautiful sliding FAQ triggers, floating header bars, or integration with standard Webhook..."
-              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs min-h-[70px] focus:ring-1 focus:ring-[#1A3C6E] outline-none" 
+              className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm min-h-[70px] focus:ring-1 focus:ring-[#1A3C6E] outline-none" 
             />
           </div>
         </div>
@@ -1009,30 +1009,30 @@ export default function LpQuestionnaireForm({
 
       {/* SECTION 10: Advertising & Traffic Sources */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">10</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">10</span>
           {qL("Advertising & Traffic Sources", "Marketing Campaign Scope")}
         </legend>
 
         <div className="space-y-4 pt-3">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">
+            <label className="text-sm font-semibold text-slate-700 block mb-1">
               {qL("Are you planning to run paid ads to this Landing Page?", "Is the client spending on paid campaigns to drive traffic?")}
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" name="lp_ads_r" checked={runPaidAds === 'yes'} onChange={() => setRunPaidAds('yes')} /> Yes</label>
-              <label className="flex items-center gap-2 text-xs cursor-pointer"><input type="radio" name="lp_ads_r" checked={runPaidAds === 'no'} onChange={() => { setRunPaidAds('no'); }} /> No</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="lp_ads_r" checked={runPaidAds === 'yes'} onChange={() => setRunPaidAds('yes')} /> Yes</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="lp_ads_r" checked={runPaidAds === 'no'} onChange={() => { setRunPaidAds('no'); }} /> No</label>
             </div>
             {runPaidAds === 'yes' && (
               <div className="mt-2.5 bg-slate-100/50 p-3 border rounded-xl animate-fadeIn space-y-2">
-                <span className="text-[11px] font-semibold text-slate-600 block">{qL("Select target ad platform channels:", "Channels configured:")}</span>
+                <span className="text-xs font-semibold text-slate-600 block">{qL("Select target ad platform channels:", "Channels configured:")}</span>
                 <div className="flex flex-wrap gap-2">
                   {["Meta Ads (FB & Insta)", "Google Search / Display Ads", "TikTok Ads Campaign", "YouTube Video Ads", "LinkedIn Business Ads", "Twitter / X Ads"].map(plat => (
                     <button
                       key={plat}
                       type="button"
                       onClick={() => toggleMultiSelect(plat, adPlatforms, setAdPlatforms)}
-                      className={`px-2.5 py-1 text-[11px] font-semibold rounded ${
+                      className={`px-2.5 py-1 text-xs font-semibold rounded ${
                         adPlatforms.includes(plat) ? 'bg-[#1A3C6E] text-[#D4A017]' : 'bg-white border text-slate-600'
                       }`}
                     >
@@ -1045,7 +1045,7 @@ export default function LpQuestionnaireForm({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-2">
+            <label className="text-sm font-semibold text-slate-700 block mb-2">
               {qL("Select other traffic strategies to connect (Select multi)", "Target traffic metrics sources (Select multi)")}
             </label>
             <div className="flex flex-wrap gap-2">
@@ -1054,7 +1054,7 @@ export default function LpQuestionnaireForm({
                   key={traffic}
                   type="button"
                   onClick={() => toggleMultiSelect(traffic, otherTraffic, setOtherTraffic)}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg border text-sm font-semibold cursor-pointer ${
                     otherTraffic.includes(traffic) 
                       ? 'bg-[#1A3C6E] text-[#D4A017]' 
                       : 'bg-white border-slate-200 text-slate-600 hover:border-[#1A3C6E]'
@@ -1070,12 +1070,12 @@ export default function LpQuestionnaireForm({
 
       {/* SECTION 11: Legal Pages & Trust Setup */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">11</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">11</span>
           {qL("Legal Pages & Trust Setup", "Project Legals & Compliance Requirements")}
         </legend>
 
-        <div className="space-y-4 pt-3 text-xs text-slate-700">
+        <div className="space-y-4 pt-3 text-sm text-slate-700">
           <span className="font-semibold block text-slate-600">{qL("Does your business currently have legal pages?", "Select legal requirements:")}</span>
           
           <div className="space-y-3 bg-white p-4 border rounded-2xl">
@@ -1087,7 +1087,7 @@ export default function LpQuestionnaireForm({
               </div>
             </div>
             {privacyPolicy === 'no' && (
-              <div className="text-[11px] text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 shadow-inner rounded p-1.5 animate-fadeIn">
+              <div className="text-xs text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 shadow-inner rounded p-1.5 animate-fadeIn">
                 <span>{qL("Would you like your freelancer to prepare this for you?", "Does the client need you to provide custom policy templates?")}</span>
                 <div className="flex gap-3">
                   <label className="flex items-center gap-1 cursor-pointer"><input type="radio" checked={privacyPolicyPrep === 'yes'} onChange={() => setPrivacyPolicyPrep('yes')} /> Yes</label>
@@ -1104,7 +1104,7 @@ export default function LpQuestionnaireForm({
               </div>
             </div>
             {termsPolicy === 'no' && (
-              <div className="text-[11px] text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 shadow-inner rounded p-1.5 animate-fadeIn">
+              <div className="text-xs text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 shadow-inner rounded p-1.5 animate-fadeIn">
                 <span>{qL("Would you like your freelancer to prepare this for you?", "Does the client need you to provide custom terms guidelines?")}</span>
                 <div className="flex gap-3">
                   <label className="flex items-center gap-1 cursor-pointer"><input type="radio" checked={termsPolicyPrep === 'yes'} onChange={() => setTermsPolicyPrep('yes')} /> Yes</label>
@@ -1121,7 +1121,7 @@ export default function LpQuestionnaireForm({
               </div>
             </div>
             {refundPolicy === 'no' && (
-              <div className="text-[11px] text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 shadow-inner rounded p-1.5 mt-2 animate-fadeIn">
+              <div className="text-xs text-slate-500 pl-4 py-1 flex items-center gap-2 bg-slate-50 shadow-inner rounded p-1.5 mt-2 animate-fadeIn">
                 <span>{qL("Would you like your freelancer to prepare this for you?", "Does the client need custom return structure generated?")}</span>
                 <div className="flex gap-3">
                   <label className="flex items-center gap-1 cursor-pointer"><input type="radio" checked={refundPolicyPrep === 'yes'} onChange={() => setRefundPolicyPrep('yes')} /> Yes</label>
@@ -1135,24 +1135,24 @@ export default function LpQuestionnaireForm({
 
       {/* SECTION 12: Delivery Timescales & Financial Limits */}
       <fieldset className="border border-slate-100 rounded-2xl p-4 md:p-6 bg-slate-50/30 text-left">
-        <legend className="text-xs font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[9px] font-black">12</span>
+        <legend className="text-sm font-black text-[#1A3C6E] bg-white border px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+          <span className="w-5 h-5 rounded-full bg-[#1A3C6E] text-[#D4A017] flex items-center justify-center text-[10px] font-black">12</span>
           {qL("Delivery Timescales & Financial Limits", "Project Timeline, Guidelines & Budget Bounds")}
         </legend>
 
-        <div className="space-y-4 pt-3 text-xs text-slate-700">
+        <div className="space-y-4 pt-3 text-sm text-slate-700">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Project Deadline Range", "Expected Delivery Date Indicator")}</label>
-              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium" />
+              <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Project Deadline Range", "Expected Delivery Date Indicator")}</label>
+              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white font-medium" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Target Budget Range", "Aesthetic Sourcing Budget Size")}</label>
-              <input type="text" value={budgetRange} onChange={e => setBudgetRange(e.target.value)} placeholder="e.g. ₦150,000 – ₦300,000" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white" />
+              <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Target Budget Range", "Aesthetic Sourcing Budget Size")}</label>
+              <input type="text" value={budgetRange} onChange={e => setBudgetRange(e.target.value)} placeholder="e.g. ₦150,000 – ₦300,000" className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white" />
             </div>
             <div className="md:col-span-2">
-              <label className="text-xs font-semibold text-slate-700 block mb-1">{qL("Additional Consulting Notes", "Additional Freelancer Instructions")}</label>
-              <textarea value={additionalNotes} onChange={e => setAdditionalNotes(e.target.value)} placeholder="Any special requests or details..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-xs min-h-[80px] focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white" />
+              <label className="text-sm font-semibold text-slate-700 block mb-1">{qL("Additional Consulting Notes", "Additional Freelancer Instructions")}</label>
+              <textarea value={additionalNotes} onChange={e => setAdditionalNotes(e.target.value)} placeholder="Any special requests or details..." className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm min-h-[80px] focus:ring-1 focus:ring-[#1A3C6E] outline-none bg-white" />
             </div>
           </div>
         </div>

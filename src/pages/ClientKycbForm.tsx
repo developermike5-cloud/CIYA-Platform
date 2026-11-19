@@ -522,7 +522,7 @@ export default function ClientKycbForm() {
           <div className="absolute top-0 left-0 w-2 h-full bg-teal-500" />
           
           <div className="space-y-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-700">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-teal-50 text-teal-700">
               <Globe className="w-3.5 h-3.5" /> Client Onboarding Portal
             </span>
             <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
@@ -535,10 +535,10 @@ export default function ClientKycbForm() {
           </div>
 
           <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 text-left max-w-2xl mx-auto">
-            <h4 className="text-xs font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+            <h4 className="text-sm font-extrabold text-amber-900 uppercase tracking-wider flex items-center gap-1.5 mb-1">
               <FileText className="w-4 h-4 text-amber-600" /> Instructions for Submission
             </h4>
-            <p className="text-xs text-amber-800 leading-relaxed font-semibold">
+            <p className="text-sm text-amber-800 leading-relaxed font-semibold">
               Fill out each section below as accurately as possible. When you are done, click the <strong>"Download Completed Answers"</strong> button at the very bottom of this page. This will download a structured text file containing all your inputs. Simply forward or email that file to your developer to initiate your website build!
             </p>
           </div>
@@ -549,13 +549,13 @@ export default function ClientKycbForm() {
           <div className="border-b border-slate-100 pb-4">
             <h3 className="text-sm font-black uppercase tracking-wider text-slate-400 mb-2">Selected Form Profile</h3>
             <div className="inline-flex bg-slate-100 p-1 rounded-xl">
-              <span className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'lp' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
+              <span className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'lp' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
                 Landing Page
               </span>
-              <span className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'ec' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
+              <span className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'ec' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
                 eCommerce Store
               </span>
-              <span className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'portfolio' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
+              <span className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'portfolio' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
                 Portfolio Website
               </span>
             </div>
@@ -565,7 +565,7 @@ export default function ClientKycbForm() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-xs font-black uppercase text-slate-500 mb-1">Client Name / Representative <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-black uppercase text-slate-500 mb-1">Client Name / Representative <span className="text-red-500">*</span></label>
                 <input 
                   type="text" 
                   value={clientName} 
@@ -575,11 +575,11 @@ export default function ClientKycbForm() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-black uppercase text-slate-500 mb-1">Date Completed</label>
+                <label className="block text-sm font-black uppercase text-slate-500 mb-1">Date Completed</label>
                 <CIYADatePicker value={dateCompleted} onChange={setDateCompleted} />
               </div>
               <div>
-                <label className="block text-xs font-black uppercase text-slate-500 mb-1">Business Name <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-black uppercase text-slate-500 mb-1">Business Name <span className="text-red-500">*</span></label>
                 <input 
                   type="text" 
                   value={businessName} 
@@ -589,7 +589,7 @@ export default function ClientKycbForm() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-black uppercase text-slate-500 mb-1">Industry / Niche</label>
+                <label className="block text-sm font-black uppercase text-slate-500 mb-1">Industry / Niche</label>
                 <input 
                   type="text" 
                   value={industry} 
@@ -599,7 +599,7 @@ export default function ClientKycbForm() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-black uppercase text-slate-500 mb-1">Phone Number</label>
+                <label className="block text-sm font-black uppercase text-slate-500 mb-1">Phone Number</label>
                 <input 
                   type="text" 
                   value={phone} 
@@ -609,7 +609,7 @@ export default function ClientKycbForm() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-black uppercase text-slate-500 mb-1">Email Address</label>
+                <label className="block text-sm font-black uppercase text-slate-500 mb-1">Email Address</label>
                 <input 
                   type="email" 
                   value={email} 
@@ -619,7 +619,7 @@ export default function ClientKycbForm() {
                 />
               </div>
               <div className="md:col-span-2 col-span-1">
-                <label className="block text-xs font-black uppercase text-slate-500 mb-1">Business / Operational Address</label>
+                <label className="block text-sm font-black uppercase text-slate-500 mb-1">Business / Operational Address</label>
                 <input 
                   type="text" 
                   value={address} 
@@ -1038,13 +1038,13 @@ export default function ClientKycbForm() {
               <h4 className="text-base font-black text-slate-900 flex items-center justify-center gap-2">
                 <Sparkles className="w-5 h-5 text-teal-600" /> Done Filling Out the Form?
               </h4>
-              <p className="text-xs text-slate-500 font-semibold max-w-md mx-auto">
+              <p className="text-sm text-slate-500 font-semibold max-w-md mx-auto">
                 No database login or account required. Click below to securely download your compiled requirements as a text brief. Then, forward it directly to your developer!
               </p>
             </div>
 
             {downloadSuccess && (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black uppercase tracking-wider px-4 py-2.5 rounded-xl flex items-center gap-2 animate-fadeIn">
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-black uppercase tracking-wider px-4 py-2.5 rounded-xl flex items-center gap-2 animate-fadeIn">
                 <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
                 Answers Downloaded Successfully! Send it to your Developer! 🎉
               </div>
@@ -1061,7 +1061,7 @@ export default function ClientKycbForm() {
         </div>
 
         {/* Brand Footer */}
-        <div className="text-center text-[10px] text-slate-400 font-extrabold tracking-widest uppercase pb-10">
+        <div className="text-center text-xs text-slate-400 font-extrabold tracking-widest uppercase pb-10">
           🛡️ CIYA Guarded Academy Client Portal • White-Label Enabled
         </div>
 
