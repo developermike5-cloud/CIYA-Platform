@@ -744,6 +744,20 @@ export default function StudentBuzz({
     }
   };
 
+  // Long-press on a comment opens its action row (same interaction as posts)
+  const startCommentLongPress = (commentId: string) => {
+    longPressTimer.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      setSelectedCommentId(commentId);
+      if ('vibrate' in navigator) navigator.vibrate(50);
+    }, 600);
+  };
+  const endCommentLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+  };
+
   return (
     <div 
       className={`w-full mx-auto font-sans select-none flex flex-col ${
@@ -1870,17 +1884,17 @@ export default function StudentBuzz({
                   }
 
                   return (
-                    <div key={c.id} className="flex gap-2.5">
-                      {/* Profile picture by the left, before the name */}
-                      <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[11px] font-black shrink-0 overflow-hidden">
-                        {c.senderPhoto ? (
-                          <img src={c.senderPhoto} alt={c.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          (c.senderName || 'S').charAt(0).toUpperCase()
-                        )}
-                      </div>
+                    <div key={c.id} className={`flex flex-col ${isMyComment ? 'items-end' : 'items-start'}`}>
                       <div className="max-w-[80%] min-w-0 flex flex-col">
-                        <div className="flex items-center gap-1.5 mb-0.5">
+                        {/* Avatar and name together, on top of the comment */}
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden">
+                            {c.senderPhoto ? (
+                              <img src={c.senderPhoto} alt={c.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              (c.senderName || 'S').charAt(0).toUpperCase()
+                            )}
+                          </div>
                           <span className="text-[11px] font-black text-slate-800 truncate">{c.senderName}</span>
                           {c.isAdmin && (
                             <span className="px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 flex items-center gap-0.5">
@@ -1891,9 +1905,25 @@ export default function StudentBuzz({
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
+                            // Ignore the click that fires right after a long-press
+                            if (longPressFiredRef.current) {
+                              longPressFiredRef.current = false;
+                              return;
+                            }
                             // Tap once to open actions, tap again to close
                             setSelectedCommentId(selectedCommentId === c.id ? null : c.id);
                           }}
+                          onContextMenu={(e) => {
+                            // Prevent the browser menu on mobile so the long-press works
+                            if (window.innerWidth < 768) {
+                              e.preventDefault();
+                              setSelectedCommentId(c.id);
+                              if ('vibrate' in navigator) navigator.vibrate(50);
+                            }
+                          }}
+                          onTouchStart={() => startCommentLongPress(c.id)}
+                          onTouchEnd={endCommentLongPress}
+                          onTouchMove={endCommentLongPress}
                           className={`px-3 py-2 rounded-2xl text-xs font-medium leading-relaxed inline-block cursor-pointer ${isMyComment ? 'bg-slate-900 text-white rounded-tr-xs' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'} ${
                             selectedCommentId === c.id ? 'ring-2 ring-emerald-500/50' : ''
                           }`}
