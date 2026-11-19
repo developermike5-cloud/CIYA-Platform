@@ -26,7 +26,8 @@ import {
   onValue, 
   onDisconnect, 
   runTransaction,
-  serverTimestamp as rtdbTimestamp 
+  serverTimestamp as rtdbTimestamp, 
+  increment as rtdbIncrement 
 } from 'firebase/database';
 import { db, rtdb, auth } from '../firebase';
 import { safeStorage } from '../utils/safeStorage';
@@ -208,10 +209,15 @@ export function subscribeToGroups(
       return;
     }
 
-    const list: BuzzGroup[] = Object.keys(data).map(id => ({
-      ...data[id],
-      id
-    })).filter((g) => {
+    const list: BuzzGroup[] = Object.keys(data).map(id => {
+      const g = { ...data[id], id } as BuzzGroup;
+      // Guard against malformed counters (e.g. a sentinel object stored by an older bug):
+      // membersCount must always render as a number or fall back to the members map.
+      if (g.membersCount !== undefined && typeof g.membersCount !== 'number') {
+        g.membersCount = g.members ? Object.keys(g.members).length : 1;
+      }
+      return g;
+    }).filter((g) => {
       if (g.isPersonal) return g.ownerUid === currentUid;
       return true; 
     });
@@ -332,7 +338,7 @@ export async function joinBuzzGroup(groupId: string, uid: string): Promise<void>
   });
   if (result.committed) {
     try {
-      await update(ref(rtdb, `buzz_groups/${groupId}`), { membersCount: increment(1) });
+      await update(ref(rtdb, `buzz_groups/${groupId}`), { membersCount: rtdbIncrement(1) });
     } catch (e) {}
     const now = Date.now();
     localGroupsCache = localGroupsCache.map((g) =>
