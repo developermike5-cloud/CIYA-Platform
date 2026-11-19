@@ -4,7 +4,7 @@ import { promptsStore } from '../utils/promptsStore';
 import staticFullPrompts from '../data/full_prompts.json';
 import staticModularPrompts from '../data/modular_prompts.json';
 import { db } from '../firebase';
-import { doc, updateDoc, collection, query, where, orderBy, limit, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import CustomDropdown from './CustomDropdown';
 import { 
   Play, 
@@ -30,10 +30,25 @@ import {
   RotateCw,
   Wand2,
   Loader2,
-  Trash2
+  ArrowLeft
 } from 'lucide-react';
-import ConfirmDialog from './ConfirmDialog';
 import { showCiyaToast } from './CiyaToast';
+
+// Daily prompt-copy limit: 3 copies per day for every student, free or paid.
+// The real enforcement lives on the server (netlify function prompt-copy-limit);
+// this constant only mirrors it for the on-screen tracker.
+const PROMPT_COPY_DAILY_LIMIT = 3;
+
+// Flatten AI markdown into the plain prompt style used in the KYCB section:
+// no hash headings, no bold/italic stars, no bullet dashes or stars.
+const stripPromptMarkdown = (text: string): string => text
+  .replace(/```[a-zA-Z]*\n?/g, '')
+  .replace(/^#{1,6}\s+/gm, '')
+  .replace(/\*\*([^*]+)\*\*/g, '$1')
+  .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s,.;:)]|$)/g, '$1$2')
+  .replace(/`([^`]+)`/g, '$1')
+  .replace(/^\s*[-*\u2022]\s+/gm, '')
+  .trim();
 
 interface TemplateItem {
   id: string;
@@ -500,14 +515,14 @@ export default function PromptGenerator({
   const [kycbForms, setKycbForms] = useState<any[]>([]);
   const [loadingKycb, setLoadingKycb] = useState(false);
   const [tailorView, setTailorView] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedKycbId, setSelectedKycbId] = useState<string | null>(null);
 
   useEffect(() => {
     setTailoredPrompt(null);
     setTailoringError(null);
     setTailoringDoc(null);
     setTailorView(false);
+    setSelectedKycbId(null);
   }, [selectedTemplate]);
 
   const previewLink = selectedTemplate?.link1 || selectedTemplate?.link2 || selectedTemplate?.videoUrl;
@@ -533,24 +548,6 @@ export default function PromptGenerator({
       setKycbForms([]);
     } finally {
       setLoadingKycb(false);
-    }
-  };
-
-  // Delete a saved KYCB form (with confirmation handled by ConfirmDialog)
-  const handleConfirmDeleteKycb = async () => {
-    if (!confirmDeleteId) return;
-    setDeletingId(confirmDeleteId);
-    try {
-      await deleteDoc(doc(db, 'kycb_questionnaires', confirmDeleteId));
-      if (tailoringDoc?.id === confirmDeleteId) setTailoringDoc(null);
-      showCiyaToast("Saved KYCB form deleted.");
-      setConfirmDeleteId(null);
-      await fetchKycbForms();
-    } catch (err) {
-      console.error("Failed to delete KYCB form:", err);
-      showCiyaToast("Failed to delete the KYCB form. Please try again.");
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -638,7 +635,7 @@ export default function PromptGenerator({
       }
 
       if (result.prompt) {
-        setTailoredPrompt(result.prompt);
+        setTailoredPrompt(stripPromptMarkdown(result.prompt));
       } else {
         throw new Error("Received an empty tailored prompt from AI.");
       }
@@ -714,7 +711,7 @@ export default function PromptGenerator({
   const rawCopies = Array.isArray(userProfile?.promptCopies) ? userProfile.promptCopies : [];
   const currentDayCopies = rawCopies.filter((t: number) => t >= lastResetTimestamp);
   
-  const dailyLimit = hasYearBadge ? (appSettings?.promptsProLimit ?? 100) : (appSettings?.promptsFreeLimit ?? 3);
+  const dailyLimit = PROMPT_COPY_DAILY_LIMIT;
   const remainingCopies = Math.max(0, dailyLimit - currentDayCopies.length);
   const hasExceededLimit = currentDayCopies.length >= dailyLimit;
 
@@ -775,10 +772,38 @@ export default function PromptGenerator({
     }
 
     // Limit check
-    const dailyLimit = hasYearBadge ? (appSettings?.promptsProLimit ?? 100) : (appSettings?.promptsFreeLimit ?? 3);
+    const dailyLimit = PROMPT_COPY_DAILY_LIMIT;
     if (currentDayCopies.length >= dailyLimit) {
       showCiyaToast(`⚠️ You have reached your daily copy limit of ${dailyLimit} prompts. It will reset at ${resetTimeStr}.`);
       return;
+    }
+
+    // Server-side enforcement: the server counts the copy in Firestore and
+    // refuses once the student has copied 3 times since today's reset.
+    if (currentUser?.uid) {
+      try {
+        const limitRes = await fetch('/api/prompt-copy-limit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: currentUser.uid })
+        });
+        const limitData = await limitRes.json();
+        if (!limitRes.ok || !limitData.allowed) {
+          showCiyaToast(`\u26a0\ufe0f You have reached your daily copy limit of ${PROMPT_COPY_DAILY_LIMIT} prompts. It will reset at ${resetTimeStr}.`);
+          return;
+        }
+        if (Array.isArray(limitData.updatedCopies) && setUserProfile) {
+          setUserProfile((prev: any) => {
+            const updated = { ...prev, promptCopies: limitData.updatedCopies };
+            safeStorage.setItem('ciya_cached_profile', JSON.stringify(updated));
+            return updated;
+          });
+        }
+      } catch (limitErr) {
+        console.error("Copy limit check failed:", limitErr);
+        showCiyaToast("Couldn't reach the copy limit server. Please try again.");
+        return;
+      }
     }
 
     try {
@@ -1014,18 +1039,26 @@ export default function PromptGenerator({
                           <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
                             <div className="flex items-center gap-1.5">
                               <FileText className="w-3.5 h-3.5 text-indigo-400" />
-                              <span className="font-extrabold text-[10px] tracking-wider uppercase text-slate-400">
+                              <span className="font-black text-xs tracking-wider uppercase text-white">
                                 {tailoredPrompt ? 'Tailored AI Prompt' : tailorView ? 'Choose Your KYCB' : 'Prompt Template Body'}
                               </span>
                             </div>
-                            {tailoredPrompt && (
+                            {!tailoredPrompt && tailorView ? (
+                              <button
+                                onClick={() => { setTailorView(false); setSelectedKycbId(null); setTailoringError(null); }}
+                                className="text-[9px] font-black text-indigo-400 hover:text-indigo-300 transition-colors uppercase border-0 bg-transparent cursor-pointer flex items-center gap-1"
+                              >
+                                <ArrowLeft className="w-3 h-3" />
+                                Back to prompt
+                              </button>
+                            ) : tailoredPrompt ? (
                               <button
                                 onClick={() => { setTailoredPrompt(null); setTailoringDoc(null); setTailorView(true); fetchKycbForms(); }}
                                 className="text-[9px] font-black text-indigo-400 hover:text-indigo-300 transition-colors uppercase border-0 bg-transparent cursor-pointer"
                               >
                                 Choose another KYCB
                               </button>
-                            )}
+                            ) : null}
                           </div>
 
                           {tailoredPrompt ? (
@@ -1095,29 +1128,27 @@ export default function PromptGenerator({
                               {kycbForms.map((f) => (
                                 <div
                                   key={f.id}
-                                  onClick={() => runTailor(f)}
-                                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all relative group overflow-hidden bg-slate-900/60 hover:bg-slate-800/60 ${tailoringDoc?.id === f.id ? 'border-indigo-500 ring-1 ring-indigo-500/40' : 'border-slate-800 hover:border-slate-700'}`}
+                                  onClick={() => { setSelectedKycbId(f.id); setTailoringError(null); }}
+                                  className={`p-3 rounded-xl border text-left cursor-pointer transition-all relative group overflow-hidden ${selectedKycbId === f.id ? 'border-indigo-500 ring-1 ring-indigo-500/40 bg-slate-800/70' : 'border-slate-800 hover:border-slate-700 bg-slate-900/60 hover:bg-slate-800/60'}`}
                                 >
-                                  <div className="space-y-1 pr-2">
+                                  <div className="space-y-1">
                                     <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-400">
                                       {f.type === 'lp' ? 'LANDING PAGE' : f.type === 'ec' ? 'ECOMMERCE' : 'PORTFOLIO'}
                                     </span>
                                     <div className="font-extrabold text-white text-[11px] truncate">{f.clientName || 'Unnamed client'}</div>
                                     <div className="text-[9px] text-slate-400 font-bold truncate">{f.businessName || ''}</div>
                                   </div>
-                                  <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(f.id); }}
-                                      disabled={deletingId === f.id}
-                                      title="Delete this saved KYCB form"
-                                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors border-0 bg-transparent cursor-pointer disabled:opacity-50"
-                                    >
-                                      {deletingId === f.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                                    </button>
-                                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider flex items-center gap-1">
-                                      Tailor <ChevronRight className="w-3 h-3" />
-                                    </span>
-                                  </div>
+                                  {selectedKycbId === f.id && (
+                                    <div className="mt-2 pt-2 border-t border-slate-800 flex justify-center">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); runTailor(f); }}
+                                        className="px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-[9px] font-black uppercase rounded-lg flex items-center justify-center gap-1.5 transition-all border-0 cursor-pointer active:scale-95"
+                                      >
+                                        <Wand2 className="w-3 h-3 text-amber-300" />
+                                        Tailor with this KYCB
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -1304,15 +1335,6 @@ export default function PromptGenerator({
         </div>
 
       </div>
-      <ConfirmDialog
-        open={!!confirmDeleteId}
-        title="Delete saved KYCB form?"
-        message={`Delete the saved KYCB form for ${kycbForms.find(x => x.id === confirmDeleteId)?.clientName || 'this client'}? This cannot be undone.`}
-        confirmLabel="Yes, delete"
-        cancelLabel="Keep it"
-        onConfirm={handleConfirmDeleteKycb}
-        onCancel={() => setConfirmDeleteId(null)}
-      />
     </div>
   );
 }
