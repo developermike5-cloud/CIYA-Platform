@@ -28,6 +28,7 @@ async function getAccessToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   if (cachedToken && cachedToken.exp - 60 > now) return cachedToken.token;
   const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
+  if (!sa.private_key || !sa.client_email) throw new Error('service account env missing or malformed');
   const input = b64url(JSON.stringify({
     iss: sa.client_email,
     scope: SCOPES,
@@ -41,8 +42,10 @@ async function getAccessToken(): Promise<string> {
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${input}.${signature}` }),
   });
-  const data: any = await res.json();
-  if (!res.ok || !data.access_token) throw new Error(`token mint failed (${res.status})`);
+  const text = await res.text();
+  let data: any = {};
+  try { data = JSON.parse(text); } catch {}
+  if (!res.ok || !data.access_token) throw new Error(`token mint failed (${res.status}): ${text.slice(0, 300)}`);
   cachedToken = { token: data.access_token, exp: now + (data.expires_in || 3600) };
   return cachedToken.token;
 }
