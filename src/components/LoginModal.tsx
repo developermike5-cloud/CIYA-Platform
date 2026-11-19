@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
-import { Mail, Lock, X, Sparkles, ArrowRight, User, Phone, MapPin, ChevronDown, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { Mail, Lock, X, Sparkles, ArrowRight, User, Phone, MapPin, ChevronDown, Eye, EyeOff, KeyRound, Check } from 'lucide-react';
 import { auth, db, safeGetItem, safeSetItem } from '../firebase';
 import BrandingLogo from './BrandingLogo';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth';
 import InstallGuide from './InstallGuide';
 import { isMobileBrowser } from '../utils/courseServer';
 import { useIntakeRoute } from '../hooks/useIntakeRoute';
@@ -39,10 +39,33 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   // Password Visibility Toggle State
   const [showPassword, setShowPassword] = useState(false);
 
-  // Password Reset States
+  // Password Reset States (CIYA OTP pipeline: email -> 6-digit code -> new password)
   const [isResetMode, setIsResetMode] = useState(false);
+  const [resetStep, setResetStep] = useState<'email' | 'verify'>('email');
   const [resetEmail, setResetEmail] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetNewPw, setResetNewPw] = useState('');
+  const [resetConfirmPw, setResetConfirmPw] = useState('');
+  const [showResetPw, setShowResetPw] = useState(false);
+  const [showResetConfirmPw, setShowResetConfirmPw] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
   const [resetSuccess, setResetSuccess] = useState('');
+
+  // Resend code cooldown countdown
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setInterval(() => setResendIn((s) => (s <= 1 ? 0 : s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendIn]);
+
+  const MIN_RESET_PW_LENGTH = 8;
+  const resetPwChecks = [
+    { label: `At least ${MIN_RESET_PW_LENGTH} characters`, met: resetNewPw.length >= MIN_RESET_PW_LENGTH },
+    { label: 'An uppercase letter (A-Z)', met: /[A-Z]/.test(resetNewPw) },
+    { label: 'A lowercase letter (a-z)', met: /[a-z]/.test(resetNewPw) },
+    { label: 'A number (0-9)', met: /[0-9]/.test(resetNewPw) },
+    { label: 'A symbol (!@#$%&*)', met: /[^A-Za-z0-9]/.test(resetNewPw) },
+  ];
 
   // Sign In States
   const [signInEmail, setSignInEmail] = useState('');
@@ -149,11 +172,13 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   };
 
-  // Handle Password Reset Email
-  const handleSendPasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle OTP password reset, step 1: request the code.
+  // The endpoint answers the same for every email, so the message here is
+  // deliberately generic: we never confirm whether an account exists.
+  const handleRequestOtp = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!resetEmail.trim()) {
-      setError('Please enter your email address to receive password reset instructions.');
+      setError('Please enter your email address to receive a reset code.');
       return;
     }
     setLoading(true);
@@ -161,17 +186,63 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     setResetSuccess('');
 
     try {
-      await sendPasswordResetEmail(auth, resetEmail.trim());
-      setResetSuccess(`Password reset email sent! Please check ${resetEmail.trim()} (inbox and spam folder) for the reset link.`);
-    } catch (err: any) {
-      console.error('Password reset error:', err);
-      if (err.code === 'auth/user-not-found' || err.message?.toLowerCase().includes('user-not-found')) {
-        setError('No registered user was found under this email address.');
-      } else if (err.code === 'auth/invalid-email') {
-        setError('Please enter a valid email address.');
-      } else {
-        setError(err.message || 'Failed to send password reset email. Please try again.');
+      const res = await fetch('/api/password-reset-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim().toLowerCase() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.message || 'Could not send the reset code. Please try again.');
       }
+      setResetSuccess(`If your email is registered with CIYA, a 6-digit reset code has been sent to ${resetEmail.trim()}. It expires in 10 minutes. Check your inbox and spam folder.`);
+      setResetStep('verify');
+      setResendIn(60);
+    } catch (err: any) {
+      setError(err.message || 'Could not send the reset code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle OTP password reset, step 2: verify the code and change the password.
+  const handleConfirmReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (resetOtp.trim().length !== 6) {
+      setError('Enter the 6-digit code from your email.');
+      return;
+    }
+    if (!resetPwChecks.every((c) => c.met)) {
+      setError('Your new password must meet every requirement listed below.');
+      return;
+    }
+    if (resetNewPw !== resetConfirmPw) {
+      setError('The two passwords do not match.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/password-reset-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim().toLowerCase(), otp: resetOtp.trim(), newPassword: resetNewPw })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.message || 'Could not change your password. Please try again.');
+      }
+      setResetStep('email');
+      setResetOtp('');
+      setResetNewPw('');
+      setResetConfirmPw('');
+      setShowResetPw(false);
+      setShowResetConfirmPw(false);
+      setResetEmail('');
+      setResetSuccess('Your password has been changed. You can now sign in with your new password.');
+    } catch (err: any) {
+      setError(err.message || 'Could not change your password. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -449,11 +520,13 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
               {/* FORGOT PASSWORD RESET VIEW */}
               {isResetMode ? (
-                <form onSubmit={handleSendPasswordReset} className="space-y-4">
+                <form onSubmit={resetStep === 'email' ? handleRequestOtp : handleConfirmReset} className="space-y-4">
                   <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-300 text-xs leading-relaxed font-semibold flex items-start gap-2.5">
                     <KeyRound className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <div>
-                      Enter your registered email address below. A password reset link will be sent to your email box.
+                      {resetStep === 'email'
+                        ? 'Enter your registered email address below. A 6-digit reset code will be sent to your email.'
+                        : 'Enter the 6-digit code sent to your email, then choose your new password.'}
                     </div>
                   </div>
 
@@ -463,40 +536,148 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300 mb-1">Account Email Address *</label>
-                    <div className="relative">
-                      <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-teal-400" />
-                      <input
-                        type="email"
-                        required
-                        value={resetEmail}
-                        onChange={(e) => setResetEmail(e.target.value)}
-                        placeholder="yourname@example.com"
-                        className="w-full pl-9 pr-4 py-2.5 bg-teal-950/80 border border-teal-850 focus:border-amber-400 rounded-xl text-xs text-white placeholder:text-teal-600 outline-none font-semibold transition-all"
-                      />
+                  {resetStep === 'email' ? (
+                    <div>
+                      <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300 mb-1">Account Email Address *</label>
+                      <div className="relative">
+                        <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-teal-400" />
+                        <input
+                          type="email"
+                          required
+                          value={resetEmail}
+                          onChange={(e) => setResetEmail(e.target.value)}
+                          placeholder="yourname@example.com"
+                          className="w-full pl-9 pr-4 py-2.5 bg-teal-950/80 border border-teal-850 focus:border-amber-400 rounded-xl text-xs text-white placeholder:text-teal-600 outline-none font-semibold transition-all"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300 mb-1">6-Digit Code *</label>
+                        <div className="relative">
+                          <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-teal-400" />
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            required
+                            maxLength={6}
+                            value={resetOtp}
+                            onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ''))}
+                            placeholder="000000"
+                            className="w-full pl-9 pr-4 py-2.5 bg-teal-950/80 border border-teal-850 focus:border-amber-400 rounded-xl text-xs text-white placeholder:text-teal-600 outline-none font-semibold tracking-[0.45em] text-center transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300 mb-1">New Password *</label>
+                        <div className="relative">
+                          <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-teal-400" />
+                          <input
+                            type={showResetPw ? 'text' : 'password'}
+                            required
+                            value={resetNewPw}
+                            onChange={(e) => setResetNewPw(e.target.value)}
+                            placeholder="Enter your new password"
+                            className="w-full pl-9 pr-10 py-2.5 bg-teal-950/80 border border-teal-850 focus:border-amber-400 rounded-xl text-xs text-white placeholder:text-teal-600 outline-none font-semibold transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowResetPw(!showResetPw)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-teal-400 hover:text-amber-400 p-1 bg-transparent border-0 cursor-pointer transition-colors"
+                            title={showResetPw ? 'Hide password' : 'Show password'}
+                          >
+                            {showResetPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300 mb-1">Confirm New Password *</label>
+                        <div className="relative">
+                          <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-teal-400" />
+                          <input
+                            type={showResetConfirmPw ? 'text' : 'password'}
+                            required
+                            value={resetConfirmPw}
+                            onChange={(e) => setResetConfirmPw(e.target.value)}
+                            placeholder="Re-enter your new password"
+                            className="w-full pl-9 pr-10 py-2.5 bg-teal-950/80 border border-teal-850 focus:border-amber-400 rounded-xl text-xs text-white placeholder:text-teal-600 outline-none font-semibold transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowResetConfirmPw(!showResetConfirmPw)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-teal-400 hover:text-amber-400 p-1 bg-transparent border-0 cursor-pointer transition-colors"
+                            title={showResetConfirmPw ? 'Hide password' : 'Show password'}
+                          >
+                            {showResetConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-teal-900/60 bg-teal-950/50 px-4 py-3">
+                        <p className="text-[11px] font-black uppercase tracking-wider text-teal-300 mb-2">Your password must include</p>
+                        <ul className="space-y-1.5">
+                          {resetPwChecks.map((c) => (
+                            <li key={c.label} className={`flex items-center gap-2 text-xs font-bold transition-colors duration-300 ${c.met ? 'text-emerald-400' : 'text-teal-700'}`}>
+                              <span className={`grid place-items-center w-[18px] h-[18px] rounded-full border-2 shrink-0 transition-colors duration-300 ${c.met ? 'bg-emerald-500 border-emerald-500' : 'border-teal-800 bg-transparent'}`}>
+                                {c.met && <Check className="w-3 h-3 text-teal-950" strokeWidth={3.5} />}
+                              </span>
+                              {c.label}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="text-center">
+                        <button
+                          type="button"
+                          disabled={resendIn > 0 || loading}
+                          onClick={() => handleRequestOtp()}
+                          className="text-[11px] text-teal-400 hover:text-amber-300 font-bold underline disabled:opacity-50 disabled:no-underline bg-transparent border-0 cursor-pointer p-0"
+                        >
+                          {resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
+                        </button>
+                      </div>
+                    </>
+                  )}
 
                   <button
                     type="submit"
                     disabled={loading}
                     className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-teal-950 font-black rounded-xl text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer border-0 uppercase tracking-wider disabled:opacity-60"
                   >
-                    <span>{loading ? 'Sending Reset Email...' : 'Send Password Reset Link'}</span>
+                    <span>
+                      {loading
+                        ? resetStep === 'email'
+                          ? 'Sending Code...'
+                          : 'Changing Password...'
+                        : resetStep === 'email'
+                          ? 'Request OTP'
+                          : 'Change Password'}
+                    </span>
                   </button>
 
                   <div className="text-center pt-2">
                     <button
                       type="button"
                       onClick={() => {
-                        setIsResetMode(false);
+                        if (resetStep === 'verify') {
+                          setResetStep('email');
+                          setResetOtp('');
+                          setResetNewPw('');
+                          setResetConfirmPw('');
+                        } else {
+                          setIsResetMode(false);
+                        }
                         setError('');
                         setResetSuccess('');
                       }}
                       className="text-xs text-teal-400 hover:text-white font-bold underline bg-transparent border-0 cursor-pointer p-0"
                     >
-                      ← Back to Sign In
+                      {resetStep === 'verify' ? '← Use a different email' : '← Back to Sign In'}
                     </button>
                   </div>
                 </form>
@@ -526,6 +707,12 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                           type="button"
                           onClick={() => {
                             setIsResetMode(true);
+                            setResetStep('email');
+                            setResetOtp('');
+                            setResetNewPw('');
+                            setResetConfirmPw('');
+                            setShowResetPw(false);
+                            setShowResetConfirmPw(false);
                             setError('');
                             setResetSuccess('');
                             if (signInEmail) setResetEmail(signInEmail);

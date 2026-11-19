@@ -37,6 +37,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/password-reset-request"
+  to = "/.netlify/functions/password-reset-request"
+  status = 200
+
+[[redirects]]
+  from = "/api/password-reset-confirm"
+  to = "/.netlify/functions/password-reset-confirm"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
