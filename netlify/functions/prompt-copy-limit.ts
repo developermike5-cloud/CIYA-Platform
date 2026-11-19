@@ -73,11 +73,11 @@ async function getAccessToken(): Promise<string> {
   return cachedToken.token;
 }
 
-const json = (statusCode: number, body: Record<string, unknown>) => ({
-  statusCode,
-  headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-  body: JSON.stringify(body),
-});
+const json = (statusCode: number, body: Record<string, unknown>) =>
+  new Response(JSON.stringify(body), {
+    status: statusCode,
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
 
 // The last daily reset, in ms, for the promptLimitResetTime wall clock in
 // Lagos (UTC+1, no DST). E.g. "00:00" resets at midnight Lagos time.
