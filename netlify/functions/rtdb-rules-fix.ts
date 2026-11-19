@@ -24,8 +24,23 @@ function b64url(input: Buffer | string): string {
   return Buffer.from(input).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
+// The modern runtime's clock can be skewed (observed ~11h fast), and Google
+// rejects JWTs whose iat/exp are in the future. Derive true UTC from the
+// Date response header of a Google endpoint instead of the local clock.
+async function trueNow(): Promise<number> {
+  try {
+    const r = await fetch('https://www.googleapis.com/discovery/v1/apis');
+    const d = r.headers.get('date');
+    if (d) {
+      const t = Math.floor(new Date(d).getTime() / 1000);
+      if (t > 1_600_000_000) return t;
+    }
+  } catch {}
+  return Math.floor(Date.now() / 1000);
+}
+
 async function getAccessToken(): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
+  const now = await trueNow();
   if (cachedToken && cachedToken.exp - 60 > now) return cachedToken.token;
   const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
   if (!sa.private_key || !sa.client_email) throw new Error('service account env missing or malformed');
@@ -72,7 +87,7 @@ export default async (req: Request) => {
   try {
     if (req.method === 'GET' && new URL(req.url).searchParams.get('debug') === '1') {
       const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
-      const now = Math.floor(Date.now() / 1000);
+      const now = await trueNow();
       return new Response(JSON.stringify({
         envLen: (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').length,
         clientEmail: sa.client_email,
