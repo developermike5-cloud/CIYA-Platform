@@ -30,7 +30,9 @@ import {
   Download,
   BadgeCheck,
   ListChecks,
-  UserPlus
+  UserPlus,
+  Copy,
+  MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
@@ -52,7 +54,10 @@ import {
   subscribeToBuzzCategories,
   DEFAULT_BUZZ_CATEGORIES,
   subscribeToStarredMessages,
-  joinBuzzGroup
+  joinBuzzGroup,
+  subscribeToMessageComments,
+  sendMessageComment,
+  BuzzComment
 } from '../services/buzzRtdbService';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { Star, AlertCircle } from 'lucide-react';
@@ -98,6 +103,15 @@ export default function StudentBuzz({
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  // Comments on a message (text + image only, no videos)
+  const [commentsMessage, setCommentsMessage] = useState<BuzzMessage | null>(null);
+  const [comments, setComments] = useState<BuzzComment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentFile, setCommentFile] = useState<File | null>(null);
+  const [commentPreviewUrl, setCommentPreviewUrl] = useState<string | null>(null);
+  const [sendingComment, setSendingComment] = useState(false);
+  const commentFileInputRef = useRef<HTMLInputElement | null>(null);
   const [categories, setCategories] = useState<string[]>(['All', 'Favourite', 'Website Development', 'Mobile App Development']);
 
   // Favourite messages state
@@ -252,6 +266,22 @@ export default function StudentBuzz({
     };
   }, [activeGroupId, currentUser?.uid]);
 
+  // Subscribe to comments of the message the comments panel is open on
+  useEffect(() => {
+    if (!commentsMessage || !activeGroupId) {
+      setComments([]);
+      return;
+    }
+    setLoadingComments(true);
+    const unsubComments = subscribeToMessageComments(activeGroupId, commentsMessage.id, (list) => {
+      setComments(list);
+      setLoadingComments(false);
+    }, 100);
+    return () => {
+      unsubComments();
+    };
+  }, [commentsMessage?.id, activeGroupId]);
+
   // Scroll to bottom when messages update
   useEffect(() => {
     if (activeGroupId && messagesEndRef.current) {
@@ -402,6 +432,82 @@ export default function StudentBuzz({
     }
   };
 
+  // Comment image selection (images only, no videos)
+  const handleCommentFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Comments support images only.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Image exceeds the 10MB limit.');
+      return;
+    }
+    setCommentFile(file);
+    setCommentPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const clearCommentImage = () => {
+    setCommentFile(null);
+    if (commentPreviewUrl) {
+      URL.revokeObjectURL(commentPreviewUrl);
+      setCommentPreviewUrl(null);
+    }
+    if (commentFileInputRef.current) {
+      commentFileInputRef.current.value = '';
+    }
+  };
+
+  const handleSendComment = async () => {
+    if (!commentsMessage || !activeGroupId) return;
+    if (!currentUser) {
+      onLoginRequest();
+      return;
+    }
+    const cleanText = commentText.trim();
+    if (!cleanText && !commentFile) return;
+    try {
+      setSendingComment(true);
+      let commentImageUrl: string | undefined = undefined;
+      if (commentFile) {
+        const uploadRes = await uploadToCloudinary(commentFile, 'ciya/buzz_chat', undefined, currentUser.uid);
+        if (uploadRes && uploadRes.url) {
+          commentImageUrl = uploadRes.url;
+        } else {
+          throw new Error('Image upload returned an empty URL.');
+        }
+      }
+      await sendMessageComment(activeGroupId, commentsMessage.id, {
+        senderUid: currentUser.uid,
+        senderName: userProfile?.fullName || currentUser.displayName || 'Student',
+        senderEmail: currentUser.email || '',
+        senderPhoto: userProfile?.photoUrl || currentUser.photoURL || undefined,
+        isAdmin: effectiveIsAdmin,
+        text: cleanText,
+        imageUrl: commentImageUrl
+      });
+      setCommentText('');
+      clearCommentImage();
+    } catch (err: any) {
+      console.error('Failed to post comment:', err);
+      showToast(err.message || 'Failed to post comment. Please check connection.');
+    } finally {
+      setSendingComment(false);
+    }
+  };
+
+  const handleCopyMessage = async (msg: BuzzMessage) => {
+    try {
+      await navigator.clipboard.writeText(msg.text || '');
+      showToast('Copied to clipboard!');
+    } catch {
+      showToast('Could not copy. Please try again.');
+    }
+    setMessageActionMenuId(null);
+    setSelectedMessageId(null);
+  };
+
   const handleReaction = async (messageId: string, emoji: string, currentEmoji?: string | null) => {
     if (!activeGroupId) return;
     if (!currentUser) {
@@ -486,6 +592,7 @@ export default function StudentBuzz({
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [joiningGroup, setJoiningGroup] = useState(false);
 
+
   const handleEnterGroup = async () => {
     if (!activeGroupId) return;
     if (!activeUid) {
@@ -534,6 +641,7 @@ export default function StudentBuzz({
 
   // Mobile Long Press Logic
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressFiredRef = useRef(false);
 
   // Force Cloudinary to trigger a direct download instead of opening in a new tab
   const handleDownloadMedia = async (url: string, fileName?: string) => {
@@ -581,6 +689,7 @@ export default function StudentBuzz({
 
   const handleTouchStart = (msgId: string) => {
     longPressTimer.current = setTimeout(() => {
+      longPressFiredRef.current = true;
       setSelectedMessageId(msgId);
       setMessageActionMenuId(msgId);
       // Trigger a light haptic feedback if possible
@@ -1090,13 +1199,16 @@ export default function StudentBuzz({
                     {/* Message Bubble */}
                     <div
                       onClick={() => {
-                        // Only handle click on desktop (md and above)
-                        if (window.innerWidth >= 768) {
-                          if (selectedMessageId === msg.id) {
-                            setSelectedMessageId(null);
-                          } else {
-                            setSelectedMessageId(msg.id);
-                          }
+                        // Ignore the click that fires right after a long-press
+                        if (longPressFiredRef.current) {
+                          longPressFiredRef.current = false;
+                          return;
+                        }
+                        // Tap once to select, tap again to unselect
+                        if (selectedMessageId === msg.id) {
+                          setSelectedMessageId(null);
+                        } else {
+                          setSelectedMessageId(msg.id);
                         }
                       }}
                       onContextMenu={(e) => {
@@ -1218,6 +1330,23 @@ export default function StudentBuzz({
                       </div>
                     </div>
 
+                    {/* Comments trigger */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCommentsMessage(msg);
+                      }}
+                      className={`mt-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider bg-transparent border-0 p-0 cursor-pointer text-slate-400 hover:text-emerald-600 transition-colors ${
+                        (msg.commentsCount || 0) > 0 ? 'text-emerald-600' : ''
+                      }`}
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      {(msg.commentsCount || 0) > 0
+                        ? `${msg.commentsCount} comment${msg.commentsCount === 1 ? '' : 's'}`
+                        : 'Comment'}
+                    </button>
+
                     {/* Interaction Bar (Directly Under Emojis) */}
                     {selectedMessageId === msg.id && (
                       <div className={`mt-2 flex flex-col gap-2 ${isMe ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-top-1 duration-200`}>
@@ -1272,6 +1401,21 @@ export default function StudentBuzz({
                           >
                             <Star className={`w-4 h-4 ${isStarred ? 'fill-current' : ''}`} />
                             <span className="text-[9px] font-bold uppercase">{isStarred ? 'Saved' : 'Favourite'}</span>
+                          </button>
+
+                          <div className="w-px h-6 bg-slate-100" />
+
+                          {/* Copy Icon */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyMessage(msg);
+                            }}
+                            className="flex flex-col items-center gap-0.5 p-1.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                          >
+                            <Copy className="w-4 h-4" />
+                            <span className="text-[9px] font-bold uppercase">Copy</span>
                           </button>
 
                           <div className="w-px h-6 bg-slate-100" />
@@ -1573,6 +1717,155 @@ export default function StudentBuzz({
           </div>
         </div>
       )}
+      {/* Message Comments Panel */}
+      {commentsMessage && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 bg-slate-950/60 backdrop-blur-sm"
+          onClick={() => setCommentsMessage(null)}
+        >
+          <div
+            className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg h-[82dvh] sm:h-[75dvh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-slate-100 bg-white flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-4.5 h-4.5 w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                    Comments {(comments.length > 0) && <span className="text-emerald-600">({comments.length})</span>}
+                  </h3>
+                  <p className="text-[11px] font-medium text-slate-500 truncate">
+                    On {commentsMessage.senderName}'s post
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCommentsMessage(null)}
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors shrink-0 border-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Comments List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+              {loadingComments ? (
+                <div className="py-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+                  <span className="text-xs font-medium">Loading comments...</span>
+                </div>
+              ) : comments.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 space-y-1.5">
+                  <MessageCircle className="w-8 h-8 mx-auto text-slate-300" />
+                  <div className="font-bold text-slate-700 text-sm">No comments yet</div>
+                  <p className="text-xs text-slate-400">Be the first to comment on this post.</p>
+                </div>
+              ) : (
+                comments.map((c) => {
+                  const isMyComment = currentUser?.uid && c.senderUid === currentUser.uid;
+                  return (
+                    <div key={c.id} className={`flex gap-2.5 ${isMyComment ? 'flex-row-reverse' : ''}`}>
+                      <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[11px] font-black shrink-0 overflow-hidden">
+                        {c.senderPhoto ? (
+                          <img src={c.senderPhoto} alt={c.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          (c.senderName || 'S').charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className={`max-w-[80%] min-w-0 ${isMyComment ? 'items-end text-right' : ''} flex flex-col`}>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-[11px] font-black text-slate-800 truncate">{c.senderName}</span>
+                          {c.isAdmin && (
+                            <span className="px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 flex items-center gap-0.5">
+                              <Shield className="w-2 h-2" /> Admin
+                            </span>
+                          )}
+                          <span className="text-[9px] text-slate-400 shrink-0">
+                            {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div className={`px-3 py-2 rounded-2xl text-xs font-medium leading-relaxed inline-block ${isMyComment ? 'bg-slate-900 text-white rounded-tr-xs' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'}`}>
+                          {c.imageUrl && (
+                            <img
+                              src={c.imageUrl}
+                              alt="Comment image"
+                              className="mb-1.5 rounded-xl max-h-56 w-auto object-cover cursor-pointer"
+                              referrerPolicy="no-referrer"
+                              onClick={() => setPreviewModalImage(c.imageUrl || null)}
+                            />
+                          )}
+                          {c.text && <p className="break-words whitespace-pre-wrap">{c.text}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Comment Composer (images only, no videos) */}
+            <div className="p-3 border-t border-slate-100 bg-white shrink-0 space-y-2">
+              {commentPreviewUrl && (
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-2">
+                  <img src={commentPreviewUrl} alt="Selected" className="w-10 h-10 rounded-lg object-cover" />
+                  <span className="text-[10px] font-bold text-slate-500 flex-1 truncate">Image attached</span>
+                  <button
+                    type="button"
+                    onClick={clearCommentImage}
+                    className="text-rose-500 hover:text-rose-700 text-xs font-black cursor-pointer bg-transparent border-0"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendComment();
+                }}
+                className="flex items-center gap-2 bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/90 focus-within:border-emerald-500 focus-within:bg-white transition-all"
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={commentFileInputRef}
+                  onChange={handleCommentFileSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => commentFileInputRef.current?.click()}
+                  disabled={sendingComment}
+                  className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0 disabled:opacity-50 border-0 bg-transparent"
+                  title="Attach image"
+                >
+                  <ImageIcon className="w-4 h-4" />
+                </button>
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Write a comment..."
+                  disabled={sendingComment}
+                  className="flex-1 bg-transparent border-0 focus:outline-none text-sm font-medium text-slate-900 placeholder:text-slate-400 px-1"
+                />
+                <button
+                  type="submit"
+                  disabled={sendingComment || (!commentText.trim() && !commentFile)}
+                  className="w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-xs transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed shrink-0 border-0"
+                >
+                  {sendingComment ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 stroke-[2.5]" />}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast Message */}
       <AnimatePresence>
         {toast && (

@@ -73,6 +73,21 @@ export interface BuzzMessage {
   };
   starredBy?: Record<string, boolean>;
   starredAt?: number;
+  commentsCount?: number; // number of comments posted on this message
+}
+
+export interface BuzzComment {
+  id: string;
+  messageId: string;
+  groupId: string;
+  senderUid: string;
+  senderName: string;
+  senderEmail: string;
+  senderPhoto?: string;
+  isAdmin?: boolean;
+  text: string;
+  imageUrl?: string; // comments support text and images only (no videos)
+  timestamp: number;
 }
 
 export interface OnlineUser {
@@ -826,4 +841,58 @@ export async function saveBuzzCategories(categories: string[]): Promise<void> {
       console.warn('Could not persist categories to RTDB:', e);
     }
   }
+}
+
+
+/**
+ * Subscribes to the comments on one Buzz message.
+ * Comments live under buzz_comments/{groupId}/{messageId}; newest last.
+ */
+export function subscribeToMessageComments(
+  groupId: string,
+  messageId: string,
+  callback: (comments: BuzzComment[]) => void,
+  limitCount: number = 100
+): () => void {
+  if (!rtdb) {
+    callback([]);
+    return () => {};
+  }
+  const commentsRef = ref(rtdb, `buzz_comments/${groupId}/${messageId}`);
+  const q = rtdbQuery(commentsRef, limitToLast(limitCount));
+  const unsubscribe = onValue(q, (snapshot) => {
+    const data = snapshot.val() || {};
+    const list: BuzzComment[] = Object.keys(data)
+      .map((id) => ({ ...data[id], id }))
+      .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    callback(list);
+  }, (err) => {
+    console.warn('subscribeToMessageComments error:', err);
+    callback([]);
+  });
+  return () => {
+    try { unsubscribe(); } catch (e) {}
+  };
+}
+
+/**
+ * Posts a comment on a Buzz message and bumps the message's commentsCount.
+ */
+export async function sendMessageComment(
+  groupId: string,
+  messageId: string,
+  payload: Omit<BuzzComment, 'id' | 'messageId' | 'groupId' | 'timestamp'>
+): Promise<void> {
+  if (!rtdb || !groupId || !messageId) return;
+  const commentsRef = ref(rtdb, `buzz_comments/${groupId}/${messageId}`);
+  const newRef = push(commentsRef);
+  await set(newRef, {
+    ...payload,
+    messageId,
+    groupId,
+    timestamp: Date.now()
+  });
+  try {
+    await runTransaction(ref(rtdb, `buzz_messages/${groupId}/${messageId}/commentsCount`), (cur) => (cur || 0) + 1);
+  } catch (e) {}
 }
