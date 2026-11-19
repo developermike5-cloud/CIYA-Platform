@@ -110,21 +110,31 @@ async function readDoc(token: string, projectId: string, path: string): Promise<
   return res.json();
 }
 
-async function patchDoc(token: string, projectId: string, uid: string, copies: number[]) {
-  const body = {
-    fields: {
-      promptCopies: { arrayValue: { values: copies.map((t) => ({ integerValue: String(t) })) } },
-    },
-  };
-  const res = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=promptCopies`,
-    {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }
+const copiesField = (copies: number[]) => ({
+  fields: {
+    promptCopies: { arrayValue: { values: copies.map((t) => ({ integerValue: String(t) })) } },
+  },
+});
+
+async function writeCopies(token: string, projectId: string, uid: string, copies: number[], userExists: boolean) {
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const body = JSON.stringify(copiesField(copies));
+  let res: Response;
+  if (userExists) {
+    // Existing user document: patch just the promptCopies field.
+    res = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=promptCopies`,
+      { method: "PATCH", headers, body }
+    );
+    if (res.ok) return;
+    if (res.status !== 404) throw new Error(`copy count update failed (${res.status})`);
+  }
+  // No user document yet (or it vanished): create it with the count.
+  res = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users?documentId=${encodeURIComponent(uid)}`,
+    { method: "POST", headers, body }
   );
-  if (!res.ok) throw new Error(`copy count update failed (${res.status})`);
+  if (!res.ok) throw new Error(`copy count create failed (${res.status})`);
 }
 
 export default async (req: Request) => {
@@ -152,6 +162,7 @@ export default async (req: Request) => {
     const lastReset = lastResetTimestamp(resetTimeStr);
 
     const userDoc = await readDoc(token, projectId, `users/${uid}`);
+    const userExists = !!userDoc?.fields;
     const values = userDoc?.fields?.promptCopies?.arrayValue?.values || [];
     const copies: number[] = values
       .map((v: any) => Number(v.integerValue ?? v.doubleValue ?? 0))
@@ -164,7 +175,7 @@ export default async (req: Request) => {
 
     const now = Date.now();
     const updated = [...copies.filter((t) => t >= now - 48 * 60 * 60 * 1000), now];
-    await patchDoc(token, projectId, uid, updated);
+    await writeCopies(token, projectId, uid, updated, userExists);
     return json(200, {
       allowed: true,
       remaining: DAILY_LIMIT - todayCount - 1,
