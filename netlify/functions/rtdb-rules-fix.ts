@@ -220,6 +220,25 @@ export default async (req: Request) => {
       if (out.match === null) out.match = keys.length === 0 ? 'no-jwk-keys-returned' : false;
       return new Response(JSON.stringify(out, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
     }
+    if (req.method === 'GET' && new URL(req.url).searchParams.get('tamper') === '1') {
+      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
+      const now = Math.floor(Date.now() / 1000);
+      const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })))
+        + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+      const signature = await signJwtInput(input);
+      const tampered = signature.slice(0, 20) + (signature[20] === 'A' ? 'B' : 'A') + signature.slice(21);
+      const mint = async (assertion: string) => {
+        const body = 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(assertion);
+        const r = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
+        return `http=${r.status} ${(await r.text()).slice(0, 200)}`;
+      };
+      const out = {
+        realSignature: await mint(`${input}.${signature}`),
+        tamperedSignature: await mint(`${input}.${tampered}`),
+        garbageAssertion: await mint('not.a.jwt'),
+      };
+      return new Response(JSON.stringify(out, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
+    }
     if (req.method === 'GET' && new URL(req.url).searchParams.get('echo') === '1') {
       const assertion = await buildAssertion();
       const r = await fetch('https://postman-echo.com/post', {
