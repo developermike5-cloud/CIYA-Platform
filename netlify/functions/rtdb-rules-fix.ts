@@ -5,53 +5,49 @@
  * POST -> adds the comment reactions child rule under buzz_comments/$groupId/$messageId/$commentId
  *
  * Written in the MODERN Netlify Functions style (default export, Request/Response)
- * so it is NOT subject to the legacy Lambda-compatibility 4KB environment limit,
- * which currently blocks any new legacy-style function on this site.
- *
- * Uses the same service-account JWT -> OAuth token approach as firebase-proxy.ts
- * (no firebase-admin dependency), then reads/writes the RTDB rules via the
- * .settings/rules.json REST endpoint.
+ * so it is NOT subject to the legacy Lambda-compatibility 4KB environment limit.
+ * JWT signing uses the Web Crypto API (crypto.subtle) rather than node:crypto,
+ * which mis-signs in some modern runtimes.
  */
-import crypto from 'crypto';
-
 type ServiceAccount = { project_id: string; client_email: string; private_key: string };
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPES = 'https://www.googleapis.com/auth/cloud-platform';
 let cachedToken: { token: string; exp: number } | null = null;
 
-function b64url(input: Buffer | string): string {
-  return Buffer.from(input).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+function strToBytes(s: string): Uint8Array {
+  return new TextEncoder().encode(s);
 }
 
-// The modern runtime's clock can be skewed (observed ~11h fast), and Google
-// rejects JWTs whose iat/exp are in the future. Derive true UTC from the
-// Date response header of a Google endpoint instead of the local clock.
-async function trueNow(): Promise<number> {
-  try {
-    const r = await fetch('https://www.googleapis.com/discovery/v1/apis');
-    const d = r.headers.get('date');
-    if (d) {
-      const t = Math.floor(new Date(d).getTime() / 1000);
-      if (t > 1_600_000_000) return t;
-    }
-  } catch {}
-  return Math.floor(Date.now() / 1000);
+function bytesToB64url(b: Uint8Array): string {
+  let s = '';
+  for (const c of b) s += String.fromCharCode(c);
+  return btoa(s).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function pemToDer(pem: string): Uint8Array {
+  const b64 = pem.replace(/-----BEGIN PRIVATE KEY-----/, '').replace(/-----END PRIVATE KEY-----/, '').replace(/\s+/g, '');
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+
+async function signJwtInput(input: string): Promise<string> {
+  const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
+  const key = await crypto.subtle.importKey('pkcs8', pemToDer(sa.private_key), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, strToBytes(input));
+  return bytesToB64url(new Uint8Array(sig));
 }
 
 async function getAccessToken(): Promise<string> {
-  const now = await trueNow();
+  const now = Math.floor(Date.now() / 1000);
   if (cachedToken && cachedToken.exp - 60 > now) return cachedToken.token;
   const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
   if (!sa.private_key || !sa.client_email) throw new Error('service account env missing or malformed');
-  const input = b64url(JSON.stringify({
-    iss: sa.client_email,
-    scope: SCOPES,
-    aud: TOKEN_URL,
-    iat: now,
-    exp: now + 3600,
-  })) + '.' + b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const signature = b64url(crypto.createSign('RSA-SHA256').update(input).sign(sa.private_key));
+  const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: TOKEN_URL, iat: now, exp: now + 3600 })))
+    + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
+  const signature = await signJwtInput(input);
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -85,20 +81,6 @@ const corsHeaders = {
 
 export default async (req: Request) => {
   try {
-    if (req.method === 'GET' && new URL(req.url).searchParams.get('debug') === '1') {
-      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
-      const now = await trueNow();
-      return new Response(JSON.stringify({
-        envLen: (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').length,
-        clientEmail: sa.client_email,
-        keyLen: (sa.private_key || '').length,
-        keyStarts: (sa.private_key || '').slice(0, 31),
-        keyEnds: (sa.private_key || '').slice(-30),
-        literalBackslashN: (sa.private_key || '').split('\\\\n').length - 1,
-        headB64: b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' })),
-        payloadB64: b64url(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: TOKEN_URL, iat: now, exp: now + 3600 })),
-      }, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
-    }
     const token = await getAccessToken();
     if (req.method === 'GET') {
       const rules = await readRules(token);
