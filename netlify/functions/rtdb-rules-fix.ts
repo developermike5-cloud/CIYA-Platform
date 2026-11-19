@@ -111,6 +111,12 @@ async function buildAssertion(): Promise<string> {
 
 export default async (req: Request) => {
   try {
+    if (req.method === 'GET' && new URL(req.url).searchParams.get('raw') === '1') {
+      const token = await getAccessToken();
+      const res = await fetch(`${rtdbBase()}/.settings/rules.json`, { headers: { Authorization: `Bearer ${token}` } });
+      const text = await res.text();
+      return new Response(`http=${res.status}\n\n${text.slice(0, 1200)}`, { status: 200, headers: { 'content-type': 'text/plain', ...corsHeaders } });
+    }
     if (req.method === 'GET' && new URL(req.url).searchParams.get('probe') === '1') {
       const candidates: Array<[string, string]> = [
         ['cloud-platform', 'https://www.googleapis.com/auth/cloud-platform'],
