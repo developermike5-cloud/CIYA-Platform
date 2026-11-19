@@ -18,6 +18,10 @@
               ".validate": "newData.isString() && newData.val().length <= 8"
             }
           },
+          "commentsCount": {
+            // Any signed-in user may increment/decrement the comment counter
+            ".write": "auth != null"
+          },
           "starredBy": {
             "$uid": {
               // Users can only star/unstar for themselves
@@ -60,6 +64,20 @@
         "$uid": {
           // Users can only set their own typing status
           ".write": "auth != null && $uid === auth.uid"
+        }
+      }
+    },
+        "buzz_comments": {
+      // Any signed-in user can read comments on messages they can already see
+      ".read": "auth != null",
+      "$groupId": {
+        ".read": "auth != null",
+        "$messageId": {
+          ".read": "auth != null",
+          "$commentId": {
+            // Only the comment author can create, edit or delete their comment
+            ".write": "auth != null && (!data.exists() || data.child('senderUid').val() === auth.uid)"
+          }
         }
       }
     },

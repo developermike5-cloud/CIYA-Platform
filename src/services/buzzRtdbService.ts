@@ -886,12 +886,14 @@ export async function sendMessageComment(
   if (!rtdb || !groupId || !messageId) return;
   const commentsRef = ref(rtdb, `buzz_comments/${groupId}/${messageId}`);
   const newRef = push(commentsRef);
-  await set(newRef, {
+  // cleanObject strips undefined fields (e.g. an absent senderPhoto); the RTDB
+  // SDK throws a long cryptic error when a set() payload contains undefined.
+  await set(newRef, cleanObject({
     ...payload,
     messageId,
     groupId,
     timestamp: Date.now()
-  });
+  }));
   try {
     await runTransaction(ref(rtdb, `buzz_messages/${groupId}/${messageId}/commentsCount`), (cur) => (cur || 0) + 1);
   } catch (e) {}
