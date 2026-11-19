@@ -16,6 +16,10 @@ import crypto from "crypto";
 
 const DAILY_LIMIT = 3;
 
+// CIYA's Firestore is a named database (created alongside the AI Studio app),
+// not the project's default database. Overridable via env for future moves.
+const FIRESTORE_DB = process.env.FIRESTORE_DATABASE_ID || "ai-studio-1aaee609-a922-43e7-9568-0b675490ff78";
+
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 function b64url(input: crypto.BinaryLike): string {
@@ -103,7 +107,7 @@ function lastResetTimestamp(resetTimeStr: string): number {
 
 async function readDoc(token: string, projectId: string, path: string): Promise<any> {
   const res = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}`,
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DB}/documents/${path}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
   if (!res.ok) return null;
@@ -123,7 +127,7 @@ async function writeCopies(token: string, projectId: string, uid: string, copies
   if (userExists) {
     // Existing user document: patch just the promptCopies field.
     res = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=promptCopies`,
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DB}/documents/users/${uid}?updateMask.fieldPaths=promptCopies`,
       { method: "PATCH", headers, body }
     );
     if (res.ok) return;
@@ -131,7 +135,7 @@ async function writeCopies(token: string, projectId: string, uid: string, copies
   }
   // No user document yet (or it vanished): create it with the count.
   res = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users?documentId=${encodeURIComponent(uid)}`,
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DB}/documents/users?documentId=${encodeURIComponent(uid)}`,
     { method: "POST", headers, body }
   );
   if (!res.ok) {
