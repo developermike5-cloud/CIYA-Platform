@@ -250,7 +250,7 @@ export default async (req: Request) => {
       let received: any = {};
       try { received = JSON.parse(t); } catch {}
       return new Response(JSON.stringify({
-        assertionSent: assertion.slice(0, 60) + '...',
+        assertionSent: assertion,
         sentGrantType: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
         echoStatus: r.status,
         echoForm: received?.form || null,
