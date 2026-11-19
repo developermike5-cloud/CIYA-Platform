@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Users, 
   Info, 
@@ -33,7 +33,9 @@ import {
   ListChecks,
   UserPlus,
   Copy,
-  MessageCircle
+  MessageCircle,
+  ChevronDown,
+  Timer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
@@ -62,6 +64,8 @@ import {
   deleteMessageComment,
   BuzzComment
 } from '../services/buzzRtdbService';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { Star, AlertCircle } from 'lucide-react';
 import { showCiyaToast } from './CiyaToast';
@@ -139,6 +143,9 @@ export default function StudentBuzz({
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [messageLimit, setMessageLimit] = useState(50);
   const pendingJumpRef = useRef<string | null>(null);
+  // Profile photos fetched from Firestore for senders whose messages/comments lack senderPhoto
+  const [profilePhotos, setProfilePhotos] = useState<Record<string, string>>({});
+  const profilePhotoFetchedRef = useRef<Set<string>>(new Set());
   const commentFileInputRef = useRef<HTMLInputElement | null>(null);
   const [categories, setCategories] = useState<string[]>(['All', 'Favourite', 'Website Development', 'Mobile App Development']);
 
@@ -311,6 +318,37 @@ export default function StudentBuzz({
       unsubComments();
     };
   }, [commentsMessage?.id, activeGroupId]);
+
+  // Fetch uploaded profile photos for senders whose messages/comments lack senderPhoto
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const uids = new Set<string>();
+    for (const m of messages) {
+      if (!m.senderPhoto && m.senderUid && !profilePhotoFetchedRef.current.has(m.senderUid)) uids.add(m.senderUid);
+    }
+    for (const c of comments) {
+      if (!c.senderPhoto && c.senderUid && !profilePhotoFetchedRef.current.has(c.senderUid)) uids.add(c.senderUid);
+    }
+    if (uids.size === 0) return;
+    let cancelled = false;
+    (async () => {
+      const results: Record<string, string> = {};
+      await Promise.all([...uids].map(async (uid) => {
+        profilePhotoFetchedRef.current.add(uid);
+        try {
+          const snap = await getDoc(doc(db, 'users', uid));
+          const photo = (snap.data() as { photoUrl?: string } | undefined)?.photoUrl || '';
+          if (photo) results[uid] = photo;
+        } catch {
+          // Profile not readable: the initials fallback stays for this sender
+        }
+      }));
+      if (!cancelled && Object.keys(results).length > 0) {
+        setProfilePhotos((prev) => ({ ...prev, ...results }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [messages, comments, currentUser?.uid]);
 
   // Scroll to bottom when messages update (held while a favourite jump settles)
   useEffect(() => {
@@ -669,6 +707,32 @@ export default function StudentBuzz({
   const activeGroup = groups.find((g) => g.id === activeGroupId);
   const isStarredCategory = selectedCategory === 'Favourite';
   const canSendMessages = !isStarredCategory && (effectiveIsAdmin || activeGroup?.allowStudentsChat !== false);
+  // Posting cooldown: non-admins must wait between posts (minutes set by admin per group)
+  const groupCooldownSeconds = activeGroup?.postCooldownSeconds || 0;
+  const cooldownSeconds = !isStarredCategory && !effectiveIsAdmin && groupCooldownSeconds > 0 ? groupCooldownSeconds : 0;
+  const lastOwnPostTs = useMemo(() => {
+    if (!cooldownSeconds || !currentUser?.uid) return 0;
+    let t = 0;
+    for (const m of messages) {
+      if (m.senderUid === currentUser.uid && m.timestamp > t) t = m.timestamp;
+    }
+    return t;
+  }, [messages, currentUser?.uid, cooldownSeconds]);
+  const [cooldownTick, setCooldownTick] = useState(Date.now());
+  useEffect(() => {
+    if (!cooldownSeconds) return;
+    const iv = setInterval(() => setCooldownTick(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, [cooldownSeconds, activeGroupId]);
+  const cooldownRemaining = cooldownSeconds && lastOwnPostTs
+    ? Math.max(0, Math.ceil((lastOwnPostTs + cooldownSeconds * 1000 - cooldownTick) / 1000))
+    : 0;
+  const cooldownLabel = `${Math.floor(cooldownRemaining / 60)}:${String(cooldownRemaining % 60).padStart(2, '0')}`;
+
+  // Personal ("You") rooms show the user's own uploaded profile photo, never a placeholder image
+  const personalPhoto = userProfile?.photoUrl || currentUser?.photoURL || '';
+  const groupAvatarSrc = (g: { imageUrl?: string; isPersonal?: boolean; category?: string } | null | undefined) =>
+    g && (g.isPersonal || g.category === 'Personal') && personalPhoto ? personalPhoto : g?.imageUrl;
 
   // Group membership gate: students must join a group before seeing its content
   const activeUid = currentUser?.uid || '';
@@ -994,9 +1058,9 @@ export default function StudentBuzz({
                       {/* Avatar & Badge Column */}
                       <div className="flex flex-col items-center gap-2 shrink-0">
                         <div className={`w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform duration-300 ${isPersonal ? 'bg-indigo-100/60 text-indigo-600' : 'bg-slate-100 border border-slate-200 text-slate-300'}`}>
-                          {group.imageUrl ? (
+                          {groupAvatarSrc(group) ? (
                             <img
-                              src={group.imageUrl}
+                              src={groupAvatarSrc(group)}
                               alt={group.name}
                               className="w-full h-full object-cover"
                               referrerPolicy="no-referrer"
@@ -1087,9 +1151,9 @@ export default function StudentBuzz({
           {/* Scrollable Details */}
           <div className="flex-1 overflow-y-auto">
             <div className="relative h-44 sm:h-60 w-full bg-slate-100 overflow-hidden shrink-0">
-              {activeGroup?.imageUrl ? (
+              {groupAvatarSrc(activeGroup) ? (
                 <img
-                  src={activeGroup.imageUrl}
+                  src={groupAvatarSrc(activeGroup)}
                   alt={activeGroup.name}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
@@ -1214,9 +1278,9 @@ export default function StudentBuzz({
             </button>
 
             <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/15 overflow-hidden flex items-center justify-center shrink-0">
-              {activeGroup?.imageUrl ? (
+              {groupAvatarSrc(activeGroup) ? (
                 <img
-                  src={activeGroup.imageUrl}
+                  src={groupAvatarSrc(activeGroup)}
                   alt={activeGroup.name}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
@@ -1296,8 +1360,8 @@ export default function StudentBuzz({
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 overflow-hidden flex items-center justify-center shrink-0">
-                            {activeGroup?.imageUrl ? (
-                              <img src={activeGroup.imageUrl} alt={activeGroup.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            {groupAvatarSrc(activeGroup) ? (
+                              <img src={groupAvatarSrc(activeGroup)} alt={activeGroup.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             ) : (
                               <Users className="w-5 h-5 text-emerald-600" />
                             )}
@@ -1434,8 +1498,8 @@ export default function StudentBuzz({
                         <div className="flex items-center gap-1.5 mb-1">
                           {/* Profile picture beside the name */}
                           <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[9px] font-black shrink-0 overflow-hidden">
-                            {msg.senderPhoto ? (
-                              <img src={msg.senderPhoto} alt={msg.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            {(msg.senderPhoto || profilePhotos[msg.senderUid]) ? (
+                              <img src={msg.senderPhoto || profilePhotos[msg.senderUid]} alt={msg.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             ) : (
                               (msg.senderName || 'S').charAt(0).toUpperCase()
                             )}
@@ -1528,14 +1592,17 @@ export default function StudentBuzz({
                           e.stopPropagation();
                           setCommentsMessage(msg);
                         }}
-                        className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider bg-transparent border-0 p-0 cursor-pointer text-slate-400 hover:text-emerald-600 transition-colors ${
-                          (msg.commentsCount || 0) > 0 ? 'text-emerald-600' : ''
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border transition-colors cursor-pointer ${
+                          (msg.commentsCount || 0) > 0
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600'
                         }`}
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
                         {(msg.commentsCount || 0) > 0
                           ? `${msg.commentsCount} comment${msg.commentsCount === 1 ? '' : 's'}`
                           : 'Comment'}
+                        <ChevronDown className="w-3 h-3" />
                       </button>
                       {Object.keys(reactionCounts).length > 0 && (
                         <div className="flex items-center gap-1 flex-wrap">
@@ -1801,8 +1868,8 @@ export default function StudentBuzz({
                         className="w-full text-left p-3 hover:bg-slate-50 rounded-2xl flex items-center gap-3 transition-colors cursor-pointer group"
                       >
                         <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                          {g.imageUrl ? (
-                            <img src={g.imageUrl} className="w-full h-full object-cover rounded-xl" />
+                          {groupAvatarSrc(g) ? (
+                            <img src={groupAvatarSrc(g)} className="w-full h-full object-cover rounded-xl" />
                           ) : (
                             <Users className="w-4 h-4 text-slate-400" />
                           )}
@@ -1860,6 +1927,13 @@ export default function StudentBuzz({
                 <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>
                   Announcement mode: only instructors can post here.
+                </span>
+              </div>
+            ) : cooldownRemaining > 0 ? (
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold flex items-center justify-center gap-2 text-center">
+                <Timer className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>
+                  Posting cooldown: you can post again in {cooldownLabel}.
                 </span>
               </div>
             ) : (
@@ -2016,8 +2090,8 @@ export default function StudentBuzz({
                         {/* Avatar and name together, on top of the comment */}
                         <div className="flex items-center gap-1.5 mb-1">
                           <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden">
-                            {c.senderPhoto ? (
-                              <img src={c.senderPhoto} alt={c.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            {(c.senderPhoto || profilePhotos[c.senderUid]) ? (
+                              <img src={c.senderPhoto || profilePhotos[c.senderUid]} alt={c.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                             ) : (
                               (c.senderName || 'S').charAt(0).toUpperCase()
                             )}

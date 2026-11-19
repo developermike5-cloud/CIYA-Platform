@@ -49,6 +49,7 @@ export interface BuzzGroup {
   isProOnly?: boolean;
   isAdminOnly?: boolean;
   rules?: string; // Group rules & regulations shown before joining (admin editable)
+  postCooldownSeconds?: number; // Students must wait this long between posts (seconds). Admins are never limited
   members?: Record<string, number>; // uid -> joinedAt ms. Students must join before seeing content
 }
 
@@ -249,7 +250,6 @@ export async function ensurePersonalGroup(uid: string, name: string): Promise<vo
       name: 'You',
       description: 'Store and save important info relating to your studies.',
       category: 'Personal',
-      imageUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&q=80',
       allowStudentsChat: true,
       createdAt: Date.now(),
       membersCount: 1,

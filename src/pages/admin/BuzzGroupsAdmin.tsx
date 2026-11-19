@@ -54,6 +54,7 @@ export default function BuzzGroupsAdmin() {
   const [isProOnly, setIsProOnly] = useState(false);
   const [isAdminOnly, setIsAdminOnly] = useState(false);
   const [groupRules, setGroupRules] = useState('');
+  const [cooldownMinutes, setCooldownMinutes] = useState(0);
 
   // Category state
   const [categories, setCategories] = useState<string[]>(DEFAULT_BUZZ_CATEGORIES);
@@ -199,6 +200,7 @@ export default function BuzzGroupsAdmin() {
     setIsProOnly(!!group.isProOnly);
     setIsAdminOnly(!!group.isAdminOnly);
     setGroupRules(group.rules || '');
+    setCooldownMinutes(group.postCooldownSeconds ? Math.round(group.postCooldownSeconds / 60) : 0);
     setUploadError(null);
     setShowAddCategory(false);
     setIsModalOpen(true);
@@ -251,7 +253,8 @@ export default function BuzzGroupsAdmin() {
           allowStudentsChat: allowStudentsChat,
           isProOnly: isProOnly,
           isAdminOnly: isAdminOnly,
-          rules: groupRules.trim() || undefined
+          rules: groupRules.trim() || undefined,
+          postCooldownSeconds: Math.max(0, Math.round(cooldownMinutes * 60)) || undefined
         });
         setActionSuccess(`Group "${groupName}" updated successfully.`);
       } else {
@@ -264,6 +267,7 @@ export default function BuzzGroupsAdmin() {
           isProOnly: isProOnly,
           isAdminOnly: isAdminOnly,
           rules: groupRules.trim() || undefined,
+          postCooldownSeconds: Math.max(0, Math.round(cooldownMinutes * 60)) || undefined,
           createdBy: adminEmail
         });
         setActionSuccess(`New group "${groupName}" created successfully.`);
@@ -800,6 +804,25 @@ export default function BuzzGroupsAdmin() {
                   onChange={(e) => setGroupRules(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-medium resize-none !text-slate-900"
                 />
+              </div>
+
+              {/* Posting Cooldown (time between posts) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Time Between Posts (minutes)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="0 = no limit"
+                  value={cooldownMinutes === 0 ? '' : cooldownMinutes}
+                  onChange={(e) => setCooldownMinutes(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-medium !text-slate-900"
+                />
+                <p className="text-[11px] text-slate-500 mt-1 font-medium">
+                  Students must wait this long after posting before they can post again. Leave empty or 0 for no limit. Admins can always post freely.
+                </p>
               </div>
 
               {/* Toggle: Allow Students to Chat */}
