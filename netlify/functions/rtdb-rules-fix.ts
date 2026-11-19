@@ -297,7 +297,7 @@ export default async (req: Request) => {
       const res = await fetch(`${rtdbBase()}/.settings/rules.json`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify(rules),
+        body: JSON.stringify(wrapper.rules ? wrapper : rules),
       });
       const text = await res.text();
       if (!res.ok) return new Response(`rules write failed (${res.status}): ${text.slice(0, 400)}`, { status: 500, headers: corsHeaders });
