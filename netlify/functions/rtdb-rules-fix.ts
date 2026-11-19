@@ -47,21 +47,11 @@ async function tryMint(scope: string): Promise<{ ok: boolean; detail: string }> 
     const input = bytesToB64url(strToBytes(JSON.stringify({ iss: sa.client_email, scope, aud: TOKEN_URL, iat: now, exp: now + 3600 })))
       + '.' + bytesToB64url(strToBytes(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
     const signature = await signJwtInput(input);
-    // self-verify with the public half of the same key
-    const keyObj = await crypto.subtle.importKey('pkcs8', pemToDer(sa.private_key), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, true, ['sign']);
-    const spki = await crypto.subtle.exportKey('spki', keyObj);
-    const pub = await crypto.subtle.importKey('spki', spki, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-    const sigB64 = signature.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = sigB64 + '==='.slice((sigB64.length + 3) % 4);
-    const bin = atob(padded);
-    const sigBytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) sigBytes[i] = bin.charCodeAt(i);
-    const selfVerified = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', pub, sigBytes, strToBytes(input));
     const body = 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(`${input}.${signature}`);
     const res = await fetch(TOKEN_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body });
     const text = await res.text();
     let d: any = {}; try { d = JSON.parse(text); } catch {}
-    return { ok: !!(res.ok && d.access_token), detail: selfVerified ? `selfVerified=true http=${res.status} ${text.slice(0, 120)}` : `selfVerified=FALSE http=${res.status} ${text.slice(0, 120)}` };
+    return { ok: !!(res.ok && d.access_token), detail: `http=${res.status} ${text.slice(0, 140)}` };
   } catch (e: any) {
     return { ok: false, detail: `threw: ${e?.message || String(e)}` };
   }
