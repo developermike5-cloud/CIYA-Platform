@@ -4,11 +4,14 @@
  * GET  -> current state booleans
  * POST -> adds the comment reactions child rule under buzz_comments/$groupId/$messageId/$commentId
  *
+ * Written in the MODERN Netlify Functions style (default export, Request/Response)
+ * so it is NOT subject to the legacy Lambda-compatibility 4KB environment limit,
+ * which currently blocks any new legacy-style function on this site.
+ *
  * Uses the same service-account JWT -> OAuth token approach as firebase-proxy.ts
  * (no firebase-admin dependency), then reads/writes the RTDB rules via the
  * .settings/rules.json REST endpoint.
  */
-import type { Handler } from '@netlify/functions';
 import crypto from 'crypto';
 
 type ServiceAccount = { project_id: string; client_email: string; private_key: string };
@@ -56,15 +59,24 @@ async function readRules(token: string): Promise<any> {
   return JSON.parse(text);
 }
 
-const handler: Handler = async (event) => {
+const corsHeaders = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-headers': 'content-type',
+};
+
+export default async (req: Request) => {
   try {
     const token = await getAccessToken();
-    if (event.httpMethod === 'GET') {
+    if (req.method === 'GET') {
       const rules = await readRules(token);
       const b = JSON.stringify(rules?.buzz_comments || {});
-      return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ hasBuzzComments: !!rules?.buzz_comments, hasReactionsChild: b.includes('"reactions"') }) };
+      return new Response(JSON.stringify({ hasBuzzComments: !!rules?.buzz_comments, hasReactionsChild: b.includes('"reactions"') }), {
+        status: 200,
+        headers: { 'content-type': 'application/json', ...corsHeaders },
+      });
     }
-    if (event.httpMethod === 'POST') {
+    if (req.method === 'POST') {
       const rules = await readRules(token);
       rules.buzz_comments = rules.buzz_comments || {};
       rules.buzz_comments['$groupId'] = rules.buzz_comments['$groupId'] || {};
@@ -85,15 +97,16 @@ const handler: Handler = async (event) => {
         body: JSON.stringify(rules),
       });
       const text = await res.text();
-      if (!res.ok) return { statusCode: 500, body: `rules write failed (${res.status}): ${text.slice(0, 400)}` };
+      if (!res.ok) return new Response(`rules write failed (${res.status}): ${text.slice(0, 400)}`, { status: 500, headers: corsHeaders });
       const after = await readRules(token);
       const b = JSON.stringify(after?.buzz_comments || {});
-      return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ buzzCommentsReactionsAdded: true, hasReactionsChild: b.includes('"reactions"'), hasCommentsCount: b.includes('commentsCount') }) };
+      return new Response(JSON.stringify({ buzzCommentsReactionsAdded: true, hasReactionsChild: b.includes('"reactions"'), hasCommentsCount: b.includes('commentsCount') }), {
+        status: 200,
+        headers: { 'content-type': 'application/json', ...corsHeaders },
+      });
     }
-    return { statusCode: 405, body: 'Method not allowed' };
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   } catch (err: any) {
-    return { statusCode: 500, body: `error: ${err?.message || String(err)}` };
+    return new Response(`error: ${err?.message || String(err)}`, { status: 500, headers: corsHeaders });
   }
 };
-
-export { handler };
