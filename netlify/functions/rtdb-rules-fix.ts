@@ -17,7 +17,7 @@ import crypto from 'crypto';
 type ServiceAccount = { project_id: string; client_email: string; private_key: string };
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const SCOPES = 'https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/firebase https://www.googleapis.com/auth/datastore';
+const SCOPES = 'https://www.googleapis.com/auth/cloud-platform';
 let cachedToken: { token: string; exp: number } | null = null;
 
 function b64url(input: Buffer | string): string {
@@ -71,6 +71,20 @@ const corsHeaders = {
 export default async (req: Request) => {
   try {
     const token = await getAccessToken();
+    if (req.method === 'GET' && new URL(req.url).searchParams.get('debug') === '1') {
+      const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}') as ServiceAccount;
+      const now = Math.floor(Date.now() / 1000);
+      return new Response(JSON.stringify({
+        envLen: (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').length,
+        clientEmail: sa.client_email,
+        keyLen: (sa.private_key || '').length,
+        keyStarts: (sa.private_key || '').slice(0, 31),
+        keyEnds: (sa.private_key || '').slice(-30),
+        literalBackslashN: (sa.private_key || '').split('\\\\n').length - 1,
+        headB64: b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' })),
+        payloadB64: b64url(JSON.stringify({ iss: sa.client_email, scope: SCOPES, aud: TOKEN_URL, iat: now, exp: now + 3600 })),
+      }, null, 2), { status: 200, headers: { 'content-type': 'application/json', ...corsHeaders } });
+    }
     if (req.method === 'GET') {
       const rules = await readRules(token);
       const b = JSON.stringify(rules?.buzz_comments || {});
