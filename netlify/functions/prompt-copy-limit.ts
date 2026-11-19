@@ -134,7 +134,10 @@ async function writeCopies(token: string, projectId: string, uid: string, copies
     `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users?documentId=${encodeURIComponent(uid)}`,
     { method: "POST", headers, body }
   );
-  if (!res.ok) throw new Error(`copy count create failed (${res.status})`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`copy count create failed (${res.status}): ${detail.slice(0, 300)}`);
+  }
 }
 
 export default async (req: Request) => {
