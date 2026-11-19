@@ -1034,7 +1034,7 @@ export default function PromptGenerator({
                         </div>
                       </div>
                     ) : (
-                      <div className="absolute inset-0 bg-slate-950 p-4 pt-8 flex flex-col justify-between z-10 text-white animate-in fade-in slide-in-from-bottom-4 duration-300">
+                      <div className="absolute inset-0 bg-slate-950 p-4 pt-8 flex flex-col justify-between z-10 text-white animate-in fade-in slide-in-from-bottom-4 duration-300 select-none" style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }} onContextMenu={(e) => e.preventDefault()}>
                         <div className="flex-1 overflow-y-auto pr-1 space-y-3 pt-2 min-h-0">
                           <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
                             <div className="flex items-center gap-1.5">
@@ -1062,7 +1062,7 @@ export default function PromptGenerator({
                           </div>
 
                           {tailoredPrompt ? (
-                            <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
+                            <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-none" style={{ WebkitTouchCallout: 'none' }}>
                               {tailoredPrompt}
                             </p>
                           ) : tailorView ? (
@@ -1155,7 +1155,7 @@ export default function PromptGenerator({
                           )}
                             </>
                           ) : (
-                            <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
+                            <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-none" style={{ WebkitTouchCallout: 'none' }}>
                               {selectedTemplate?.template}
                             </p>
                           )}
