@@ -499,6 +499,7 @@ export default function PromptGenerator({
   const [tailoringDoc, setTailoringDoc] = useState<any | null>(null);
   const [kycbForms, setKycbForms] = useState<any[]>([]);
   const [loadingKycb, setLoadingKycb] = useState(false);
+  const [tailorView, setTailorView] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -506,6 +507,7 @@ export default function PromptGenerator({
     setTailoredPrompt(null);
     setTailoringError(null);
     setTailoringDoc(null);
+    setTailorView(false);
   }, [selectedTemplate]);
 
   const previewLink = selectedTemplate?.link1 || selectedTemplate?.link2 || selectedTemplate?.videoUrl;
@@ -995,12 +997,12 @@ export default function PromptGenerator({
                             <div className="flex items-center gap-1.5">
                               <FileText className="w-3.5 h-3.5 text-indigo-400" />
                               <span className="font-extrabold text-[10px] tracking-wider uppercase text-slate-400">
-                                {tailoredPrompt ? 'Tailored AI Prompt' : 'Choose Your KYCB'}
+                                {tailoredPrompt ? 'Tailored AI Prompt' : tailorView ? 'Choose Your KYCB' : 'Prompt Template Body'}
                               </span>
                             </div>
                             {tailoredPrompt && (
                               <button
-                                onClick={() => { setTailoredPrompt(null); setTailoringDoc(null); }}
+                                onClick={() => { setTailoredPrompt(null); setTailoringDoc(null); setTailorView(true); fetchKycbForms(); }}
                                 className="text-[9px] font-black text-indigo-400 hover:text-indigo-300 transition-colors uppercase border-0 bg-transparent cursor-pointer"
                               >
                                 Choose another KYCB
@@ -1008,6 +1010,12 @@ export default function PromptGenerator({
                             )}
                           </div>
 
+                          {tailoredPrompt ? (
+                            <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
+                              {tailoredPrompt}
+                            </p>
+                          ) : tailorView ? (
+                            <>
                           {isTailoring ? (
                             <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
                               <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
@@ -1035,10 +1043,6 @@ export default function PromptGenerator({
                                 </button>
                               </div>
                             </div>
-                          ) : tailoredPrompt ? (
-                            <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
-                              {tailoredPrompt}
-                            </p>
                           ) : loadingKycb ? (
                             <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
                               <Loader2 className="w-7 h-7 text-indigo-500 animate-spin" />
@@ -1100,10 +1104,16 @@ export default function PromptGenerator({
                               ))}
                             </div>
                           )}
+                            </>
+                          ) : (
+                            <p className="font-mono text-[10px] md:text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-indigo-600">
+                              {selectedTemplate?.template}
+                            </p>
+                          )}
                         </div>
 
-                        {/* Copy controls (only once a tailored prompt exists) */}
-                        {tailoredPrompt && (
+                        {/* Bottom action inside the screen: tailor, or copy once tailored */}
+                        {tailoredPrompt ? (
                           <div className="pt-3 border-t border-slate-900 bg-slate-950 space-y-2">
                             <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold px-1 uppercase tracking-wider">
                               <span>Daily Copy Tracker</span>
@@ -1133,6 +1143,16 @@ export default function PromptGenerator({
                                 Your copy limit resets today at {resetTimeStr} (Nigeria Time).
                               </p>
                             )}
+                          </div>
+                        ) : (
+                          <div className="pt-3 border-t border-slate-900 bg-slate-950">
+                            <button
+                              onClick={() => { setTailorView(true); fetchKycbForms(); }}
+                              className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-[10px] font-black uppercase rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 transition-all border-0 cursor-pointer active:scale-95"
+                            >
+                              <Wand2 className="w-3.5 h-3.5 text-amber-300" />
+                              Tailor with my KYCB
+                            </button>
                           </div>
                         )}
                       </div>
@@ -1220,7 +1240,6 @@ export default function PromptGenerator({
                 } else {
                   setIsShowingText(true);
                   setIsShowingLinkPreview(false);
-                  fetchKycbForms();
                 }
               }}
               className="w-full py-3.5 rounded-2xl font-black text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer active:scale-95 border-0 bg-indigo-600 hover:bg-indigo-700 text-white"
@@ -1231,7 +1250,7 @@ export default function PromptGenerator({
                 </>
               ) : (
                 <>
-                  <Wand2 className="w-4 h-4 text-amber-300" /> Tailor with my KYCB
+                  <Eye className="w-4 h-4" /> Open Prompt
                 </>
               )}
             </button>
