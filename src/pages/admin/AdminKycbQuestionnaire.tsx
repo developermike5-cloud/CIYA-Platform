@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { collection, addDoc, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy, where, limit, onSnapshot } from 'firebase/firestore';
 import ReactMarkdown from 'react-markdown';
-import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, Lock, X, ClipboardList, Archive, RefreshCw } from 'lucide-react';
+import { CreditCard, Globe, Plus, Trash2, Check, ArrowRight, Printer, Save, Smartphone, Sparkles, FolderLock, Copy, Download, Link2, X, ClipboardList, Archive, RefreshCw } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import CIYADatePicker from '../../components/CIYADatePicker';
 import { safeStorage } from '../../utils/safeStorage';
@@ -82,12 +82,8 @@ export default function AdminKycbQuestionnaire({
   const hasExceededLimit = savedForms.length >= currentLimit;
 
   const [shareType, setShareType] = useState<'lp' | 'ec' | 'portfolio'>('lp');
-  const [shareTitle, setShareTitle] = useState(
-    isPro ? 'Website Requirements Questionnaire' : 'CIYA Academy Website Requirements Form'
-  );
-  const [shareStudent, setShareStudent] = useState(
-    userProfile?.fullName || defaultClientName || ''
-  );
+  const [shareTitle, setShareTitle] = useState('');
+  const [shareStudent, setShareStudent] = useState('');
   const [linkCopied, setLinkCopied] = useState(false);
 
   // Perspective helper function
@@ -1583,6 +1579,8 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
   const openClientLink = (form: SavedForm) => {
     setClientLinkForm(form);
     setLinkCopied(false);
+    setShareTitle('');
+    setShareStudent('');
     setShowClientLinkModal(true);
   };
 
@@ -2684,13 +2682,11 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
               </p>
 
               <div>
-                <label className="text-xs font-black uppercase text-slate-400 tracking-wider block mb-1.5">Website Type (fixed to this form)</label>
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-100 border border-slate-200">
-                  <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                <label className="text-xs font-black uppercase text-slate-400 tracking-wider block mb-1.5">Website Type</label>
+                <div className="px-3 py-2.5 rounded-xl bg-slate-100 border border-slate-200">
                   <span className="text-sm font-black text-slate-800">
                     {clientLinkForm.type === 'lp' ? '✏️ Landing Page' : clientLinkForm.type === 'ec' ? '🛒 eCommerce Store' : '💼 Portfolio Website'}
                   </span>
-                  <span className="ml-auto text-xs font-bold text-slate-400">Cannot be changed</span>
                 </div>
               </div>
 
@@ -2764,13 +2760,6 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                 <h3 className="font-black text-sm md:text-base text-white tracking-tight">Saved Form Answers</h3>
                 <p className="text-sm font-bold text-slate-200 mt-1 truncate max-w-[280px]">{clientName}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowViewModal(false)}
-                className="w-9 h-9 rounded-full bg-slate-700 hover:bg-slate-600 text-white border-2 border-slate-500 shadow-md flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
             <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-1.5">
               {(() => {
