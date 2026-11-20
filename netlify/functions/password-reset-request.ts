@@ -9,11 +9,11 @@ import crypto from "crypto";
  * When the email IS registered (and rate limits allow), a 6-digit OTP is
  * stored hashed in Firestore (password_reset_otps, server-only: the global
  * deny-all rules block client access; admin calls bypass rules) and emailed
- * through ZeptoMail using the ZEPTO_TEMPLATE_KEY_OTP template.
+ * through ZeptoMail as code-generated HTML (the ZeptoMail OTP template never
+ * filled its merge tags, so the send no longer depends on one).
  *
  * Env: FIREBASE_SERVICE_ACCOUNT_JSON, VITE_FIREBASE_FIRESTORE_DATABASE_ID,
- * ZEPTO_TEMPLATE_KEY_OTP, ZEPTO_FROM_ADDRESS, ZEPTOMAIL_API_KEY / ZEPTO_API_KEY,
- * ZEPTO_FROM_NAME.
+ * ZEPTO_FROM_ADDRESS, ZEPTOMAIL_API_KEY / ZEPTO_API_KEY, ZEPTO_FROM_NAME.
  */
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -111,34 +111,75 @@ function hashOtp(otp: string, email: string): string {
   return crypto.createHash("sha256").update(`${otp}:${email.toLowerCase()}:${OTP_SALT}`).digest("hex");
 }
 
+function escapeHtml(v: string): string {
+  return v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function otpEmailHtml(firstname: string, otp: string, expiryMinutes: string): string {
+  const name = escapeHtml(firstname || "there");
+  const code = escapeHtml(otp);
+  const expiry = escapeHtml(expiryMinutes);
+  return [
+    '<!DOCTYPE html><html><body style="margin:0;padding:0;background:#042f2e;">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#042f2e;padding:32px 16px;"><tr><td align="center">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">',
+    '<tr><td align="center" style="padding-bottom:24px;">',
+    '<div style="font-size:22px;font-weight:800;color:#f59e0b;letter-spacing:4px;">CIYA</div>',
+    '<div style="font-size:11px;color:#5eead4;letter-spacing:3px;text-transform:uppercase;">Create It Yourself Academy</div>',
+    '</td></tr>',
+    '<tr><td style="background:#0b3d3a;border-radius:16px;padding:32px 28px;border:1px solid #134e4a;">',
+    `<p style="margin:0 0 12px;font-size:16px;color:#ffffff;font-weight:700;">Hi ${name},</p>`,
+    `<p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#99f6e4;">Use the code below to reset your CIYA password. It expires in ${expiry} minutes.</p>`,
+    '<div style="background:#f59e0b;border-radius:12px;padding:16px 12px;text-align:center;">',
+    `<span style="font-size:32px;font-weight:800;letter-spacing:10px;color:#042f2e;">${code}</span>`,
+    '</div>',
+    '<p style="margin:20px 0 0;font-size:13px;line-height:1.6;color:#99f6e4;">If you didn\'t request a password reset, you can safely ignore this email. Your password will stay unchanged.</p>',
+    '</td></tr>',
+    '<tr><td align="center" style="padding-top:20px;"><span style="font-size:12px;color:#5eead4;">The CIYA Team</span></td></tr>',
+    '</table>',
+    '</td></tr></table>',
+    '</body></html>',
+  ].join("");
+}
+
+function otpEmailText(firstname: string, otp: string, expiryMinutes: string): string {
+  return [
+    `Hi ${firstname || "there"},`,
+    "",
+    `Use the code below to reset your CIYA password. It expires in ${expiryMinutes} minutes.`,
+    "",
+    otp,
+    "",
+    "If you didn't request a password reset, you can safely ignore this email. Your password will stay unchanged.",
+    "",
+    "The CIYA Team",
+  ].join("\n");
+}
+
 async function sendOtpEmail(opts: { toEmail: string; firstname: string; otp: string; expiryMinutes: string }): Promise<boolean> {
   const apiKey = (process.env.ZEPTOMAIL_API_KEY || process.env.ZEPTO_API_KEY || "")
     .trim()
     .replace(/^Zoho-enczapikey\s*/i, "")
     .trim();
-  const templateKey = process.env.ZEPTO_TEMPLATE_KEY_OTP;
   const fromAddress = process.env.ZEPTO_FROM_ADDRESS;
   const fromName = process.env.ZEPTO_FROM_NAME || "CIYA Academy";
-  if (!apiKey || !templateKey || !fromAddress) {
+  if (!apiKey || !fromAddress) {
     console.log("password-reset-request: zepto not configured, OTP email not sent", {
       hasKey: !!apiKey,
-      hasTemplate: !!templateKey,
       hasFrom: !!fromAddress,
     });
     return false;
   }
-  const res = await fetch("https://api.zeptomail.com/v1.1/email/template", {
+  const firstname = opts.firstname || "there";
+  const res = await fetch("https://api.zeptomail.com/v1.1/email", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Zoho-enczapikey ${apiKey}` },
     body: JSON.stringify({
-      template_key: templateKey,
       from: { address: fromAddress, name: fromName },
-      to: [{ email_address: { address: opts.toEmail, name: opts.firstname || "CIYA Student" } }],
-      merge_info: {
-        firstname: opts.firstname || "there",
-        otp: opts.otp,
-        expiry_minutes: opts.expiryMinutes,
-      },
+      to: [{ email_address: { address: opts.toEmail, name: firstname === "there" ? "CIYA Student" : firstname } }],
+      subject: "Your CIYA password reset code",
+      htmlbody: otpEmailHtml(firstname, opts.otp, opts.expiryMinutes),
+      textbody: otpEmailText(firstname, opts.otp, opts.expiryMinutes),
     }),
   });
   if (!res.ok) {

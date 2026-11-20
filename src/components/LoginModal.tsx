@@ -41,7 +41,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
   // Password Reset States (CIYA OTP pipeline: email -> 6-digit code -> new password)
   const [isResetMode, setIsResetMode] = useState(false);
-  const [resetStep, setResetStep] = useState<'email' | 'verify'>('email');
+  const [resetStep, setResetStep] = useState<'email' | 'code' | 'password'>('email');
   const [resetEmail, setResetEmail] = useState('');
   const [resetOtp, setResetOtp] = useState('');
   const [resetNewPw, setResetNewPw] = useState('');
@@ -196,7 +196,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         throw new Error(data?.message || 'Could not send the reset code. Please try again.');
       }
       setResetSuccess(`If your email is registered with CIYA, a 6-digit reset code has been sent to ${resetEmail.trim()}. It expires in 10 minutes. Check your inbox and spam folder.`);
-      setResetStep('verify');
+      setResetStep('code');
       setResendIn(60);
     } catch (err: any) {
       setError(err.message || 'Could not send the reset code. Please try again.');
@@ -205,7 +205,36 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   };
 
-  // Handle OTP password reset, step 2: verify the code and change the password.
+  // Handle OTP password reset, step 2: verify the code only.
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (resetOtp.trim().length !== 6) {
+      setError('Enter the 6-digit code from your email.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/password-reset-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim().toLowerCase(), otp: resetOtp.trim(), verifyOnly: true })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.message || 'That code is invalid or has expired. Request a new one and try again.');
+      }
+      setResetSuccess('Code verified. Now choose your new password.');
+      setResetStep('password');
+    } catch (err: any) {
+      setError(err.message || 'That code is invalid or has expired. Request a new one and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle OTP password reset, step 3: change the password.
   const handleConfirmReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (resetOtp.trim().length !== 6) {
@@ -520,13 +549,36 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
               {/* FORGOT PASSWORD RESET VIEW */}
               {isResetMode ? (
-                <form onSubmit={resetStep === 'email' ? handleRequestOtp : handleConfirmReset} className="space-y-4">
+                <form onSubmit={resetStep === 'email' ? handleRequestOtp : resetStep === 'code' ? handleVerifyCode : handleConfirmReset} className="space-y-4">
+                  {/* 3-step flow guide */}
+                  <div className="flex items-center justify-center gap-1.5">
+                    {(['email', 'code', 'password'] as const).map((stepName, i) => {
+                      const labels = ['Email', 'Code', 'Password'];
+                      const idx = ['email', 'code', 'password'].indexOf(resetStep);
+                      const done = i < idx;
+                      const active = i === idx;
+                      return (
+                        <div key={stepName} className="flex items-center gap-1.5">
+                          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all ${active ? 'bg-amber-500/15 border-amber-500/50' : done ? 'bg-emerald-500/10 border-emerald-600/40' : 'bg-teal-950/60 border-teal-900'}`}>
+                            <span className={`grid place-items-center w-4 h-4 rounded-full text-[9px] font-black ${active ? 'bg-amber-500 text-teal-950' : done ? 'bg-emerald-500 text-teal-950' : 'bg-teal-900 text-teal-500'}`}>
+                              {done ? <Check className="w-2.5 h-2.5" strokeWidth={4} /> : i + 1}
+                            </span>
+                            <span className={`text-[10px] font-black uppercase tracking-wider ${active ? 'text-amber-400' : done ? 'text-emerald-400' : 'text-teal-700'}`}>{labels[i]}</span>
+                          </div>
+                          {i < 2 && <div className={`w-3 h-px ${done ? 'bg-emerald-600/60' : 'bg-teal-900'}`} />}
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-300 text-xs leading-relaxed font-semibold flex items-start gap-2.5">
                     <KeyRound className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <div>
                       {resetStep === 'email'
                         ? 'Enter your registered email address below. A 6-digit reset code will be sent to your email.'
-                        : 'Enter the 6-digit code sent to your email, then choose your new password.'}
+                        : resetStep === 'code'
+                          ? `Enter the 6-digit code we sent to ${resetEmail.trim()}. It expires in 10 minutes.`
+                          : `Code verified. Now choose a new password for ${resetEmail.trim()}.`}
                     </div>
                   </div>
 
@@ -551,7 +603,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                         />
                       </div>
                     </div>
-                  ) : (
+                                    ) : resetStep === 'code' ? (
                     <>
                       <div>
                         <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300 mb-1">6-Digit Code *</label>
@@ -571,6 +623,19 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                         </div>
                       </div>
 
+                      <div className="text-center">
+                        <button
+                          type="button"
+                          disabled={resendIn > 0 || loading}
+                          onClick={() => handleRequestOtp()}
+                          className="text-[11px] text-teal-400 hover:text-amber-300 font-bold underline disabled:opacity-50 disabled:no-underline bg-transparent border-0 cursor-pointer p-0"
+                        >
+                          {resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
                       <div>
                         <label className="block text-[11px] font-black uppercase tracking-wider text-teal-300 mb-1">New Password *</label>
                         <div className="relative">
@@ -630,17 +695,6 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                           ))}
                         </ul>
                       </div>
-
-                      <div className="text-center">
-                        <button
-                          type="button"
-                          disabled={resendIn > 0 || loading}
-                          onClick={() => handleRequestOtp()}
-                          className="text-[11px] text-teal-400 hover:text-amber-300 font-bold underline disabled:opacity-50 disabled:no-underline bg-transparent border-0 cursor-pointer p-0"
-                        >
-                          {resendIn > 0 ? `Resend code in ${resendIn}s` : 'Resend code'}
-                        </button>
-                      </div>
                     </>
                   )}
 
@@ -653,10 +707,14 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       {loading
                         ? resetStep === 'email'
                           ? 'Sending Code...'
-                          : 'Changing Password...'
+                          : resetStep === 'code'
+                            ? 'Verifying Code...'
+                            : 'Changing Password...'
                         : resetStep === 'email'
                           ? 'Request OTP'
-                          : 'Change Password'}
+                          : resetStep === 'code'
+                            ? 'Verify Code'
+                            : 'Change Password'}
                     </span>
                   </button>
 
@@ -664,20 +722,21 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     <button
                       type="button"
                       onClick={() => {
-                        if (resetStep === 'verify') {
+                        if (resetStep === 'code') {
                           setResetStep('email');
                           setResetOtp('');
+                        } else if (resetStep === 'password') {
+                          setResetStep('code');
                           setResetNewPw('');
                           setResetConfirmPw('');
                         } else {
                           setIsResetMode(false);
                         }
                         setError('');
-                        setResetSuccess('');
                       }}
                       className="text-xs text-teal-400 hover:text-white font-bold underline bg-transparent border-0 cursor-pointer p-0"
                     >
-                      {resetStep === 'verify' ? '← Use a different email' : '← Back to Sign In'}
+                      {resetStep === 'email' ? '← Back to Sign In' : resetStep === 'code' ? '← Use a different email' : '← Back to code'}
                     </button>
                   </div>
                 </form>

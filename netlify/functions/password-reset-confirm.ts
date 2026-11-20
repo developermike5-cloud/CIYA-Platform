@@ -3,6 +3,8 @@ import crypto from "crypto";
 /**
  * Password reset pipeline, step 2: verify the OTP and set the new password.
  * POST /api/password-reset-confirm  { email, otp, newPassword }
+ *   or { email, otp, verifyOnly: true } to only validate the code (the UI's
+ *   separate code screen). verifyOnly counts attempts but burns nothing.
  *
  * Checks the hashed OTP from password_reset_otps (Firestore, server-only),
  * then updates the password through the Identity Toolkit admin API and
@@ -136,14 +138,16 @@ const handler = async (event: any) => {
     const email = String(body?.email || "").trim().toLowerCase();
     const otp = String(body?.otp || "").trim();
     const newPassword = String(body?.newPassword || "");
+    const verifyOnly = body?.verifyOnly === true;
 
-    if (!email || !/^\d{6}$/.test(otp) || !passwordOk(newPassword)) {
+    if (!email || !/^\d{6}$/.test(otp) || (!verifyOnly && !passwordOk(newPassword))) {
       return json(400, {
         ok: false,
         error: "bad-request",
-        message: !passwordOk(newPassword)
-          ? "Your new password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number and a symbol."
-          : "Enter the 6-digit code from your email.",
+        message:
+          !verifyOnly && !passwordOk(newPassword)
+            ? "Your new password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number and a symbol."
+            : "Enter the 6-digit code from your email.",
       });
     }
 
@@ -199,6 +203,10 @@ const handler = async (event: any) => {
             ? `That code is incorrect. ${left} attempt${left === 1 ? "" : "s"} left before it is locked.`
             : "Too many incorrect attempts. Request a new code and try again.",
       });
+    }
+
+    if (verifyOnly) {
+      return json(200, { ok: true, verified: true, message: "Code verified" });
     }
 
     // Find the auth account and set the new password.
