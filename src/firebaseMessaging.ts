@@ -16,6 +16,7 @@ import { db } from './firebase';
 import firebaseConfig from '../firebase-applet-config.json';
 
 let messagingInstance: Messaging | null = null;
+let lastPushRegisterError: string | null = null;
 let foregroundHandler: ((title: string, body: string) => void) | null = null;
 
 /** Where the notification permission currently stands on this device. */
@@ -23,6 +24,11 @@ export function getPushPermissionState(): 'granted' | 'denied' | 'default' | 'un
   if (typeof window === 'undefined' || typeof Notification === 'undefined') return 'unsupported';
   if (!('serviceWorker' in navigator)) return 'unsupported';
   return Notification.permission;
+}
+
+/** Why push registration last failed on this device, for the settings panel. */
+export function getPushRegistrationError(): string | null {
+  return lastPushRegisterError;
 }
 
 /** What the server reports after a push delivery attempt. */
@@ -68,10 +74,12 @@ export async function registerStudentPush(
   uid: string,
   onForeground?: (title: string, body: string) => void
 ): Promise<boolean> {
+  lastPushRegisterError = null;
   try {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return false;
     if (typeof Notification === 'undefined') return false;
-    if (!(await isSupported().catch(() => false))) return false;
+    const supported = await isSupported().catch(() => false);
+    if (!supported) { lastPushRegisterError = 'This browser cannot use Firebase push notifications (isSupported false).'; return false; }
 
     let permission: NotificationPermission = Notification.permission;
     if (permission === 'default') {
@@ -81,17 +89,23 @@ export async function registerStudentPush(
         return false;
       }
     }
-    if (permission !== 'granted') return false;
+    if (permission !== 'granted') { lastPushRegisterError = `Notification permission is ${permission}.`; return false; }
 
     const registration = await navigator.serviceWorker.ready;
     if (!messagingInstance) messagingInstance = getMessaging();
     if (onForeground) foregroundHandler = onForeground;
 
-    const token = await getToken(messagingInstance, {
-      vapidKey: (firebaseConfig as any).vapidPublicKey as string,
-      serviceWorkerRegistration: registration
-    });
-    if (!token) return false;
+    let token: string | null = null;
+    try {
+      token = await getToken(messagingInstance, {
+        vapidKey: (firebaseConfig as any).vapidPublicKey as string,
+        serviceWorkerRegistration: registration
+      });
+    } catch (tokErr: any) {
+      lastPushRegisterError = `Token registration failed: ${tokErr?.code || 'error'} ${String(tokErr?.message || tokErr || '').slice(0, 180)}`;
+      return false;
+    }
+    if (!token) { lastPushRegisterError = 'The browser returned no push token (empty token).'; return false; }
 
     onMessage(messagingInstance, (payload) => {
       const t = payload.notification?.title || (payload.data && payload.data.title) || 'CIYA';
@@ -111,7 +125,8 @@ export async function registerStudentPush(
       await setDoc(tokenRef, { fcmTokens: { [token]: true } }, { merge: true });
     }
     return true;
-  } catch (err) {
+  } catch (err: any) {
+    lastPushRegisterError = `Push registration failed: ${err?.code || ''} ${String(err?.message || err || '').slice(0, 180)}`.trim();
     console.warn('Push registration skipped:', err);
     return false;
   }

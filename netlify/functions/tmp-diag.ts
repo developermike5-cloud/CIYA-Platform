@@ -71,7 +71,7 @@ export default async (req: Request) => {
       method: "POST",
       headers: { ...H, "Content-Type": "application/json" },
       body: JSON.stringify({
-        structuredQuery: { from: [{ collectionId: "users" }], limit: 100 },
+        structuredQuery: { from: [{ collectionId: "users" }], limit: 1000 },
       }),
     }).then(r => r.json()) as any;
     const users: any[] = [];

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { collection, collectionGroup, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, safeGetItem } from '../firebase';
-import { registerStudentPush, sendPushRequest, getPushPermissionState, unregisterStudentPush } from '../firebaseMessaging';
+import { registerStudentPush, sendPushRequest, getPushPermissionState, getPushRegistrationError, unregisterStudentPush } from '../firebaseMessaging';
 
 /** Best-effort push delivery through the server. In-app history entries are
  * written by each calling flow, so push and history never double up. */
@@ -7825,9 +7825,15 @@ export default function StudentDashboard() {
                   {notifPrefs.push && (
                     <div className="mt-4 rounded-2xl border p-3.5 text-xs font-semibold leading-relaxed">
                       {pushPerm === 'granted' ? (
-                        <div className="border-emerald-200 bg-emerald-50 text-emerald-800">
-                          Push is enabled on this device. You will receive alerts even when the app is closed.
-                        </div>
+                        getPushRegistrationError() ? (
+                          <div className="border-rose-200 bg-rose-50 text-rose-800">
+                            Push could not finish registering on this device: {getPushRegistrationError()}
+                          </div>
+                        ) : (
+                          <div className="border-emerald-200 bg-emerald-50 text-emerald-800">
+                            Push is enabled on this device. You will receive alerts even when the app is closed.
+                          </div>
+                        )
                       ) : pushPerm === 'denied' ? (
                         <div className="border-rose-200 bg-rose-50 text-rose-800">
                           Your browser has notifications blocked for this site. Allow notifications in the browser's site settings, then switch push off and on again.
