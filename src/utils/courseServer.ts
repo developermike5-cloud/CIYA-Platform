@@ -47,7 +47,16 @@ export function isMobileBrowser(): boolean {
   try {
     if (typeof navigator === 'undefined') return false;
     const ua = navigator.userAgent || '';
-    return /Android|iPhone|iPod|iPad|Mobile|webOS|BlackBerry|Opera Mini|IEMobile/i.test(ua);
+    if (!/Android|iPhone|iPod|iPad|Mobile|webOS|BlackBerry|Opera Mini|IEMobile/i.test(ua)) return false;
+    // The UA string alone is not proof of a phone: some desktop browsers
+    // report a mobile-looking UA, and a laptop that gets misread must keep
+    // full web access. A real phone's primary pointer is the touchscreen
+    // (coarse); a laptop's is the trackpad or mouse (fine), so trust that.
+    try {
+      return window.matchMedia('(pointer: coarse)').matches;
+    } catch {
+      return true;
+    }
   } catch {
     return false;
   }
