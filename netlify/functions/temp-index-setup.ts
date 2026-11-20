@@ -45,7 +45,7 @@ function json(statusCode: number, body: any) {
 
 const PROJECT_ID = "gen-lang-client-0862975917";
 const DATABASE_ID = "ai-studio-1aaee609-a922-43e7-9568-0b675490ff78";
-const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE_ID}`;
+const BASE = `https://firestore.googleapis.com/v1beta2/projects/${PROJECT_ID}/databases/${DATABASE_ID}`;
 const DESIRED_INDEXES: any[] = [
   {
     collectionId: "kycb_questionnaires",
