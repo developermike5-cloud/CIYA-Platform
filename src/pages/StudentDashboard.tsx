@@ -5788,6 +5788,36 @@ export default function StudentDashboard() {
     }
   };
 
+  const [pushTestBusy, setPushTestBusy] = useState(false);
+  const [pushTestMsg, setPushTestMsg] = useState<string | null>(null);
+
+  // Admin-only: one-tap test that enables notifications on THIS device (the
+  // browser prompt appears right from this tap), registers the device for push
+  // and sends one real test alert to it, so a broken device shows its exact
+  // error immediately.
+  const handleAdminTestPush = async () => {
+    if (!currentUser?.uid || pushTestBusy) return;
+    setPushTestBusy(true);
+    setPushTestMsg(null);
+    const ok = await registerStudentPush(currentUser.uid, (title, body) => {
+      showCiyaToast(title ? `${title}: ${body}` : body);
+    });
+    if (!ok) {
+      setPushTestMsg(`Could not enable push on this device. ${getPushRegistrationError() || ''}`.trim());
+      setPushTestBusy(false);
+      return;
+    }
+    const res = await sendPushRequest(currentUser.uid, 'CIYA test push', 'If you can read this, push notifications work on this device.');
+    if (res.ok && res.sent > 0) {
+      setPushTestMsg('Test push sent. Look for the CIYA notification on this device.');
+    } else if (res.ok && res.recipients === 0) {
+      setPushTestMsg('Enabled, but the server found no push token for this device.');
+    } else {
+      setPushTestMsg(`Server replied: recipients ${res.recipients}, sent ${res.sent}, failed ${res.failed}.`);
+    }
+    setPushTestBusy(false);
+  };
+
   const menuReturnViewRef = useRef<'courses' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz'>('courses');
   const handleViewChange = (view: 'courses' | 'profile' | 'membership' | 'quizscores' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz' | 'notificationsettings', cId: string | null = null) => {
     // Menu sections (Profile / Membership / Quiz Score Sheet) live under the More
@@ -7842,6 +7872,28 @@ export default function StudentDashboard() {
                         <div className="border-amber-200 bg-amber-50 text-amber-900">
                           Tap Enable on the banner (or switch push off and back on) to allow notifications on this device.
                         </div>
+                      )}
+                    </div>
+                  )}
+
+                  {isAdmin && (
+                    <div className="mt-4 rounded-2xl border border-teal-100 bg-teal-50/60 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-slate-900">Test push on this device</p>
+                          <p className="text-xs text-slate-500 font-medium mt-0.5 leading-relaxed">Asks this browser to enable notifications, registers the device and sends one real test alert to it.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAdminTestPush}
+                          disabled={pushTestBusy}
+                          className={`shrink-0 px-4 py-2.5 rounded-xl text-xs font-extrabold border-0 cursor-pointer transition-colors text-white bg-teal-600 hover:bg-teal-700 active:scale-[0.98] ${pushTestBusy ? 'opacity-60' : ''}`}
+                        >
+                          {pushTestBusy ? 'Sending…' : 'Send test push'}
+                        </button>
+                      </div>
+                      {pushTestMsg && (
+                        <p className="text-xs font-semibold text-slate-700 mt-2.5">{pushTestMsg}</p>
                       )}
                     </div>
                   )}
