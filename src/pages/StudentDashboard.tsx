@@ -6373,6 +6373,22 @@ export default function StudentDashboard() {
         
         loadInitialProfile();
 
+        // Daily engagement touch for the re-engagement email ladder:
+        // one users-doc write per device per day records lastEngagedAt so
+        // the reminder job knows this student is still active.
+        try {
+          const touchKey = `ciya_engaged_${user.uid}_${new Date().toISOString().slice(0, 10)}`;
+          if (safeGetItem(touchKey) !== '1') {
+            try { localStorage.setItem(touchKey, '1'); } catch { /* private mode */ }
+            updateDoc(doc(db, 'users', user.uid), {
+              lastEngagedAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            }).catch((touchErr: unknown) => console.warn('engagement touch failed:', touchErr));
+          }
+        } catch (touchErr) {
+          console.warn('engagement touch failed:', touchErr);
+        }
+
         // 2. Perform admin verification asynchronously in the background
         if (user.email?.toLowerCase() === 'developermike5@gmail.com') {
           setIsAdmin(true);
