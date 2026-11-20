@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { dispatchNotification } from '../../services/notifyHub';
 import { Link, useNavigate } from 'react-router';
 import CustomDropdown from '../../components/CustomDropdown';
 import RowActionsDropdown, { actionIcons } from '../../components/admin/RowActionsDropdown';
@@ -393,6 +394,15 @@ export default function AdvancedCoursesAdmin({ tier = 'advanced' }: { tier?: 'ad
             onClick={async () => {
               setCloudPublishStatus('Publishing…');
               const res = await publishCoursesToServer(coursesStore.getAdvancedCourses());
+              if (res.ok) {
+                void dispatchNotification({
+                  broadcast: true,
+                  title: 'New course just landed on CIYA 🎓',
+                  message: 'Fresh lessons are now live in the CIYA classroom. Open the app to explore and start learning.',
+                  type: 'new_course',
+                  triggeredBy: 'Academy Admin Office'
+                });
+              }
               setCloudPublishStatus(
                 res.ok
                   ? `Live on Cloudinary: ${res.published} course(s)`

@@ -7,6 +7,7 @@ import { registerStudentPush, sendPushRequest, getPushPermissionState, getPushRe
  * written by each calling flow, so push and history never double up. */
 const pushNotify = (uid: string | undefined, title: string, message: string, url: string = '/dashboard') =>
   uid ? sendPushRequest(uid, title, message, url).catch(() => false) : Promise.resolve(false);
+import { dispatchNotification } from '../services/notifyHub';
 import { useStudyTimeTracker } from '../hooks/useStudyTimeTracker';
 import StudyStatsSplashModal from '../components/StudyStatsSplashModal';
 import { ref as dbRef, onValue } from 'firebase/database';
@@ -2824,6 +2825,16 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         assignmentsRefreshRef?.();
       }
 
+      if (finalStatus === 'Pending') {
+        void dispatchNotification({
+          userIds: [currentUser.uid],
+          title: 'Assignment submitted \u2713',
+          message: 'Your assignment was received and is awaiting review by the Academy team. You will be notified the moment it is graded.',
+          type: 'assignment_submitted',
+          triggeredBy: 'CIYA System'
+        });
+      }
+
       const cleanReason = (evalRes.adminReason || '').replace(/^Automated Compliance:\s*/i, '');
 
       if (finalStatus !== 'Pending') {
@@ -2839,6 +2850,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
           triggeredBy: 'Academy Coordinator',
           createdAt: serverTimestamp()
         });
+        void pushNotify(currentUser.uid, finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Assignment Needs Correction ❌`, finalStatus === 'Approved' ? unlockInfo.message : `Your assignment for Day ${dayIndex + 1} did not meet requirements: "${cleanReason}". Please fix and resubmit.`);
 
         if (finalStatus === 'Approved') {
           pushNotify(currentUser.uid, 'Day Complete! 🏁', unlockInfo.message);
@@ -5013,6 +5025,7 @@ export default function StudentDashboard() {
             triggeredBy: 'Academy Coordinator',
             createdAt: serverTimestamp()
           });
+          void pushNotify(currentUser.uid, finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Assignment Needs Correction ❌`, finalStatus === 'Approved' ? unlockInfo.message : `Your assignment for Day ${sub.dayIndex + 1} did not meet requirements: "${cleanReason}". Please fix and resubmit.`);
 
           if (finalStatus === 'Approved') {
             pushNotify(currentUser.uid, 'Day Complete! 🏁', unlockInfo.message);
@@ -5167,6 +5180,16 @@ export default function StudentDashboard() {
         assignmentsRefreshRef?.();
       }
 
+      if (finalStatus === 'Pending') {
+        void dispatchNotification({
+          userIds: [currentUser.uid],
+          title: 'Assignment submitted \u2713',
+          message: 'Your assignment was received and is awaiting review by the Academy team. You will be notified the moment it is graded.',
+          type: 'assignment_submitted',
+          triggeredBy: 'CIYA System'
+        });
+      }
+
       const cleanReason = (evalRes.adminReason || '').replace(/^Automated Compliance:\s*/i, '');
 
       if (finalStatus !== 'Pending') {
@@ -5182,6 +5205,7 @@ export default function StudentDashboard() {
           triggeredBy: 'Academy Coordinator',
           createdAt: serverTimestamp()
         });
+        void pushNotify(currentUser.uid, finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Assignment Needs Correction ❌`, finalStatus === 'Approved' ? unlockInfo.message : `Your assignment for Day ${dayIndex + 1} did not meet requirements: "${cleanReason}". Please fix and resubmit.`);
 
         if (finalStatus === 'Approved') {
           pushNotify(currentUser.uid, 'Day Complete! 🏁', unlockInfo.message);
@@ -6162,6 +6186,16 @@ export default function StudentDashboard() {
         assignmentsRefreshRef?.();
       }
 
+      if (finalStatus === 'Pending') {
+        void dispatchNotification({
+          userIds: [currentUser.uid],
+          title: 'Assignment submitted \u2713',
+          message: 'Your assignment was received and is awaiting review by the Academy team. You will be notified the moment it is graded.',
+          type: 'assignment_submitted',
+          triggeredBy: 'CIYA System'
+        });
+      }
+
       const submissionData = {
         text: submitText,
         link: submitLink,
@@ -6210,6 +6244,7 @@ export default function StudentDashboard() {
           triggeredBy: 'Academy Coordinator',
           createdAt: serverTimestamp()
         });
+        void pushNotify(currentUser.uid, finalStatus === 'Approved' ? `Assignment Approved! 🎉` : `Assignment Needs Correction ❌`, finalStatus === 'Approved' ? unlockInfo.message : `Your assignment for Day ${submitDayIndex + 1} did not meet requirements: "${cleanReason}". Please fix and resubmit.`);
 
         if (finalStatus === 'Approved') {
           showToast(unlockInfo.toast);

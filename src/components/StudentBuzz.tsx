@@ -65,6 +65,7 @@ import {
 } from '../services/buzzRtdbService';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { dispatchNotification } from '../services/notifyHub';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { Star, AlertCircle } from 'lucide-react';
 import { showCiyaToast } from './CiyaToast';
@@ -509,6 +510,21 @@ export default function StudentBuzz({
         } : undefined
       });
 
+      // Notify the group's other members (in-app + push) through the dispatcher
+      try {
+        const memberUids = activeGroup?.members ? Object.keys(activeGroup.members).filter((u: string) => u !== currentUser.uid) : [];
+        if (memberUids.length) {
+          await dispatchNotification({
+            userIds: memberUids,
+            title: `${userProfile?.fullName || currentUser.displayName || 'Someone'} posted in ${activeGroup?.name || 'your group'}`,
+            message: (cleanText || 'Sent an attachment').slice(0, 140),
+            type: 'buzz_reply',
+            triggeredBy: 'Buzz',
+            url: '/dashboard'
+          });
+        }
+      } catch { /* notification is best-effort */ }
+
       // Reset input & typing state
       setMessageText('');
       setReplyingTo(null);
@@ -580,6 +596,16 @@ export default function StudentBuzz({
         text: cleanText,
         imageUrl: commentImageUrl
       });
+      if ((commentsMessage as any).senderUid && (commentsMessage as any).senderUid !== currentUser.uid) {
+        void dispatchNotification({
+          userIds: [(commentsMessage as any).senderUid],
+          title: `${userProfile?.fullName || currentUser.displayName || 'Someone'} replied to your post`,
+          message: (cleanText || 'Sent an attachment').slice(0, 140),
+          type: 'buzz_reply',
+          triggeredBy: 'Buzz',
+          url: '/dashboard'
+        });
+      }
       setCommentText('');
       clearCommentImage();
     } catch (err: any) {

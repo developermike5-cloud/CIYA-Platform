@@ -235,6 +235,32 @@ export function emailHtml(opts: { firstName: string; courseName: string; tier: n
 
 // ---- ZeptoMail raw-HTML send ---------------------------------------------
 
+/** Warm course-completion congratulations email (one per completed course, ever). */
+export function completionEmailHtml(opts: { firstName: string; courseName: string }): string {
+  const { firstName, courseName } = opts;
+  const course = esc(courseName);
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,.12);">
+<tr><td style="background:linear-gradient(135deg,#0d3b2e,#0f766e);padding:28px 28px 22px;">
+<h1 style="margin:0;font-family:Arial,sans-serif;font-size:22px;color:#ffffff;">🎉 Congratulations, ${esc(firstName)}!</h1>
+<p style="margin:8px 0 0;font-family:Arial,sans-serif;font-size:14px;color:#ccfbf1;">CIY Academy</p>
+</td></tr>
+<tr><td style="padding:28px;">
+<p style="margin:0 0 14px;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#0f172a;">You have officially completed <strong>${course}</strong>. Every lesson watched, every assignment submitted, every milestone crossed: that is real work, and it shows.</p>
+<p style="margin:0 0 14px;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#0f172a;">Keep an eye on your dashboard: your certificate of completion is being prepared, and your next course is waiting whenever you are ready to keep the streak alive.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 6px;">
+<tr><td style="background:#0f766e;border-radius:999px;">
+<a href="${APP_URL}/" style="display:inline-block;padding:12px 30px;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;">Open CIYA</a>
+</td></tr></table>
+<p style="margin:18px 0 0;font-family:Arial,sans-serif;font-size:12px;color:#64748b;">You received this because you completed a course at CIY Academy.</p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
 export async function sendZeptoHtml(to: string, subject: string, html: string): Promise<{ ok: boolean; status: number; detail?: string }> {
   const apiKey = (process.env.ZEPTOMAIL_API_KEY || process.env.ZEPTO_API_KEY || "").trim().replace(/^Zoho-enczapikey\s*/i, "").trim();
   const fromAddress = process.env.ZEPTO_FROM_ADDRESS || "";
@@ -289,6 +315,9 @@ export async function runScan(token: string, projectId: string, sendEmails: bool
     sent: 0,
     sendFailed: 0,
     laddersReset: 0,
+    completionSent: 0,
+    completionFailed: 0,
+    completionSkipped: 0,
   };
   const byTier: Record<number, number> = { 3: 0, 7: 0, 14: 0, 30: 0 };
   const now = Date.now();
@@ -393,7 +422,56 @@ export async function runScan(token: string, projectId: string, sendEmails: bool
     }
   }
 
-  return { counts, byTier, wouldSend: sendEmails ? undefined : dry.wouldSend };
+  // Course-completion congratulations: one email per completed course, ever.
+  counts.completionSent = 0;
+  counts.completionFailed = 0;
+  counts.completionSkipped = 0;
+  const completionPending: { name: string; email: string; courseName: string }[] = [];
+  for (const { id: uid, fields } of users) {
+    if (adminIds.has(uid) || ["admin", "super_admin", "superadmin"].includes(s(fields.role)) || s(fields.email).toLowerCase() === ADMIN_EMAIL) continue;
+    const email = s(fields.email).trim();
+    if (!email || !email.includes("@")) continue;
+    if (emailOff(fields)) continue;
+    const registered = strArr(fields.registeredCourses);
+    const doneCourses = registered.filter((cid) => cid && courseDone(fields, cid));
+    if (!doneCourses.length) continue;
+    const sentMap = fields?.completionEmailsSent?.mapValue?.fields || {};
+    const unsent = doneCourses.filter((cid) => !sentMap[cid]);
+    counts.completionSkipped += doneCourses.length - unsent.length;
+    if (!unsent.length) continue;
+    const patchFields: Record<string, any> = {};
+    for (const cid of unsent) {
+      let title = KNOWN_COURSE_TITLES[cid] || "";
+      if (!title && cid.length > 14) title = prettifyTitle(cid);
+      if (!title) {
+        if (!courseTitles.has(cid)) courseTitles.set(cid, await readCourseTitle(token, projectId, cid));
+        title = courseTitles.get(cid) || "";
+        if (title) title = prettifyTitle(title);
+      }
+      const courseName = title || "your course";
+      const name = firstNameOf(fields);
+      if (!sendEmails) {
+        completionPending.push({ name, email, courseName });
+        continue;
+      }
+      const html = completionEmailHtml({ firstName: name, courseName });
+      const sent = await sendZeptoHtml(email, `Congratulations ${name}! You completed ${courseName}`, html);
+      if (sent.ok) {
+        counts.completionSent++;
+        patchFields[cid] = { timestampValue: new Date().toISOString() };
+      } else {
+        counts.completionFailed++;
+        console.warn(`reminders-ladder: completion email failed for ${uid}: ${sent.status} ${sent.detail || ""}`);
+      }
+    }
+    if (Object.keys(patchFields).length) {
+      await patchDoc(token, projectId, `users/${uid}`, {
+        completionEmailsSent: { mapValue: { fields: patchFields } },
+      });
+    }
+  }
+
+  return { counts, byTier, wouldSend: sendEmails ? undefined : dry.wouldSend, completionPending: sendEmails ? undefined : completionPending };
 }
 
 export function tierCopyMeta(tier: number, row: ScanRow): { subject: string } {
