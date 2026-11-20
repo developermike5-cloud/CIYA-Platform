@@ -1,0 +1,92 @@
+/** TEMPORARY diagnostic: live Firestore ruleset + recent notifications + admins docs. GET only. */
+import crypto from "crypto";
+
+const FIRESTORE_DB = process.env.FIRESTORE_DATABASE_ID || "ai-studio-1aaee609-a922-43e7-9568-0b675490ff78";
+const TOKEN_URL = "https://oauth2.googleapis.com/token";
+const SCOPES = "https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/firebase";
+
+function b64url(input: crypto.BinaryLike): string {
+  return Buffer.from(input as any).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+type ServiceAccount = { project_id: string; client_email: string; private_key: string };
+function loadServiceAccount(): ServiceAccount {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is not set");
+  const sa = JSON.parse(raw) as ServiceAccount;
+  if (sa.private_key?.includes("\\n")) sa.private_key = sa.private_key.replace(/\\n/g, "\n");
+  return sa;
+}
+async function getAccessToken(scope: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const sa = loadServiceAccount();
+  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claims = b64url(JSON.stringify({ iss: sa.client_email, scope, aud: TOKEN_URL, iat: now, exp: now + 3600 }));
+  const signer = crypto.createSign("RSA-SHA256");
+  signer.update(`${header}.${claims}`);
+  const signature = signer.sign(sa.private_key, "base64");
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: `${header}.${claims}.${signature}`,
+    }),
+  });
+  if (!res.ok) throw new Error(`token ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const j: any = await res.json();
+  return j.access_token;
+}
+const g = (v: any) => {
+  if (!v) return null;
+  if (v.stringValue !== undefined) return v.stringValue;
+  if (v.booleanValue !== undefined) return v.booleanValue;
+  if (v.integerValue !== undefined) return Number(v.integerValue);
+  if (v.timestampValue !== undefined) return v.timestampValue;
+  if (v.nullValue !== undefined) return null;
+  if (v.mapValue) return Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k, x]: any) => [k, g(x)]));
+  if (v.arrayValue) return (v.arrayValue.values || []).map((x: any) => g(x));
+  return "?";
+};
+export default async (req: Request) => {
+  if (req.method !== "GET") return new Response(JSON.stringify({ error: "GET only" }), { status: 405 });
+  try {
+    const sa = loadServiceAccount();
+    const token = await getAccessToken(SCOPES);
+    const H = { Authorization: `Bearer ${token}` };
+    const out: any = {};
+
+    // Latest deployed Firestore ruleset source.
+    const rsList = await fetch(`https://firebaserules.googleapis.com/v1/projects/${sa.project_id}/rulesets?pageSize=25`, { headers: H }).then(r => r.json()) as any;
+    const fsRs = (rsList.rulesets || []).filter((r: any) => r.metadata?.service === "firestore.googleapis.com");
+    if (fsRs.length) {
+      const newest = fsRs[0];
+      const full = await fetch(`https://firebaserules.googleapis.com/v1/${newest.name}`, { headers: H }).then(r => r.json()) as any;
+      out.ruleset = { name: newest.name, created: newest.createTime, source: (full.source?.files || []).map((f: any) => f.content).join("\n") };
+    } else {
+      out.ruleset = { note: "no firestore rulesets found", all: (rsList.rulesets || []).map((r: any) => ({ name: r.name, service: r.metadata?.service })) };
+    }
+
+    // Recent notifications docs.
+    const notifUrl = `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/notifications?pageSize=15&orderBy=createdAt%20desc`;
+    const nres = await fetch(notifUrl, { headers: H }).then(r => r.json()) as any;
+    out.notifications = (nres.documents || []).map((d: any) => {
+      const f: any = {};
+      for (const k of ["userId", "isRead", "title", "type", "createdAt"]) f[k] = g(d.fields?.[k]);
+      return { id: d.name.split("/").pop(), ...f };
+    });
+    if (nres.error) out.notificationsError = nres.error;
+
+    // Admins docs.
+    const ares = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/admins?pageSize=10`, { headers: H }).then(r => r.json()) as any;
+    out.admins = (ares.documents || []).map((d: any) => {
+      const f: any = {};
+      for (const k of ["email", "role", "permissions"]) f[k] = g(d.fields?.[k]);
+      return { id: d.name.split("/").pop(), ...f };
+    });
+    if (ares.error) out.adminsError = ares.error;
+
+    return new Response(JSON.stringify(out), { headers: { "Content-Type": "application/json" } });
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err?.message || "diag failed" }), { status: 500 });
+  }
+};

@@ -32,6 +32,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/tmp-diag"
+  to = "/.netlify/functions/tmp-diag"
+  status = 200
+
+[[redirects]]
   from = "/api/prompt-copy-limit"
   to = "/.netlify/functions/prompt-copy-limit"
   status = 200
