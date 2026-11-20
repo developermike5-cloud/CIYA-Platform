@@ -66,6 +66,20 @@ export default async (req: Request) => {
       out.ruleset = { name: newest.name, created: newest.createTime, source: (full.source?.files || []).map((f: any) => f.content).join("\n") };
     }
 
+    // FCM v1 API probe: does this project accept Cloud Messaging calls at all?
+    try {
+      const msgToken = await getAccessToken("https://www.googleapis.com/auth/firebase.messaging");
+      const fcmRes = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${msgToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: { token: "dummy-token-probe-0000", notification: { title: "t", body: "b" } } }),
+      });
+      const fcmText = await fcmRes.text();
+      out.fcmProbe = { status: fcmRes.status, body: fcmText.slice(0, 400) };
+    } catch (e: any) {
+      out.fcmProbe = { error: String(e?.message || e) };
+    }
+
     // Push diagnostics: which users hold FCM tokens, and their channel prefs.
     const uq = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents:runQuery`, {
       method: "POST",
