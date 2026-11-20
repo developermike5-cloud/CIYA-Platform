@@ -95,6 +95,24 @@ const handler = async (event: any) => {
   if (event.httpMethod !== "POST") return json(405, { ok: false, error: "method-not-allowed" });
   try {
     const body = typeof event.body === "string" ? JSON.parse(event.body) : event.body || {};
+    if (body?.op === "list") {
+      const token2 = await getAccessToken();
+      let pageToken: string | undefined = body?.pageToken;
+      const accounts: any[] = [];
+      for (let i = 0; i < 12; i++) {
+        const saL = loadServiceAccount();
+        const url = `https://identitytoolkit.googleapis.com/v1/projects/${saL.project_id}/accounts:batchGet?maxResults=500${pageToken ? `&nextPageToken=${encodeURIComponent(pageToken)}` : ""}`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token2}` } });
+        const data: any = await res.json();
+        if (!res.ok) return json(200, { ok: false, error: "batchGet failed", detail: JSON.stringify(data).slice(0, 500) });
+        for (const u of data.userInfo || []) {
+          accounts.push({ localId: u.localId, email: u.email, displayName: u.displayName || "", lastLoginAt: u.lastLoginAt || "", createdAt: u.createdAt || "" });
+        }
+        if (!data.nextPageToken) break;
+        pageToken = data.nextPageToken;
+      }
+      return json(200, { ok: true, count: accounts.length, accounts });
+    }
     const email = String(body?.email || "").trim().toLowerCase();
     const fieldsIn = body?.fields && typeof body.fields === "object" ? body.fields : null;
     if (!email) return json(400, { ok: false, error: "email required" });
