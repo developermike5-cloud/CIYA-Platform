@@ -444,6 +444,18 @@ service cloud.firestore {
       allow update: if isSignedIn()
                     && (incoming().userId == request.auth.uid || adminPerm('manage_notifications'));
       allow delete: if adminPerm('manage_notifications');
+
+      // Per-student read receipts for broadcast ("all") notifications: each
+      // account writes only its own receipt doc, so one student marking a
+      // broadcast read never flips the shared isRead flag for everyone.
+      match /readReceipts/{readerId} {
+        allow read, list: if isSignedIn();
+        allow create: if isSignedIn()
+                      && request.auth.uid == readerId
+                      && request.resource.data.diff({}).affectedKeys().hasOnly(['isRead', 'readAt'])
+                      && request.resource.data.get('isRead', false) == true;
+        allow update: if isSignedIn() && request.auth.uid == readerId;
+      }
     }
 
     match /notification_templates/{templateId} {

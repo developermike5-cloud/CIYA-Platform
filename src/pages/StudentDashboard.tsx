@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, collectionGroup, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, safeGetItem } from '../firebase';
 import { registerStudentPush, sendPushRequest, getPushPermissionState } from '../firebaseMessaging';
 
@@ -4867,6 +4867,20 @@ export default function StudentDashboard() {
         );
         const snap = await getDocs(q);
         if (cancelled) return;
+        // Broadcast ("all") notifications record reads per student in the
+        // readReceipts subcollection; addressed ones use isRead on the doc.
+        try {
+          const readsSnap = await getDocs(collectionGroup(db, 'readReceipts'));
+          const mine = new Set<string>(
+            readsSnap.docs
+              .filter(d => d.id === currentUser.uid && d.data()?.isRead === true)
+              .map(d => d.ref.parent.parent?.id)
+              .filter(Boolean) as string[]
+          );
+          if (!cancelled) setBroadcastReadIds(mine);
+        } catch {
+          // Read receipts are best-effort; addressed notifications still use isRead.
+        }
         const list = snap.docs.map(doc => {
           const data = doc.data();
           let submittedText = data.submittedText || '';
@@ -5480,6 +5494,9 @@ export default function StudentDashboard() {
   });
 
   const [dbNotifications, setDbNotifications] = useState<any[]>([]);
+  // Notification ids this account has personally read among broadcast
+  // ("all") notifications, backed by the readReceipts subcollection.
+  const [broadcastReadIds, setBroadcastReadIds] = useState<Set<string>>(new Set<string>());
 
   // Subscriptions to notifications
   useEffect(() => {
@@ -5503,6 +5520,20 @@ export default function StudentDashboard() {
         );
         const snap = await getDocs(q);
         if (cancelled) return;
+        // Broadcast ("all") notifications record reads per student in the
+        // readReceipts subcollection; addressed ones use isRead on the doc.
+        try {
+          const readsSnap = await getDocs(collectionGroup(db, 'readReceipts'));
+          const mine = new Set<string>(
+            readsSnap.docs
+              .filter(d => d.id === currentUser.uid && d.data()?.isRead === true)
+              .map(d => d.ref.parent.parent?.id)
+              .filter(Boolean) as string[]
+          );
+          if (!cancelled) setBroadcastReadIds(mine);
+        } catch {
+          // Read receipts are best-effort; addressed notifications still use isRead.
+        }
         const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         list.sort((a: any, b: any) => {
           const timeA = a.createdAt?.seconds || 0;
@@ -5529,25 +5560,45 @@ export default function StudentDashboard() {
     };
   }, [currentUser, isAdmin]);
 
-  const unreadNotificationsCount = dbNotifications.filter(x => !x.isRead).length;
+  // A notification counts as read for this account when the doc says so, or,
+  // for broadcasts, when this account has its own read receipt.
+  const notifIsRead = (n: any) =>
+    !!n.isRead || (!!currentUser?.uid && broadcastReadIds.has(n.id));
+
+  const unreadNotificationsCount = dbNotifications.filter(x => !notifIsRead(x)).length;
 
 
 
   const handleMarkAsRead = async (id: string) => {
+    if (!currentUser?.uid) return;
     setDbNotifications((prev) => prev.map((n: any) => (n.id === id ? { ...n, isRead: true } : n)));
     try {
-      await updateDoc(doc(db, 'notifications', id), { isRead: true });
+      const target = dbNotifications.find((n: any) => n.id === id);
+      if (target && (target.userId === 'all' || target.type === 'system_broadcast')) {
+        // Broadcasts never flip the shared isRead flag: each account writes its
+        // own read receipt, so one person marking read does not affect others.
+        setBroadcastReadIds((prev) => new Set(prev).add(id));
+        await setDoc(doc(db, 'notifications', id, 'readReceipts', currentUser.uid), { isRead: true, readAt: serverTimestamp() }, { merge: true });
+      } else {
+        await updateDoc(doc(db, 'notifications', id), { isRead: true });
+      }
     } catch (e) {
       console.error(e);
     }
   };
 
   const handleMarkAllAsRead = async () => {
+    if (!currentUser?.uid) return;
     setDbNotifications((prev) => prev.map((n: any) => ({ ...n, isRead: true })));
     try {
-      const unreadList = dbNotifications.filter(x => !x.isRead);
+      const unreadList = dbNotifications.filter((x: any) => !notifIsRead(x));
       for (const item of unreadList) {
-        await updateDoc(doc(db, 'notifications', item.id), { isRead: true });
+        if (item.userId === 'all' || item.type === 'system_broadcast') {
+          setBroadcastReadIds((prev) => new Set(prev).add(item.id));
+          await setDoc(doc(db, 'notifications', item.id, 'readReceipts', currentUser.uid), { isRead: true, readAt: serverTimestamp() }, { merge: true });
+        } else {
+          await updateDoc(doc(db, 'notifications', item.id), { isRead: true });
+        }
       }
     } catch (e) {
       console.error(e);
@@ -5631,10 +5682,9 @@ export default function StudentDashboard() {
         if (!cancelled) showCiyaToast(title ? `${title}: ${body}` : body);
       });
     } else if (permission === 'default') {
-      // Only offer once per device until the student answers it.
-      if (safeStorage.getItem('ciya_push_banner_dismissed') !== '1') {
-        if (!cancelled) setShowPushBanner(true);
-      }
+      // Keep offering on every fresh load until the student answers, so the
+      // prompt is never permanently lost. "Not now" only hides it this session.
+      if (!cancelled) setShowPushBanner(true);
     }
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5656,7 +5706,6 @@ export default function StudentDashboard() {
 
   const handleDismissPushBanner = () => {
     setShowPushBanner(false);
-    safeStorage.setItem('ciya_push_banner_dismissed', '1');
   };
 
   const menuReturnViewRef = useRef<'courses' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz'>('courses');
@@ -7490,9 +7539,9 @@ export default function StudentDashboard() {
                           dbNotifications.slice(0, 5).map((notif) => (
                             <div
                               key={notif.id}
-                              className={`p-3.5 relative flex gap-2.5 ${!notif.isRead ? 'bg-amber-50/20' : ''}`}
+                              className={`p-3.5 relative flex gap-2.5 ${!notifIsRead(notif) ? 'bg-amber-50/20' : ''}`}
                             >
-                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${!notif.isRead ? 'bg-amber-500' : 'bg-transparent'}`} />
+                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${!notifIsRead(notif) ? 'bg-amber-500' : 'bg-transparent'}`} />
                               <div className="space-y-1 flex-1 min-w-0">
                                 <p className="text-xs text-slate-800 font-bold leading-relaxed">{notif.title}</p>
                                 <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{notif.message}</p>
@@ -7504,10 +7553,10 @@ export default function StudentDashboard() {
                               </div>
                               <button
                                 type="button"
-                                onClick={() => !notif.isRead && handleMarkAsRead(notif.id)}
-                                className={`shrink-0 self-start text-[9px] font-black uppercase tracking-wide px-2.5 py-1.5 rounded-full border-0 cursor-pointer transition-colors ${notif.isRead ? 'bg-slate-100 text-slate-400' : 'bg-teal-50 text-teal-700 hover:bg-teal-100'}`}
+                                onClick={() => !notifIsRead(notif) && handleMarkAsRead(notif.id)}
+                                className={`shrink-0 self-start text-[9px] font-black uppercase tracking-wide px-2.5 py-1.5 rounded-full border-0 cursor-pointer transition-colors ${notifIsRead(notif) ? 'bg-slate-100 text-slate-400' : 'bg-teal-50 text-teal-700 hover:bg-teal-100'}`}
                               >
-                                {notif.isRead ? 'Read \u2713' : 'Mark as read'}
+                                {notifIsRead(notif) ? 'Read \u2713' : 'Mark as read'}
                               </button>
                             </div>
                           ))
@@ -8106,12 +8155,12 @@ export default function StudentDashboard() {
                     <div 
                       key={notif.id} 
                       className={`p-4 border rounded-2xl text-left transition-colors relative overflow-hidden ${
-                        notif.isRead 
+                        notifIsRead(notif) 
                           ? 'bg-slate-50/40 border-slate-200' 
                           : 'bg-indigo-50/10 border-indigo-200 ring-2 ring-indigo-550/40'
                       }`}
                     >
-                      {!notif.isRead && (
+                      {!notifIsRead(notif) && (
                         <span className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600" />
                       )}
                       <div className="flex items-start justify-between gap-3 font-sans">
@@ -8122,10 +8171,10 @@ export default function StudentDashboard() {
                           </span>
                           <button
                             type="button"
-                            onClick={() => !notif.isRead && handleMarkAsRead(notif.id)}
-                            className={`text-[9px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full border-0 cursor-pointer transition-colors ${notif.isRead ? 'bg-slate-100 text-slate-400' : 'bg-teal-50 text-teal-700 hover:bg-teal-100'}`}
+                            onClick={() => !notifIsRead(notif) && handleMarkAsRead(notif.id)}
+                            className={`text-[9px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full border-0 cursor-pointer transition-colors ${notifIsRead(notif) ? 'bg-slate-100 text-slate-400' : 'bg-teal-50 text-teal-700 hover:bg-teal-100'}`}
                           >
-                            {notif.isRead ? 'Read \u2713' : 'Mark as read'}
+                            {notifIsRead(notif) ? 'Read \u2713' : 'Mark as read'}
                           </button>
                         </div>
                       </div>
@@ -9256,9 +9305,6 @@ export default function StudentDashboard() {
                   <>
                     <div className="relative p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
                       <UserIcon className="w-5 h-5 stroke-2" />
-                      {unreadNotificationsCount > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-slate-900 animate-pulse" />
-                      )}
                     </div>
                     <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
                       Menu
