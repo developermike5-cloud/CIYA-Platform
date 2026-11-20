@@ -69,8 +69,8 @@ export default async (req: Request) => {
     if (!target) return new Response(JSON.stringify({ stage: "find release", releases: releases.map((r: any) => ({ name: r.name, ruleset: r.ruleset })) }), { status: 500 });
 
     const releaseId = target.name.split("/releases/")[1];
-    const patch = await fetch(`https://firebaserules.googleapis.com/v1/projects/${sa.project_id}/releases/${encodeURIComponent(releaseId)}?updateMask=ruleset`, {
-      method: "PATCH", headers: H, body: JSON.stringify({ ruleset: newRuleset }),
+    const patch = await fetch(`https://firebaserules.googleapis.com/v1/projects/${sa.project_id}/releases/${encodeURIComponent(releaseId)}?updateMask=rulesetName`, {
+      method: "PATCH", headers: H, body: JSON.stringify({ rulesetName: newRuleset }),
     }).then(r => r.json()) as any;
     if (patch.error) return new Response(JSON.stringify({ stage: "release patch", error: patch.error }), { status: 500 });
 
