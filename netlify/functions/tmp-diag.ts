@@ -86,6 +86,21 @@ export default async (req: Request) => {
     });
     if (runq.error) out.notificationsError = runq.error;
 
+    // Global offline-mode signal + the test broadcast's read receipts.
+    const sigRes = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/settings/system_signals`, { headers: H }).then(r => r.json()) as any;
+    if (sigRes.error) out.systemSignalsError = sigRes.error;
+    else {
+      const sf: any = {};
+      for (const k of Object.keys(sigRes.fields || {})) sf[k] = g(sigRes.fields[k]);
+      out.system_signals = sf;
+    }
+    const nRes = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/notifications/v7l5XuM1bxjTkiWFD5jk`, { headers: H }).then(r => r.json()) as any;
+    if (nRes.error) out.testNotifError = nRes.error;
+    else out.testNotif = { id: nRes.name.split('/').pop(), userId: g(nRes.fields?.userId), isRead: g(nRes.fields?.isRead), title: g(nRes.fields?.title), type: g(nRes.fields?.type) };
+    const rrRes = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/notifications/v7l5XuM1bxjTkiWFD5jk/readReceipts?pageSize=25`, { headers: H }).then(r => r.json()) as any;
+    if (rrRes.error) out.readReceiptsError = rrRes.error;
+    else out.readReceipts = (rrRes.documents || []).map((d: any) => ({ id: d.name.split('/').pop(), uid: g(d.fields?.uid), isRead: g(d.fields?.isRead), readAt: g(d.fields?.readAt), updatedAt: g(d.fields?.updatedAt) }));
+
     // Admins docs.
     const ares = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/admins?pageSize=10`, { headers: H }).then(r => r.json()) as any;
     out.admins = (ares.documents || []).map((d: any) => {
