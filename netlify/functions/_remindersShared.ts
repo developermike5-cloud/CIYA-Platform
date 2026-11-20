@@ -34,7 +34,7 @@ type ServiceAccount = { project_id: string; client_email: string; private_key: s
 
 let cachedToken: { token: string; exp: number } | null = null;
 
-function loadServiceAccount(): ServiceAccount {
+export function loadServiceAccount(): ServiceAccount {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is not set");
   const sa = JSON.parse(raw) as ServiceAccount;
