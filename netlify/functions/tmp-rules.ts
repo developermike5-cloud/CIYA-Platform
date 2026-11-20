@@ -45,7 +45,12 @@ export default async (req: Request) => {
 
     if (req.method === "GET") {
       const rel = await fetch(`https://firebaserules.googleapis.com/v1/projects/${sa.project_id}/releases`, { headers: H }).then(r => r.json()) as any;
-      return new Response(JSON.stringify({ releases: rel.releases || [], error: rel.error || null }), { headers: { "Content-Type": "application/json" } });
+      let detail: any = null;
+      const target = (rel.releases || []).find((r: any) => (r.name || "").includes(FIRESTORE_DB));
+      if (target) {
+        detail = await fetch(`https://firebaserules.googleapis.com/v1/${encodeURIComponent(target.name.split("/releases/")[1]) === target.name ? target.name : target.name}`.replace("https://firebaserules.googleapis.com/v1/", "https://firebaserules.googleapis.com/v1/"), { headers: H }).then(r => r.json()) as any;
+      }
+      return new Response(JSON.stringify({ releases: rel.releases || [], detail, error: rel.error || null }), { headers: { "Content-Type": "application/json" } });
     }
     if (req.method !== "POST") return new Response(JSON.stringify({ error: "POST to apply, GET to inspect" }), { status: 405 });
 
