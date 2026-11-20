@@ -74,11 +74,11 @@ async function getAccessToken(scope: string): Promise<string> {
   return data.access_token;
 }
 
-const json = (code: number, body: any) => ({
-  statusCode: code,
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(body),
-});
+const json = (code: number, body: any) =>
+  new Response(JSON.stringify(body), {
+    status: code,
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
 
 function baseUrl(projectId: string): string {
   return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DB}/documents`;
