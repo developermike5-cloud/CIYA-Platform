@@ -57,6 +57,7 @@ export default async (req: Request) => {
 
     // Latest deployed Firestore ruleset source.
     const rsList = await fetch(`https://firebaserules.googleapis.com/v1/projects/${sa.project_id}/rulesets?pageSize=25`, { headers: H }).then(r => r.json()) as any;
+    if (rsList.error) out.rulesListError = rsList.error;
     const fsRs = (rsList.rulesets || []).filter((r: any) => r.metadata?.service === "firestore.googleapis.com");
     if (fsRs.length) {
       const newest = fsRs[0];
@@ -67,7 +68,7 @@ export default async (req: Request) => {
     }
 
     // Recent notifications docs.
-    const notifUrl = `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/notifications?pageSize=15&orderBy=createdAt%20desc`;
+    const notifUrl = `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/notifications?pageSize=20&showMissing=false`;
     const nres = await fetch(notifUrl, { headers: H }).then(r => r.json()) as any;
     out.notifications = (nres.documents || []).map((d: any) => {
       const f: any = {};
