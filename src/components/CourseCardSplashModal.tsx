@@ -103,7 +103,7 @@ export default function CourseCardSplashModal({
               <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-gradient-to-br from-slate-800 to-indigo-950 text-white">
                 <span className="text-4xl mb-2">🎓</span>
                 <span className="text-xs font-black uppercase tracking-wider text-indigo-300">
-                  {course.category || 'CIYA Academy'}
+                  {course.category || 'CIY Academy'}
                 </span>
               </div>
             )}

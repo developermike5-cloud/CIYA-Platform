@@ -2733,7 +2733,7 @@ INPUT 2: WEBSITE PROMPT TEMPLATE
                   const origin = window.location.origin;
                   const params = new URLSearchParams();
                   params.set('type', clientLinkForm.type);
-                  params.set('title', shareTitle || 'CIYA Academy Website Requirements Form');
+                  params.set('title', shareTitle || 'CIY Academy Website Requirements Form');
                   if (shareStudent) {
                     params.set('student', shareStudent);
                   }

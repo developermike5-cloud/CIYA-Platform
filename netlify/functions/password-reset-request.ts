@@ -162,7 +162,7 @@ async function sendOtpEmail(opts: { toEmail: string; firstname: string; otp: str
     .replace(/^Zoho-enczapikey\s*/i, "")
     .trim();
   const fromAddress = process.env.ZEPTO_FROM_ADDRESS;
-  const fromName = process.env.ZEPTO_FROM_NAME || "CIYA Academy";
+  const fromName = process.env.ZEPTO_FROM_NAME || "CIY Academy";
   if (!apiKey || !fromAddress) {
     console.log("password-reset-request: zepto not configured, OTP email not sent", {
       hasKey: !!apiKey,

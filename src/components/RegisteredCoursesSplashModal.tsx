@@ -129,7 +129,7 @@ export default function RegisteredCoursesSplashModal({
                 </div>
                 <h4 className="text-sm font-black text-slate-900">No registered courses yet</h4>
                 <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto">
-                  Browse the CIYA Academy explore catalog to start learning and enroll in your first course track.
+                  Browse the CIY Academy explore catalog to start learning and enroll in your first course track.
                 </p>
                 <button
                   type="button"

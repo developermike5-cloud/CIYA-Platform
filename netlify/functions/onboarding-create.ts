@@ -197,7 +197,7 @@ async function sendLoginEmail(opts: {
     .trim();
   const templateKey = (opts.paid && process.env.ZEPTO_TEMPLATE_KEY_PAID) || process.env.ZEPTO_TEMPLATE_KEY;
   const fromAddress = process.env.ZEPTO_FROM_ADDRESS;
-  const fromName = process.env.ZEPTO_FROM_NAME || "CIYA Academy";
+  const fromName = process.env.ZEPTO_FROM_NAME || "CIY Academy";
   if (!apiKey || !templateKey || !fromAddress) {
     return { queued: false, reason: "not-configured" };
   }

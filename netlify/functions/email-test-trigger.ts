@@ -49,7 +49,7 @@ const handler = async (event: { httpMethod: string; body?: string | null }) => {
       ? process.env.ZEPTO_TEMPLATE_KEY_PAID || process.env.ZEPTO_TEMPLATE_KEY
       : process.env.ZEPTO_TEMPLATE_KEY;
   const fromAddress = process.env.ZEPTO_FROM_ADDRESS;
-  const fromName = process.env.ZEPTO_FROM_NAME || "CIYA Academy";
+  const fromName = process.env.ZEPTO_FROM_NAME || "CIY Academy";
 
   if (!apiKey || !templateKey || !fromAddress) {
     return json(200, { ok: false, sent: false, reason: "not-configured" });

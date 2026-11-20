@@ -138,7 +138,7 @@ function Navbar({ onOpenLogin }: { onOpenLogin: () => void }) {
       }`}
     >
       <div className="max-w-[1152px] mx-auto px-6 flex items-center justify-between gap-4 md:h-24 h-[76px]">
-        <a href="#home" aria-label="CIYA Academy home" className="hover:opacity-85 transition-opacity">
+        <a href="#home" aria-label="CIY Academy home" className="hover:opacity-85 transition-opacity">
           <BrandingLogo size="sm" />
         </a>
 
@@ -175,7 +175,7 @@ function Footer() {
     <footer className="bg-teal-950 border-t border-teal-900 pt-20 pb-8 px-6 md:px-12 lg:px-24">
       <div className="max-w-[1152px] mx-auto grid grid-cols-1 md:grid-cols-[1.6fr_1fr_1fr_1fr] gap-11 mb-14 w-full max-md:text-center">
         <div>
-          <a href="#home" aria-label="CIYA Academy home" className="inline-flex hover:opacity-85 transition-opacity">
+          <a href="#home" aria-label="CIY Academy home" className="inline-flex hover:opacity-85 transition-opacity">
             <BrandingLogo size="sm" />
           </a>
           <p className="text-sm text-teal-300 leading-[1.7] max-w-[20rem] mt-3">

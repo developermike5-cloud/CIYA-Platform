@@ -765,7 +765,7 @@ export default function PortalLocksAdmin() {
       requireForDay1: false,
       requireForDay4: true,
       price: 25000,
-      accountName: 'CIYA Academy International Ltd',
+      accountName: '',
       accountNumber: '5070133907',
       bankName: 'Moniepoint',
       benefitText: '• Unlocks Day 4 and Day 5 high-income curriculum\n• Professional Certificate of Completion (PDF/Print)\n• Dedicated Masterclass Discord / WhatsApp Group\n• Direct 1-on-1 Admin Priority assignment reviews',
@@ -775,7 +775,7 @@ export default function PortalLocksAdmin() {
     advancedCourseSettings: {
       enabled: true,
       price: 50000,
-      accountName: 'CIYA Academy International Ltd',
+      accountName: '',
       accountNumber: '5070133907',
       bankName: 'Moniepoint',
       whatsappNumber: '+2349042544355',
@@ -854,7 +854,7 @@ export default function PortalLocksAdmin() {
             requireForDay1: data?.yearBadgeSettings?.requireForDay1 ?? false,
             requireForDay4: data?.yearBadgeSettings?.requireForDay4 ?? true,
             price: data?.yearBadgeSettings?.price ?? 25000,
-            accountName: data?.yearBadgeSettings?.accountName ?? 'CIYA Academy International Ltd',
+            accountName: data?.yearBadgeSettings?.accountName ?? '',
             accountNumber: data?.yearBadgeSettings?.accountNumber ?? '5070133907',
             bankName: data?.yearBadgeSettings?.bankName ?? 'Moniepoint',
             benefitText: data?.yearBadgeSettings?.benefitText ?? '• Unlocks Day 4 and Day 5 high-income curriculum\n• Professional Certificate of Completion (PDF/Print)\n• Dedicated Masterclass Discord / WhatsApp Group\n• Direct 1-on-1 Admin Priority assignment reviews',
@@ -864,7 +864,7 @@ export default function PortalLocksAdmin() {
           advancedCourseSettings: {
             enabled: data?.advancedCourseSettings?.enabled ?? true,
             price: data?.advancedCourseSettings?.price ?? 50000,
-            accountName: data?.advancedCourseSettings?.accountName ?? 'CIYA Academy International Ltd',
+            accountName: data?.advancedCourseSettings?.accountName ?? '',
             accountNumber: data?.advancedCourseSettings?.accountNumber ?? '5070133907',
             bankName: data?.advancedCourseSettings?.bankName ?? 'Moniepoint',
             whatsappNumber: data?.advancedCourseSettings?.whatsappNumber ?? '+2349042544355',
@@ -1040,7 +1040,7 @@ export default function PortalLocksAdmin() {
         advancedCourseSettings: beginnersSettings.advancedCourseSettings || {
           enabled: true,
           price: 50000,
-          accountName: 'CIYA Academy International Ltd',
+          accountName: '',
           accountNumber: '5070133907',
           bankName: 'Moniepoint',
           whatsappNumber: '+2349042544355',
@@ -1352,7 +1352,7 @@ export default function PortalLocksAdmin() {
         ...(beginnersSettings.advancedCourseSettings || {
           enabled: true,
           price: 50000,
-          accountName: 'CIYA Academy International Ltd',
+          accountName: '',
           accountNumber: '5070133907',
           bankName: 'Moniepoint',
           whatsappNumber: '+2349042544355',
@@ -2038,7 +2038,7 @@ export default function PortalLocksAdmin() {
                       value={beginnersSettings.yearBadgeSettings.accountName || ''}
                       onChange={(e) => handleUpdateYearBadgeSetting('accountName', e.target.value)}
                       className="w-full bg-white border border-slate-200 text-slate-900 font-bold text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500"
-                      placeholder="e.g., CIYA Academy International Ltd"
+                      placeholder="e.g., CIY Academy International Ltd"
                     />
                   </div>
 
@@ -2648,10 +2648,10 @@ export default function PortalLocksAdmin() {
                     <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wide">Account Name</label>
                     <input
                       type="text"
-                      value={beginnersSettings.advancedCourseSettings?.accountName ?? 'CIYA Academy International Ltd'}
+                      value={beginnersSettings.advancedCourseSettings?.accountName ?? 'CIY Academy International Ltd'}
                       onChange={(e) => handleUpdateAdvancedCourseSetting('accountName', e.target.value)}
                       className="w-full bg-white border border-slate-200 text-slate-900 font-bold text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-purple-500"
-                      placeholder="e.g., CIYA Academy International Ltd"
+                      placeholder="e.g., CIY Academy International Ltd"
                     />
                   </div>
 
@@ -3598,7 +3598,7 @@ export function YearBadgePaymentFlow({
               <CiyaBadgePreview userProfile={userProfile} />
             </div>
             <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
-              🏅 CIYA Academy Membership Badge
+              🏅 CIY Academy Membership Badge
             </span>
             <h4 className="text-base md:text-lg font-black text-slate-900 tracking-tight leading-snug">
               Unlock Elite Curriculum, Priority Reviews & Badging!
@@ -3660,7 +3660,7 @@ export function YearBadgePaymentFlow({
             
             <div className="space-y-1">
               <span className="text-[9px] uppercase tracking-widest text-slate-400 font-extrabold block">Account Name</span>
-              <p className="text-sm font-extrabold text-white">{yearBadgeSettings?.accountName || 'CIYA Academy International Ltd'}</p>
+              <p className="text-sm font-extrabold text-white">{yearBadgeSettings?.accountName || 'CIY Academy International Ltd'}</p>
             </div>
 
             <div className="space-y-1 flex justify-between items-center bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
@@ -3731,7 +3731,7 @@ export function YearBadgePaymentFlow({
                   </div>
                   <div>
                     <span className="text-[9px] uppercase font-black text-slate-400">Account Name</span>
-                    <p className="font-extrabold text-slate-800 truncate">{yearBadgeSettings?.accountName || 'CIYA Academy'}</p>
+                    <p className="font-extrabold text-slate-800 truncate">{yearBadgeSettings?.accountName || 'CIY Academy'}</p>
                   </div>
                 </div>
                 

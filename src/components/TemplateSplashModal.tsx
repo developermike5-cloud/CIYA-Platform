@@ -31,25 +31,25 @@ export default function TemplateSplashModal({
         initial={{ y: '110%' }}
         animate={{ y: 0, transition: { type: 'spring', stiffness: 300, damping: 27, mass: 1.05 } }}
         exit={{ y: '110%', transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } }}
-        className="fixed inset-x-0 bottom-[62px] sm:bottom-[68px] z-40 max-w-xl mx-auto rounded-t-[28px] overflow-hidden bg-white flex flex-col max-h-[calc(85dvh-64px)] shadow-[0_-18px_60px_rgba(180,83,9,0.3)] font-sans select-none"
+        className="fixed inset-x-0 bottom-[62px] sm:bottom-[68px] z-40 max-w-xl mx-auto rounded-t-[28px] overflow-hidden bg-white flex flex-col max-h-[calc(85dvh-64px)] shadow-[0_-18px_60px_rgba(6,95,70,0.35)] font-sans select-none"
       >
         {/* Gradient hero header with sparkle glows */}
-        <div className="relative shrink-0 bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 px-5 pt-4 pb-5 overflow-hidden">
-          <div aria-hidden="true" className="absolute -top-10 -right-8 w-36 h-36 rounded-full bg-amber-300/30 blur-2xl pointer-events-none" />
-          <div aria-hidden="true" className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-orange-300/25 blur-2xl pointer-events-none" />
+        <div className="relative shrink-0 bg-gradient-to-br from-teal-700 via-emerald-600 to-teal-800 px-5 pt-4 pb-5 overflow-hidden">
+          <div aria-hidden="true" className="absolute -top-10 -right-8 w-36 h-36 rounded-full bg-emerald-400/25 blur-2xl pointer-events-none" />
+          <div aria-hidden="true" className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-teal-300/20 blur-2xl pointer-events-none" />
 
-          <div className="w-10 h-1 bg-white/40 rounded-full mx-auto mb-4" />
+          <div className="w-10 h-1 bg-white/35 rounded-full mx-auto mb-4" />
 
           <div className="relative flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 text-white flex items-center justify-center shadow-lg shadow-amber-900/30">
+              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 text-white flex items-center justify-center shadow-lg shadow-emerald-950/30">
                 <LayoutTemplate className="w-5 h-5 stroke-[2.5]" />
               </div>
               <div>
                 <h3 className="text-base font-black text-white tracking-tight leading-tight">
                   CIYA Templates &amp; KYCB
                 </h3>
-                <p className="text-[11px] font-semibold text-amber-50/90">
+                <p className="text-[11px] font-semibold text-emerald-100/90">
                   AI prompt lab &amp; business data sheets
                 </p>
               </div>
@@ -58,7 +58,7 @@ export default function TemplateSplashModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/35 text-white flex items-center justify-center border-0 cursor-pointer transition-colors"
+              className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center border-0 cursor-pointer transition-colors"
               aria-label="Close sheet"
             >
               <X className="w-4 h-4" />
@@ -76,15 +76,15 @@ export default function TemplateSplashModal({
               onClose();
               onSelectSection('prompts');
             }}
-            className="group relative flex items-center justify-between gap-4 p-4 sm:p-[18px] rounded-[22px] bg-white border border-slate-200/80 hover:border-amber-400 shadow-[0_2px_10px_rgba(2,44,34,0.06)] hover:shadow-[0_10px_30px_rgba(245,158,11,0.25)] transition-all cursor-pointer text-left overflow-hidden"
+            className="group relative flex items-center justify-between gap-4 p-4 sm:p-[18px] rounded-[22px] bg-white border border-slate-200/80 hover:border-emerald-400 shadow-[0_2px_10px_rgba(2,44,34,0.06)] hover:shadow-[0_10px_30px_rgba(16,185,129,0.22)] transition-all cursor-pointer text-left overflow-hidden"
           >
-            <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full" />
+            <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full" />
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 text-white flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0 group-hover:scale-110 transition-transform duration-300">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0 group-hover:scale-110 transition-transform duration-300">
                 <Sparkles className="w-6 h-6 stroke-[2.5]" />
               </div>
               <div>
-                <h4 className="text-base font-black text-slate-900 group-hover:text-amber-700 transition-colors">
+                <h4 className="text-base font-black text-slate-900 group-hover:text-emerald-700 transition-colors">
                   Prompt templates
                 </h4>
                 <p className="text-[11px] font-semibold text-slate-500">
@@ -92,7 +92,7 @@ export default function TemplateSplashModal({
                 </p>
               </div>
             </div>
-            <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 group-hover:bg-amber-500 group-hover:text-white flex items-center justify-center transition-colors shrink-0">
+            <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white flex items-center justify-center transition-colors shrink-0">
               <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </motion.div>

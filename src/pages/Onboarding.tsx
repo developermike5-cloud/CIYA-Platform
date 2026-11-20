@@ -1367,7 +1367,7 @@ function OnboardingSubmissionDetails({ data }: { data: any }) {
           </div>
           {data.intent && (
             <div>
-              <span className="text-slate-450 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
+              <span className="text-slate-450 block text-[10px] uppercase font-bold">What are you building CIY Academy for?</span>
               <p className="text-slate-300 italic mt-0.5 leading-relaxed bg-slate-950/60 p-3 border border-slate-800/60 rounded-xl">{data.intent}</p>
             </div>
           )}

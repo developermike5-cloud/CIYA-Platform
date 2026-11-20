@@ -4300,7 +4300,7 @@ function SubmissionDetailsCard({ profile }: { profile: any }) {
             </div>
             {profile.intent && (
               <div>
-                <span className="text-slate-600 block text-[10px] uppercase font-bold">What are you building CIYA Academy for?</span>
+                <span className="text-slate-600 block text-[10px] uppercase font-bold">What are you building CIY Academy for?</span>
                 <p className="text-slate-600 italic mt-0.5 leading-relaxed font-semibold bg-white p-2.5 rounded-xl border border-slate-200">{profile.intent}</p>
               </div>
             )}
@@ -8962,7 +8962,7 @@ export default function StudentDashboard() {
                             Congratulations on your selection, {userProfile?.fullName || 'Scholar'}!
                           </h1>
                           <p className="text-xs text-teal-50 opacity-90 leading-relaxed max-w-2xl font-medium">
-                            You have unrestricted, free premium access to all active CIYA Academy daily courses below. Embark on systematic lessons, evaluate code, clear checkpoints, and hand in assignments directly to certified coaches!
+                            You have unrestricted, free premium access to all active CIY Academy daily courses below. Embark on systematic lessons, evaluate code, clear checkpoints, and hand in assignments directly to certified coaches!
                           </p>
                         </div>
                       </div>
@@ -10112,11 +10112,11 @@ export default function StudentDashboard() {
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <span className="text-slate-400">Account Name</span>
                   <div className="flex items-center gap-1 flex-wrap">
-                    <span className="text-slate-900 font-extrabold text-right truncate max-w-[200px]">{appSettings?.advancedCourseSettings?.accountName ?? 'CIYA Academy International Ltd'}</span>
+                    <span className="text-slate-900 font-extrabold text-right truncate max-w-[200px]">{appSettings?.advancedCourseSettings?.accountName || 'Not set'}</span>
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText(appSettings?.advancedCourseSettings?.accountName ?? 'CIYA Academy International Ltd');
+                        navigator.clipboard.writeText(appSettings?.advancedCourseSettings?.accountName || '');
                         showToast('Copied Account Name! 📋');
                       }}
                       className="text-[10px] text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-0 rounded px-1.5 py-0.5 cursor-pointer font-bold"

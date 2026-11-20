@@ -1406,7 +1406,7 @@ export default function UsersAdmin() {
         {section('Application Answers', (
           <>
             <div className="divide-y divide-slate-100">
-              {row('What are you building CIYA Academy for?', u.intent)}
+              {row('What are you building CIY Academy for?', u.intent)}
               {row('Primary learning goal', u.goal)}
               {row('Knowledge / tools background', u.pathwayExperience || u.experience)}
               {row('Reason for choosing this pathway', u.pathwayReason)}

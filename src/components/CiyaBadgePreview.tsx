@@ -74,7 +74,7 @@ export default function CiyaBadgePreview({ userProfile, active = false }: { user
 
         {/* Footer strip */}
         <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
-          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-200/60">CIYA Academy Membership Badge</p>
+          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-200/60">CIY Academy Membership Badge</p>
           <span className="text-base shrink-0">🏅</span>
         </div>
       </div>

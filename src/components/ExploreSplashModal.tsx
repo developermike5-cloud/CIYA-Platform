@@ -61,7 +61,7 @@ export default function ExploreSplashModal({
               </div>
               <div>
                 <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-tight">
-                  Explore CIYA Academy Courses
+                  Explore CIY Academy Courses
                 </h3>
                 <p className="text-[11px] text-slate-500 font-semibold">
                   Practical step-by-step masterclasses & AI tracks
