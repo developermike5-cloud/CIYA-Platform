@@ -14,7 +14,8 @@ import crypto from "crypto";
 
 const FIRESTORE_DB = process.env.FIRESTORE_DATABASE_ID || "ai-studio-1aaee609-a922-43e7-9568-0b675490ff78";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
-const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
+// One token covers both the Firestore lookup and the FCM send.
+const SCOPES = "https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/firebase.messaging";
 const MAX_TARGETS = 2000;
 
 function b64url(input: crypto.BinaryLike): string {
@@ -165,7 +166,7 @@ export default async (req: Request) => {
 
     const sa = loadServiceAccount();
     const projectId = sa.project_id;
-    const token = await getAccessToken(FCM_SCOPE);
+    const token = await getAccessToken(SCOPES);
 
     let targets: { uid: string; tokens: string[] }[] = [];
     if (target === "all") {
