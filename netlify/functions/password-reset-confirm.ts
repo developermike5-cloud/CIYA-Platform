@@ -247,13 +247,19 @@ const handler = async (event: any) => {
     // Single use: burn the OTP, and clear any pending temporary-password state.
     await googleFetch(`${base}/${docPath}`, { method: "DELETE" });
     try {
-      await googleFetch(`${base}/users/${localId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fields: { passwordChangeRequired: B(false), tempPasswordActive: B(false), updatedAt: TS(Date.now()) },
-        }),
-      });
+      // Field-masked patch: without updateMask, Firestore REST replaces the
+      // whole document and would wipe the student's profile (approval status,
+      // dashboard unlock, everything). Only these three fields may change.
+      await googleFetch(
+        `${base}/users/${localId}?updateMask.fieldPaths=passwordChangeRequired&updateMask.fieldPaths=tempPasswordActive&updateMask.fieldPaths=updatedAt`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fields: { passwordChangeRequired: B(false), tempPasswordActive: B(false), updatedAt: TS(Date.now()) },
+          }),
+        }
+      );
     } catch {
       // non-critical
     }
