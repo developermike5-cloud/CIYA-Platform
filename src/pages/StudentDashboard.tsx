@@ -9344,7 +9344,7 @@ export default function StudentDashboard() {
       {/* Mobile Native App Bottom Navigation Bar */}
       {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && !isStudyStatsOpen && currentView !== 'profile' && currentView !== 'membership' && currentView !== 'quizscores' && currentView !== 'notificationsettings' && (currentView as string) !== 'notifications' && !isNotificationsPopupOpen && (
         <nav 
-          className="ciya-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] px-2 pt-1 pb-[max(env(safe-area-inset-bottom),10px)] select-none transition-all duration-300"
+          className="ciya-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-50 bg-gradient-to-b from-slate-900 via-slate-900 to-[#052e23] border-t border-white/10 shadow-[0_-10px_36px_rgba(6,95,70,0.45)] px-2 pt-1 pb-[max(env(safe-area-inset-bottom),10px)] select-none transition-all duration-300"
           aria-label="Mobile Navigation"
         >
         <div className="grid grid-cols-5 items-center max-w-lg mx-auto relative">
@@ -9380,20 +9380,20 @@ export default function StudentDashboard() {
                     <motion.div
                       layoutId="mobileNavActiveBubble"
                       transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
+                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/50 ring-4 ring-slate-900 z-10"
                     >
                       <Compass className="w-5 h-5 stroke-[2.5]" />
                     </motion.div>
-                    <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
+                    <span className="text-[10px] font-black text-emerald-300 tracking-tight leading-none mt-auto pt-4">
                       Explore
                     </span>
                   </>
                 ) : (
                   <>
-                    <div className="p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
+                    <div className="p-1 text-slate-300 group-hover:text-white transition-colors">
                       <Compass className="w-5 h-5 stroke-2" />
                     </div>
-                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
+                    <span className="text-[10px] font-semibold text-slate-300 group-hover:text-white tracking-tight leading-none mt-0.5">
                       Explore
                     </span>
                   </>
@@ -9432,20 +9432,20 @@ export default function StudentDashboard() {
                     <motion.div
                       layoutId="mobileNavActiveBubble"
                       transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
+                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/50 ring-4 ring-slate-900 z-10"
                     >
                       <BookOpen className="w-5 h-5 stroke-[2.5]" />
                     </motion.div>
-                    <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
+                    <span className="text-[10px] font-black text-emerald-300 tracking-tight leading-none mt-auto pt-4">
                       Course
                     </span>
                   </>
                 ) : (
                   <>
-                    <div className="p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
+                    <div className="p-1 text-slate-300 group-hover:text-white transition-colors">
                       <BookOpen className="w-5 h-5 stroke-2" />
                     </div>
-                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
+                    <span className="text-[10px] font-semibold text-slate-300 group-hover:text-white tracking-tight leading-none mt-0.5">
                       Course
                     </span>
                   </>
@@ -9474,20 +9474,20 @@ export default function StudentDashboard() {
                     <motion.div
                       layoutId="mobileNavActiveBubble"
                       transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
+                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/50 ring-4 ring-slate-900 z-10"
                     >
                       <MessageCircle className="w-5 h-5 stroke-[2.5]" />
                     </motion.div>
-                    <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
+                    <span className="text-[10px] font-black text-emerald-300 tracking-tight leading-none mt-auto pt-4">
                       Buzz
                     </span>
                   </>
                 ) : (
                   <>
-                    <div className="p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
+                    <div className="p-1 text-slate-300 group-hover:text-white transition-colors">
                       <MessageCircle className="w-5 h-5 stroke-2" />
                     </div>
-                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
+                    <span className="text-[10px] font-semibold text-slate-300 group-hover:text-white tracking-tight leading-none mt-0.5">
                       Buzz
                     </span>
                   </>
@@ -9516,20 +9516,20 @@ export default function StudentDashboard() {
                     <motion.div
                       layoutId="mobileNavActiveBubble"
                       transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
+                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/50 ring-4 ring-slate-900 z-10"
                     >
                       <LayoutTemplate className="w-5 h-5 stroke-[2.5]" />
                     </motion.div>
-                    <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
+                    <span className="text-[10px] font-black text-emerald-300 tracking-tight leading-none mt-auto pt-4">
                       Template
                     </span>
                   </>
                 ) : (
                   <>
-                    <div className="p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
+                    <div className="p-1 text-slate-300 group-hover:text-white transition-colors">
                       <LayoutTemplate className="w-5 h-5 stroke-2" />
                     </div>
-                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
+                    <span className="text-[10px] font-semibold text-slate-300 group-hover:text-white tracking-tight leading-none mt-0.5">
                       Template
                     </span>
                   </>
@@ -9558,20 +9558,20 @@ export default function StudentDashboard() {
                     <motion.div
                       layoutId="mobileNavActiveBubble"
                       transition={{ type: "spring", stiffness: 450, damping: 32 }}
-                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
+                      className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/50 ring-4 ring-slate-900 z-10"
                     >
                       <UserIcon className="w-5 h-5 stroke-[2.5]" />
                     </motion.div>
-                    <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
+                    <span className="text-[10px] font-black text-emerald-300 tracking-tight leading-none mt-auto pt-4">
                       Menu
                     </span>
                   </>
                 ) : (
                   <>
-                    <div className="relative p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
+                    <div className="relative p-1 text-slate-300 group-hover:text-white transition-colors">
                       <UserIcon className="w-5 h-5 stroke-2" />
                     </div>
-                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
+                    <span className="text-[10px] font-semibold text-slate-300 group-hover:text-white tracking-tight leading-none mt-0.5">
                       Menu
                     </span>
                   </>
@@ -9588,39 +9588,40 @@ export default function StudentDashboard() {
         <div className="fixed inset-0 z-40 md:hidden flex flex-col justify-end pointer-events-none">
           {/* Frosted dark backdrop */}
           <div 
-            className="fixed inset-0 bg-slate-950/65 backdrop-blur-xs transition-opacity pointer-events-auto"
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity pointer-events-auto"
             onClick={() => setIsMobileMenuOpen(false)}
           />
 
           {/* Slide-Up Sheet Container (Positioned strictly above bottom navigation bar) */}
           <motion.div 
             initial={{ y: "100%" }}
-            animate={{ y: 0, transition: { type: 'spring', damping: 30, stiffness: 640, mass: 0.9 } }}
+            animate={{ y: 0, transition: { type: 'spring', damping: 28, stiffness: 320, mass: 1.05 } }}
             className="fixed inset-x-0 bottom-[62px] sm:bottom-[68px] z-40 max-w-xl mx-auto bg-white rounded-t-[32px] p-5 pb-6 shadow-[0_-12px_40px_rgba(0,0,0,0.25)] border-t border-slate-200/90 max-h-[calc(85dvh-64px)] overflow-y-auto font-sans text-left pointer-events-auto"
           >
             {/* Grab Handle */}
             <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-4" />
 
             {/* Profile Section (photo on top, name + email below, edit at the bottom) */}
-            <div className="relative bg-slate-50 border border-slate-200/80 rounded-3xl p-5 pt-6 pb-4 mb-3 text-center">
+            <div className="relative bg-gradient-to-br from-teal-700 via-emerald-600 to-teal-800 rounded-3xl p-5 pt-6 pb-4 mb-3 text-center overflow-hidden">
+                <div aria-hidden="true" className="absolute -top-10 -right-8 w-32 h-32 rounded-full bg-emerald-300/20 blur-2xl pointer-events-none" />
               <button
                 type="button"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors"
+                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 border border-white/30 text-white hover:bg-white/35 flex items-center justify-center cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-600 text-white font-black text-lg flex items-center justify-center shadow-md overflow-hidden">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-white/20 border border-white/30 text-white font-black text-lg flex items-center justify-center shadow-lg overflow-hidden">
                 {(userProfile?.photoURL || currentUser?.photoURL) ? (
                   <img src={userProfile?.photoURL || currentUser?.photoURL} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   (userProfile?.fullName || currentUser?.displayName || 'S').slice(0, 1).toUpperCase()
                 )}
               </div>
-              <h4 className="mt-2.5 text-sm font-black text-slate-900 truncate max-w-[250px] mx-auto">
+              <h4 className="mt-2.5 text-sm font-black text-white truncate max-w-[250px] mx-auto">
                 {userProfile?.fullName || currentUser?.displayName || (isGuest ? 'Guest Student' : 'Student')}
               </h4>
-              <p className="text-[11px] text-slate-500 font-semibold font-mono truncate max-w-[250px] mx-auto">
+              <p className="text-[11px] text-emerald-100/85 font-semibold font-mono truncate max-w-[250px] mx-auto">
                 {currentUser?.email || 'Browse & preview courses'}
               </p>
               {!isGuest && (
@@ -9630,7 +9631,7 @@ export default function StudentDashboard() {
                     setIsMobileMenuOpen(false);
                     handleViewChange('profile');
                   }}
-                  className="mt-3 inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 text-white font-black text-[11px] uppercase tracking-wide shadow-md border-0 cursor-pointer active:scale-[0.98] transition-transform"
+                  className="mt-3 inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-white text-teal-800 font-black text-[11px] uppercase tracking-wide shadow-md border-0 cursor-pointer active:scale-[0.98] transition-transform"
                 >
                   <UserIcon className="w-3.5 h-3.5" />
                   View Profile
@@ -9655,7 +9656,7 @@ export default function StudentDashboard() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">🏷️</div>
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm"><Award className="w-4 h-4" /></div>
                     <span>CIYA Membership</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400" />
@@ -9674,7 +9675,7 @@ export default function StudentDashboard() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">📝</div>
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white flex items-center justify-center shrink-0 shadow-sm"><Edit3 className="w-4 h-4" /></div>
                     <span>Quiz Score Sheet</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400" />
@@ -9693,7 +9694,7 @@ export default function StudentDashboard() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">🔔</div>
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm"><Bell className="w-4 h-4" /></div>
                     <span>Notifications</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400" />
@@ -9708,9 +9709,7 @@ export default function StudentDashboard() {
                   className="w-full flex items-center justify-between p-3.5 rounded-2xl transition-all border border-amber-200 bg-amber-50 text-amber-900 font-black no-underline"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0">
-                      💻
-                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 text-white flex items-center justify-center shrink-0 shadow-sm"><Lock className="w-4 h-4" /></div>
                     <span>Admin Control Panel</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-amber-600" />

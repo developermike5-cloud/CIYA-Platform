@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, MessageCircle, BookOpen, Users, Sparkles, ChevronRight, Newspaper, ArrowRight } from 'lucide-react';
+import { X, MessageCircle, Users, Newspaper, ChevronRight } from 'lucide-react';
 
 interface BuzzSplashModalProps {
   isOpen: boolean;
@@ -17,37 +17,40 @@ export default function BuzzSplashModal({
 
   return (
     <AnimatePresence>
-      {/* Backdrop below bottom nav bar */}
+      {/* Frosted backdrop below mobile bottom nav bar */}
       <motion.div
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1, transition: { duration: 0.15 } }}
-        exit={{ opacity: 0, transition: { duration: 0.12 } }}
-        className="fixed inset-0 z-40 bg-slate-950/70"
+        animate={{ opacity: 1, transition: { duration: 0.18 } }}
+        exit={{ opacity: 0, transition: { duration: 0.15 } }}
+        className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-[3px]"
         onClick={onClose}
       />
 
       {/* Slide-Up Bottom Splash Sheet (Sits strictly ABOVE bottom navigation bar) */}
       <motion.div
-        initial={{ y: '100%' }}
-        animate={{ y: 0, transition: { type: 'spring', damping: 30, stiffness: 640, mass: 0.9 } }}
-        exit={{ y: '100%', transition: { duration: 0.18, ease: 'easeIn' } }}
-        className="fixed inset-x-0 bottom-[62px] sm:bottom-[68px] z-40 max-w-xl mx-auto bg-white rounded-t-[32px] shadow-[0_-12px_40px_rgba(0,0,0,0.25)] border-t border-slate-200/90 flex flex-col max-h-[calc(85dvh-64px)] overflow-hidden font-sans select-none"
+        initial={{ y: '110%' }}
+        animate={{ y: 0, transition: { type: 'spring', stiffness: 300, damping: 27, mass: 1.05 } }}
+        exit={{ y: '110%', transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } }}
+        className="fixed inset-x-0 bottom-[62px] sm:bottom-[68px] z-40 max-w-xl mx-auto rounded-t-[28px] overflow-hidden bg-white flex flex-col max-h-[calc(85dvh-64px)] shadow-[0_-18px_60px_rgba(6,95,70,0.35)] font-sans select-none"
       >
-        {/* Pull Handle & Header */}
-        <div className="p-4 pb-3 border-b border-slate-100 shrink-0 bg-white">
-          <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-3" />
+        {/* Gradient hero header with sparkle glows */}
+        <div className="relative shrink-0 bg-gradient-to-br from-teal-700 via-emerald-600 to-teal-800 px-5 pt-4 pb-5 overflow-hidden">
+          <div aria-hidden="true" className="absolute -top-10 -right-8 w-36 h-36 rounded-full bg-emerald-400/25 blur-2xl pointer-events-none" />
+          <div aria-hidden="true" className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-teal-300/20 blur-2xl pointer-events-none" />
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center font-black">
+          <div className="w-10 h-1 bg-white/35 rounded-full mx-auto mb-4" />
+
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/25 text-white flex items-center justify-center shadow-lg shadow-emerald-950/30">
                 <MessageCircle className="w-5 h-5 stroke-[2.5]" />
               </div>
               <div>
-                <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-tight">
+                <h3 className="text-base font-black text-white tracking-tight leading-tight">
                   CIYA Buzz Hub
                 </h3>
-                <p className="text-[11px] text-slate-500 font-semibold">
-                  Live cohort discussions & academy articles
+                <p className="text-[11px] font-semibold text-emerald-100/90">
+                  Live cohort discussions &amp; academy articles
                 </p>
               </div>
             </div>
@@ -55,7 +58,7 @@ export default function BuzzSplashModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center border-0 cursor-pointer transition-colors"
+              className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center border-0 cursor-pointer transition-colors"
               aria-label="Close sheet"
             >
               <X className="w-4 h-4" />
@@ -63,53 +66,67 @@ export default function BuzzSplashModal({
           </div>
         </div>
 
-        {/* Card Options Container */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-3">
+        {/* Card options */}
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-3.5 bg-gradient-to-b from-slate-50 to-white">
           {/* Card 1: Buzz Chats */}
-          <div
+          <motion.div
             id="buzz-splash-card-chats"
+            initial={{ y: 18, opacity: 0 }}
+            animate={{ y: 0, opacity: 1, transition: { delay: 0.1, type: 'spring', stiffness: 420, damping: 26 } }}
             onClick={() => {
               onClose();
               onSelectSection('groups');
             }}
-            className="group p-4 sm:p-5 rounded-2xl border-2 border-slate-200 hover:border-emerald-500 bg-white hover:bg-emerald-50/25 transition-all cursor-pointer shadow-xs hover:shadow-md flex items-center justify-between gap-4 text-left"
+            className="group relative flex items-center justify-between gap-4 p-4 sm:p-[18px] rounded-[22px] bg-white border border-slate-200/80 hover:border-emerald-400 shadow-[0_2px_10px_rgba(2,44,34,0.06)] hover:shadow-[0_10px_30px_rgba(16,185,129,0.22)] transition-all cursor-pointer text-left overflow-hidden"
           >
+            <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full" />
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-slate-950 flex items-center justify-center shadow-md shadow-emerald-500/25 shrink-0 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0 group-hover:scale-110 transition-transform duration-300">
                 <Users className="w-6 h-6 stroke-[2.5]" />
               </div>
-              <h4 className="text-base sm:text-lg font-black text-slate-900 group-hover:text-emerald-700 transition-colors">
-                Buzz Chats
-              </h4>
+              <div>
+                <h4 className="text-base font-black text-slate-900 group-hover:text-emerald-700 transition-colors">
+                  Buzz Chats
+                </h4>
+                <p className="text-[11px] font-semibold text-slate-500">
+                  Join your cohort group chats
+                </p>
+              </div>
             </div>
-
-            <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-emerald-500 group-hover:text-slate-950 text-slate-400 flex items-center justify-center transition-colors shrink-0">
+            <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white flex items-center justify-center transition-colors shrink-0">
               <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </div>
-          </div>
+          </motion.div>
 
           {/* Card 2: Blog and Articles */}
-          <div
+          <motion.div
             id="buzz-splash-card-blog"
+            initial={{ y: 18, opacity: 0 }}
+            animate={{ y: 0, opacity: 1, transition: { delay: 0.18, type: 'spring', stiffness: 420, damping: 26 } }}
             onClick={() => {
               onClose();
               onSelectSection('blog');
             }}
-            className="group p-4 sm:p-5 rounded-2xl border-2 border-slate-200 hover:border-indigo-500 bg-white hover:bg-indigo-50/25 transition-all cursor-pointer shadow-xs hover:shadow-md flex items-center justify-between gap-4 text-left"
+            className="group relative flex items-center justify-between gap-4 p-4 sm:p-[18px] rounded-[22px] bg-white border border-slate-200/80 hover:border-indigo-400 shadow-[0_2px_10px_rgba(2,44,34,0.06)] hover:shadow-[0_10px_30px_rgba(99,102,241,0.22)] transition-all cursor-pointer text-left overflow-hidden"
           >
+            <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-indigo-400 to-violet-500 rounded-full" />
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/25 shrink-0 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0 group-hover:scale-110 transition-transform duration-300">
                 <Newspaper className="w-6 h-6 stroke-[2.5]" />
               </div>
-              <h4 className="text-base sm:text-lg font-black text-slate-900 group-hover:text-indigo-600 transition-colors">
-                Blog and Articles
-              </h4>
+              <div>
+                <h4 className="text-base font-black text-slate-900 group-hover:text-indigo-700 transition-colors">
+                  Blog &amp; Articles
+                </h4>
+                <p className="text-[11px] font-semibold text-slate-500">
+                  Reads and stories from the academy
+                </p>
+              </div>
             </div>
-
-            <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-indigo-600 group-hover:text-white text-slate-400 flex items-center justify-center transition-colors shrink-0">
+            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-colors shrink-0">
               <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </div>
-          </div>
+          </motion.div>
         </div>
       </motion.div>
     </AnimatePresence>

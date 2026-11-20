@@ -226,7 +226,7 @@ export function emailHtml(opts: { firstName: string; courseName: string; tier: n
     </div>
   </td></tr>
   <tr><td style="padding:18px 32px 26px;font-family:Arial,Helvetica,sans-serif;border-top:1px solid #eef2f0;">
-    <p style="margin:0;color:#6b7772;font-size:12px;line-height:1.5;">You are receiving this because you have an unfinished course at CIYA Academy. Your progress is always saved.</p>
+    <p style="margin:0;color:#6b7772;font-size:12px;line-height:1.5;">You are receiving this because you have an unfinished course at CIY Academy. Your progress is always saved.</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -238,7 +238,7 @@ export function emailHtml(opts: { firstName: string; courseName: string; tier: n
 export async function sendZeptoHtml(to: string, subject: string, html: string): Promise<{ ok: boolean; status: number; detail?: string }> {
   const apiKey = (process.env.ZEPTOMAIL_API_KEY || process.env.ZEPTO_API_KEY || "").trim().replace(/^Zoho-enczapikey\s*/i, "").trim();
   const fromAddress = process.env.ZEPTO_FROM_ADDRESS || "";
-  const fromName = process.env.ZEPTO_FROM_NAME || "CIYA Academy";
+  const fromName = process.env.ZEPTO_FROM_NAME || "CIY Academy";
   if (!apiKey || !fromAddress) return { ok: false, status: 0, detail: "zepto-not-configured" };
   const res = await fetch("https://api.zeptomail.com/v1.1/email", {
     method: "POST",
