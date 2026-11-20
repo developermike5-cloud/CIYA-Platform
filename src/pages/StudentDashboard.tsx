@@ -4538,6 +4538,11 @@ export default function StudentDashboard() {
     });
   };
 
+  // True once the auth listener has fired at least once. Until then a cached
+  // sign-in can make authChecking read false while currentUser is still null,
+  // which briefly flashed an empty login modal before the dashboard loaded.
+  const authResolvedRef = React.useRef(false);
+
   const [authChecking, setAuthChecking] = useState(() => {
     // A pending first-login (invited admin still on a temporary password) holds the
     // loading screen until routing sends them back to the password gate
@@ -5550,7 +5555,7 @@ export default function StudentDashboard() {
   // Auto-open login if guest in PWA mode
   useEffect(() => {
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
-    if (!authChecking && !currentUser && isPWA) {
+    if (authResolvedRef.current && !authChecking && !currentUser && isPWA) {
       setIsLoginOpen(true);
     }
   }, [authChecking, currentUser]);
@@ -6064,7 +6069,7 @@ export default function StudentDashboard() {
     const params = new URLSearchParams(window.location.search);
     const isPWA = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
     
-    if ((params.get('login') === 'true' || isPWA) && !currentUser) {
+    if (authResolvedRef.current && (params.get('login') === 'true' || isPWA) && !currentUser) {
       setIsLoginOpen(true);
     }
   }, [currentUser, authChecking]);
@@ -6073,7 +6078,10 @@ export default function StudentDashboard() {
     let unsubSnapshot: (() => void) | null = null;
 
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
+      authResolvedRef.current = true;
       if (user) {
+        // Signed in: never keep the auto-opened login modal up.
+        setIsLoginOpen(false);
         // A pending first-login (invited admin still on a temporary password) must
         // never reach any dashboard, including this one, even via Back
         const pendingFirstLogin = safeStorage.getItem('ciya_pending_first_login');
