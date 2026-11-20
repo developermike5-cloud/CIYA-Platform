@@ -69,12 +69,24 @@ export default async (req: Request) => {
     if (!target) return new Response(JSON.stringify({ stage: "find release", releases: releases.map((r: any) => ({ name: r.name, ruleset: r.ruleset })) }), { status: 500 });
 
     const releaseId = target.name.split("/releases/")[1];
-    const patch = await fetch(`https://firebaserules.googleapis.com/v1/projects/${sa.project_id}/releases/${encodeURIComponent(releaseId)}?updateMask=rulesetName`, {
-      method: "PATCH", headers: H, body: JSON.stringify({ rulesetName: newRuleset }),
-    }).then(r => r.json()) as any;
-    if (patch.error) return new Response(JSON.stringify({ stage: "release patch", error: patch.error }), { status: 500 });
+    const base = `https://firebaserules.googleapis.com/v1/projects/${sa.project_id}/releases/`;
+    const variants = [
+      { label: "literal-slash+rulesetName", url: `${base}${releaseId}?updateMask=rulesetName`, body: { rulesetName: newRuleset } },
+      { label: "literal-slash+ruleset", url: `${base}${releaseId}?updateMask=ruleset`, body: { ruleset: newRuleset } },
+      { label: "literal-slash+full-resource", url: `${base}${releaseId}?updateMask=rulesetName`, body: { name: target.name, rulesetName: newRuleset } },
+      { label: "encoded-slash+full-resource", url: `${base}${encodeURIComponent(releaseId)}?updateMask=rulesetName`, body: { name: target.name, rulesetName: newRuleset } },
+    ];
+    const attempts: any[] = [];
+    let patch: any = null;
+    for (const v of variants) {
+      const res = await fetch(v.url, { method: "PATCH", headers: H, body: JSON.stringify(v.body) });
+      const txt = await res.text();
+      attempts.push({ label: v.label, status: res.status, body: txt.slice(0, 300) });
+      if (res.ok) { patch = JSON.parse(txt); break; }
+    }
+    if (!patch) return new Response(JSON.stringify({ stage: "release patch", attempts }), { status: 500 });
 
-    return new Response(JSON.stringify({ ok: true, newRuleset, release: patch.name, nowPointsTo: patch.ruleset }), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, newRuleset, release: patch.name, nowPointsTo: patch.rulesetName }), { headers: { "Content-Type": "application/json" } });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err?.message || "apply failed" }), { status: 500 });
   }
