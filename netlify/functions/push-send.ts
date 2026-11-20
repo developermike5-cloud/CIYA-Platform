@@ -107,6 +107,12 @@ async function listUsers(token: string, projectId: string): Promise<any[]> {
   return rows.filter((r: any) => r.document);
 }
 
+/** Firestore REST: a student's push channel setting. Only a stored false turns it off. */
+function pushEnabled(fields: any): boolean {
+  const p = fields?.notificationPrefs?.mapValue?.fields;
+  return p?.push?.booleanValue !== false;
+}
+
 function extractTokens(fields: any): string[] {
   const map = fields?.fcmTokens?.mapValue?.fields || {};
   return Object.keys(map);
@@ -169,6 +175,7 @@ export default async (req: Request) => {
     const token = await getAccessToken(SCOPES);
 
     let targets: { uid: string; tokens: string[] }[] = [];
+    let skipped = 0;
     if (target === "all") {
       const docs = await listUsers(token, projectId);
       for (const d of docs) {
@@ -176,11 +183,15 @@ export default async (req: Request) => {
         const uid = String(d.document?.name || "").split("/").pop();
         if (!uid) continue;
         if (f.isAdmin?.booleanValue === true) continue;
+        if (!pushEnabled(f)) { skipped++; continue; }
         const toks = extractTokens(f);
         if (toks.length) targets.push({ uid, tokens: toks });
       }
     } else {
       const doc = await readDoc(token, projectId, `users/${target}`);
+      if (doc?.fields && !pushEnabled(doc.fields)) {
+        skipped++;
+      }
       const toks = doc?.fields ? extractTokens(doc.fields) : [];
       if (toks.length) targets.push({ uid: target, tokens: toks });
     }
@@ -214,7 +225,7 @@ export default async (req: Request) => {
       }
     }
 
-    return json(200, { ok: true, recipients: targets.length, sent, failed });
+    return json(200, { ok: true, recipients: targets.length, sent, failed, skipped });
   } catch (err: any) {
     return json(500, { error: err?.message || "Push send failed." });
   }

@@ -10,7 +10,7 @@
  *
  * This module never reloads or refreshes the app.
  */
-import { doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, deleteField, serverTimestamp } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage, isSupported, type Messaging } from 'firebase/messaging';
 import { db } from './firebase';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -114,5 +114,30 @@ export async function registerStudentPush(
   } catch (err) {
     console.warn('Push registration skipped:', err);
     return false;
+  }
+}
+
+/**
+ * Remove this device's FCM token from the user's profile so the server stops
+ * sending pushes to it. Used when the student switches the push channel off in
+ * their notification settings. Never refreshes or reloads the app.
+ */
+export async function unregisterStudentPush(uid: string): Promise<void> {
+  try {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission !== 'granted') return;
+    if (!(await isSupported().catch(() => false))) return;
+
+    if (!messagingInstance) messagingInstance = getMessaging();
+    const registration = await navigator.serviceWorker.ready;
+    const token = await getToken(messagingInstance, {
+      vapidKey: (firebaseConfig as any).vapidPublicKey as string,
+      serviceWorkerRegistration: registration
+    });
+    if (!token) return;
+    await updateDoc(doc(db, 'users', uid), { [`fcmTokens.${token}`]: deleteField(), updatedAt: serverTimestamp() });
+  } catch (err) {
+    console.warn('Push unregistration skipped:', err);
   }
 }

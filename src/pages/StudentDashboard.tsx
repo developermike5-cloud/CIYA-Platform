@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { collection, collectionGroup, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, safeGetItem } from '../firebase';
-import { registerStudentPush, sendPushRequest, getPushPermissionState } from '../firebaseMessaging';
+import { registerStudentPush, sendPushRequest, getPushPermissionState, unregisterStudentPush } from '../firebaseMessaging';
 
 /** Best-effort push delivery through the server. In-app history entries are
  * written by each calling flow, so push and history never double up. */
@@ -4690,13 +4690,14 @@ export default function StudentDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'membership' | 'quizscores' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz'>(() => {
+  const [currentView, setCurrentView] = useState<'courses' | 'profile' | 'membership' | 'quizscores' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz' | 'notificationsettings'>(() => {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
     if (view === 'prompts') return 'prompts';
     if (view === 'profile') return 'profile';
     if (view === 'membership') return 'membership';
     if (view === 'quizscores') return 'quizscores';
+    if (view === 'notificationsettings') return 'notificationsettings';
     if (view === 'notifications') return 'notifications';
     if (view === 'assignments') return 'assignments';
     if (view === 'kycb') return 'kycb';
@@ -4800,6 +4801,8 @@ export default function StudentDashboard() {
       setCurrentView('membership');
     } else if (view === 'quizscores') {
       setCurrentView('quizscores');
+    } else if (view === 'notificationsettings') {
+      setCurrentView('notificationsettings');
     } else {
       setCurrentView('courses');
     }
@@ -5582,7 +5585,17 @@ export default function StudentDashboard() {
   const notifIsRead = (n: any) =>
     !!n.isRead || (!!currentUser?.uid && broadcastReadIds.has(n.id));
 
-  const unreadNotificationsCount = dbNotifications.filter(x => !notifIsRead(x)).length;
+
+  // Per-student notification channel settings, stored on users/{uid}.notificationPrefs.
+  // All three channels default ON, so a fresh student gets the push prompt out of the box.
+  const [notifPrefs, setNotifPrefs] = useState<{ email: boolean; inApp: boolean; push: boolean }>(() => ({ email: true, inApp: true, push: true }));
+  const [notifPrefsBusy, setNotifPrefsBusy] = useState<'email' | 'inApp' | 'push' | null>(null);
+  // One push-prompt offer per session: the settings tab can always re-offer it.
+  const pushBannerOfferedRef = useRef(false);
+  // In-app channel toggle: when the student switches in-app alerts off, the
+  // bell, splash and desk show nothing, exactly like an empty notifications list.
+  const visibleDbNotifications = notifPrefs.inApp ? dbNotifications : [];
+  const unreadNotificationsCount = visibleDbNotifications.filter(x => !notifIsRead(x)).length;
 
 
 
@@ -5725,12 +5738,62 @@ export default function StudentDashboard() {
     setShowPushBanner(false);
   };
 
+  // Hydrate the channel settings from the loaded profile, then offer the push
+  // enable banner exactly once per session when push is switched on and the
+  // browser has not answered the permission question yet.
+  useEffect(() => {
+    const p: any = userProfile?.notificationPrefs;
+    if (!p || typeof p !== 'object') return;
+    const next = { email: p.email !== false, inApp: p.inApp !== false, push: p.push !== false };
+    setNotifPrefs((cur) => (cur.email === next.email && cur.inApp === next.inApp && cur.push === next.push ? cur : next));
+    if (next.push && !pushBannerOfferedRef.current && getPushPermissionState() === 'default') {
+      pushBannerOfferedRef.current = true;
+      setShowPushBanner(true);
+    }
+  }, [userProfile?.notificationPrefs]);
+
+  // Notification settings tab: toggle one of the three channels. Switching push
+  // ON is the user tap that unlocks the browser permission prompt (the enable
+  // banner appears right away); switching it OFF removes this device's token so
+  // the server stops sending pushes to it.
+  const handleToggleNotifPref = async (channel: 'email' | 'inApp' | 'push') => {
+    if (!currentUser?.uid || notifPrefsBusy) return;
+    const next = { ...notifPrefs, [channel]: !notifPrefs[channel] } as { email: boolean; inApp: boolean; push: boolean };
+    setNotifPrefs(next);
+    setNotifPrefsBusy(channel);
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), { notificationPrefs: next });
+    } catch (err) {
+      console.warn('Could not save notification preference:', err);
+      setNotifPrefs(notifPrefs);
+      showCiyaToast('Could not save that setting. Try again.');
+      setNotifPrefsBusy(null);
+      return;
+    }
+    setNotifPrefsBusy(null);
+    if (channel === 'push') {
+      if (next.push) {
+        if (getPushPermissionState() === 'granted') {
+          const ok = await registerStudentPush(currentUser.uid, (title, body) => {
+            showCiyaToast(title ? `${title}: ${body}` : body);
+          });
+          showCiyaToast(ok ? 'Push notifications are on for this device.' : 'Push could not finish registering on this device.');
+        } else {
+          pushBannerOfferedRef.current = true;
+          setShowPushBanner(true);
+        }
+      } else {
+        await unregisterStudentPush(currentUser.uid);
+      }
+    }
+  };
+
   const menuReturnViewRef = useRef<'courses' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz'>('courses');
-  const handleViewChange = (view: 'courses' | 'profile' | 'membership' | 'quizscores' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz', cId: string | null = null) => {
+  const handleViewChange = (view: 'courses' | 'profile' | 'membership' | 'quizscores' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz' | 'notificationsettings', cId: string | null = null) => {
     // Menu sections (Profile / Membership / Quiz Score Sheet) live under the More
     // menu popup: remember where the user was so Back can return them there.
-    if ((view === 'profile' || view === 'membership' || view === 'quizscores') &&
-        !(currentView === 'profile' || currentView === 'membership' || currentView === 'quizscores')) {
+    if ((view === 'profile' || view === 'membership' || view === 'quizscores' || view === 'notificationsettings') &&
+        !(currentView === 'profile' || currentView === 'membership' || currentView === 'quizscores' || currentView === 'notificationsettings')) {
       menuReturnViewRef.current = currentView;
     }
     setCurrentView(view);
@@ -7308,6 +7371,18 @@ export default function StudentDashboard() {
               </div>
             </button>
           )}
+          {!isGuest && (
+            <button
+              type="button"
+              onClick={() => handleViewChange('notificationsettings', null)}
+              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'notificationsettings' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-sm">🔔</span>
+                <span>Notifications</span>
+              </div>
+            </button>
+          )}
           {isAdmin && (
             <Link 
               to="/admin" 
@@ -7509,7 +7584,7 @@ export default function StudentDashboard() {
                     if (next) {
                       // Self-heal: re-check receipts for broadcasts that still
                       // show unread so a cached or failed read can't linger.
-                      const staleBroadcasts = dbNotifications
+                      const staleBroadcasts = visibleDbNotifications
                         .filter((n: any) => !n.isRead && (n.userId === 'all' || n.type === 'system_broadcast'))
                         .map((n: any) => n.id);
                       recheckBroadcastReceipts(staleBroadcasts);
@@ -7559,12 +7634,16 @@ export default function StudentDashboard() {
                       </div>
 
                       <div className="max-h-[45vh] overflow-y-auto divide-y divide-slate-100/60">
-                        {dbNotifications.length === 0 ? (
-                          <div className="px-4 py-10 text-center text-slate-400 text-xs font-semibold">
-                            No notifications yet
+                        {visibleDbNotifications.length === 0 ? (
+                          <div className="px-4 py-10 text-center text-slate-400 text-xs font-semibold space-y-2">
+                            {notifPrefs.inApp ? (
+                              <p>No notifications yet</p>
+                            ) : (
+                              <p>In-app notifications are turned off.<br />Switch them on in the Notifications tab in the menu.</p>
+                            )}
                           </div>
                         ) : (
-                          dbNotifications.slice(0, 5).map((notif) => (
+                          visibleDbNotifications.slice(0, 5).map((notif) => (
                             <div
                               key={notif.id}
                               className={`p-3.5 relative flex gap-2.5 ${!notifIsRead(notif) ? 'bg-amber-50/20' : ''}`}
@@ -7688,6 +7767,81 @@ export default function StudentDashboard() {
               appSettings={appSettings}
               onNavigateToKycb={() => setCurrentView('kycb')}
             />
+          ) : currentView === 'notificationsettings' ? (
+            (() => {
+              const pushPerm = getPushPermissionState();
+              const rows: { key: 'email' | 'inApp' | 'push'; icon: string; name: string; desc: string }[] = [
+                { key: 'email', icon: '📧', name: 'Email notifications', desc: 'Course confirmations, receipts and announcements sent to your email address.' },
+                { key: 'inApp', icon: '💬', name: 'In-app notifications', desc: 'Alerts inside the app: the bell, the splash screen and your notification desk.' },
+                { key: 'push', icon: '🔔', name: 'Push notifications', desc: 'Get alerts even when the app is closed. Switching this on asks your device for permission.' },
+              ];
+              return (
+                <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm text-slate-800 max-w-2xl mx-auto my-6 font-sans">
+                  <div className="text-left mb-6">
+                    <button
+                      type="button"
+                      onClick={handleSectionBack}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-extrabold border-0 cursor-pointer active:scale-[0.98] transition-transform shadow-md"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Back
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3 mb-2 border-b border-slate-100 pb-4">
+                    <div className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 shrink-0">
+                      <Bell className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Notification Settings</h3>
+                      <p className="text-xs text-slate-500 font-medium">Choose how CIYA reaches you. A channel only delivers while its switch is on.</p>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {rows.map((row) => {
+                      const on = notifPrefs[row.key];
+                      return (
+                        <div key={row.key} className="py-4 flex items-center justify-between gap-4">
+                          <div className="flex items-start gap-3 min-w-0">
+                            <span className="text-lg leading-none mt-0.5" aria-hidden="true">{row.icon}</span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-black text-slate-900">{row.name}</p>
+                              <p className="text-xs text-slate-500 font-medium leading-relaxed mt-0.5">{row.desc}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={on}
+                            disabled={notifPrefsBusy === row.key}
+                            onClick={() => handleToggleNotifPref(row.key)}
+                            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors border-0 cursor-pointer ${on ? 'bg-teal-600' : 'bg-slate-300'} ${notifPrefsBusy === row.key ? 'opacity-60' : ''}`}
+                          >
+                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${on ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {notifPrefs.push && (
+                    <div className="mt-4 rounded-2xl border p-3.5 text-xs font-semibold leading-relaxed">
+                      {pushPerm === 'granted' ? (
+                        <div className="border-emerald-200 bg-emerald-50 text-emerald-800">
+                          Push is enabled on this device. You will receive alerts even when the app is closed.
+                        </div>
+                      ) : pushPerm === 'denied' ? (
+                        <div className="border-rose-200 bg-rose-50 text-rose-800">
+                          Your browser has notifications blocked for this site. Allow notifications in the browser's site settings, then switch push off and on again.
+                        </div>
+                      ) : (
+                        <div className="border-amber-200 bg-amber-50 text-amber-900">
+                          Tap Enable on the banner (or switch push off and back on) to allow notifications on this device.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()
           ) : (currentView === 'profile' || currentView === 'membership' || currentView === 'quizscores') ? (
             (currentView === 'profile' && !isAdmin && appSettings?.lockedSections?.profile) ? (
               <div className="bg-white border text-sm border-slate-200 rounded-3xl p-8 md:p-12 text-center max-w-2xl mx-auto shadow-sm my-6 font-sans">
@@ -8172,14 +8326,23 @@ export default function StudentDashboard() {
                 )}
               </div>
 
-              {dbNotifications.length === 0 ? (
+              {visibleDbNotifications.length === 0 ? (
                 <div className="text-center py-16 text-slate-400 uppercase font-black text-xs space-y-3">
                   <div className="text-3xl animate-pulse">🔔</div>
-                  <p className="tracking-widest">Your Inbox is silent.</p>
+                  <p className="tracking-widest">{notifPrefs.inApp ? 'Your Inbox is silent.' : 'In-app notifications are turned off.'}</p>
+                  {!notifPrefs.inApp && (
+                    <button
+                      type="button"
+                      onClick={() => handleViewChange('notificationsettings')}
+                      className="text-teal-600 hover:text-teal-700 font-black bg-transparent border-0 cursor-pointer"
+                    >
+                      Turn them on in the Notifications tab
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {dbNotifications.map((notif) => (
+                  {visibleDbNotifications.map((notif) => (
                     <div 
                       key={notif.id} 
                       className={`p-4 border rounded-2xl text-left transition-colors relative overflow-hidden ${
@@ -9105,7 +9268,7 @@ export default function StudentDashboard() {
         </div>
       )}
       {/* Mobile Native App Bottom Navigation Bar */}
-      {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && !isStudyStatsOpen && currentView !== 'profile' && currentView !== 'membership' && currentView !== 'quizscores' && (currentView as string) !== 'notifications' && !isNotificationsPopupOpen && (
+      {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && !isStudyStatsOpen && currentView !== 'profile' && currentView !== 'membership' && currentView !== 'quizscores' && currentView !== 'notificationsettings' && (currentView as string) !== 'notifications' && !isNotificationsPopupOpen && (
         <nav 
           className="ciya-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] px-2 pt-1 pb-[max(env(safe-area-inset-bottom),10px)] select-none transition-all duration-300"
           aria-label="Mobile Navigation"
@@ -9439,6 +9602,25 @@ export default function StudentDashboard() {
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">📝</div>
                     <span>Quiz Score Sheet</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
+              )}
+
+              {/* Notifications */}
+              {!isGuest && (
+                <button
+                  type="button"
+                  onClick={() => handleViewChange('notificationsettings')}
+                  className={`w-full flex items-center justify-between p-3.5 rounded-2xl transition-all border cursor-pointer ${
+                    currentView === 'notificationsettings'
+                      ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-black'
+                      : 'bg-white hover:bg-slate-50 border-slate-200/60 text-slate-800 font-extrabold'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">🔔</div>
+                    <span>Notifications</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400" />
                 </button>
