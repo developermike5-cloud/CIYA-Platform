@@ -9028,7 +9028,7 @@ export default function StudentDashboard() {
         </div>
       )}
       {/* Mobile Native App Bottom Navigation Bar */}
-      {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && !isStudyStatsOpen && currentView !== 'profile' && currentView !== 'membership' && currentView !== 'quizscores' && !isNotificationsPopupOpen && (
+      {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && !isStudyStatsOpen && currentView !== 'profile' && currentView !== 'membership' && currentView !== 'quizscores' && (currentView as string) !== 'notifications' && !isNotificationsPopupOpen && (
         <nav 
           className="ciya-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-50 bg-slate-900 border-t border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.35)] px-2 pt-1 pb-[max(env(safe-area-inset-bottom),10px)] select-none transition-all duration-300"
           aria-label="Mobile Navigation"

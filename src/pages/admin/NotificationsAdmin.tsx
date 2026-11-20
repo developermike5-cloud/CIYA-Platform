@@ -118,10 +118,10 @@ export default function NotificationsAdmin() {
     ).slice(0, 6);
   };
 
-  const StudentPicker = ({ q, setQ, picked, setPicked }: {
-    q: string; setQ: (v: string) => void;
-    picked: UserStudent | null; setPicked: (s: UserStudent | null) => void;
-  }) => (
+  // A plain render helper, not a nested component: React would see a brand
+  // new component type on every parent render and remount the input, which
+  // dropped focus after the first typed character.
+  const renderStudentPicker = (q: string, setQ: (v: string) => void, picked: UserStudent | null, setPicked: (s: UserStudent | null) => void) => (
     <div className="relative">
       {picked ? (
         <div className="flex items-center justify-between gap-2 bg-slate-50 border rounded-xl p-3">
@@ -281,7 +281,7 @@ export default function NotificationsAdmin() {
           <form onSubmit={handleManualDispatch} className="space-y-4 text-xs font-semibold flex-1 flex flex-col">
             <div className="space-y-1.5">
               <label className="block text-[10px] uppercase font-black text-slate-500">Send to</label>
-              <StudentPicker q={recipientQuery} setQ={setRecipientQuery} picked={selectedRecipient} setPicked={setSelectedRecipient} />
+              {renderStudentPicker(recipientQuery, setRecipientQuery, selectedRecipient, setSelectedRecipient)}
             </div>
             <div className="space-y-1.5">
               <label className="block text-[10px] uppercase font-black text-slate-500">Title</label>
@@ -323,7 +323,7 @@ export default function NotificationsAdmin() {
           <p className="text-xs text-slate-500 font-semibold">Send a test alert to one student only. It confirms push notifications reach their device. The student must first have tapped Enable on the notification banner in their app and allowed notifications.</p>
           <div className="space-y-1.5">
             <label className="block text-[10px] uppercase font-black text-slate-500">Test student</label>
-            <StudentPicker q={testQuery} setQ={setTestQuery} picked={testStudent} setPicked={setTestStudent} />
+            {renderStudentPicker(testQuery, setTestQuery, testStudent, setTestStudent)}
           </div>
           <div className="mt-auto">
             <button
