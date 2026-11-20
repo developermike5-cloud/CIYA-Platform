@@ -5598,7 +5598,8 @@ export default function StudentDashboard() {
   // Push notifications: register the student's FCM token after login and
   // surface foreground pushes as branded CIYA toasts. Never refreshes the app.
   useEffect(() => {
-    if (!currentUser?.uid || isAdmin) return;
+    // Admins register too, so the academy admin can receive and test pushes.
+    if (!currentUser?.uid) return;
     let cancelled = false;
     registerStudentPush(currentUser.uid, (title, body) => {
       if (!cancelled) showCiyaToast(title ? `${title}: ${body}` : body);
