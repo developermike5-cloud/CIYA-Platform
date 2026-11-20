@@ -55,27 +55,36 @@ export default async (req: Request) => {
     const H = { Authorization: `Bearer ${token}` };
     const out: any = {};
 
-    // Latest deployed Firestore ruleset source.
+    // Latest deployed rulesets: dump services so nothing is mis-filtered.
     const rsList = await fetch(`https://firebaserules.googleapis.com/v1/projects/${sa.project_id}/rulesets?pageSize=25`, { headers: H }).then(r => r.json()) as any;
     if (rsList.error) out.rulesListError = rsList.error;
-    const fsRs = (rsList.rulesets || []).filter((r: any) => r.metadata?.service === "firestore.googleapis.com");
-    if (fsRs.length) {
-      const newest = fsRs[0];
+    const all = rsList.rulesets || [];
+    out.rulesetServices = all.map((r: any) => ({ name: r.name, service: r.metadata?.service, created: r.createTime }));
+    const newest = all[0];
+    if (newest) {
       const full = await fetch(`https://firebaserules.googleapis.com/v1/${newest.name}`, { headers: H }).then(r => r.json()) as any;
       out.ruleset = { name: newest.name, created: newest.createTime, source: (full.source?.files || []).map((f: any) => f.content).join("\n") };
-    } else {
-      out.ruleset = { note: "no firestore rulesets found", all: (rsList.rulesets || []).map((r: any) => ({ name: r.name, service: r.metadata?.service })) };
     }
 
-    // Recent notifications docs.
-    const notifUrl = `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/notifications?pageSize=20&showMissing=false`;
-    const nres = await fetch(notifUrl, { headers: H }).then(r => r.json()) as any;
-    out.notifications = (nres.documents || []).map((d: any) => {
+    // Recent notifications docs via runQuery (ordered by createdAt desc).
+    const runq = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents:runQuery`, {
+      method: "POST",
+      headers: { ...H, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: "notifications" }],
+          orderBy: [{ field: { fieldPath: "createdAt" }, direction: "DESCENDING" }],
+          limit: 12,
+        },
+      }),
+    }).then(r => r.json()) as any;
+    out.notifications = (Array.isArray(runq) ? runq : []).filter((x: any) => x.document).map((x: any) => {
+      const d = x.document;
       const f: any = {};
       for (const k of ["userId", "isRead", "title", "type", "createdAt"]) f[k] = g(d.fields?.[k]);
       return { id: d.name.split("/").pop(), ...f };
     });
-    if (nres.error) out.notificationsError = nres.error;
+    if (runq.error) out.notificationsError = runq.error;
 
     // Admins docs.
     const ares = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/admins?pageSize=10`, { headers: H }).then(r => r.json()) as any;
