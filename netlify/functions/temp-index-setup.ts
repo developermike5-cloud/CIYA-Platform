@@ -55,7 +55,7 @@ const DESIRED_FIELDS = [
 export const handler = async () => {
   try {
     const base = `${BASE}/collectionGroups/${COLLECTION_ID}/indexes`;
-    const listRes = await googleFetch(`${base}?pageSize=200`);
+    const listRes = await googleFetch(base);
     if (!listRes.ok) return json(502, { ok: false, error: `list failed (${listRes.status}): ${(await listRes.text()).slice(0, 500)}` });
     const listData: any = await listRes.json();
     const sig = (idx: any) => (idx.fields || []).map((f: any) => `${f.fieldPath}:${f.order || f.arrayConfig || "ASCENDING"}`).sort().join("|");
