@@ -507,7 +507,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 </h3>
                 <p className="text-xs text-teal-300 font-semibold">
                   {isResetMode 
-                    ? 'Receive a secure reset link in your email to recover your account.' 
+                    ? 'Enter the 6-digit code we email you, then set a new password.' 
                     : 'Welcome back! Sign in to access your dashboard and courses.'}
                 </p>
               </div>

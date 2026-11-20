@@ -134,10 +134,19 @@ async function sendOtpEmail(opts: { toEmail: string; firstname: string; otp: str
       template_key: templateKey,
       from: { address: fromAddress, name: fromName },
       to: [{ email_address: { address: opts.toEmail, name: opts.firstname || "CIYA Student" } }],
+      // Alias keys included so the live template's own tag names still match
+      // (unmatched merge tags render empty). Trim once the real names confirm.
       merge_info: {
         firstname: opts.firstname || "there",
+        name: opts.firstname || "there",
         otp: opts.otp,
+        code: opts.otp,
+        OTP: opts.otp,
+        otp_code: opts.otp,
         expiry_minutes: opts.expiryMinutes,
+        expiry: opts.expiryMinutes,
+        expiryMinutes: opts.expiryMinutes,
+        minutes: opts.expiryMinutes,
       },
     }),
   });
