@@ -155,7 +155,7 @@ async function patchTokens(token: string, projectId: string, uid: string, remain
 export default async (req: Request) => {
   if (req.method !== "POST") return json(405, { error: "POST only" });
   try {
-    const raw = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+    const raw: any = await req.json().catch(() => ({}));
     const target: string = raw.target;
     const title: string = String(raw.title || "").trim();
     const body: string = String(raw.body || "").trim();
