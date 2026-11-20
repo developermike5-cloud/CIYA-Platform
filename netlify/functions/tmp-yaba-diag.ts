@@ -1,6 +1,8 @@
 /** TEMP diagnostic (delete after use): find the "yaba" account and its saved details. */
 import { getAccessToken, loadServiceAccount } from "./_remindersShared";
 
+const FIRESTORE_DB = process.env.FIRESTORE_DATABASE_ID || "ai-studio-1aaee609-a922-43e7-9568-0b675490ff78";
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -11,7 +13,7 @@ const json = (status: number, body: unknown) =>
 
 async function runQuery(token: string, projectId: string, structuredQuery: any): Promise<any[]> {
   const res = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`,
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${FIRESTORE_DB}/documents:runQuery`,
     {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
