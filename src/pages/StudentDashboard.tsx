@@ -2253,7 +2253,7 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           };
-          await setDoc(userRef, newProfileData);
+          await setDoc(userRef, newProfileData, { merge: true });
         } else {
           throw updateErr;
         }
@@ -9781,7 +9781,7 @@ export default function StudentDashboard() {
                           createdAt: serverTimestamp(),
                           updatedAt: serverTimestamp()
                         };
-                        await setDoc(userRef, newProfileData);
+                        await setDoc(userRef, newProfileData, { merge: true });
                       } else {
                         await setDoc(userRef, dbUpdates, { merge: true });
                       }
