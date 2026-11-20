@@ -108,3 +108,10 @@ body.template-modal-open header {
 body.ciya-modal-open .ciya-bottom-nav {
   display: none !important;
 }
+
+/* Notification bell bottom splash */
+@keyframes fo-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.fo-splash-sheet { animation: fo-slide-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }

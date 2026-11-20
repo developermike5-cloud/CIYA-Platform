@@ -5554,8 +5554,27 @@ export default function StudentDashboard() {
     }
   };
 
+  // Bell splash -> full Notification Desk. Remember where the student was so
+  // the desk's back button can return them there and reopen the splash.
+  const openNotificationsDesk = () => {
+    if (currentView !== 'notifications') {
+      notificationsReturnViewRef.current = currentView as typeof notificationsReturnViewRef.current;
+    }
+    setIsNotificationsPopupOpen(false);
+    handleViewChange('notifications', null);
+  };
+
+  const handleNotificationsBack = () => {
+    handleViewChange(notificationsReturnViewRef.current || 'courses', null);
+    setIsNotificationsPopupOpen(true);
+  };
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsPopupOpen, setIsNotificationsPopupOpen] = useState(false);
+  // The bell opens a bottom splash showing the last five alerts. "See more"
+  // opens the full Notification Desk; its back button returns the student to
+  // where they were and reopens this splash.
+  const notificationsReturnViewRef = useRef<'courses' | 'prompts' | 'assignments' | 'kycb' | 'blog' | 'buzz'>('courses');
   const [isPWAInstallModalOpen, setIsPWAInstallModalOpen] = useState(false);
   const { isInstallable, isInstalled, isIOS, installApp, needRefresh, updateServiceWorker } = usePWAInstall();
   const [editingProfile, setEditingProfile] = useState(false);
@@ -7187,28 +7206,6 @@ export default function StudentDashboard() {
           {!isGuest && (
             <button 
               type="button"
-              onClick={() => handleViewChange('notifications', null)}
-              className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'notifications' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
-            >
-              <div className="flex items-center gap-3">
-                <Bell className="w-4 h-4 text-amber-400" />
-                <span>Notification Desk</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {unreadNotificationsCount > 0 && (
-                  <span className="bg-rose-550 text-white text-[9px] font-black px-2 py-0.5 rounded-full shrink-0">
-                    {unreadNotificationsCount}
-                  </span>
-                )}
-                {!isAdmin && appSettings?.lockedSections?.notifications && (
-                  <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                )}
-              </div>
-            </button>
-          )}
-          {!isGuest && (
-            <button 
-              type="button"
               onClick={() => handleViewChange('profile', null)}
               className={`w-full text-left flex items-center justify-between px-4 py-3 rounded-xl transition-all border-0 cursor-pointer ${currentView === 'profile' ? 'bg-teal-600 text-white font-black shadow-sm' : 'text-slate-100 bg-transparent font-extrabold hover:bg-slate-800/60 hover:text-white'}`}
             >
@@ -7456,20 +7453,25 @@ export default function StudentDashboard() {
                   )}
                 </button>
 
+
                 {isNotificationsPopupOpen && (
                   <>
-                    {/* Fixed full-screen transparent click catcher */}
-                    <div 
-                      className="fixed inset-0 z-[100] bg-transparent cursor-default" 
+                    {/* Soft scrim behind the splash */}
+                    <div
+                      className="fixed inset-0 z-[100] bg-slate-900/40 cursor-default"
                       onClick={() => setIsNotificationsPopupOpen(false)}
                     />
-                    
-                    {/* Pop-up dropdown */}
-                    <div className="absolute right-[-40px] xs:right-[-20px] sm:right-0 mt-2.5 w-[280px] xs:w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 py-3.5 z-[101] text-left font-sans">
-                      <div className="px-4 pb-2.5 border-b border-slate-100 flex items-center justify-between">
+
+                    {/* Bottom notification splash: the last five alerts, with a
+                        mark-as-read button on each and See more for the full desk */}
+                    <div className="fo-splash-sheet fixed inset-x-0 bottom-0 z-[101] w-full bg-white rounded-t-3xl shadow-2xl border-t border-slate-200 text-left font-sans">
+                      <div className="flex justify-center pt-2.5">
+                        <span className="block h-1.5 w-10 rounded-full bg-slate-200" aria-hidden="true"></span>
+                      </div>
+                      <div className="px-4 pt-2 pb-2.5 border-b border-slate-100 flex items-center justify-between">
                         <span className="font-extrabold text-slate-800 text-sm">Notifications</span>
                         {unreadNotificationsCount > 0 && (
-                          <button 
+                          <button
                             type="button"
                             onClick={handleMarkAllAsRead}
                             className="text-[10px] font-black text-teal-600 hover:text-teal-700 bg-transparent border-0 cursor-pointer p-0"
@@ -7478,23 +7480,20 @@ export default function StudentDashboard() {
                           </button>
                         )}
                       </div>
-                      
-                      <div className="max-h-64 overflow-y-auto divide-y divide-slate-100/60">
+
+                      <div className="max-h-[45vh] overflow-y-auto divide-y divide-slate-100/60">
                         {dbNotifications.length === 0 ? (
-                          <div className="px-4 py-8 text-center text-slate-400 text-xs font-semibold">
+                          <div className="px-4 py-10 text-center text-slate-400 text-xs font-semibold">
                             No notifications yet
                           </div>
                         ) : (
                           dbNotifications.slice(0, 5).map((notif) => (
-                            <div 
+                            <div
                               key={notif.id}
-                              onClick={() => {
-                                handleMarkAsRead(notif.id);
-                              }}
-                              className={`p-3.5 transition-colors cursor-pointer relative hover:bg-slate-50 flex gap-2.5 ${!notif.isRead ? 'bg-amber-50/20' : ''}`}
+                              className={`p-3.5 relative flex gap-2.5 ${!notif.isRead ? 'bg-amber-50/20' : ''}`}
                             >
                               <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${!notif.isRead ? 'bg-amber-500' : 'bg-transparent'}`} />
-                              <div className="space-y-1 flex-1">
+                              <div className="space-y-1 flex-1 min-w-0">
                                 <p className="text-xs text-slate-800 font-bold leading-relaxed">{notif.title}</p>
                                 <p className="text-[11px] text-slate-500 font-medium leading-relaxed">{notif.message}</p>
                                 {notif.createdAt && (
@@ -7503,21 +7502,25 @@ export default function StudentDashboard() {
                                   </p>
                                 )}
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => !notif.isRead && handleMarkAsRead(notif.id)}
+                                className={`shrink-0 self-start text-[9px] font-black uppercase tracking-wide px-2.5 py-1.5 rounded-full border-0 cursor-pointer transition-colors ${notif.isRead ? 'bg-slate-100 text-slate-400' : 'bg-teal-50 text-teal-700 hover:bg-teal-100'}`}
+                              >
+                                {notif.isRead ? 'Read \u2713' : 'Mark as read'}
+                              </button>
                             </div>
                           ))
                         )}
                       </div>
 
-                      <div className="px-4 pt-2.5 border-t border-slate-100">
+                      <div className="px-4 py-2.5 border-t border-slate-100">
                         <button
                           type="button"
-                          onClick={() => {
-                            handleViewChange('notifications');
-                            setIsNotificationsPopupOpen(false);
-                          }}
-                          className="w-full text-center py-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-teal-600 hover:text-teal-700 text-xs font-black transition-colors border-0 cursor-pointer"
+                          onClick={openNotificationsDesk}
+                          className="w-full text-center py-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-teal-600 hover:text-teal-700 text-xs font-black transition-colors border-0 cursor-pointer"
                         >
-                          See More
+                          See more
                         </button>
                       </div>
                     </div>
@@ -8067,10 +8070,20 @@ export default function StudentDashboard() {
               </div>
             ) : (
               <div className="bg-white border text-sm border-slate-200 rounded-3xl p-6 md:p-8 max-w-2xl mx-auto shadow-sm space-y-4 animate-fade-in">
-              <div className="flex items-center justify-between border-b pb-4 mb-2">
-                <div className="space-y-0.5 text-left">
+              <div className="flex items-center justify-between gap-3 border-b pb-4 mb-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    type="button"
+                    onClick={handleNotificationsBack}
+                    className="w-9 h-9 shrink-0 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center border-0 cursor-pointer transition-colors"
+                    title="Back"
+                  >
+                    <ArrowLeft className="w-4 h-4 text-slate-700" />
+                  </button>
+                  <div className="space-y-0.5 text-left min-w-0">
                   <span className="text-[10px] uppercase tracking-wider text-teal-600 font-black block">Notification Desk</span>
                   <h3 className="text-base md:text-lg font-black text-slate-800">🔔 My Inbox & Announcements</h3>
+                  </div>
                 </div>
                 {unreadNotificationsCount > 0 && (
                   <button 
@@ -8092,8 +8105,7 @@ export default function StudentDashboard() {
                   {dbNotifications.map((notif) => (
                     <div 
                       key={notif.id} 
-                      onClick={() => !notif.isRead && handleMarkAsRead(notif.id)}
-                      className={`p-4 border rounded-2xl text-left transition-colors relative overflow-hidden cursor-pointer ${
+                      className={`p-4 border rounded-2xl text-left transition-colors relative overflow-hidden ${
                         notif.isRead 
                           ? 'bg-slate-50/40 border-slate-200' 
                           : 'bg-indigo-50/10 border-indigo-200 ring-2 ring-indigo-550/40'
@@ -8102,11 +8114,20 @@ export default function StudentDashboard() {
                       {!notif.isRead && (
                         <span className="absolute top-0 left-0 w-1.5 h-full bg-indigo-600" />
                       )}
-                      <div className="flex items-center justify-between gap-3 font-sans">
+                      <div className="flex items-start justify-between gap-3 font-sans">
                         <strong className="text-slate-900 font-extrabold text-xs md:text-sm">{notif.title}</strong>
-                        <span className="text-[9px] text-slate-400 font-mono font-bold">
-                          {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString() : 'Just Now'}
-                        </span>
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <span className="text-[9px] text-slate-400 font-mono font-bold">
+                            {notif.createdAt?.toDate ? notif.createdAt.toDate().toLocaleDateString() : 'Just Now'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => !notif.isRead && handleMarkAsRead(notif.id)}
+                            className={`text-[9px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full border-0 cursor-pointer transition-colors ${notif.isRead ? 'bg-slate-100 text-slate-400' : 'bg-teal-50 text-teal-700 hover:bg-teal-100'}`}
+                          >
+                            {notif.isRead ? 'Read \u2713' : 'Mark as read'}
+                          </button>
+                        </div>
                       </div>
                       <p className="text-xs text-slate-700 font-semibold leading-relaxed mt-2 whitespace-pre-wrap bg-white/70 p-3 rounded-xl border border-slate-100">{notif.message}</p>
                     </div>
