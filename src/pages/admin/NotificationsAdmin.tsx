@@ -1,21 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, serverTimestamp, writeBatch, limit } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, getDocs, serverTimestamp, limit } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { sendPushRequest } from '../../firebaseMessaging';
 import { onAuthStateChanged } from 'firebase/auth';
-import CustomDropdown from '../../components/CustomDropdown';
-import { Mail, Settings, Plus, Trash2, Calendar, Send, Users, AlertCircle, RefreshCw, Layers } from 'lucide-react';
+import { Send, Zap, Bell, RefreshCw, History, FlaskConical, X } from 'lucide-react';
 import { showCiyaToast } from '../../components/CiyaToast';
-
-interface NotificationTemplate {
-  id: string;
-  title: string;
-  message: string;
-  triggerType: 'manual' | 'automatic';
-  eventType: 'none' | 'user_joined' | 'assignment_submitted' | 'assignment_approved' | 'assignment_disapproved';
-  createdAt: any;
-  createdBy: string;
-}
 
 interface UserStudent {
   id: string;
@@ -35,60 +24,45 @@ interface DispatchedNotification {
   triggerType: string;
 }
 
+/** What fires on its own, with no admin action, as in-app alert + push. */
+const AUTOMATIC_NOTIFICATIONS = [
+  { icon: '🎓', title: 'Course unlocked', detail: 'Fires the moment a course is unlocked for a student.' },
+  { icon: '🎉', title: 'Assignment graded', detail: 'Fires when you approve or return a submitted assignment.' },
+  { icon: '🏁', title: 'Day completed', detail: 'Fires when a student completes a course day.' },
+  { icon: '🎖️', title: 'Membership approved', detail: 'Fires when a payment or badge upgrade is approved.' }
+];
+
 export default function NotificationsAdmin() {
-  const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
   const [students, setStudents] = useState<UserStudent[]>([]);
   const [history, setHistory] = useState<DispatchedNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Form State for Template Creation
-  const [templateId, setTemplateId] = useState('');
-  const [templateTitle, setTemplateTitle] = useState('');
-  const [templateMsg, setTemplateMsg] = useState('');
-  const [triggerType, setTriggerType] = useState<'manual' | 'automatic'>('manual');
-  const [eventType, setEventType] = useState<'none' | 'user_joined' | 'assignment_submitted' | 'assignment_approved' | 'assignment_disapproved'>('none');
-
-  // Form State for Manual Dispatch
-  const [selectedStudentId, setSelectedStudentId] = useState<'all' | string>('all');
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  // Manual dispatch state
+  const [recipientQuery, setRecipientQuery] = useState('');
+  const [selectedRecipient, setSelectedRecipient] = useState<UserStudent | null>(null);
   const [manualTitle, setManualTitle] = useState('');
   const [manualMessage, setManualMessage] = useState('');
-  const [sendAsPush, setSendAsPush] = useState(true);
-  
-  const [toast, setToast] = useState<{ type: 'success' | 'refused', msg: string } | null>(null);
   const [spinning, setSpinning] = useState(false);
 
+  // Test push state
+  const [testQuery, setTestQuery] = useState('');
+  const [testStudent, setTestStudent] = useState<UserStudent | null>(null);
+
+  const [toast, setToast] = useState<{ type: 'success' | 'refused', msg: string } | null>(null);
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
-  
-  // Super Admin Check
-  const isSuperAdmin = currentUser?.email?.toLowerCase() === 'developermike5@gmail.com';
 
   useEffect(() => {
-    let unsubTemplates: (() => void) | null = null;
     let unsubHistory: (() => void) | null = null;
 
     const authUnsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
 
-      if (unsubTemplates) {
-        unsubTemplates();
-        unsubTemplates = null;
-      }
       if (unsubHistory) {
         unsubHistory();
         unsubHistory = null;
       }
 
       if (user) {
-        // 1. Fetch Notification Templates
-        const qTemplates = query(collection(db, 'notification_templates'), orderBy('createdAt', 'desc'));
-        unsubTemplates = onSnapshot(qTemplates, (snap) => {
-          const list: NotificationTemplate[] = [];
-          snap.forEach(d => list.push({ id: d.id, ...d.data() } as NotificationTemplate));
-          setTemplates(list);
-        });
-
-        // 2. Fetch Dispatched Notifications History
         const qHistory = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50));
         unsubHistory = onSnapshot(qHistory, (snap) => {
           const list: DispatchedNotification[] = [];
@@ -97,7 +71,6 @@ export default function NotificationsAdmin() {
           setLoading(false);
         });
 
-        // 3. Fetch User Students list for manual picker dropdown using plain getDocs with limit 1000
         getDocs(query(collection(db, 'users'), limit(1000))).then(snap => {
           const list: UserStudent[] = [];
           snap.forEach(d => {
@@ -107,7 +80,6 @@ export default function NotificationsAdmin() {
           setStudents(list);
         }).catch(err => console.error("Error loading student select list:", err));
       } else {
-        setTemplates([]);
         setHistory([]);
         setStudents([]);
         setLoading(false);
@@ -116,156 +88,144 @@ export default function NotificationsAdmin() {
 
     return () => {
       authUnsubscribe();
-      if (unsubTemplates) unsubTemplates();
       if (unsubHistory) unsubHistory();
     };
   }, []);
 
   const showToastMsg = (msg: string, type: 'success' | 'refused' = 'success') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 4500);
   };
 
-  // Super Admin Template Submission
-  const handleSaveTemplate = async (e: React.FormEvent) => {
+  /** Push delivery feedback shared by manual and test sends. */
+  const reportPush = (pushRes: { ok: boolean; recipients: number }, name: string) => {
+    if (!pushRes.ok) {
+      showToastMsg('Push delivery failed on the server. The in-app alert was still delivered.', 'refused');
+    } else if (pushRes.recipients > 0) {
+      showToastMsg(`Push delivered to ${name}: ${pushRes.recipients} device${pushRes.recipients === 1 ? '' : 's'} rang.`);
+    } else {
+      showToastMsg(`Saved to ${name}'s inbox, but no device has push enabled yet. They must open the app and tap Enable on the notification banner.`, 'refused');
+    }
+  };
+
+  /** Filter students by what the admin typed (name or email). */
+  const filteredStudents = (q: string): UserStudent[] => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return students.slice(0, 6);
+    return students.filter(s =>
+      (s.fullName || '').toLowerCase().includes(needle) ||
+      (s.email || '').toLowerCase().includes(needle)
+    ).slice(0, 6);
+  };
+
+  const StudentPicker = ({ q, setQ, picked, setPicked }: {
+    q: string; setQ: (v: string) => void;
+    picked: UserStudent | null; setPicked: (s: UserStudent | null) => void;
+  }) => (
+    <div className="relative">
+      {picked ? (
+        <div className="flex items-center justify-between gap-2 bg-slate-50 border rounded-xl p-3">
+          <span className="text-xs font-bold text-slate-800 truncate">
+            {picked.fullName || picked.email || 'Unnamed student'}
+            {picked.fullName && picked.email ? <span className="text-slate-400 font-semibold"> · {picked.email}</span> : null}
+          </span>
+          <button type="button" onClick={() => { setPicked(null); setQ(''); }}
+            className="shrink-0 text-slate-400 hover:text-slate-700 cursor-pointer" aria-label="Clear selected student">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <>
+          <input
+            type="text"
+            placeholder="Type a student's name or email..."
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            className="w-full bg-slate-50 border outline-none p-3 rounded-xl text-slate-800 focus:border-indigo-500 focus:bg-white text-xs font-semibold"
+          />
+          {q.trim() !== '' && (
+            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+              {filteredStudents(q).length === 0 ? (
+                <div className="p-3 text-xs text-slate-400 font-bold">No student matches "{q}".</div>
+              ) : filteredStudents(q).map(s => (
+                <button key={s.id} type="button"
+                  onClick={() => { setPicked(s); setQ(''); }}
+                  className="w-full text-left px-3 py-2.5 hover:bg-indigo-50 text-xs font-bold text-slate-700 cursor-pointer border-b border-slate-50 last:border-0">
+                  {s.fullName || 'Unnamed student'} <span className="text-slate-400 font-semibold">· {s.email}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  const handleManualDispatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSuperAdmin) {
-      showCiyaToast("Permission denied! Only the Super Admin can set up notification templates.");
+    if (!manualTitle.trim() || !manualMessage.trim()) {
+      showCiyaToast("Write a title and a message body first.");
       return;
     }
-    if (!templateTitle.trim() || !templateMsg.trim()) {
-      showCiyaToast("Please complete both template title and message body.");
+    if (!selectedRecipient) {
+      showCiyaToast("Pick who should receive this notification.");
       return;
     }
 
     setSpinning(true);
-    const cleanId = templateId.trim() || `tmpl_${Date.now()}`;
-
     try {
-      await setDoc(doc(db, 'notification_templates', cleanId), {
-        id: cleanId,
-        title: templateTitle.trim(),
-        message: templateMsg.trim(),
-        triggerType,
-        eventType,
-        createdBy: currentUser?.email || 'Super Admin',
+      const isBroadcast = selectedRecipient.id === 'all';
+      await addDoc(collection(db, 'notifications'), {
+        userId: isBroadcast ? 'all' : selectedRecipient.id,
+        title: manualTitle.trim(),
+        message: manualMessage.trim(),
+        type: isBroadcast ? 'system_broadcast' : 'custom',
+        isRead: false,
+        triggeredBy: currentUser?.email || 'Admin',
+        triggerType: 'manual',
         createdAt: serverTimestamp()
       });
 
-      showToastMsg(`Template "${cleanId}" saved into repository successfully!`, 'success');
-      setTemplateId('');
-      setTemplateTitle('');
-      setTemplateMsg('');
-      setTriggerType('manual');
-      setEventType('none');
+      const pushRes = await sendPushRequest(isBroadcast ? 'all' : selectedRecipient.id, manualTitle.trim(), manualMessage.trim(), '/dashboard');
+      reportPush(pushRes, isBroadcast ? 'all students' : (selectedRecipient.fullName || selectedRecipient.email || 'student'));
+
+      setManualTitle('');
+      setManualMessage('');
+      setSelectedRecipient(null);
+      setRecipientQuery('');
     } catch (err: any) {
       console.error(err);
-      showToastMsg(`Failed to save template: ${err.message}`, 'refused');
+      showToastMsg(`Dispatch failure: ${err.message}`, 'refused');
     } finally {
       setSpinning(false);
     }
   };
 
-  // Super Admin delete template
-  const handleDeleteTemplate = async (id: string) => {
-    if (!isSuperAdmin) {
-      showCiyaToast("Permission denied!");
-      return;
-    }
-    if (!confirm(`Are you sure you want to delete template ${id}?`)) return;
-
-    try {
-      await deleteDoc(doc(db, 'notification_templates', id));
-      showToastMsg("Template erased from database.", 'success');
-    } catch (err: any) {
-      showToastMsg(err.message, 'refused');
-    }
-  };
-
-  // Select/apply template details to manual dispatch inputs
-  const handleApplyTemplate = (id: string) => {
-    setSelectedTemplateId(id);
-    if (!id) {
-      setManualTitle('');
-      setManualMessage('');
-      return;
-    }
-    const selected = templates.find(t => t.id === id);
-    if (selected) {
-      setManualTitle(selected.title);
-      setManualMessage(selected.message);
-    }
-  };
-
-  // Manual trigger broadcast/destination dispatch
-  const handleManualDispatch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualTitle.trim() || !manualMessage.trim()) {
-      showCiyaToast("Dispatch draft is empty. Please describe title and message body.");
+  const handleSendTest = async () => {
+    if (!testStudent) {
+      showCiyaToast("Type a student's name and pick them from the list first.");
       return;
     }
 
     setSpinning(true);
+    const studentName = testStudent.fullName || testStudent.email || 'student';
     try {
-      if (selectedStudentId === 'all') {
-        // Broadcast System Alert
-        await addDoc(collection(db, 'notifications'), {
-          userId: 'all',
-          title: manualTitle.trim(),
-          message: manualMessage.trim(),
-          type: 'system_broadcast',
-          isRead: false,
-          triggeredBy: currentUser?.email || 'Admin',
-          triggerType: 'manual',
-          createdAt: serverTimestamp()
-        });
+      await addDoc(collection(db, 'notifications'), {
+        userId: testStudent.id,
+        title: '🔔 CIYA Test Notification',
+        message: `Hi ${studentName}, this is a test alert sent from the admin desk. If you can see this, notifications are working on your account.`,
+        type: 'custom',
+        isRead: false,
+        triggeredBy: currentUser?.email || 'Admin (test)',
+        triggerType: 'manual',
+        createdAt: serverTimestamp()
+      });
 
-        if (sendAsPush) {
-          const pushRes = await sendPushRequest('all', manualTitle.trim(), manualMessage.trim(), '/dashboard');
-          if (!pushRes.ok) {
-            showToastMsg('Push delivery failed: no registered devices responded.', 'refused');
-          } else if (pushRes.recipients > 0) {
-            showToastMsg(`Push delivered to ${pushRes.recipients} device${pushRes.recipients === 1 ? '' : 's'}.`);
-          } else {
-            showToastMsg('Alert saved, but no student device has push enabled yet.', 'refused');
-          }
-        }
-
-        // Also push individual alerts for immediate feedback if needed, but 'all' handles global fetch
-        showToastMsg("Global Broadcast alert dispatched live! 🚀", 'success');
-      } else {
-        // Target single cadet
-        await addDoc(collection(db, 'notifications'), {
-          userId: selectedStudentId,
-          title: manualTitle.trim(),
-          message: manualMessage.trim(),
-          type: 'custom',
-          isRead: false,
-          triggeredBy: currentUser?.email || 'Admin',
-          triggerType: 'manual',
-          createdAt: serverTimestamp()
-        });
-
-        if (sendAsPush) {
-          const pushRes = await sendPushRequest(selectedStudentId, manualTitle.trim(), manualMessage.trim(), '/dashboard');
-          if (!pushRes.ok) {
-            showToastMsg('Push delivery failed: no registered devices responded.', 'refused');
-          } else if (pushRes.recipients > 0) {
-            showToastMsg(`Push delivered to ${pushRes.recipients} device${pushRes.recipients === 1 ? '' : 's'}.`);
-          } else {
-            showToastMsg('Alert saved, but this student has no device with push enabled yet.', 'refused');
-          }
-        }
-        const chosenStudentName = students.find(s => s.id === selectedStudentId)?.fullName || 'Cadet';
-        showToastMsg(`Target notification dispatched to ${chosenStudentName}!`, 'success');
-      }
-
-      setManualTitle('');
-      setManualMessage('');
-      setSelectedTemplateId('');
+      const pushRes = await sendPushRequest(testStudent.id, '🔔 CIYA Test Notification', `Hi ${studentName}, this is a test alert from the admin desk. If you can see this, notifications are working on your account.`, '/dashboard');
+      reportPush(pushRes, studentName);
     } catch (err: any) {
       console.error(err);
-      showToastMsg(`Dispatch failure: ${err.message}`, 'refused');
+      showToastMsg(`Test failed: ${err.message}`, 'refused');
     } finally {
       setSpinning(false);
     }
@@ -275,9 +235,7 @@ export default function NotificationsAdmin() {
     <div className="space-y-6 text-left" id="notifications-admin-workspace">
       {/* Toast Alert overlay */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-xl shadow-xl flex items-center gap-3 transition-all animate-bounce ${
-          toast.type === 'success' ? 'bg-indigo-600 text-white' : 'bg-rose-600 text-white'
-        }`}>
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-xl shadow-xl flex items-center gap-3 transition-all ${toast.type === 'success' ? 'bg-indigo-600 text-white' : 'bg-rose-600 text-white'}`}>
           <div className="font-bold flex items-center gap-2">
             <span>{toast.type === 'success' ? '✓' : '⚠️'}</span>
             <span>{toast.msg}</span>
@@ -287,268 +245,124 @@ export default function NotificationsAdmin() {
 
       {/* Overview Banner */}
       <div className="bg-slate-900 text-white p-6 md:p-8 rounded-3xl border border-slate-800 shadow-md">
-        <span className="text-xs bg-teal-500/20 text-teal-300 font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">BROADCASTING & ALERT ENGINES</span>
-        <h1 className="text-xl md:text-2xl font-black mt-2">Notification & Broadcast Desk</h1>
-        <p className="text-slate-400 text-xs md:text-sm mt-1">Configure systemic custom notification templates (Super Admin) or manually dispatch alerts to students or lists.</p>
+        <span className="text-xs bg-teal-500/20 text-teal-300 font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">BROADCASTING &amp; ALERT ENGINES</span>
+        <h1 className="text-xl md:text-2xl font-black mt-2">Notifications</h1>
+        <p className="text-slate-400 text-xs md:text-sm mt-1">CIYA alerts go out on their own when things happen. Below you can send one manually or test that push delivery works.</p>
+      </div>
+
+      {/* Automatic notifications: read-only, nothing to configure */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+        <h3 className="font-black text-slate-800 text-base border-b pb-3 uppercase tracking-wide flex items-center gap-2">
+          <Zap className="w-5 h-5 text-amber-500" />
+          Automatic notifications — no setup needed
+        </h3>
+        <p className="text-xs text-slate-500 font-semibold">These fire on their own, as an in-app alert and a push notification. You never have to send them.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {AUTOMATIC_NOTIFICATIONS.map((item) => (
+            <div key={item.title} className="flex items-start gap-3 bg-slate-50 border rounded-2xl p-3.5">
+              <span className="text-xl shrink-0" aria-hidden="true">{item.icon}</span>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-slate-800">{item.title}</p>
+                <p className="text-[11px] text-slate-500 font-semibold leading-snug mt-0.5">{item.detail}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-
-        {/* Column 1: Templates Setup (Only Admin / Super Admin can access template configuration) */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6 flex flex-col justify-between">
-          <div className="space-y-4">
-            <h3 className="font-black text-slate-800 text-base border-b pb-3 uppercase tracking-wide flex items-center gap-2">
-              <Settings className="w-5 h-5 text-indigo-600" />
-              Template Configurator {isSuperAdmin ? '👑 (Super Admin)' : '🔒 (Super view only)'}
-            </h3>
-
-            {isSuperAdmin ? (
-              <form onSubmit={handleSaveTemplate} className="space-y-4 text-xs font-semibold">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="block text-[10px] uppercase font-black text-slate-500">Template Identifier Code</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. assignment_submitted_alert"
-                      value={templateId}
-                      onChange={e => setTemplateId(e.target.value)}
-                      className="w-full bg-slate-50 border outline-none p-2.5 rounded-xl text-slate-800 focus:border-indigo-500 focus:bg-white font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-[10px] uppercase font-black text-slate-500">Event Cascade Trigger</label>
-                    <CustomDropdown
-                      value={eventType}
-                      options={[
-                        { label: 'Manual Trigger Only', value: 'none' },
-                        { label: 'Automatic: New Student signup', value: 'user_joined' },
-                        { label: 'Automatic: Assignment submitted', value: 'assignment_submitted' },
-                        { label: 'Automatic: Assignment approved', value: 'assignment_approved' },
-                        { label: 'Automatic: Assignment disapproved', value: 'assignment_disapproved' }
-                      ]}
-                      onChange={val => setEventType(val as any)}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[10px] uppercase font-black text-slate-500">Notification Subject / Title *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Your submission has been received!"
-                    value={templateTitle}
-                    onChange={e => setTemplateTitle(e.target.value)}
-                    required
-                    className="w-full bg-slate-50 border outline-none p-2.5 rounded-xl text-slate-800 focus:border-indigo-500 focus:bg-white"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[10px] uppercase font-black text-slate-500">Compose Template message body *</label>
-                  <textarea
-                    rows={4}
-                    value={templateMsg}
-                    onChange={e => setTemplateMsg(e.target.value)}
-                    required
-                    placeholder="Write detailed layout. Supports dynamic placeholders like {userName}, {dayNumber}, {adminReason}."
-                    className="w-full bg-slate-50 border outline-none p-3 rounded-xl text-slate-800 focus:border-indigo-500 focus:bg-white leading-relaxed"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 pt-2">
-                  <span className="text-[10px] uppercase text-slate-400 font-bold">Trigger Rule:</span>
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={triggerType === 'manual'}
-                        onChange={() => setTriggerType('manual')}
-                        className="text-indigo-600 focus:ring-indigo-550"
-                      /> Manual Trigger
-                    </label>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={triggerType === 'automatic'}
-                        onChange={() => setTriggerType('automatic')}
-                        className="text-indigo-600 focus:ring-indigo-550"
-                      /> Automatic Scheduler Trigger
-                    </label>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={spinning}
-                  className="w-full py-3 bg-indigo-600 hover:bg-slate-800 text-white font-extrabold uppercase rounded-xl transition-all border-0 shadow-md cursor-pointer text-xs"
-                >
-                  {spinning ? 'Saving Template...' : 'Save Notification Template'}
-                </button>
-              </form>
-            ) : (
-              <div className="bg-slate-50 p-6 rounded-2xl border flex flex-col items-center justify-center text-center space-y-2 py-10">
-                <AlertCircle className="w-8 h-8 text-amber-500" />
-                <h4 className="font-extrabold text-sm text-slate-800 uppercase tracking-wider">Super Admin Restricted Access</h4>
-                <p className="text-xs text-slate-500 max-w-sm">Only the primary Super Admin (Mike) can create or update automatic triggering email/in-app alert layouts.</p>
-              </div>
-            )}
-          </div>
-
-          {/* List of current saved templates */}
-          <div className="border-t pt-5 mt-5 space-y-3.5">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">Repository Templates Layouts ({templates.length})</span>
-            <div className="space-y-2.5 max-h-[250px] overflow-y-auto">
-              {templates.length === 0 ? (
-                <p className="text-xs font-bold text-slate-400">No custom templates built yet.</p>
-              ) : (
-                templates.map((tmpl) => (
-                  <div key={tmpl.id} className="p-3 border rounded-2xl bg-slate-50 flex items-start justify-between gap-3 text-xs">
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <strong className="text-slate-900 truncate font-extrabold block">{tmpl.title}</strong>
-                        <span className={`text-[8px] font-black px-1.5 py-0.25 rounded uppercase shrink-0 ${
-                          tmpl.triggerType === 'automatic' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'
-                        }`}>
-                          {tmpl.triggerType}
-                        </span>
-                      </div>
-                      <p className="text-slate-500 truncate font-medium">{tmpl.message}</p>
-                      <div className="flex items-center gap-1.5 font-mono text-[9px] text-indigo-700 font-bold">
-                        <span>Code: {tmpl.id}</span>
-                        {tmpl.eventType !== 'none' && <span>| Cascade: [{tmpl.eventType}]</span>}
-                      </div>
-                    </div>
-
-                    {isSuperAdmin && (
-                      <button
-                        onClick={() => handleDeleteTemplate(tmpl.id)}
-                        className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer border-0 shrink-0 bg-transparent"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Column 2: Live Dispatch Controller */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-5">
+        {/* Manual send: the one manual control */}
+        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4 flex flex-col">
           <h3 className="font-black text-slate-800 text-base border-b pb-3 uppercase tracking-wide flex items-center gap-2">
             <Send className="w-5 h-5 text-indigo-600" />
-            Live Dispatch Panel
+            Send a notification
           </h3>
-
-          <form onSubmit={handleManualDispatch} className="space-y-4 text-xs font-semibold">
-            <div className="space-y-1">
-              <label className="block text-[10px] uppercase font-black text-slate-500">1. Select Target Recipient Studio</label>
-              <CustomDropdown
-                value={selectedStudentId}
-                options={[
-                  { label: '📣 Global Broadcast Alert (All Students)', value: 'all' },
-                  ...students.map(s => ({
-                    label: `👤 ${s.fullName || 'Anonymous'} (${s.email})`,
-                    value: s.id
-                  }))
-                ]}
-                onChange={val => setSelectedStudentId(val)}
-                className="w-full"
-              />
+          <p className="text-xs text-slate-500 font-semibold">Write anything you want students to hear about. It lands in their in-app inbox and pushes to their devices automatically.</p>
+          <form onSubmit={handleManualDispatch} className="space-y-4 text-xs font-semibold flex-1 flex flex-col">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] uppercase font-black text-slate-500">Send to</label>
+              <StudentPicker q={recipientQuery} setQ={setRecipientQuery} picked={selectedRecipient} setPicked={setSelectedRecipient} />
             </div>
-
-            <div className="space-y-1">
-              <label className="block text-[10px] uppercase font-black text-slate-500">2. Preload Template Template (Optional)</label>
-              <CustomDropdown
-                value={selectedTemplateId}
-                options={[
-                  { label: '-- Write Custom Message from Scratch --', value: '' },
-                  ...templates.map(t => ({
-                    label: `📄 Apply: ${t.title}`,
-                    value: t.id
-                  }))
-                ]}
-                onChange={val => handleApplyTemplate(val)}
-                className="w-full"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-[10px] uppercase font-black text-slate-500">3. Notification Subject Title *</label>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] uppercase font-black text-slate-500">Title</label>
               <input
                 type="text"
-                placeholder="Alert Subject line..."
+                placeholder="e.g. New week, new module!"
                 value={manualTitle}
                 onChange={e => setManualTitle(e.target.value)}
-                required
-                className="w-full bg-slate-50 border outline-none p-2.5 rounded-xl text-slate-800 font-extrabold focus:border-indigo-500 focus:bg-white"
+                className="w-full bg-slate-50 border outline-none p-3 rounded-xl text-slate-800 focus:border-indigo-500 focus:bg-white"
               />
             </div>
-
-            <div className="space-y-1">
-              <label className="block text-[10px] uppercase font-black text-slate-500">4. Compose Dispatch Message Body *</label>
+            <div className="space-y-1.5 flex-1">
+              <label className="block text-[10px] uppercase font-black text-slate-500">Message</label>
               <textarea
-                rows={4}
+                placeholder="What should students know?"
                 value={manualMessage}
                 onChange={e => setManualMessage(e.target.value)}
-                required
-                placeholder="Write custom alert dispatch details specifically..."
-                className="w-full bg-slate-50 border outline-none p-3 rounded-xl text-slate-800 font-bold focus:border-indigo-500 focus:bg-white leading-relaxed"
+                rows={5}
+                className="w-full bg-slate-50 border outline-none p-3 rounded-xl text-slate-800 focus:border-indigo-500 focus:bg-white resize-none h-full"
               />
             </div>
-
-            <div className="flex items-center gap-2 bg-slate-50 border rounded-xl p-3">
-              <input
-                type="checkbox"
-                checked={sendAsPush}
-                onChange={e => setSendAsPush(e.target.checked)}
-                className="w-4 h-4 accent-indigo-600 cursor-pointer"
-                id="send-as-push"
-              />
-              <label htmlFor="send-as-push" className="text-[10px] uppercase font-black text-slate-600 cursor-pointer">
-                Also send as push notification to {selectedStudentId === 'all' ? 'all students' : 'this student'}
-              </label>
-            </div>
-
             <button
               type="submit"
               disabled={spinning}
               className="w-full py-3.5 bg-indigo-600 hover:bg-slate-800 text-white font-extrabold uppercase rounded-xl transition-all border-0 shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs"
             >
               <Send className="w-4 h-4" />
-              {spinning ? 'Dispatching Live...' : 'Dispatch Alert Notification Now'}
+              {spinning ? 'Sending...' : 'Send notification'}
             </button>
           </form>
         </div>
 
+        {/* Test push delivery */}
+        <div className="bg-white border border-emerald-200 rounded-3xl p-6 shadow-sm space-y-4 flex flex-col">
+          <h3 className="font-black text-slate-800 text-base border-b pb-3 uppercase tracking-wide flex items-center gap-2">
+            <FlaskConical className="w-5 h-5 text-emerald-600" />
+            Test push delivery
+          </h3>
+          <p className="text-xs text-slate-500 font-semibold">Send a test alert to one student only. It confirms push notifications reach their device. The student must first have tapped Enable on the notification banner in their app and allowed notifications.</p>
+          <div className="space-y-1.5">
+            <label className="block text-[10px] uppercase font-black text-slate-500">Test student</label>
+            <StudentPicker q={testQuery} setQ={setTestQuery} picked={testStudent} setPicked={setTestStudent} />
+          </div>
+          <div className="mt-auto">
+            <button
+              type="button"
+              onClick={handleSendTest}
+              disabled={spinning}
+              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold uppercase rounded-xl transition-all border-0 shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs"
+            >
+              <Bell className="w-4 h-4" />
+              {spinning ? 'Sending test...' : 'Send test notification'}
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Dispatched logs histories */}
+      {/* Recent notifications */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
         <h3 className="font-extrabold text-slate-800 text-base flex items-center gap-2 border-b pb-3 uppercase tracking-wide">
-          <Layers className="w-5 h-5 text-indigo-600" />
-          Live Dispatched Activity Logs history
+          <History className="w-5 h-5 text-indigo-600" />
+          Recent notifications
         </h3>
 
         {loading ? (
           <div className="p-12 text-center text-slate-400 font-bold flex items-center justify-center gap-2">
             <RefreshCw className="w-5 h-5 animate-spin" />
-            <span>Syncing activity logs...</span>
+            <span>Loading notifications...</span>
           </div>
         ) : history.length === 0 ? (
           <div className="p-8 text-center text-slate-400 font-bold text-xs uppercase border-2 border-dashed rounded-2xl">
-            No notification activity logs logged yet.
+            No notifications sent yet.
           </div>
         ) : (
           <div className="space-y-2.5 max-h-[350px] overflow-y-auto">
             {history.map((hist) => {
               const matchesStudent = students.find(s => s.id === hist.userId);
-              const targetLabel = hist.userId === 'all' 
-                ? '📣 GLOBAL BROADCAST' 
-                : matchesStudent 
-                  ? `👤 ${matchesStudent.fullName || 'Cadet'} (${matchesStudent.email})` 
+              const targetLabel = hist.userId === 'all'
+                ? '📣 ALL STUDENTS'
+                : matchesStudent
+                  ? `👤 ${matchesStudent.fullName || 'Student'} (${matchesStudent.email})`
                   : '👤 Unknown Student';
 
               return (
@@ -569,7 +383,7 @@ export default function NotificationsAdmin() {
                   <div className="shrink-0 text-slate-500 uppercase text-[9px] font-black flex sm:flex-col justify-between items-end gap-1 font-mono">
                     <span>{hist.triggerType}</span>
                     <span>
-                      {hist.createdAt?.toDate ? hist.createdAt.toDate().toLocaleString() : 'Logging...'}
+                      {hist.createdAt?.toDate ? hist.createdAt.toDate().toLocaleString() : ''}
                     </span>
                   </div>
                 </div>
