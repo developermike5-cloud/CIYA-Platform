@@ -70,18 +70,18 @@ export default async (req: Request) => {
 
     const releaseId = target.name.split("/releases/")[1];
     const base = `https://firebaserules.googleapis.com/v1/projects/${sa.project_id}/releases/`;
+    // UpdateReleaseRequest body: { release: Release, updateMask: "rulesetName" }.
     const variants = [
-      { label: "literal-slash+rulesetName", url: `${base}${releaseId}?updateMask=rulesetName`, body: { rulesetName: newRuleset } },
-      { label: "literal-slash+ruleset", url: `${base}${releaseId}?updateMask=ruleset`, body: { ruleset: newRuleset } },
-      { label: "literal-slash+full-resource", url: `${base}${releaseId}?updateMask=rulesetName`, body: { name: target.name, rulesetName: newRuleset } },
-      { label: "encoded-slash+full-resource", url: `${base}${encodeURIComponent(releaseId)}?updateMask=rulesetName`, body: { name: target.name, rulesetName: newRuleset } },
+      { label: "wrapped+literal", url: `${base}${releaseId}`, body: { release: { name: target.name, rulesetName: newRuleset }, updateMask: "rulesetName" } },
+      { label: "wrapped+query-mask", url: `${base}${releaseId}?updateMask=rulesetName`, body: { release: { name: target.name, rulesetName: newRuleset } } },
+      { label: "wrapped+encoded", url: `${base}${encodeURIComponent(releaseId)}?updateMask=rulesetName`, body: { release: { name: target.name, rulesetName: newRuleset }, updateMask: "rulesetName" } },
     ];
     const attempts: any[] = [];
     let patch: any = null;
     for (const v of variants) {
       const res = await fetch(v.url, { method: "PATCH", headers: H, body: JSON.stringify(v.body) });
       const txt = await res.text();
-      attempts.push({ label: v.label, status: res.status, body: txt.slice(0, 300) });
+      attempts.push({ label: v.label, status: res.status, body: txt.slice(0, 700) });
       if (res.ok) { patch = JSON.parse(txt); break; }
     }
     if (!patch) return new Response(JSON.stringify({ stage: "release patch", attempts }), { status: 500 });
