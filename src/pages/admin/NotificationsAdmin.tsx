@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, getDocs, serverTimestamp, limit } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
-import { sendPushRequest } from '../../firebaseMessaging';
+import { sendPushRequest, registerStudentPush, getPushRegistrationError } from '../../firebaseMessaging';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Send, Zap, Bell, RefreshCw, History, FlaskConical, X } from 'lucide-react';
 import { showCiyaToast } from '../../components/CiyaToast';
@@ -201,6 +201,41 @@ export default function NotificationsAdmin() {
     }
   };
 
+  // Self-test state: push enablement on the admin's own device.
+  const [selfTestBusy, setSelfTestBusy] = useState(false);
+  const [selfTestMsg, setSelfTestMsg] = useState<string | null>(null);
+
+  // One-tap self-test: asks THIS browser to enable notifications (the prompt
+  // fires from the tap), registers the device for push and sends one real
+  // test alert back to it, so a broken device shows its exact error at once.
+  const handleSelfTestPush = async () => {
+    if (!currentUser?.uid || selfTestBusy) return;
+    setSelfTestBusy(true);
+    setSelfTestMsg(null);
+    const ok = await registerStudentPush(currentUser.uid, (title, body) => {
+      showCiyaToast(title ? `${title}: ${body}` : body);
+    });
+    if (!ok) {
+      setSelfTestMsg(`Could not enable push on this device. ${getPushRegistrationError() || ''}`.trim());
+      setSelfTestBusy(false);
+      return;
+    }
+    try {
+      const res = await sendPushRequest(currentUser.uid, 'CIYA test push', 'If you can read this, push notifications work on this device.');
+      if (res.ok && res.sent > 0) {
+        setSelfTestMsg('Test push sent. Look for the CIYA notification on this device.');
+      } else if (res.ok && res.recipients === 0) {
+        setSelfTestMsg('Enabled, but the server found no push token for this device.');
+      } else {
+        setSelfTestMsg(`Server replied: recipients ${res.recipients}, sent ${res.sent}, failed ${res.failed}.`);
+      }
+    } catch (err: any) {
+      setSelfTestMsg(`Test failed: ${err.message}`);
+    } finally {
+      setSelfTestBusy(false);
+    }
+  };
+
   const handleSendTest = async () => {
     if (!testStudent) {
       showCiyaToast("Type a student's name and pick them from the list first.");
@@ -336,6 +371,29 @@ export default function NotificationsAdmin() {
               {spinning ? 'Sending test...' : 'Send test notification'}
             </button>
           </div>
+        </div>
+
+        {/* Test push on this device (self-test) */}
+        <div className="bg-white border border-teal-200 rounded-3xl p-6 shadow-sm space-y-4 flex flex-col">
+          <h3 className="font-black text-slate-800 text-base border-b pb-3 uppercase tracking-wide flex items-center gap-2">
+            <Bell className="w-5 h-5 text-teal-600" />
+            Test push on this device
+          </h3>
+          <p className="text-xs text-slate-500 font-semibold">For your own laptop. One tap asks this browser to enable notifications, registers the device and sends one real test alert back to it, so you can see exactly why a device is failing.</p>
+          <div className="mt-auto">
+            <button
+              type="button"
+              onClick={handleSelfTestPush}
+              disabled={selfTestBusy}
+              className="w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white font-extrabold uppercase rounded-xl transition-all border-0 shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs"
+            >
+              <Bell className="w-4 h-4" />
+              {selfTestBusy ? 'Sending test...' : 'Send test push to this device'}
+            </button>
+          </div>
+          {selfTestMsg && (
+            <p className="text-xs font-semibold text-slate-700">{selfTestMsg}</p>
+          )}
         </div>
       </div>
 
