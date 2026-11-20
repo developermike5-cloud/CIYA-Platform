@@ -111,6 +111,19 @@ async function readCourseTitle(token: string, projectId: string, cid: string): P
   }
 }
 
+/** Course ids and titles bundled into the frontend (src/data/*.json). */
+const KNOWN_COURSE_TITLES: Record<string, string> = {
+  najnq9llx: "Building a professional portfolio website",
+  psw96tm5o: "Building a converting landing page",
+  qlpspor4hm: "Premium e-commerce website development",
+  "advanced-ai-mastery": "CIYA Advance Website Fullstack course",
+};
+
+/** Titles like "BUILDING A CONVERTING LANDING PAGE" read better title-cased in mail. */
+function prettifyTitle(t: string): string {
+  return t.toLowerCase().replace(/(^|\s)([a-z])/g, (_m, a, b) => a + b.toUpperCase());
+}
+
 /** REST patch of one doc (bypasses security rules: service account is trusted). */
 async function patchDoc(token: string, projectId: string, path: string, fields: Record<string, any> | null): Promise<boolean> {
   const mask = fields ? Object.keys(fields).map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join("&") : "updateMask.fieldPaths=reminderLadder";
@@ -209,7 +222,7 @@ export function emailHtml(opts: { firstName: string; courseName: string; tier: n
     <h1 style="margin:0 0 14px;color:#0f3d33;font-size:22px;line-height:1.3;">${t.heading}</h1>
     ${t.lines.map((l) => `<p style="margin:0 0 14px;color:#28322e;font-size:15px;line-height:1.6;">${l}</p>`).join("")}
     <div style="margin:22px 0 6px;">
-      <a href="${APP_URL}/dashboard" style="display:inline-block;background:#0f766e;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:13px 26px;border-radius:8px;">${t.cta}</a>
+      <a href="${APP_URL}/" style="display:inline-block;background:#0f766e;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:13px 26px;border-radius:8px;">${t.cta}</a>
     </div>
   </td></tr>
   <tr><td style="padding:18px 32px 26px;font-family:Arial,Helvetica,sans-serif;border-top:1px solid #eef2f0;">
@@ -336,14 +349,19 @@ export async function runScan(token: string, projectId: string, sendEmails: bool
     // Pick the first incomplete course that has a resolvable title.
     let courseName = "";
     for (const cid of incomplete.slice(0, 4)) {
-      if (!courseTitles.has(cid)) courseTitles.set(cid, await readCourseTitle(token, projectId, cid));
-      const title = courseTitles.get(cid) || "";
+      let title = KNOWN_COURSE_TITLES[cid] || "";
+      if (!title && cid.length > 14) title = prettifyTitle(cid);
+      if (!title) {
+        if (!courseTitles.has(cid)) courseTitles.set(cid, await readCourseTitle(token, projectId, cid));
+        title = courseTitles.get(cid) || "";
+        if (title) title = prettifyTitle(title);
+      }
       if (title) {
         courseName = title;
         break;
       }
     }
-    if (!courseName) courseName = "course";
+    if (!courseName) courseName = "your course";
 
     const row: ScanRow = {
       uid,
