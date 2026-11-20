@@ -2,11 +2,6 @@
 # This file is automatically read by Netlify when you deploy.
 
 [[redirects]]
-  from = "/api/temp-index-setup"
-  to = "/.netlify/functions/temp-index-setup"
-  status = 200
-
-[[redirects]]
   from = "/api/course-store"
   to = "/.netlify/functions/course-store"
   status = 200
