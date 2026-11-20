@@ -222,7 +222,13 @@ export default function NotificationsAdmin() {
 
         if (sendAsPush) {
           const pushRes = await sendPushRequest('all', manualTitle.trim(), manualMessage.trim(), '/dashboard');
-          if (!pushRes) showToastMsg('Push delivery failed: no registered devices responded.', 'refused');
+          if (!pushRes.ok) {
+            showToastMsg('Push delivery failed: no registered devices responded.', 'refused');
+          } else if (pushRes.recipients > 0) {
+            showToastMsg(`Push delivered to ${pushRes.recipients} device${pushRes.recipients === 1 ? '' : 's'}.`);
+          } else {
+            showToastMsg('Alert saved, but no student device has push enabled yet.', 'refused');
+          }
         }
 
         // Also push individual alerts for immediate feedback if needed, but 'all' handles global fetch
@@ -242,7 +248,13 @@ export default function NotificationsAdmin() {
 
         if (sendAsPush) {
           const pushRes = await sendPushRequest(selectedStudentId, manualTitle.trim(), manualMessage.trim(), '/dashboard');
-          if (!pushRes) showToastMsg('Push delivery failed: no registered devices responded.', 'refused');
+          if (!pushRes.ok) {
+            showToastMsg('Push delivery failed: no registered devices responded.', 'refused');
+          } else if (pushRes.recipients > 0) {
+            showToastMsg(`Push delivered to ${pushRes.recipients} device${pushRes.recipients === 1 ? '' : 's'}.`);
+          } else {
+            showToastMsg('Alert saved, but this student has no device with push enabled yet.', 'refused');
+          }
         }
         const chosenStudentName = students.find(s => s.id === selectedStudentId)?.fullName || 'Cadet';
         showToastMsg(`Target notification dispatched to ${chosenStudentName}!`, 'success');

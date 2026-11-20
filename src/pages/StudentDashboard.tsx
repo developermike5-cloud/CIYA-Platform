@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, safeGetItem } from '../firebase';
-import { registerStudentPush, sendPushRequest } from '../firebaseMessaging';
+import { registerStudentPush, sendPushRequest, getPushPermissionState } from '../firebaseMessaging';
 
 /** Best-effort push delivery through the server. In-app history entries are
  * written by each calling flow, so push and history never double up. */
@@ -5593,20 +5593,52 @@ export default function StudentDashboard() {
     return (safeStorage.getItem('ciya_course_level_filter') as 'beginner' | 'advanced') || 'beginner';
   });
   const [activeDurationFilter, setActiveDurationFilter] = useState<'standard' | 'express'>('standard');
+  // Branded banner that asks the student to turn on push notifications.
+  // Browsers require a tap before they will show the system permission prompt,
+  // so the ask is never fired automatically on page load.
+  const [showPushBanner, setShowPushBanner] = useState(false);
   const navigate = useNavigate();
 
-  // Push notifications: register the student's FCM token after login and
-  // surface foreground pushes as branded CIYA toasts. Never refreshes the app.
+  // Push notifications: register the student's FCM token and surface foreground
+  // pushes as branded CIYA toasts. Never refreshes the app. Permission is only
+  // requested through the user-tapped banner below (browsers block auto asks).
   useEffect(() => {
     // Admins register too, so the academy admin can receive and test pushes.
     if (!currentUser?.uid) return;
     let cancelled = false;
-    registerStudentPush(currentUser.uid, (title, body) => {
-      if (!cancelled) showCiyaToast(title ? `${title}: ${body}` : body);
-    });
+    const permission = getPushPermissionState();
+    if (permission === 'granted') {
+      registerStudentPush(currentUser.uid, (title, body) => {
+        if (!cancelled) showCiyaToast(title ? `${title}: ${body}` : body);
+      });
+    } else if (permission === 'default') {
+      // Only offer once per device until the student answers it.
+      if (safeStorage.getItem('ciya_push_banner_dismissed') !== '1') {
+        if (!cancelled) setShowPushBanner(true);
+      }
+    }
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid, isAdmin]);
+
+  // The banner tap is the browser gesture that unlocks the permission prompt.
+  const handleEnablePush = async () => {
+    if (!currentUser?.uid) return;
+    const ok = await registerStudentPush(currentUser.uid, (title, body) => {
+      showCiyaToast(title ? `${title}: ${body}` : body);
+    });
+    if (ok) {
+      showCiyaToast('Push notifications are on for this device.');
+    } else {
+      showCiyaToast('Push notifications could not be turned on. Check site settings if it was blocked.');
+    }
+    setShowPushBanner(false);
+  };
+
+  const handleDismissPushBanner = () => {
+    setShowPushBanner(false);
+    safeStorage.setItem('ciya_push_banner_dismissed', '1');
+  };
 
   const menuReturnViewRef = useRef<'courses' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz'>('courses');
   const handleViewChange = (view: 'courses' | 'profile' | 'membership' | 'quizscores' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz', cId: string | null = null) => {
@@ -8959,6 +8991,21 @@ export default function StudentDashboard() {
         </div>
       </main>
 
+      {/* Push notifications opt-in banner. Browsers only show the system
+          permission prompt from a real tap, so the ask lives on Enable. */}
+      {showPushBanner && (
+        <div className="fixed inset-x-0 bottom-20 sm:bottom-4 z-[70] flex justify-center px-3 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-md rounded-2xl bg-slate-900 text-white shadow-2xl border border-white/10 p-4 flex items-center gap-3">
+            <span className="text-2xl shrink-0" aria-hidden="true">🔔</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] uppercase font-black tracking-wide text-emerald-300">Turn on push alerts</p>
+              <p className="text-xs text-slate-200 leading-snug mt-0.5">Get course unlocks, approvals and announcements even when the app is closed.</p>
+            </div>
+            <button onClick={handleEnablePush} className="shrink-0 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-900 text-[11px] font-black uppercase px-4 py-2">Enable</button>
+            <button onClick={handleDismissPushBanner} className="shrink-0 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold uppercase px-3 py-2">Not now</button>
+          </div>
+        </div>
+      )}
       {/* Mobile Native App Bottom Navigation Bar */}
       {(!isBuzzChatActive || currentView !== 'buzz') && !(currentView === 'courses' && !!selectedCourseId && new URLSearchParams(location.search).get('syllabus') === 'false') && !isStudyStatsOpen && currentView !== 'profile' && currentView !== 'membership' && currentView !== 'quizscores' && (
         <nav 

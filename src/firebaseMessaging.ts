@@ -18,8 +18,24 @@ import firebaseConfig from '../firebase-applet-config.json';
 let messagingInstance: Messaging | null = null;
 let foregroundHandler: ((title: string, body: string) => void) | null = null;
 
+/** Where the notification permission currently stands on this device. */
+export function getPushPermissionState(): 'granted' | 'denied' | 'default' | 'unsupported' {
+  if (typeof window === 'undefined' || typeof Notification === 'undefined') return 'unsupported';
+  if (!('serviceWorker' in navigator)) return 'unsupported';
+  return Notification.permission;
+}
+
+/** What the server reports after a push delivery attempt. */
+export interface PushSendResult {
+  ok: boolean;
+  recipients: number;
+  sent: number;
+  failed: number;
+}
+
 /** Fire-and-forget request to the server to deliver a push. */
-export async function sendPushRequest(target: 'all' | string, title: string, message: string, url: string = '/dashboard'): Promise<boolean> {
+export async function sendPushRequest(target: 'all' | string, title: string, message: string, url: string = '/dashboard'): Promise<PushSendResult> {
+  const zero: PushSendResult = { ok: false, recipients: 0, sent: 0, failed: 0 };
   try {
     const res = await fetch('/api/push-send', {
       method: 'POST',
@@ -28,12 +44,18 @@ export async function sendPushRequest(target: 'all' | string, title: string, mes
     });
     if (!res.ok) {
       console.warn('Push send refused by server:', res.status);
-      return false;
+      return zero;
     }
-    return true;
+    const data: Record<string, unknown> = await res.json().catch(() => ({}));
+    return {
+      ok: true,
+      recipients: Number(data.recipients ?? 0) || 0,
+      sent: Number(data.sent ?? 0) || 0,
+      failed: Number(data.failed ?? 0) || 0
+    };
   } catch (err) {
     console.warn('Push send failed:', err);
-    return false;
+    return zero;
   }
 }
 
