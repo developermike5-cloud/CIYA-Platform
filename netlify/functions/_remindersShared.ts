@@ -121,7 +121,7 @@ const KNOWN_COURSE_TITLES: Record<string, string> = {
 
 /** Titles like "BUILDING A CONVERTING LANDING PAGE" read better title-cased in mail. */
 function prettifyTitle(t: string): string {
-  return t.toLowerCase().replace(/(^|\s)([a-z])/g, (_m, a, b) => a + b.toUpperCase());
+  return t.toLowerCase().replace(/(^|\s)([a-z])/g, (_m, a, b) => a + b.toUpperCase()).replace(/\bciya\b/g, "CIYA");
 }
 
 /** REST patch of one doc (bypasses security rules: service account is trusted). */
