@@ -822,7 +822,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                       className="w-full py-3 bg-slate-900 hover:bg-slate-850 text-white border border-teal-800/80 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider disabled:opacity-60"
                       id="login_email_signin_btn"
                     >
-                      <span>{loading ? 'Signing In...' : 'Sign In with Email & Password'}</span>
+                      <span>{loading ? 'Signing In...' : 'Sign In'}</span>
                     </button>
                   </form>
 

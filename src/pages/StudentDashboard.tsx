@@ -7,7 +7,7 @@ import { ref as dbRef, onValue } from 'firebase/database';
 import { signOut, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useNavigate, Link, useLocation } from 'react-router';
 import { Course, CourseDay, CourseVideo } from '../types';
-import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText, Wifi, WifiOff, Award, ChevronRight, MoreHorizontal, Smartphone, Download, RefreshCw, Lightbulb } from 'lucide-react';
+import { Compass, User as UserIcon, BookOpen, LogOut, Lock, Menu, X, CheckCircle, Edit3, Save, Clock, MessageCircle, ArrowLeft, Play, ExternalLink, Sparkles, ChevronDown, ChevronUp, Bell, FileText, Wifi, WifiOff, Award, ChevronRight, MoreHorizontal, Smartphone, Download, RefreshCw, Lightbulb, LayoutTemplate } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import BrandingLogo from '../components/BrandingLogo';
 import LoginModal from '../components/LoginModal';
@@ -9095,7 +9095,7 @@ export default function StudentDashboard() {
                       transition={{ type: "spring", stiffness: 450, damping: 32 }}
                       className="absolute -top-3.5 sm:-top-4 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/40 ring-4 ring-slate-900 z-10"
                     >
-                      <Sparkles className="w-5 h-5 stroke-[2.5]" />
+                      <LayoutTemplate className="w-5 h-5 stroke-[2.5]" />
                     </motion.div>
                     <span className="text-[10px] font-black text-emerald-400 tracking-tight leading-none mt-auto pt-4">
                       Template
@@ -9104,7 +9104,7 @@ export default function StudentDashboard() {
                 ) : (
                   <>
                     <div className="p-1 text-slate-400 group-hover:text-slate-200 transition-colors">
-                      <Sparkles className="w-5 h-5 stroke-2" />
+                      <LayoutTemplate className="w-5 h-5 stroke-2" />
                     </div>
                     <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-200 tracking-tight leading-none mt-0.5">
                       Template
