@@ -1,3 +1,4 @@
+import { showCiyaToast } from './CiyaToast';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
@@ -193,13 +194,21 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.ok === false) {
+        // Server-side 5-minute cooldown: a code is already on its way, so let
+        // them go type it instead of blocking on a new request.
+        if (data?.error === 'rate-limited') {
+          showCiyaToast(data?.message || 'A reset code was already sent to this email. Please wait about 5 minutes before requesting another one.');
+          setResendIn(data?.retryAfterSeconds || 300);
+          setResetStep('code');
+          return;
+        }
         throw new Error(data?.message || 'Could not send the reset code. Please try again.');
       }
       setResetSuccess(`If your email is registered with CIYA, a 6-digit reset code has been sent to ${resetEmail.trim()}. It expires in 10 minutes. Check your inbox and spam folder.`);
       setResetStep('code');
-      setResendIn(60);
+      setResendIn(300);
     } catch (err: any) {
-      setError(err.message || 'Could not send the reset code. Please try again.');
+      showCiyaToast(err.message || 'Could not send the reset code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -209,7 +218,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (resetOtp.trim().length !== 6) {
-      setError('Enter the 6-digit code from your email.');
+      showCiyaToast('Enter the 6-digit code from your email.');
       return;
     }
     setLoading(true);
@@ -223,12 +232,12 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.ok === false) {
-        throw new Error(data?.message || 'That code is invalid or has expired. Request a new one and try again.');
+        throw new Error(data?.message || 'That code is incorrect or has expired. Request a new one and try again.');
       }
       setResetSuccess('Code verified. Now choose your new password.');
       setResetStep('password');
     } catch (err: any) {
-      setError(err.message || 'That code is invalid or has expired. Request a new one and try again.');
+      showCiyaToast(err.message || 'That code is incorrect or has expired. Request a new one and try again.');
     } finally {
       setLoading(false);
     }
@@ -238,15 +247,15 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const handleConfirmReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (resetOtp.trim().length !== 6) {
-      setError('Enter the 6-digit code from your email.');
+      showCiyaToast('Enter the 6-digit code from your email.');
       return;
     }
     if (!resetPwChecks.every((c) => c.met)) {
-      setError('Your new password must meet every requirement listed below.');
+      showCiyaToast('Your new password must meet every requirement listed below.');
       return;
     }
     if (resetNewPw !== resetConfirmPw) {
-      setError('The two passwords do not match.');
+      showCiyaToast('The two passwords do not match.');
       return;
     }
     setLoading(true);
@@ -262,6 +271,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       if (!res.ok || data?.ok === false) {
         throw new Error(data?.message || 'Could not change your password. Please try again.');
       }
+      const signedInEmail = resetEmail.trim();
       setResetStep('email');
       setResetOtp('');
       setResetNewPw('');
@@ -269,9 +279,13 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       setShowResetPw(false);
       setShowResetConfirmPw(false);
       setResetEmail('');
-      setResetSuccess('Your password has been changed. You can now sign in with your new password.');
+      setResetSuccess('');
+      // Straight back to sign-in with their email prefilled: they only owe the password now.
+      setIsResetMode(false);
+      setSignInEmail(signedInEmail);
+      showCiyaToast('Password changed successfully. Sign in with your new password.');
     } catch (err: any) {
-      setError(err.message || 'Could not change your password. Please try again.');
+      showCiyaToast(err.message || 'Could not change your password. Please try again.');
     } finally {
       setLoading(false);
     }

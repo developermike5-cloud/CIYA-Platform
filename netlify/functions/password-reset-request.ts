@@ -18,7 +18,7 @@ import crypto from "crypto";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const OTP_TTL_MINUTES = 10;
-const RESEND_COOLDOWN_MS = 60_000; // server-side backstop for the frontend's 60s resend timer
+const RESEND_COOLDOWN_MS = 300_000; // server-side 5-minute cooldown: no second OTP request within 5 minutes
 const MAX_REQUESTS_PER_HOUR = 5;
 const MAX_VERIFY_ATTEMPTS = 5; // mirrored by password-reset-confirm
 
@@ -217,7 +217,8 @@ const handler = async (event: any) => {
     const docPath = `password_reset_otps/${encodeURIComponent(email)}`;
     let requestCount = 1;
     let windowStart = now;
-    let skipSend = false;
+    let cooldownLeftSeconds = 0;
+    let hourlyCapped = false;
     try {
       const existing = await googleFetch(`${base}/${docPath}`);
       if (existing.ok) {
@@ -226,15 +227,41 @@ const handler = async (event: any) => {
         const createdAtMs = num(fields, "createdAt", 0);
         const wStart = num(fields, "windowStart", 0);
         const rCount = num(fields, "requestCount", 0);
-        if (now - createdAtMs < RESEND_COOLDOWN_MS) skipSend = true;
+        if (createdAtMs && now - createdAtMs < RESEND_COOLDOWN_MS) {
+          cooldownLeftSeconds = Math.max(1, Math.ceil((createdAtMs + RESEND_COOLDOWN_MS - now) / 1000));
+        }
         if (wStart && now - wStart < 3_600_000) {
           windowStart = wStart;
           requestCount = rCount + 1;
-          if (rCount >= MAX_REQUESTS_PER_HOUR) skipSend = true;
+          if (rCount >= MAX_REQUESTS_PER_HOUR) hourlyCapped = true;
         }
       }
     } catch {
       // no existing doc: fresh window
+    }
+
+    // Rate-limited answers name the wait instead of pretending to succeed.
+    if (cooldownLeftSeconds > 0) {
+      const mins = Math.ceil(cooldownLeftSeconds / 60);
+      const wait =
+        mins >= 1
+          ? `${mins} minute${mins === 1 ? "" : "s"}`
+          : `${cooldownLeftSeconds} second${cooldownLeftSeconds === 1 ? "" : "s"}`;
+      return json(200, {
+        ok: false,
+        error: "rate-limited",
+        retryAfterSeconds: cooldownLeftSeconds,
+        message: `A reset code was already sent to this email. Please wait ${wait} before requesting another one.`,
+      });
+    }
+    if (hourlyCapped) {
+      const hourlyLeftSeconds = Math.max(60, Math.ceil((windowStart + 3_600_000 - now) / 1000));
+      return json(200, {
+        ok: false,
+        error: "rate-limited",
+        retryAfterSeconds: hourlyLeftSeconds,
+        message: "Too many reset codes requested for this email in the last hour. Please try again later.",
+      });
     }
 
     // Does this email belong to a real Firebase Auth user?
@@ -259,7 +286,7 @@ const handler = async (event: any) => {
       return json(200, { ok: true });
     }
 
-    if (!skipSend) {
+    {
       const otp = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
       const expiresAt = now + OTP_TTL_MINUTES * 60_000;
       const firstname = (displayName || "").trim().split(/\s+/)[0] || "there";

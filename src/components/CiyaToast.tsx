@@ -18,7 +18,7 @@ const EVENT_NAME = 'ciya-toast';
  */
 export function showCiyaToast(message: string) {
   const lower = String(message).toLowerCase();
-  const isError = /error|failed|failure|❌|⚠️|could not|couldn't|try again|invalid|not found/.test(lower);
+  const isError = /error|failed|failure|❌|⚠️|could not|couldn't|try again|invalid|not found|incorrect|do not match/.test(lower);
   const isSuccess = /success|successfully|✅|🎉|copied|welcome|saved|submitted|sent|updated|created|registered/.test(lower);
   const variant: ToastItem['variant'] = isError ? 'error' : isSuccess ? 'success' : 'info';
   window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { message, variant } }));
