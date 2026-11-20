@@ -66,6 +66,33 @@ export default async (req: Request) => {
       out.ruleset = { name: newest.name, created: newest.createTime, source: (full.source?.files || []).map((f: any) => f.content).join("\n") };
     }
 
+    // Push diagnostics: which users hold FCM tokens, and their channel prefs.
+    const uq = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents:runQuery`, {
+      method: "POST",
+      headers: { ...H, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        structuredQuery: { from: [{ collectionId: "users" }], limit: 100 },
+      }),
+    }).then(r => r.json()) as any;
+    const users: any[] = [];
+    for (const row of Array.isArray(uq) ? uq : []) {
+      const d = row.document;
+      if (!d) continue;
+      const uid = String(d.name || "").split("/").pop();
+      const f = d.fields || {};
+      const toks = f.fcmTokens?.mapValue?.fields || {};
+      const prefs = f.notificationPrefs?.mapValue?.fields || {};
+      const gp = (x: any) => x?.booleanValue === true || x?.booleanValue === false ? x.booleanValue : undefined;
+      users.push({
+        uid,
+        isAdmin: f.isAdmin?.booleanValue === true,
+        tokens: Object.keys(toks).length,
+        tokenSample: Object.keys(toks).slice(0, 2).map(t => t.slice(-8)),
+        prefs: { email: gp(prefs.email), inApp: gp(prefs.inApp), push: gp(prefs.push) },
+      });
+    }
+    out.pushUsers = users;
+
     // Recent notifications docs via runQuery (ordered by createdAt desc).
     const runq = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents:runQuery`, {
       method: "POST",
