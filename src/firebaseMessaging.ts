@@ -70,6 +70,60 @@ export async function sendPushRequest(target: 'all' | string, title: string, mes
  * register the device token on the user's profile, and wire foreground pushes
  * to a branded in-app handler. Returns true when the device can receive pushes.
  */
+/**
+ * Push needs a service worker whose script actually contains the Firebase
+ * messaging handler. getToken() sends that worker an internal message and
+ * waits for its reply, so when the browser is still running an older main
+ * worker build (one without the messaging import) the reply never comes and
+ * the call hangs forever. Registering a small dedicated worker at its own
+ * fixed scope makes the browser fetch the current script each time, so token
+ * registration cannot be blocked by a stale app worker. It never reloads or
+ * refreshes any client.
+ */
+let messagingRegistrationPromise: Promise<ServiceWorkerRegistration | null> | null = null;
+function getMessagingRegistration(): Promise<ServiceWorkerRegistration | null> {
+  if (!messagingRegistrationPromise) {
+    messagingRegistrationPromise = (async () => {
+      if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return null;
+      const scope = '/firebase-messaging-scope/';
+      let reg = await navigator.serviceWorker.getRegistration(scope);
+      if (!reg) {
+        reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope });
+      }
+      if (!reg.active) {
+        const pending = reg.waiting || reg.installing || null;
+        if (pending) {
+          await new Promise<void>((resolve) => {
+            const onState = () => {
+              if (pending.state === 'activated') {
+                pending.removeEventListener('statechange', onState);
+                resolve();
+              }
+            };
+            pending.addEventListener('statechange', onState);
+            setTimeout(resolve, 8000);
+          });
+        }
+      }
+      return reg.active ? reg : null;
+    })().catch(() => null);
+  }
+  return messagingRegistrationPromise;
+}
+
+/** getToken with a hard timeout, so a silent service worker can never leave the caller spinning. */
+function getTokenWithTimeout(registration: ServiceWorkerRegistration, ms = 30000): Promise<string | null> {
+  return Promise.race([
+    getToken(messagingInstance!, {
+      vapidKey: (firebaseConfig as any).vapidPublicKey as string,
+      serviceWorkerRegistration: registration
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timed out after ${Math.round(ms / 1000)}s waiting for the browser to create a push token (push service worker did not respond).`)), ms)
+    )
+  ]);
+}
+
 export async function registerStudentPush(
   uid: string,
   onForeground?: (title: string, body: string) => void
@@ -91,16 +145,18 @@ export async function registerStudentPush(
     }
     if (permission !== 'granted') { lastPushRegisterError = `Notification permission is ${permission}.`; return false; }
 
-    const registration = await navigator.serviceWorker.ready;
     if (!messagingInstance) messagingInstance = getMessaging();
     if (onForeground) foregroundHandler = onForeground;
 
+    const registration = await getMessagingRegistration();
+    if (!registration) {
+      lastPushRegisterError = 'This browser could not start the push service worker (registration unavailable).';
+      return false;
+    }
+
     let token: string | null = null;
     try {
-      token = await getToken(messagingInstance, {
-        vapidKey: (firebaseConfig as any).vapidPublicKey as string,
-        serviceWorkerRegistration: registration
-      });
+      token = await getTokenWithTimeout(registration);
     } catch (tokErr: any) {
       lastPushRegisterError = `Token registration failed: ${tokErr?.code || 'error'} ${String(tokErr?.message || tokErr || '').slice(0, 180)}`;
       return false;
@@ -145,11 +201,9 @@ export async function unregisterStudentPush(uid: string): Promise<void> {
     if (!(await isSupported().catch(() => false))) return;
 
     if (!messagingInstance) messagingInstance = getMessaging();
-    const registration = await navigator.serviceWorker.ready;
-    const token = await getToken(messagingInstance, {
-      vapidKey: (firebaseConfig as any).vapidPublicKey as string,
-      serviceWorkerRegistration: registration
-    });
+    const registration = await getMessagingRegistration();
+    if (!registration) return;
+    const token = await getTokenWithTimeout(registration, 15000);
     if (!token) return;
     await updateDoc(doc(db, 'users', uid), { [`fcmTokens.${token}`]: deleteField(), updatedAt: serverTimestamp() });
   } catch (err) {
