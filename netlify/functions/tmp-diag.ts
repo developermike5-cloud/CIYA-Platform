@@ -101,6 +101,24 @@ export default async (req: Request) => {
     if (rrRes.error) out.readReceiptsError = rrRes.error;
     else out.readReceipts = (rrRes.documents || []).map((d: any) => ({ id: d.name.split('/').pop(), uid: g(d.fields?.uid), isRead: g(d.fields?.isRead), readAt: g(d.fields?.readAt), updatedAt: g(d.fields?.updatedAt) }));
 
+    // Collection-group sweep across the whole database: any readReceipts
+    // subcollection living outside notifications breaks the client's
+    // collection-group query under the deployed rules.
+    try {
+      const cgRes = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents:runQuery`, {
+        method: 'POST',
+        headers: { ...H, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'readReceipts', allDescendants: true }], limit: 25 } })
+      }).then(r => r.json()) as any;
+      if (Array.isArray(cgRes)) {
+        out.readReceiptsGroup = cgRes.filter((x: any) => x.document).map((x: any) => (x.document.name.split('/documents/')[1]));
+      } else {
+        out.readReceiptsGroupError = cgRes;
+      }
+    } catch (cgErr: any) {
+      out.readReceiptsGroupError = String(cgErr?.message || cgErr);
+    }
+
     // Admins docs.
     const ares = await fetch(`https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/${FIRESTORE_DB}/documents/admins?pageSize=10`, { headers: H }).then(r => r.json()) as any;
     out.admins = (ares.documents || []).map((d: any) => {

@@ -4868,19 +4868,8 @@ export default function StudentDashboard() {
         const snap = await getDocs(q);
         if (cancelled) return;
         // Broadcast ("all") notifications record reads per student in the
-        // readReceipts subcollection; addressed ones use isRead on the doc.
-        try {
-          const readsSnap = await getDocs(collectionGroup(db, 'readReceipts'));
-          const mine = new Set<string>(
-            readsSnap.docs
-              .filter(d => d.id === currentUser.uid && d.data()?.isRead === true)
-              .map(d => d.ref.parent.parent?.id)
-              .filter(Boolean) as string[]
-          );
-          if (!cancelled) setBroadcastReadIds(mine);
-        } catch {
-          // Read receipts are best-effort; addressed notifications still use isRead.
-        }
+        // readReceipts subcollection; that read lives in the notifications
+        // loader, which owns broadcast read state for this session.
         const list = snap.docs.map(doc => {
           const data = doc.data();
           let submittedText = data.submittedText || '';
@@ -5498,6 +5487,22 @@ export default function StudentDashboard() {
   // ("all") notifications, backed by the readReceipts subcollection.
   const [broadcastReadIds, setBroadcastReadIds] = useState<Set<string>>(new Set<string>());
 
+  // Direct per-notification read of this account's broadcast receipts. Fallback
+  // when the collection-group query fails, and the bell splash self-heal, so a
+  // cached or failed read can never hold a stale unread badge.
+  const recheckBroadcastReceipts = async (notifIds: string[]) => {
+    if (!currentUser?.uid || notifIds.length === 0) return;
+    const results = await Promise.all(
+      notifIds.map((id) =>
+        getDoc(doc(db, 'notifications', id, 'readReceipts', currentUser.uid))
+          .then((rs: any) => (rs.exists() && rs.data()?.isRead === true ? id : null))
+          .catch(() => null)
+      )
+    );
+    const mine = results.filter(Boolean) as string[];
+    if (mine.length > 0) setBroadcastReadIds((prev) => new Set([...prev, ...mine]));
+  };
+
   // Subscriptions to notifications
   useEffect(() => {
     if (!currentUser) return;
@@ -5520,6 +5525,12 @@ export default function StudentDashboard() {
         );
         const snap = await getDocs(q);
         if (cancelled) return;
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        list.sort((a: any, b: any) => {
+          const timeA = a.createdAt?.seconds || 0;
+          const timeB = b.createdAt?.seconds || 0;
+          return timeB - timeA;
+        });
         // Broadcast ("all") notifications record reads per student in the
         // readReceipts subcollection; addressed ones use isRead on the doc.
         try {
@@ -5531,16 +5542,14 @@ export default function StudentDashboard() {
               .filter(Boolean) as string[]
           );
           if (!cancelled) setBroadcastReadIds(mine);
-        } catch {
-          // Read receipts are best-effort; addressed notifications still use isRead.
+        } catch (receiptErr) {
+          console.warn('Broadcast read-receipt query failed, falling back to direct reads:', receiptErr);
+          const broadcastIds = list
+            .filter((n: any) => n.userId === 'all' || n.type === 'system_broadcast')
+            .map((n: any) => n.id);
+          if (!cancelled) await recheckBroadcastReceipts(broadcastIds);
         }
-        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        list.sort((a: any, b: any) => {
-          const timeA = a.createdAt?.seconds || 0;
-          const timeB = b.createdAt?.seconds || 0;
-          return timeB - timeA;
-        });
-        setDbNotifications(list);
+        if (!cancelled) setDbNotifications(list);
       } catch (error) {
         console.warn("Soft handling error loading db notifications:", error);
       }
@@ -5554,9 +5563,17 @@ export default function StudentDashboard() {
     };
     document.addEventListener('visibilitychange', onVisible);
 
+    // When the Firestore network comes back on (the DB toggle or boot sync
+    // re-enabling it), re-read so cache-served state doesn't linger.
+    const onNetwork = (e: Event) => {
+      if ((e as CustomEvent).detail?.enabled) load();
+    };
+    window.addEventListener('firestore-network-status', onNetwork);
+
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('firestore-network-status', onNetwork);
     };
   }, [currentUser, isAdmin]);
 
@@ -7486,7 +7503,18 @@ export default function StudentDashboard() {
             {!isGuest && (
               <div className="relative z-50">
                 <button 
-                  onClick={() => setIsNotificationsPopupOpen(!isNotificationsPopupOpen)}
+                  onClick={() => {
+                    const next = !isNotificationsPopupOpen;
+                    setIsNotificationsPopupOpen(next);
+                    if (next) {
+                      // Self-heal: re-check receipts for broadcasts that still
+                      // show unread so a cached or failed read can't linger.
+                      const staleBroadcasts = dbNotifications
+                        .filter((n: any) => !n.isRead && (n.userId === 'all' || n.type === 'system_broadcast'))
+                        .map((n: any) => n.id);
+                      recheckBroadcastReceipts(staleBroadcasts);
+                    }
+                  }}
                   className={`p-2 md:p-2.5 rounded-full cursor-pointer transition-all relative border-0 flex items-center justify-center outline-none ${
                     isNotificationsPopupOpen || currentView === 'notifications' 
                       ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400' 
