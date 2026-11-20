@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, getDocs, getDoc, orderBy, doc, updateDoc, deleteDoc, setDoc, serverTimestamp, where, addDoc, arrayUnion, deleteField } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, getActiveDatabaseId, setActiveDatabaseId, triggerSystemSignal } from '../../firebase';
+import { sendPushRequest } from '../../firebaseMessaging';
 import { ref as dbRef, set as dbSet } from 'firebase/database';
 import { Search, Filter, Check, X, Trash2, Eye, EyeOff, CheckCircle2, AlertCircle, Clock, Upload, RotateCcw, RefreshCw, Lock } from 'lucide-react';
 import BrandingLogo from '../../components/BrandingLogo';
@@ -1606,6 +1607,7 @@ Please go to your profile now to see your "CIYA badge" reflected, upload your ph
                                                 triggeredBy: 'Academy Admin Office',
                                                 createdAt: serverTimestamp()
                                               });
+                                              sendPushRequest(u.id, 'Upgraded to CIYA Student Pro! 🎖️', 'Your payment has been approved and confirmed by the Academy Admin. Your CIYA Student Pro badge and Advanced syllabus access are now active!', '/dashboard?view=profile').catch(() => {});
                                             }
 
                                             await updateDoc(doc(db, 'users', u.id), updateData);

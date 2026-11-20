@@ -7,5 +7,6 @@
   "storageBucket": "gen-lang-client-0862975917.firebasestorage.app",
   "databaseURL": "https://gen-lang-client-0862975917-default-rtdb.europe-west1.firebasedatabase.app/",
   "messagingSenderId": "261354048877",
-  "measurementId": ""
+  "measurementId": "",
+  "vapidPublicKey": "BLM7trxeIpZ1axH1O0-9wgMBNYXNkcMy8w8qqdXnoaR7jtgzKzW7o9n2CPhK4olE9-W6bV4V_AqVUv8rPCR134M"
 }

@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot, updateDoc, setDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { db, auth, rtdb, handleFirestoreError, OperationType, isFirestoreNetworkEnabled, safeGetItem } from '../firebase';
+import { registerStudentPush, sendPushRequest } from '../firebaseMessaging';
+
+/** Best-effort push delivery through the server. In-app history entries are
+ * written by each calling flow, so push and history never double up. */
+const pushNotify = (uid: string | undefined, title: string, message: string, url: string = '/dashboard') =>
+  uid ? sendPushRequest(uid, title, message, url).catch(() => false) : Promise.resolve(false);
 import { useStudyTimeTracker } from '../hooks/useStudyTimeTracker';
 import StudyStatsSplashModal from '../components/StudyStatsSplashModal';
 import { ref as dbRef, onValue } from 'firebase/database';
@@ -2835,6 +2841,10 @@ function CourseViewer({ course, userProfile, setUserProfile, currentUser, onBack
         });
 
         if (finalStatus === 'Approved') {
+          pushNotify(currentUser.uid, 'Day Complete! 🏁', unlockInfo.message);
+        }
+
+        if (finalStatus === 'Approved') {
           showToast(unlockInfo.toast);
         } else {
           showToast(`Submission Needs Correction: ${cleanReason} ❌`);
@@ -4998,6 +5008,10 @@ export default function StudentDashboard() {
             createdAt: serverTimestamp()
           });
 
+          if (finalStatus === 'Approved') {
+            pushNotify(currentUser.uid, 'Day Complete! 🏁', unlockInfo.message);
+          }
+
           if (isMounted) {
             if (finalStatus === 'Approved') {
               showToast(unlockInfo.toast);
@@ -5162,6 +5176,10 @@ export default function StudentDashboard() {
           triggeredBy: 'Academy Coordinator',
           createdAt: serverTimestamp()
         });
+
+        if (finalStatus === 'Approved') {
+          pushNotify(currentUser.uid, 'Day Complete! 🏁', unlockInfo.message);
+        }
 
         if (finalStatus === 'Approved') {
           showToast(unlockInfo.toast);
@@ -5577,6 +5595,18 @@ export default function StudentDashboard() {
   const [activeDurationFilter, setActiveDurationFilter] = useState<'standard' | 'express'>('standard');
   const navigate = useNavigate();
 
+  // Push notifications: register the student's FCM token after login and
+  // surface foreground pushes as branded CIYA toasts. Never refreshes the app.
+  useEffect(() => {
+    if (!currentUser?.uid || isAdmin) return;
+    let cancelled = false;
+    registerStudentPush(currentUser.uid, (title, body) => {
+      if (!cancelled) showCiyaToast(title ? `${title}: ${body}` : body);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid, isAdmin]);
+
   const menuReturnViewRef = useRef<'courses' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz'>('courses');
   const handleViewChange = (view: 'courses' | 'profile' | 'membership' | 'quizscores' | 'prompts' | 'notifications' | 'assignments' | 'kycb' | 'blog' | 'buzz', cId: string | null = null) => {
     // Menu sections (Profile / Membership / Quiz Score Sheet) live under the More
@@ -5654,6 +5684,8 @@ export default function StudentDashboard() {
           updatedAt: serverTimestamp()
         }).catch((persistErr: any) => console.warn("Unlock persistence failed:", persistErr));
       }
+      const unlockedCourseTitle = courses.find((c) => c.id === courseId)?.title || registeredCoursesList.find((c) => c.id === courseId)?.title || 'your course';
+      pushNotify(currentUser.uid, 'Course Unlocked 🎓', `You now have full access to "${unlockedCourseTitle}". Open it and start learning.`, `/dashboard?view=courses&courseId=${courseId}`);
       setUnlockGate(null);
       handleSelectCourseId(courseId);
       navigate(`/dashboard?view=courses&courseId=${courseId}&syllabus=false`);

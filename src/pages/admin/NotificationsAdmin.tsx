@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs, serverTimestamp, writeBatch, limit } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
+import { sendPushRequest } from '../../firebaseMessaging';
 import { onAuthStateChanged } from 'firebase/auth';
 import CustomDropdown from '../../components/CustomDropdown';
 import { Mail, Settings, Plus, Trash2, Calendar, Send, Users, AlertCircle, RefreshCw, Layers } from 'lucide-react';
@@ -52,6 +53,7 @@ export default function NotificationsAdmin() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [manualTitle, setManualTitle] = useState('');
   const [manualMessage, setManualMessage] = useState('');
+  const [sendAsPush, setSendAsPush] = useState(true);
   
   const [toast, setToast] = useState<{ type: 'success' | 'refused', msg: string } | null>(null);
   const [spinning, setSpinning] = useState(false);
@@ -218,6 +220,11 @@ export default function NotificationsAdmin() {
           createdAt: serverTimestamp()
         });
 
+        if (sendAsPush) {
+          const pushRes = await sendPushRequest('all', manualTitle.trim(), manualMessage.trim(), '/dashboard');
+          if (!pushRes) showToastMsg('Push delivery failed: no registered devices responded.', 'refused');
+        }
+
         // Also push individual alerts for immediate feedback if needed, but 'all' handles global fetch
         showToastMsg("Global Broadcast alert dispatched live! 🚀", 'success');
       } else {
@@ -232,6 +239,11 @@ export default function NotificationsAdmin() {
           triggerType: 'manual',
           createdAt: serverTimestamp()
         });
+
+        if (sendAsPush) {
+          const pushRes = await sendPushRequest(selectedStudentId, manualTitle.trim(), manualMessage.trim(), '/dashboard');
+          if (!pushRes) showToastMsg('Push delivery failed: no registered devices responded.', 'refused');
+        }
         const chosenStudentName = students.find(s => s.id === selectedStudentId)?.fullName || 'Cadet';
         showToastMsg(`Target notification dispatched to ${chosenStudentName}!`, 'success');
       }
@@ -473,6 +485,19 @@ export default function NotificationsAdmin() {
                 placeholder="Write custom alert dispatch details specifically..."
                 className="w-full bg-slate-50 border outline-none p-3 rounded-xl text-slate-800 font-bold focus:border-indigo-500 focus:bg-white leading-relaxed"
               />
+            </div>
+
+            <div className="flex items-center gap-2 bg-slate-50 border rounded-xl p-3">
+              <input
+                type="checkbox"
+                checked={sendAsPush}
+                onChange={e => setSendAsPush(e.target.checked)}
+                className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                id="send-as-push"
+              />
+              <label htmlFor="send-as-push" className="text-[10px] uppercase font-black text-slate-600 cursor-pointer">
+                Also send as push notification to {selectedStudentId === 'all' ? 'all students' : 'this student'}
+              </label>
             </div>
 
             <button
