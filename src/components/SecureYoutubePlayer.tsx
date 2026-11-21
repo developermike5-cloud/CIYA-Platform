@@ -130,7 +130,7 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
   // player preference has them on, so the caption track is switched off
   // programmatically through the IFrame Player API below.
   const buildEmbedUrl = (id: string): string => {
-    const ccParam = isAdvanced ? 'cc_load_policy=1' : 'cc_load_policy=0';
+    const ccParam = isAdvanced ? 'cc_load_policy=1&cc_lang_pref=en&hl=en' : 'cc_load_policy=0';
     const originParam = typeof window !== 'undefined' ? `&origin=${encodeURIComponent(window.location.origin)}` : '';
     return `https://www.youtube.com/embed/${id}?controls=1&modestbranding=1&rel=0&disablekb=1&playsinline=1&fs=0&enablejsapi=1${originParam}&${ccParam}`;
   };
@@ -154,6 +154,10 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
   const switchCaptionsOn = (player: any) => {
     if (!isAdvanced || !player) return;
     try { player.loadModule('captions'); } catch (e) {}
+    // Selecting the track (empty object = YouTube's default track) is what
+    // actually turns captions ON; loadModule alone only loads the module and
+    // a remembered "captions off" player preference would keep them hidden.
+    try { player.setOption('captions', 'track', {}); } catch (e) {}
     try { player.setOption('captions', 'fontSize', 0); } catch (e) {}
   };
 
@@ -185,6 +189,8 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
             playsinline: 1,
             fs: 0,
             cc_load_policy: isAdvanced ? 1 : 0,
+            cc_lang_pref: 'en',
+            hl: 'en',
             origin: typeof window !== 'undefined' ? window.location.origin : undefined
           },
           events: {
