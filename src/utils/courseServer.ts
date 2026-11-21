@@ -28,10 +28,26 @@ async function currentIdToken(): Promise<string | null> {
 // The installed-app marker: sent with every course-store call so the server can
 // tell the installed CIYA app apart from a mobile browser when the app-only
 // access toggle is enforced.
+// Entering element fullscreen flips Chrome's display-mode media query from
+// standalone to fullscreen, so while a lesson video is fullscreen this check
+// would re-read as "not the installed app" and the app-only gate would swap
+// the dashboard for the install guide mid-lesson. Remember the mode seen
+// outside fullscreen and keep it while an element is fullscreen.
+let standaloneOutsideFullscreen: boolean | null = null;
+
 export function isRunningAsPwa(): boolean {
   try {
     if (typeof window === 'undefined') return false;
-    return window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    const doc = document as any;
+    const inFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+    const matches = window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    if (!inFullscreen) {
+      standaloneOutsideFullscreen = matches;
+    }
+    if (inFullscreen && standaloneOutsideFullscreen !== null) {
+      return standaloneOutsideFullscreen;
+    }
+    return matches;
   } catch {
     return false;
   }
