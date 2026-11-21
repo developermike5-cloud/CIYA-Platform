@@ -143,7 +143,6 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
   const switchCaptionsOff = (player: any) => {
     if (isAdvanced || !player) return;
     try { player.unloadModule('captions'); } catch (e) {}
-    try { player.setOption('captions', 'track', {}); } catch (e) {}
   };
 
   // Advanced & masterclass students rely on YouTube's caption track (their
@@ -154,11 +153,15 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
   const switchCaptionsOn = (player: any) => {
     if (!isAdvanced || !player) return;
     try { player.loadModule('captions'); } catch (e) {}
-    // Selecting the track (empty object = YouTube's default track) is what
-    // actually turns captions ON; loadModule alone only loads the module and
-    // a remembered "captions off" player preference would keep them hidden.
-    try { player.setOption('captions', 'track', {}); } catch (e) {}
-    try { player.setOption('captions', 'fontSize', 0); } catch (e) {}
+    // An empty track object clears captions in today's embedded player, so
+    // select a real track instead: the English track from the tracklist when
+    // YouTube reports one, else an explicit English fallback.
+    let track: any = null;
+    try {
+      const list = player.getOption('captions', 'tracklist') || [];
+      track = list.find((t: any) => t && t.languageCode === 'en') || list[0] || null;
+    } catch (e) {}
+    try { player.setOption('captions', 'track', track || { languageCode: 'en' }); } catch (e) {}
   };
 
   useEffect(() => {
