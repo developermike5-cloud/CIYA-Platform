@@ -200,6 +200,15 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
               }
               switchCaptionsOff(player);
               switchCaptionsOn(player);
+              // Mobile browsers and installed PWAs can hand the embedded player
+              // back muted under their autoplay policies even when the student
+              // taps play, so force the audio track on wherever we can.
+              const unmutePlayer = () => {
+                try { player.unMute(); player.setVolume(100); } catch (e) {}
+              };
+              unmutePlayer();
+              containerRef.current?.addEventListener('pointerdown', unmutePlayer, { once: true });
+              containerRef.current?.addEventListener('touchend', unmutePlayer, { once: true });
               // One belt-and-braces retry in case the track list lands late.
               retryTimer = setTimeout(() => { switchCaptionsOff(player); switchCaptionsOn(player); }, 3000);
             },
@@ -208,6 +217,7 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
               if (event.data === YT.PlayerState.PLAYING) {
                 switchCaptionsOff(player);
                 switchCaptionsOn(player);
+                try { player.unMute(); player.setVolume(100); } catch (e) {}
               }
             }
           }

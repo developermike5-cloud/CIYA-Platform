@@ -20,7 +20,6 @@ import {
   Shield, 
   ExternalLink,
   MessageSquare,
-  Sparkles,
   Reply,
   Trash2,
   Forward,
@@ -1482,8 +1481,8 @@ export default function StudentBuzz({
 
                       {/* Chat wallpaper picker */}
                       <div className="border-t border-slate-100 pt-3">
-                        <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                          <Sparkles className="w-3 h-3 text-emerald-500" /> Chat wallpaper
+                        <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                          Chat wallpaper
                         </p>
                         <div className="grid grid-cols-3 gap-2">
                           {BUZZ_WALLPAPERS.map((wp) => {
@@ -1498,7 +1497,7 @@ export default function StudentBuzz({
                                 }`}
                               >
                                 <span
-                                  className={`relative w-full h-14 rounded-lg block overflow-hidden ${wp.preview}`}
+                                  className={`relative w-12 h-12 rounded-full block overflow-hidden ${wp.preview}`}
                                   style={wp.pattern}
                                 >
                                   {active && (
@@ -2065,7 +2064,7 @@ export default function StudentBuzz({
                 </span>
               </div>
             ) : (
-              <form onSubmit={handleSendMessage} className="flex items-center gap-2 bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/90 focus-within:border-emerald-500 focus-within:bg-white transition-all">
+              <form onSubmit={handleSendMessage} className={`flex items-center gap-2 p-1.5 rounded-2xl border transition-all ${isDarkBuzzWallpaper ? 'bg-slate-800/70 border-slate-700 focus-within:border-emerald-500' : 'bg-slate-100/90 border-slate-200/90 focus-within:border-emerald-500 focus-within:bg-white'}`}>
                 {/* File / Photo Upload Button */}
                 <input
                   type="file"
@@ -2159,17 +2158,17 @@ export default function StudentBuzz({
           onClick={() => setCommentsMessage(null)}
         >
           <div
-            className="bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg h-[82dvh] sm:h-[75dvh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200"
+            className={`${isDarkBuzzWallpaper ? 'bg-slate-950' : 'bg-white'} rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg h-[82dvh] sm:h-[75dvh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="p-4 border-b border-slate-100 bg-white flex items-center justify-between gap-3 shrink-0">
+            <div className={`p-4 border-b ${isDarkBuzzWallpaper ? 'border-slate-800 bg-slate-950' : 'border-slate-100 bg-white'} flex items-center justify-between gap-3 shrink-0`}>
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
                   <MessageCircle className="w-4.5 h-4.5 w-5 h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                  <h3 className={`text-sm font-black tracking-tight ${isDarkBuzzWallpaper ? 'text-white' : 'text-slate-900'}`}>
                     Comments {(comments.length > 0) && <span className="text-emerald-600">({comments.length})</span>}
                   </h3>
                   <p className="text-[11px] font-medium text-slate-500 truncate">
@@ -2180,14 +2179,15 @@ export default function StudentBuzz({
               <button
                 type="button"
                 onClick={() => setCommentsMessage(null)}
-                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors shrink-0 border-0"
+                className={`w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-colors shrink-0 border-0 ${isDarkBuzzWallpaper ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Comments List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+            <div className={`flex-1 overflow-y-auto p-4 space-y-4 relative ${activeWallpaper.chat}`}
+              style={activeWallpaper.pattern}>
               {loadingComments ? (
                 <div className="py-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
                   <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
@@ -2196,7 +2196,7 @@ export default function StudentBuzz({
               ) : comments.length === 0 ? (
                 <div className="py-12 text-center text-slate-500 space-y-1.5">
                   <MessageCircle className="w-8 h-8 mx-auto text-slate-300" />
-                  <div className="font-bold text-slate-700 text-sm">No comments yet</div>
+                  <div className={`font-bold text-sm ${isDarkBuzzWallpaper ? 'text-slate-200' : 'text-slate-700'}`}>No comments yet</div>
                   <p className="text-xs text-slate-400">Be the first to comment on this post.</p>
                 </div>
               ) : (
@@ -2224,7 +2224,7 @@ export default function StudentBuzz({
                               (c.senderName || 'S').charAt(0).toUpperCase()
                             )}
                           </div>
-                          <span className="text-[11px] font-black text-slate-800 truncate">{c.senderName}</span>
+                          <span className={`text-[11px] font-black truncate ${isDarkBuzzWallpaper ? 'text-slate-200' : 'text-slate-800'}`}>{c.senderName}</span>
                           {c.isAdmin && (
                             <span className="px-1 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 flex items-center gap-0.5">
                               <Shield className="w-2 h-2" /> Admin
@@ -2253,7 +2253,7 @@ export default function StudentBuzz({
                           onTouchStart={() => startCommentLongPress(c.id)}
                           onTouchEnd={endCommentLongPress}
                           onTouchMove={endCommentLongPress}
-                          className={`px-3 py-2 rounded-2xl text-xs font-medium leading-relaxed inline-block cursor-pointer ${isMyComment ? 'bg-slate-900 text-white rounded-tr-xs' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'} ${
+                          className={`px-3 py-2 rounded-2xl text-xs font-medium leading-relaxed inline-block cursor-pointer ${isMyComment ? (isDarkBuzzWallpaper ? 'bg-emerald-600 text-white rounded-tr-xs' : 'bg-slate-900 text-white rounded-tr-xs') : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'} ${
                             selectedCommentId === c.id ? 'ring-2 ring-emerald-500/50' : ''
                           }`}
                         >
@@ -2359,7 +2359,7 @@ export default function StudentBuzz({
             </div>
 
             {/* Comment Composer (images only, no videos) */}
-            <div className="p-3 border-t border-slate-100 bg-white shrink-0 space-y-2">
+            <div className={`p-3 border-t ${isDarkBuzzWallpaper ? 'border-slate-800 bg-slate-950' : 'border-slate-100 bg-white'} shrink-0 space-y-2`}>
               {commentPreviewUrl && (
                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-2">
                   <img src={commentPreviewUrl} alt="Selected" className="w-10 h-10 rounded-lg object-cover" />
@@ -2378,7 +2378,7 @@ export default function StudentBuzz({
                   e.preventDefault();
                   handleSendComment();
                 }}
-                className="flex items-center gap-2 bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/90 focus-within:border-emerald-500 focus-within:bg-white transition-all"
+                className={`flex items-center gap-2 p-1.5 rounded-2xl border transition-all ${isDarkBuzzWallpaper ? 'bg-slate-800/70 border-slate-700 focus-within:border-emerald-500' : 'bg-slate-100/90 border-slate-200/90 focus-within:border-emerald-500 focus-within:bg-white'}`}
               >
                 <input
                   type="file"
@@ -2391,7 +2391,7 @@ export default function StudentBuzz({
                   type="button"
                   onClick={() => commentFileInputRef.current?.click()}
                   disabled={sendingComment}
-                  className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0 disabled:opacity-50 border-0 bg-transparent"
+                  className={`p-2 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50 border-0 bg-transparent ${isDarkBuzzWallpaper ? 'text-slate-400 hover:text-white hover:bg-slate-700/60' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/60'}`}
                   title="Attach image"
                 >
                   <ImageIcon className="w-4 h-4" />
@@ -2402,7 +2402,7 @@ export default function StudentBuzz({
                   onChange={(e) => setCommentText(e.target.value)}
                   placeholder="Write a comment..."
                   disabled={sendingComment}
-                  className="flex-1 bg-transparent border-0 focus:outline-none text-sm font-medium text-slate-900 placeholder:text-slate-400 px-1"
+                  className={`flex-1 bg-transparent border-0 focus:outline-none text-sm font-medium px-1 ${isDarkBuzzWallpaper ? 'text-white placeholder:text-slate-500' : 'text-slate-900 placeholder:text-slate-400'}`}
                 />
                 <button
                   type="submit"
