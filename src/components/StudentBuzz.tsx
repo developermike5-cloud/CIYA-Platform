@@ -272,7 +272,10 @@ export default function StudentBuzz({
         email: currentUser.email || '',
         photoUrl: userProfile?.photoURL || currentUser.photoURL || ''
       },
-      activeGroupId || undefined
+      activeGroupId || undefined,
+      // The dashboard owns the online/offline lifecycle now: closing Buzz
+      // must not mark a student offline while they are still in the app.
+      { isAdmin: effectiveIsAdmin, keepOnlineOnCleanup: true }
     );
     return () => cleanupPresence();
   }, [currentUser?.uid, userProfile?.fullName, userProfile?.photoURL, activeGroupId]);

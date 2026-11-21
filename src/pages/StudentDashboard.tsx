@@ -34,6 +34,7 @@ import { uploadToCloudinary } from '../utils/cloudinary';
 import { coursesStore } from '../utils/coursesStore';
 import { fetchServerCourseGated, isCourseHydrated, isRunningAsPwa, isMobileBrowser } from '../utils/courseServer';
 import InstallGuide from '../components/InstallGuide';
+import { initUserPresence } from '../services/buzzRtdbService';
 import { fetchCourseStats, CourseStatsEntry } from '../utils/courseServer';
 import { YearBadgePaymentFlow } from './admin/PortalLocksAdmin';
 import CIYAMembershipBadge from '../components/CIYAMembershipBadge';
@@ -5508,6 +5509,25 @@ export default function StudentDashboard() {
     }
     return false;
   });
+
+  // App-wide presence: a signed-in user counts as online for as long as the
+  // app is open (not only inside Buzz chat), so the admin "Active Students
+  // Online" card reflects live data. Admins are written with role admin and
+  // are not counted as students.
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const cleanup = initUserPresence(
+      {
+        uid: currentUser.uid,
+        name: userProfile?.fullName || currentUser.displayName || 'Student',
+        email: currentUser.email || '',
+        photoUrl: userProfile?.photoURL || currentUser.photoURL || ''
+      },
+      undefined,
+      { isAdmin }
+    );
+    return () => cleanup();
+  }, [currentUser?.uid, userProfile?.fullName, userProfile?.photoURL, isAdmin]);
 
   const [dbNotifications, setDbNotifications] = useState<any[]>([]);
   // Notification ids this account has personally read among broadcast

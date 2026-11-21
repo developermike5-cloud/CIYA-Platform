@@ -101,6 +101,7 @@ export interface OnlineUser {
   status: 'online' | 'offline';
   lastSeen: number;
   currentGroupId?: string;
+  role?: 'admin' | 'student';
 }
 
 const DEFAULT_SEED_GROUPS: BuzzGroup[] = [
@@ -593,7 +594,8 @@ export function subscribeToStarredMessages(
 }
 export function initUserPresence(
   user: { uid: string; name: string; email: string; photoUrl?: string },
-  activeGroupId?: string
+  activeGroupId?: string,
+  opts?: { isAdmin?: boolean; keepOnlineOnCleanup?: boolean }
 ): () => void {
   if (!user.uid) return () => {};
 
@@ -606,7 +608,8 @@ export function initUserPresence(
       photoUrl: user.photoUrl,
       status: 'online',
       lastSeen: Date.now(),
-      currentGroupId: activeGroupId
+      currentGroupId: activeGroupId,
+      role: opts?.isAdmin ? 'admin' : 'student'
     };
     safeStorage.setItem('ciya_current_presence', JSON.stringify(onlineItem));
   } catch (e) {}
@@ -632,19 +635,31 @@ export function initUserPresence(
             photoUrl: user.photoUrl || '',
             status: 'online',
             lastSeen: Date.now(),
-            currentGroupId: activeGroupId || null
+            currentGroupId: activeGroupId || null,
+            role: opts?.isAdmin ? 'admin' : 'student'
           }).catch(() => {});
         } catch (e) {}
       }
     }, () => {});
 
+    // Keep lastSeen fresh so an app left open does not age out of the
+    // "active within the last 10 minutes" window the online list uses.
+    const heartbeat = setInterval(() => {
+      try {
+        update(userPresenceRef, { lastSeen: Date.now() }).catch(() => {});
+      } catch (e) {}
+    }, 4 * 60 * 1000);
+
     return () => {
       try {
+        clearInterval(heartbeat);
         unsubscribe();
-        set(userPresenceRef, {
-          status: 'offline',
-          lastSeen: Date.now()
-        }).catch(() => {});
+        if (!opts?.keepOnlineOnCleanup) {
+          set(userPresenceRef, {
+            status: 'offline',
+            lastSeen: Date.now()
+          }).catch(() => {});
+        }
       } catch (e) {}
     };
   } catch (e) {
@@ -656,16 +671,10 @@ export function initUserPresence(
  * Subscribes to the list of online students across the academy with robust fallback.
  */
 export function subscribeToOnlineUsers(callback: (users: OnlineUser[]) => void): () => void {
-  const fallbackList: OnlineUser[] = [
-    { uid: 'u1', name: 'Amina Bello', email: 'amina@ciya.academy', status: 'online', lastSeen: Date.now() },
-    { uid: 'u2', name: 'David Kalu', email: 'david@ciya.academy', status: 'online', lastSeen: Date.now() },
-    { uid: 'u3', name: 'Emmanuel O.', email: 'emmanuel@ciya.academy', status: 'online', lastSeen: Date.now() },
-    { uid: 'u4', name: 'Grace Adeyemi', email: 'grace@ciya.academy', status: 'online', lastSeen: Date.now() },
-    { uid: 'u5', name: 'Zainab Ibrahim', email: 'zainab@ciya.academy', status: 'online', lastSeen: Date.now() }
-  ];
-
+  // Live data only: no placeholder list. When nobody is online the list is
+  // empty, which is the honest reading of "Active Students Online".
   if (!rtdb) {
-    callback(fallbackList);
+    callback([]);
     return () => {};
   }
 
@@ -676,7 +685,7 @@ export function subscribeToOnlineUsers(callback: (users: OnlineUser[]) => void):
       (snapshot) => {
         const data = snapshot.val();
         if (!data) {
-          callback(fallbackList);
+          callback([]);
           return;
         }
 
@@ -685,7 +694,8 @@ export function subscribeToOnlineUsers(callback: (users: OnlineUser[]) => void):
 
         Object.keys(data).forEach((uid) => {
           const item = data[uid];
-          if (item && item.status === 'online' && (typeof item.lastSeen === 'number' ? item.lastSeen > cutoff : true)) {
+          // Admins are tracked for presence but never counted as students.
+          if (item && item.status === 'online' && item.role !== 'admin' && (typeof item.lastSeen === 'number' ? item.lastSeen > cutoff : true)) {
             activeList.push({
               uid,
               name: item.name || 'Student',
@@ -698,10 +708,10 @@ export function subscribeToOnlineUsers(callback: (users: OnlineUser[]) => void):
           }
         });
 
-        callback(activeList.length > 0 ? activeList : fallbackList);
+        callback(activeList);
       },
       () => {
-        callback(fallbackList);
+        callback([]);
       }
     );
 
@@ -711,7 +721,7 @@ export function subscribeToOnlineUsers(callback: (users: OnlineUser[]) => void):
       } catch (e) {}
     };
   } catch (e) {
-    callback(fallbackList);
+    callback([]);
     return () => {};
   }
 }
