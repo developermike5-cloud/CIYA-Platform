@@ -14,7 +14,7 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 
 /** Bank details come from the admin's Settings & Portal Locks page. */
 const BANK_DEFAULTS = {
-  accountName: '',
+  accountName: 'Michael Ogunnaike',
   accountNumber: '5070133907',
   bankName: 'Moniepoint',
 };

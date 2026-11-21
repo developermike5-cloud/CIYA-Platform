@@ -2038,7 +2038,7 @@ export default function PortalLocksAdmin() {
                       value={beginnersSettings.yearBadgeSettings.accountName || ''}
                       onChange={(e) => handleUpdateYearBadgeSetting('accountName', e.target.value)}
                       className="w-full bg-white border border-slate-200 text-slate-900 font-bold text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-indigo-500"
-                      placeholder="e.g., CIY Academy International Ltd"
+                      placeholder="e.g., Michael Ogunnaike"
                     />
                   </div>
 
@@ -2648,10 +2648,10 @@ export default function PortalLocksAdmin() {
                     <label className="block text-[10px] font-black text-slate-600 uppercase tracking-wide">Account Name</label>
                     <input
                       type="text"
-                      value={beginnersSettings.advancedCourseSettings?.accountName ?? 'CIY Academy International Ltd'}
+                      value={beginnersSettings.advancedCourseSettings?.accountName ?? 'Michael Ogunnaike'}
                       onChange={(e) => handleUpdateAdvancedCourseSetting('accountName', e.target.value)}
                       className="w-full bg-white border border-slate-200 text-slate-900 font-bold text-xs rounded-lg p-2.5 outline-none focus:ring-1 focus:ring-purple-500"
-                      placeholder="e.g., CIY Academy International Ltd"
+                      placeholder="e.g., Michael Ogunnaike"
                     />
                   </div>
 
@@ -3660,7 +3660,7 @@ export function YearBadgePaymentFlow({
             
             <div className="space-y-1">
               <span className="text-[9px] uppercase tracking-widest text-slate-400 font-extrabold block">Account Name</span>
-              <p className="text-sm font-extrabold text-white">{yearBadgeSettings?.accountName || 'CIY Academy International Ltd'}</p>
+              <p className="text-sm font-extrabold text-white">{yearBadgeSettings?.accountName || 'Michael Ogunnaike'}</p>
             </div>
 
             <div className="space-y-1 flex justify-between items-center bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
