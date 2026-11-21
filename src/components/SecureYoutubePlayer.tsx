@@ -146,6 +146,17 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
     try { player.setOption('captions', 'track', {}); } catch (e) {}
   };
 
+  // Advanced & masterclass students rely on YouTube's caption track (their
+  // videos carry no burned-in subtitles). cc_load_policy=1 is only the DEFAULT
+  // and YouTube still honours a remembered "captions off" player preference,
+  // so the caption module is switched ON programmatically the same way the
+  // beginner track is forced off below.
+  const switchCaptionsOn = (player: any) => {
+    if (!isAdvanced || !player) return;
+    try { player.loadModule('captions'); } catch (e) {}
+    try { player.setOption('captions', 'fontSize', 0); } catch (e) {}
+  };
+
   useEffect(() => {
     if (!videoId || apiFailed) return;
     let cancelled = false;
@@ -188,13 +199,15 @@ export default function SecureYoutubePlayer({ url, title, isAdvanced }: SecureYo
                 iframe.setAttribute('referrerPolicy', 'strict-origin-when-cross-origin');
               }
               switchCaptionsOff(player);
+              switchCaptionsOn(player);
               // One belt-and-braces retry in case the track list lands late.
-              retryTimer = setTimeout(() => switchCaptionsOff(player), 3000);
+              retryTimer = setTimeout(() => { switchCaptionsOff(player); switchCaptionsOn(player); }, 3000);
             },
             onStateChange: (event: any) => {
               if (cancelled) return;
               if (event.data === YT.PlayerState.PLAYING) {
                 switchCaptionsOff(player);
+                switchCaptionsOn(player);
               }
             }
           }

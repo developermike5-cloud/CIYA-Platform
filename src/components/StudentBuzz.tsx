@@ -64,7 +64,7 @@ import {
   BuzzComment
 } from '../services/buzzRtdbService';
 import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { dispatchNotification } from '../services/notifyHub';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { Star, AlertCircle } from 'lucide-react';
@@ -170,6 +170,63 @@ export default function StudentBuzz({
       onActiveChatChange(!!activeGroupId);
     }
   }, [activeGroupId, onActiveChatChange]);
+
+  // Chat wallpaper: three looks, switchable from the group info panel and
+  // remembered per student (device localStorage first, Firestore doc second
+  // so the choice follows the student to another device).
+  const BUZZ_WALLPAPERS: { key: string; name: string; chat: string; preview: string; pattern?: React.CSSProperties }[] = [
+    {
+      key: 'classic',
+      name: 'Classic',
+      chat: 'bg-white',
+      preview: 'bg-white border border-slate-200'
+    },
+    {
+      key: 'emerald',
+      name: 'Emerald',
+      chat: 'bg-white',
+      preview: 'bg-white',
+      pattern: {
+        backgroundImage: 'radial-gradient(rgba(13,148,136,0.13) 1.3px, transparent 1.7px), linear-gradient(140deg, #ccfbf1 0%, #f0fdfa 42%, #a7f3d0 100%)',
+        backgroundSize: '20px 20px, 100% 100%'
+      }
+    },
+    {
+      key: 'midnight',
+      name: 'Midnight',
+      chat: 'bg-slate-950',
+      preview: 'bg-slate-950',
+      pattern: {
+        backgroundImage: 'radial-gradient(rgba(255,255,255,0.07) 1.3px, transparent 1.7px), linear-gradient(140deg, #020617 0%, #052e23 52%, #1e1b4b 100%)',
+        backgroundSize: '24px 24px, 100% 100%'
+      }
+    }
+  ];
+  const buzzWallpaperKey = (k: string | null) => (BUZZ_WALLPAPERS.find(w => w.key === k)?.key || 'classic');
+  const [buzzWallpaper, setBuzzWallpaper] = useState<string>(() => {
+    try { return buzzWallpaperKey(localStorage.getItem('ciya_buzz_wallpaper')); } catch (e) { return 'classic'; }
+  });
+  const isDarkBuzzWallpaper = buzzWallpaper === 'midnight';
+  const activeWallpaper = BUZZ_WALLPAPERS.find(w => w.key === buzzWallpaper) || BUZZ_WALLPAPERS[0];
+
+  // Cross-device restore: a saved Firestore choice wins only when this device
+  // has never picked one of its own.
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    try {
+      if (localStorage.getItem('ciya_buzz_wallpaper')) return;
+    } catch (e) { return; }
+    const saved = (userProfile as any)?.buzzWallpaper;
+    if (saved) setBuzzWallpaper(buzzWallpaperKey(String(saved)));
+  }, [currentUser?.uid, (userProfile as any)?.buzzWallpaper]);
+
+  const changeBuzzWallpaper = (key: string) => {
+    setBuzzWallpaper(buzzWallpaperKey(key));
+    try { localStorage.setItem('ciya_buzz_wallpaper', buzzWallpaperKey(key)); } catch (e) {}
+    if (currentUser?.uid) {
+      updateDoc(doc(db, 'users', currentUser.uid), { buzzWallpaper: buzzWallpaperKey(key) }).catch(() => {});
+    }
+  };
 
   // Messages & RTDB stream
   const [messages, setMessages] = useState<BuzzMessage[]>([]);
@@ -1417,11 +1474,47 @@ export default function StudentBuzz({
                         </button>
                       </div>
                     </div>
-                    <div className="p-4 sm:p-5 overflow-y-auto space-y-2">
+                    <div className="p-4 sm:p-5 overflow-y-auto space-y-3">
                       <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">About this group</p>
                       <p className="text-sm font-medium text-slate-700 whitespace-pre-wrap break-words leading-relaxed">
                         {activeGroup?.description?.trim() ? activeGroup.description : 'No description for this group yet.'}
                       </p>
+
+                      {/* Chat wallpaper picker */}
+                      <div className="border-t border-slate-100 pt-3">
+                        <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3 text-emerald-500" /> Chat wallpaper
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {BUZZ_WALLPAPERS.map((wp) => {
+                            const active = buzzWallpaper === wp.key;
+                            return (
+                              <button
+                                key={wp.key}
+                                type="button"
+                                onClick={() => changeBuzzWallpaper(wp.key)}
+                                className={`rounded-xl p-1 border-2 transition-all cursor-pointer flex flex-col items-center gap-1 bg-transparent ${
+                                  active ? 'border-emerald-500 shadow-md shadow-emerald-500/20' : 'border-transparent hover:border-emerald-300'
+                                }`}
+                              >
+                                <span
+                                  className={`relative w-full h-14 rounded-lg block overflow-hidden ${wp.preview}`}
+                                  style={wp.pattern}
+                                >
+                                  {active && (
+                                    <span className="absolute inset-0 flex items-center justify-center">
+                                      <span className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg">
+                                        <Check className="w-3.5 h-3.5" />
+                                      </span>
+                                    </span>
+                                  )}
+                                </span>
+                                <span className={`text-[10px] font-bold ${active ? 'text-emerald-600' : 'text-slate-500'}`}>{wp.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                 </>
@@ -1430,14 +1523,17 @@ export default function StudentBuzz({
           </div>
 
           {/* Messages Stream Container */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-white relative">
+          <div
+            className={`flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 relative ${activeWallpaper.chat}`}
+            style={activeWallpaper.pattern}
+          >
             {loadingMessages ? (
               <div className="py-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-7 h-7 animate-spin text-emerald-600" />
                 <span className="text-xs font-medium">Loading messages...</span>
               </div>
             ) : messages.length === 0 ? (
-              <div className="py-16 text-center text-slate-500 space-y-1.5">
+              <div className={`py-16 text-center space-y-1.5 ${isDarkBuzzWallpaper ? 'text-slate-300' : 'text-slate-500'}`}>
                 <MessageSquare className="w-8 h-8 mx-auto text-slate-300" />
                 <div className="font-bold text-slate-700 text-sm">No messages yet</div>
                 <p className="text-xs text-slate-400">
